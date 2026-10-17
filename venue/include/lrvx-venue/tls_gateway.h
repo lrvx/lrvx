@@ -54,10 +54,15 @@ inline SSL_CTX* serverCtx()
   X509_gmtime_adj(X509_getm_notBefore(x), 0);
   X509_gmtime_adj(X509_getm_notAfter(x), 31536000L);
   X509_set_pubkey(x, pkey);
-  X509_NAME* name = X509_get_subject_name(x);
+  // The subject is built on its own and set, not edited through the
+  // certificate's getter: OpenSSL 4 hands that name out const. The setters
+  // copy it, so the local is freed here.
+  X509_NAME* name = X509_NAME_new();
   X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
                              reinterpret_cast<const unsigned char*>("localhost"), -1, -1, 0);
+  X509_set_subject_name(x, name);
   X509_set_issuer_name(x, name);
+  X509_NAME_free(name);
   X509_sign(x, pkey, EVP_sha256());
   SSL_CTX_use_certificate(ctx, x);
   SSL_CTX_use_PrivateKey(ctx, pkey);

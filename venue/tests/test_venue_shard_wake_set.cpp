@@ -529,9 +529,14 @@ TEST(VenueShardWakeSet, ParkUntilWithAPastDeadlineReturnsAtOnce)
 TEST(VenueShardWakeSet, ParkUntilStillWakesOnASubmitBeforeTheDeadline)
 {
   Driver driver;
-  // A cadence far enough out that a wake-up arriving on it would be obvious,
-  // and with no holds open there is nothing for the sweep to submit.
-  driver.runWithCadence(/*cadenceNs=*/200'000'000);
+  // The cadence is pushed out the way the net is, and kept under the net so
+  // the deadline is what bounds each sleep. A submit that only got through on
+  // the deadline would then hold its round for the whole cadence, well past
+  // the spin budget, and the round fails on that rather than on a wall-clock
+  // figure for the run that a loaded runner is free to miss. With no holds
+  // open there is nothing for the sweep itself to submit.
+  constexpr auto kCadence = duration_cast<milliseconds>(Driver::kFarNet) / 2;
+  driver.runWithCadence(duration_cast<nanoseconds>(kCadence).count());
 
   constexpr int kRounds = 20;
   const auto t0 = steady_clock::now();
@@ -546,9 +551,12 @@ TEST(VenueShardWakeSet, ParkUntilStillWakesOnASubmitBeforeTheDeadline)
   }
   const auto elapsed = duration_cast<milliseconds>(steady_clock::now() - t0);
 
-  std::printf("%d submits under a 200 ms cadence: %lld ms total\n", kRounds,
+  // Every round came back inside its spin budget, so no wake-up rode the
+  // deadline; the total is bounded by one cadence for the same reason.
+  std::printf("%d submits under a %lld ms cadence: %lld ms total\n", kRounds,
+              static_cast<long long>(kCadence.count()),
               static_cast<long long>(elapsed.count()));
-  EXPECT_LT(elapsed, milliseconds(600)) << "submits were waiting for the cadence deadline";
+  EXPECT_LT(elapsed, kCadence) << "submits were waiting for the cadence deadline";
   driver.shutdown();
 }
 
