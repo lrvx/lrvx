@@ -4,7 +4,12 @@
 # generate them; pass -DLRVX_RUN_CONNECTOR_INTEGRATION_TESTS=ON to
 # also register them with ctest.
 
-find_package(GTest REQUIRED)
+# Same guard tests/CMakeLists.txt uses: with LRVX_FETCH_GTEST=ON the targets
+# already exist, and an unconditional find_package fails the configure on a
+# machine with no system GoogleTest.
+if(NOT TARGET GTest::gtest)
+  find_package(GTest REQUIRED)
+endif()
 
 option(LRVX_RUN_CONNECTOR_INTEGRATION_TESTS
        "Register connector integration tests with ctest" OFF)
