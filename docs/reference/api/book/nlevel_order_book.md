@@ -48,7 +48,7 @@ public:
 
 | Aspect      | Details                                                                    |
 | ----------- | -------------------------------------------------------------------------- |
-| Input       | Consumes `BookUpdateEvent` messages, supports both `SNAPSHOT` and `DELTA`. |
+| Input       | Consumes `BookUpdateEvent` messages, supports both `SNAPSHOT` and `DELTA`. `TOP_OF_BOOK` frames are ignored: they carry the touch, not the book. |
 | Resolution  | Tick-based price quantization via `_tickSize`.                             |
 | Depth Query | Provides `bestBid`, `bestAsk`, and `Quantity` at arbitrary price levels.   |
 | Storage     | Preallocated arrays for bids and asks indexed by tick-level offset.        |

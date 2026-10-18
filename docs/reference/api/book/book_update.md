@@ -7,7 +7,8 @@ It supports multiple instrument classes (spot, futures, options) and includes op
 enum class BookUpdateType
 {
   SNAPSHOT,
-  DELTA
+  DELTA,
+  TOP_OF_BOOK
 };
 
 struct BookLevel
@@ -48,7 +49,7 @@ struct BookUpdate
 | ---------------- | ---------------------------------------------------------------- |
 | **symbol**       | Unique `SymbolId` of the instrument.                             |
 | **instrument**   | `Spot`, `Future`, or `Option`.                                   |
-| **type**         | `SNAPSHOT` (full overwrite) or `DELTA` (incremental change).     |
+| **type**         | `SNAPSHOT` (full overwrite), `DELTA` (incremental change), or `TOP_OF_BOOK` (one-level refresh of the touch; an empty side means that side is empty). |
 | **bids / asks**  | Depth updates stored in PMR vectors (`BookLevel`).               |
 | **exchangeTsNs** | Exchange timestamp in nanoseconds since Unix epoch.              |
 | **systemTsNs**   | Local system receive time in nanoseconds, for latency metrics.   |

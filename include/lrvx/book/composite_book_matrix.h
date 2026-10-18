@@ -90,18 +90,21 @@ class CompositeBookMatrix : public IMarketDataSubscriber
 
     // A SNAPSHOT replaces both sides wholesale, so a side that is empty in
     // the update really is empty (e.g. no bids left) and must be published
-    // as such. A DELTA only carries the side(s) that changed (a typical
-    // Bybit delta touches only bids or only asks); a side absent from the
-    // delta must be left exactly as it was, not zeroed out. Zeroing the
-    // untouched side used to make one exchange's ask (or bid) vanish from
-    // cross-venue comparison on every bid-only (or ask-only) delta.
-    const bool isSnapshot = ev.update.type == BookUpdateType::SNAPSHOT;
-    if (isSnapshot || hasBidLevel)
+    // as such. TOP_OF_BOOK makes the same promise about the touch: it is
+    // the venue's complete word on the best bid/ask, so an empty side means
+    // that side of the book is empty. A DELTA only carries the side(s) that
+    // changed (a typical Bybit delta touches only bids or only asks); a
+    // side absent from the delta must be left exactly as it was, not zeroed
+    // out. Zeroing the untouched side used to make one exchange's ask (or
+    // bid) vanish from cross-venue comparison on every bid-only (or
+    // ask-only) delta.
+    const bool replacesSides = ev.update.type != BookUpdateType::DELTA;
+    if (replacesSides || hasBidLevel)
     {
       exState.bidPrice.store(bestBidPrice, std::memory_order_release);
       exState.bidQty.store(bestBidQty, std::memory_order_release);
     }
-    if (isSnapshot || hasAskLevel)
+    if (replacesSides || hasAskLevel)
     {
       exState.askPrice.store(bestAskPrice, std::memory_order_release);
       exState.askQty.store(bestAskQty, std::memory_order_release);
