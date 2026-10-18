@@ -27,6 +27,8 @@ struct SymbolContext
 | Field | Type | Description |
 |-------|------|-------------|
 | `book` | `NLevelOrderBook<512>` | Order book with 512 price levels |
+| `touchBid` / `touchAsk` | `std::optional<BookLevel>` | Freshest known top of book: mirrors the depth book's top after every `SNAPSHOT`/`DELTA` and is also refreshed by `TOP_OF_BOOK` frames the depth book ignores. Empty when that side has no quote |
+| `lastTouchNs` | `int64_t` | Exchange timestamp of the frame that last wrote the touch; separate from `lastUpdateNs`, which stamps dispatched events |
 | `position` | `Quantity` | Net position (positive=long, negative=short) |
 | `avgEntryPrice` | `std::optional<Price>` | Volume-weighted average entry price, empty when the attached position manager reports none |
 | `lastTradePrice` | `Price` | Most recent trade price |
@@ -42,6 +44,14 @@ std::optional<Price> mid() const noexcept;
 ```
 
 Returns midpoint between best bid and ask. Returns `nullopt` if either side is missing.
+
+### Touch Mid
+
+```cpp
+std::optional<Price> touchMid() const noexcept;
+```
+
+Mid of the freshest known touch. `mid()` answers from the depth book and moves at depth-frame cadence; this one also moves on `TOP_OF_BOOK` frames.
 
 ### Book Spread
 

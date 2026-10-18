@@ -484,6 +484,66 @@ TEST_F(MultiSymbolStrategyTest, TopOfBookFramesDoNotReachTheStrategy)
   EXPECT_EQ(strategy.ctx(1).book.bestBid(), Price::fromDouble(100.0));
 }
 
+TEST_F(MultiSymbolStrategyTest, TouchFollowsEveryFrameKind)
+{
+  SymbolRegistry registry;
+  populateRegistry(registry, {1});
+  TestStrategy strategy({1}, registry);
+
+  // A snapshot seeds the touch from the applied book's top.
+  BookUpdateEvent snap(&_resource);
+  snap.update.symbol = 1;
+  snap.update.type = BookUpdateType::SNAPSHOT;
+  snap.update.exchangeTsNs = UnixNanos::fromRaw(1'000);
+  snap.update.bids.emplace_back(Price::fromDouble(100.0), Quantity::fromDouble(2.0));
+  snap.update.asks.emplace_back(Price::fromDouble(101.0), Quantity::fromDouble(1.0));
+  strategy.onBookUpdate(snap);
+
+  const auto& c = strategy.ctx(1);
+  ASSERT_TRUE(c.touchBid.has_value());
+  ASSERT_TRUE(c.touchAsk.has_value());
+  EXPECT_EQ(c.touchBid->price, Price::fromDouble(100.0));
+  EXPECT_EQ(c.touchAsk->price, Price::fromDouble(101.0));
+  EXPECT_EQ(c.lastTouchNs, 1'000);
+
+  // A TOP_OF_BOOK frame moves the touch — and only the touch: the depth
+  // book, lastUpdateNs and the dispatch count stay put.
+  BookUpdateEvent top(&_resource);
+  top.update.symbol = 1;
+  top.update.type = BookUpdateType::TOP_OF_BOOK;
+  top.update.exchangeTsNs = UnixNanos::fromRaw(2'000);
+  top.update.bids.emplace_back(Price::fromDouble(100.4), Quantity::fromDouble(5.0));
+  top.update.asks.emplace_back(Price::fromDouble(100.6), Quantity::fromDouble(4.0));
+  strategy.onBookUpdate(top);
+
+  EXPECT_EQ(strategy.bookCount, 1);
+  EXPECT_EQ(c.lastUpdateNs, 1'000);
+  EXPECT_EQ(c.book.bestBid(), Price::fromDouble(100.0));
+  ASSERT_TRUE(c.touchBid.has_value());
+  EXPECT_EQ(c.touchBid->price, Price::fromDouble(100.4));
+  EXPECT_EQ(c.touchBid->quantity, Quantity::fromDouble(5.0));
+  EXPECT_EQ(c.touchAsk->price, Price::fromDouble(100.6));
+  EXPECT_EQ(c.lastTouchNs, 2'000);
+
+  auto tmid = c.touchMid();
+  ASSERT_TRUE(tmid.has_value());
+  EXPECT_EQ(*tmid, Price::fromDouble(100.5));
+
+  // An ask-only touch empties the bid side: the frame is the venue's
+  // complete word on the touch.
+  BookUpdateEvent askOnly(&_resource);
+  askOnly.update.symbol = 1;
+  askOnly.update.type = BookUpdateType::TOP_OF_BOOK;
+  askOnly.update.exchangeTsNs = UnixNanos::fromRaw(3'000);
+  askOnly.update.asks.emplace_back(Price::fromDouble(100.7), Quantity::fromDouble(1.0));
+  strategy.onBookUpdate(askOnly);
+
+  EXPECT_FALSE(c.touchBid.has_value());
+  ASSERT_TRUE(c.touchAsk.has_value());
+  EXPECT_EQ(c.touchAsk->price, Price::fromDouble(100.7));
+  EXPECT_FALSE(c.touchMid().has_value());
+}
+
 class PositionTrackerTest : public ::testing::Test
 {
 };

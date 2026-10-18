@@ -23,6 +23,16 @@ struct SymbolContext
   static constexpr size_t kDefaultBookLevels = 512;
 
   NLevelOrderBook<kDefaultBookLevels> book;
+
+  // Freshest known top of book, whichever frame kind carried it: depth
+  // frames refresh it from the applied book, TOP_OF_BOOK — which the depth
+  // book ignores — refreshes only this. Empty: no quote on that side.
+  std::optional<BookLevel> touchBid{};
+  std::optional<BookLevel> touchAsk{};
+  // Stamp of the frame that last wrote the touch. Separate from
+  // lastUpdateNs, which stamps events the strategy was dispatched for.
+  int64_t lastTouchNs{0};
+
   Quantity position{};
   // Empty when the attached position manager reports no cost basis: the
   // position is flat, or the manager keeps none. This used to be a plain
@@ -45,6 +55,17 @@ struct SymbolContext
       return std::nullopt;
     }
     return Price::fromRaw((bid->raw() + ask->raw()) / 2);
+  }
+
+  // Mid of the freshest known touch; unlike mid(), moves on TOP_OF_BOOK
+  // frames too.
+  [[nodiscard]] std::optional<Price> touchMid() const noexcept
+  {
+    if (!touchBid || !touchAsk)
+    {
+      return std::nullopt;
+    }
+    return Price::fromRaw((touchBid->price.raw() + touchAsk->price.raw()) / 2);
   }
 
   [[nodiscard]] std::optional<Price> bookSpread() const noexcept
@@ -96,6 +117,9 @@ struct SymbolContext
   void reset() noexcept
   {
     book.clear();
+    touchBid.reset();
+    touchAsk.reset();
+    lastTouchNs = 0;
     position = Quantity{};
     avgEntryPrice.reset();
     lastTradePrice = Price{};
