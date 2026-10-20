@@ -181,11 +181,21 @@ endif()
 # Try the three discovery methods used in the core build (vcpkg, brew/Linux
 # system, pkg-config) and link whichever one matches.
 set(LRVX_NODE_LZ4_FOUND OFF)
+# The config's target name follows the packager (lz4::lz4 from vcpkg; LZ4::lz4
+# over the _shared/_static pair from lz4's own CMake build, which is what
+# Homebrew installs), so it is picked by existence, as the core build does.
 find_package(lz4 CONFIG QUIET)
-if(lz4_FOUND)
-  target_link_libraries(lrvx_node lz4::lz4)
+set(LRVX_NODE_LZ4_TARGET "")
+foreach(_lrvx_lz4_candidate lz4::lz4 LZ4::lz4 LZ4::lz4_shared LZ4::lz4_static)
+  if(TARGET ${_lrvx_lz4_candidate})
+    set(LRVX_NODE_LZ4_TARGET ${_lrvx_lz4_candidate})
+    break()
+  endif()
+endforeach()
+if(LRVX_NODE_LZ4_TARGET)
+  target_link_libraries(lrvx_node ${LRVX_NODE_LZ4_TARGET})
   set(LRVX_NODE_LZ4_FOUND ON)
-  message(STATUS "lrvx_node: LZ4 via find_package")
+  message(STATUS "lrvx_node: LZ4 via find_package: ${LRVX_NODE_LZ4_TARGET}")
 else()
   find_library(LZ4_LIBRARY NAMES lz4)
   find_path(LZ4_INCLUDE_DIR NAMES lz4.h)

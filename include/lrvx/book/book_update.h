@@ -21,7 +21,14 @@ namespace lrvx
 enum class BookUpdateType
 {
   SNAPSHOT,
-  DELTA
+  DELTA,
+  // One-level refresh of the touch (an exchange bbo stream between throttled
+  // depth snapshots). Carries the best bid/ask only, and an empty side means
+  // that side of the book is genuinely empty. The cross-venue matrix
+  // consumes it like a snapshot of the touch; a depth book must ignore it —
+  // merging it as a delta would strand a stale better level when the top
+  // moves away, replacing like a snapshot would drop the depth.
+  TOP_OF_BOOK
 };
 
 struct BookLevel

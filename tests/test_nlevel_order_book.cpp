@@ -64,6 +64,28 @@ TEST_F(NLevelOrderBookTest, AppliesSnapshotCorrectly)
   EXPECT_EQ(book.askAtPrice(Price::fromDouble(102.0)), Quantity::fromDouble(3.0));
 }
 
+TEST_F(NLevelOrderBookTest, IgnoresTopOfBookFrames)
+{
+  auto snap = makeSnapshot({{Price::fromDouble(100.0), Quantity::fromDouble(2.0)},
+                            {Price::fromDouble(99.0), Quantity::fromDouble(1.0)}},
+                           {{Price::fromDouble(101.0), Quantity::fromDouble(1.5)}});
+  book.applyBookUpdate(*snap);
+
+  // A TOP_OF_BOOK frame carries the touch, not the book: merged as a delta
+  // it would strand 100.0 as a stale best when the top moved to 99.5,
+  // applied as a snapshot it would drop the depth. The book must change
+  // nothing.
+  auto top = makeSnapshot({{Price::fromDouble(99.5), Quantity::fromDouble(4.0)}},
+                          {{Price::fromDouble(100.5), Quantity::fromDouble(1.0)}});
+  top->update.type = BookUpdateType::TOP_OF_BOOK;
+  book.applyBookUpdate(*top);
+
+  EXPECT_EQ(book.bestBid(), Price::fromDouble(100.0));
+  EXPECT_EQ(book.bestAsk(), Price::fromDouble(101.0));
+  EXPECT_EQ(book.bidAtPrice(Price::fromDouble(99.0)), Quantity::fromDouble(1.0));
+  EXPECT_EQ(book.bidAtPrice(Price::fromDouble(99.5)), Quantity::fromDouble(0.0));
+}
+
 TEST_F(NLevelOrderBookTest, AppliesDeltaCorrectly)
 {
   auto snap = makeSnapshot({{Price::fromDouble(100.0), Quantity::fromDouble(1.0)}},

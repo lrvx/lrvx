@@ -299,6 +299,14 @@ class NLevelOrderBook : public IOrderBook
   {
     const auto& up = ev.update;
 
+    // The touch, not the book (see BookUpdateType). Levels this book holds
+    // behind the touch are still valid, so there is nothing a depth book
+    // can safely do with one-level frames; it keeps tracking the depth feed.
+    if (up.type == BookUpdateType::TOP_OF_BOOK)
+    {
+      return;
+    }
+
     if (up.type == BookUpdateType::SNAPSHOT)
     {
       int64_t minIdx = std::numeric_limits<int64_t>::max();

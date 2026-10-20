@@ -453,6 +453,37 @@ TEST_F(MultiSymbolStrategyTest, SpreadCalculation)
   EXPECT_NEAR(spreadOpt->toDouble(), 50.0, 0.5);
 }
 
+TEST_F(MultiSymbolStrategyTest, TopOfBookFramesDoNotReachTheStrategy)
+{
+  SymbolRegistry registry;
+  populateRegistry(registry, {1});
+  TestStrategy strategy({1}, registry);
+
+  BookUpdateEvent snap(&_resource);
+  snap.update.symbol = 1;
+  snap.update.type = BookUpdateType::SNAPSHOT;
+  snap.update.exchangeTsNs = UnixNanos::fromRaw(1'000);
+  snap.update.bids.emplace_back(Price::fromDouble(100.0), Quantity::fromDouble(1.0));
+  snap.update.asks.emplace_back(Price::fromDouble(101.0), Quantity::fromDouble(1.0));
+  strategy.onBookUpdate(snap);
+  ASSERT_EQ(strategy.bookCount, 1);
+
+  // The context's depth book ignores TOP_OF_BOOK, so the strategy must not
+  // be called either: onSymbolBook would see the previous snapshot's top,
+  // and lastUpdateNs would claim that stale top is as fresh as the touch.
+  BookUpdateEvent top(&_resource);
+  top.update.symbol = 1;
+  top.update.type = BookUpdateType::TOP_OF_BOOK;
+  top.update.exchangeTsNs = UnixNanos::fromRaw(2'000);
+  top.update.bids.emplace_back(Price::fromDouble(100.5), Quantity::fromDouble(2.0));
+  top.update.asks.emplace_back(Price::fromDouble(100.6), Quantity::fromDouble(2.0));
+  strategy.onBookUpdate(top);
+
+  EXPECT_EQ(strategy.bookCount, 1);
+  EXPECT_EQ(strategy.ctx(1).lastUpdateNs, 1'000);
+  EXPECT_EQ(strategy.ctx(1).book.bestBid(), Price::fromDouble(100.0));
+}
+
 class PositionTrackerTest : public ::testing::Test
 {
 };

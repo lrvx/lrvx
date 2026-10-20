@@ -403,14 +403,31 @@ else()
 endif()
 
 option(LRVX_ENABLE_LZ4 "Enable LZ4 compression for binary logs" ON)
+# The imported target lrvx was linked against when lz4 came from a config
+# package; lrvxConfig.cmake.in re-finds that package for consumers, since the
+# export file names the target and nothing else defines it. Empty for every
+# other way of getting lz4, and with LZ4 off.
+set(LRVX_LZ4_TARGET "")
 if(LRVX_ENABLE_LZ4)
-  # Try find_package first (works with vcpkg on Windows)
+  # Try find_package first. Which target the config defines depends on who
+  # packaged it: vcpkg exports lz4::lz4; lz4's own CMake build, which Homebrew
+  # installs the package files from, exports LZ4::lz4 over LZ4::lz4_shared and
+  # LZ4::lz4_static and nothing in lower case. lz4_FOUND only says a config
+  # was read, so the target is picked by existence, and a config that defines
+  # none of these falls through to the lookups below instead of failing the
+  # generate step on a name that was never there.
   find_package(lz4 CONFIG QUIET)
-  if(lz4_FOUND)
-    target_link_libraries(${LRVX} PUBLIC lz4::lz4)
-    message(STATUS "LZ4 found via find_package")
+  foreach(_lrvx_lz4_candidate lz4::lz4 LZ4::lz4 LZ4::lz4_shared LZ4::lz4_static)
+    if(TARGET ${_lrvx_lz4_candidate})
+      set(LRVX_LZ4_TARGET ${_lrvx_lz4_candidate})
+      break()
+    endif()
+  endforeach()
+  if(LRVX_LZ4_TARGET)
+    target_link_libraries(${LRVX} PUBLIC ${LRVX_LZ4_TARGET})
+    message(STATUS "LZ4 found via find_package: ${LRVX_LZ4_TARGET}")
   else()
-    # Try find_library (works with brew on macOS)
+    # Try find_library (a system lz4 that ships no package files)
     find_library(LZ4_LIBRARY NAMES lz4)
     find_path(LZ4_INCLUDE_DIR NAMES lz4.h)
     if(LZ4_LIBRARY AND LZ4_INCLUDE_DIR)

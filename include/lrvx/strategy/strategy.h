@@ -145,6 +145,16 @@ class Strategy : public IStrategy
       return;
     }
 
+    // Same rule as the depth book itself (see BookUpdateType): a
+    // TOP_OF_BOOK frame carries the touch, not the book. The context's book
+    // ignores it, so dispatching onSymbolBook here would hand the strategy
+    // the previous snapshot's top at touch rate — with lastUpdateNs
+    // claiming it is fresh.
+    if (ev.update.type == BookUpdateType::TOP_OF_BOOK)
+    {
+      return;
+    }
+
     std::lock_guard<SymbolLock> owned(lockFor(sym));
     auto& c = _contexts[sym];
     c.book.applyBookUpdate(ev);

@@ -1,3 +1,15 @@
 @PACKAGE_INIT@
 
+# lrvx links lz4 PUBLIC, so lrvxTargets.cmake names it among lrvx::lrvx's
+# interface link libraries. When that name is a config package's imported
+# target (vcpkg's lz4::lz4, or LZ4::lz4 from lz4's own CMake build), the
+# target has to exist before the export file is read, or the consumer's
+# generate step fails on a name nothing defined. A library path from
+# find_library or pkg-config, or the vendored sources, need nothing here.
+set(LRVX_LZ4_TARGET "@LRVX_LZ4_TARGET@")
+if(LRVX_LZ4_TARGET)
+  include(CMakeFindDependencyMacro)
+  find_dependency(lz4 CONFIG)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/lrvxTargets.cmake")
