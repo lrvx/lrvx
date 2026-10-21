@@ -768,6 +768,7 @@ class EventTypeStatsAggregator(_AggregatorHandle):
         Structured numpy array with fields (symbol_id u4, trades u8, book_snapshots u8, book_deltas u8). Sorted by symbol_id ascending. Empty until DataReader.run() has called finalize().
         """
 class ExchangeCapabilities:
+    batch_submit: bool
     close_position: bool
     fok: bool
     gtc: bool

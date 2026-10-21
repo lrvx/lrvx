@@ -671,6 +671,7 @@ struct ExecutorHost
     out->supports_post_only = getBool("postOnly");
     out->supports_reduce_only = getBool("reduceOnly");
     out->supports_close_position = getBool("closePosition");
+    out->supports_batch_submit = getBool("batchSubmit");
   }
   static void onStartBridge(void* ud)
   {

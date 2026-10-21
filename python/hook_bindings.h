@@ -169,6 +169,7 @@ struct PyExchangeCapabilities
   bool post_only{false};
   bool reduce_only{false};
   bool close_position{false};
+  bool batch_submit{false};
 };
 
 inline LrvxExchangeCapabilities cCapsFromPy(const PyExchangeCapabilities& p)
@@ -188,6 +189,7 @@ inline LrvxExchangeCapabilities cCapsFromPy(const PyExchangeCapabilities& p)
   c.supports_post_only = p.post_only ? 1 : 0;
   c.supports_reduce_only = p.reduce_only ? 1 : 0;
   c.supports_close_position = p.close_position ? 1 : 0;
+  c.supports_batch_submit = p.batch_submit ? 1 : 0;
   return c;
 }
 
@@ -208,6 +210,7 @@ inline PyExchangeCapabilities pyCapsFromC(const LrvxExchangeCapabilities& c)
   p.post_only = c.supports_post_only != 0;
   p.reduce_only = c.supports_reduce_only != 0;
   p.close_position = c.supports_close_position != 0;
+  p.batch_submit = c.supports_batch_submit != 0;
   return p;
 }
 
@@ -1344,7 +1347,8 @@ class PyExecutorCxxAdapter : public lrvx::IOrderExecutor
       out.supportsGTD = pc.gtd;
       out.supportsPostOnly = pc.post_only;
       out.supportsReduceOnly = pc.reduce_only;
-      out.supportsClosePosition = pc.close_position; });
+      out.supportsClosePosition = pc.close_position;
+      out.supportsBatchSubmit = pc.batch_submit; });
     return out;
   }
 
