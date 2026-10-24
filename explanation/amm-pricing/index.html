@@ -1,0 +1,2715 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/explanation/amm-pricing/">
+      
+      
+        <link rel="prev" href="../position-valuation/">
+      
+      
+        <link rel="next" href="../market-making-quoter/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>AMM pricing in backtests - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#amm-pricing-in-backtests" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              AMM pricing in backtests
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clock-domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clock Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disruptor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disruptor Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../memory-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-state-ownership/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol strategy state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-control-plane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../per-symbol-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../order-book-tick-window/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order book tick window
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../onchain-order-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    On-chain order lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../liquidity-provision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Liquidity-provision signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../position-valuation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Position valuation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM pricing in backtests
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM pricing in backtests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#exact-in-native-wei-integers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact, in native-wei integers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-curve-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The curve interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constant-product" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constant product
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stableswap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stableswap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cryptoswap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cryptoswap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cryptoswap-repegging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cryptoswap repegging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#weighted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weighted
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concentrated-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concentrated liquidity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-raydium-constant-product" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Raydium constant product
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-orca-whirlpool-concentrated-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Orca Whirlpool concentrated liquidity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-whirlpool-adaptive-fee" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Whirlpool adaptive fee
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-raydium-clmm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Raydium CLMM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-meteora-dlmm-discrete-bins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Meteora DLMM (discrete bins)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-saber-stableswap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Saber StableSwap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#token-2022-transfer-fees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token-2022 transfer fees
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-connector-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The connector boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#replaying-a-pool-over-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replaying a pool over time
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-pool-state-tape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The pool-state tape
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#live-with-reorgs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live, with reorgs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-does-not-touch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it does not touch
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-making-quoter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market-making quoter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amm-dex-connector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM DEX connector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../replay-equivalence-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replay-equivalence gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-close-ordering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar-close ordering on tied timestamps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node-threaded-runner-lifetime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threaded Runner lifetime in Node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../javascript-value-boundary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The JavaScript value boundary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-stack-reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue-stack reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build/feature-flags/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build feature flags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../contributors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#exact-in-native-wei-integers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact, in native-wei integers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-curve-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The curve interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#constant-product" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constant product
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stableswap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stableswap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cryptoswap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cryptoswap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cryptoswap-repegging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cryptoswap repegging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#weighted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weighted
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concentrated-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concentrated liquidity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-raydium-constant-product" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Raydium constant product
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-orca-whirlpool-concentrated-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Orca Whirlpool concentrated liquidity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-whirlpool-adaptive-fee" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Whirlpool adaptive fee
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-raydium-clmm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Raydium CLMM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-meteora-dlmm-discrete-bins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Meteora DLMM (discrete bins)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#solana-saber-stableswap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solana: Saber StableSwap
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#token-2022-transfer-fees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token-2022 transfer fees
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-connector-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The connector boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#replaying-a-pool-over-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replaying a pool over time
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-pool-state-tape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The pool-state tape
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#live-with-reorgs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live, with reorgs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-does-not-touch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it does not touch
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="amm-pricing-in-backtests">AMM pricing in backtests<a class="headerlink" href="#amm-pricing-in-backtests" title="Permanent link">&para;</a></h1>
+<p>A central-limit-order-book backtest fills an order by walking price levels. An
+AMM venue has no book: a swap fills against the pool's balances, and the price
+it gets depends on the size of the swap relative to those balances. To backtest
+DEX execution honestly, the fill has to come from the pool curve.</p>
+<h2 id="exact-in-native-wei-integers">Exact, in native-wei integers<a class="headerlink" href="#exact-in-native-wei-integers" title="Permanent link">&para;</a></h2>
+<p>The deployed pool contracts compute in <code>uint256</code> over native token units (wei),
+with floor division and their own rounding. A double model of the same curve is
+close but never bit-exact: double rounds to nearest while the contract floors,
+and in a sequential backtest that small difference compounds. For anything
+touching real money against a real pool, the on-chain quote is the source of
+truth, so the curves here reproduce the contract's integer arithmetic and match
+it to the wei.</p>
+<p>The amounts are <code>u256</code>, an exact unsigned 256-bit integer, in the token's own
+units. There is no double approximation behind a curve. Converting to the
+engine's <code>Quantity</code> happens once, at the boundary where a curve result becomes
+an engine event, not on the curve itself.</p>
+<h2 id="the-curve-interface">The curve interface<a class="headerlink" href="#the-curve-interface" title="Permanent link">&para;</a></h2>
+<p><code>INTokenCurve</code> is the one curve interface. A pool holds tokens indexed
+<code>[0, tokenCount)</code> and prices a swap between an in-token <code>i</code> and an out-token <code>j</code>:
+<code>amountOut(i, j, amountIn)</code> returns the exact output, <code>applySwap</code> returns it and
+moves the pool, <code>balances()</code> exposes the composition, and <code>clone()</code> makes an
+independent copy for sizing a swap without disturbing the live pool. A two-token
+pool is just <code>n = 2</code>, so there is no separate two-token interface.</p>
+<h2 id="constant-product">Constant product<a class="headerlink" href="#constant-product" title="Permanent link">&para;</a></h2>
+<p><code>ConstantProductCurve</code> is a Uniswap V2 style pool: two reserves whose product
+stays constant across a swap, minus the fee. It reproduces <code>getAmountsOut</code> to
+the wei:</p>
+<div class="language-text highlight"><pre><span></span><code>inWithFee  = amountIn * feeNum
+amountOut  = inWithFee * reserveOut / (reserveIn * feeDen + inWithFee)
+</code></pre></div>
+<p>floored, in native units. The fee is given as a numerator and denominator, so
+one class covers the forks: Uniswap V2 and SushiSwap are 997/1000 (0.30%),
+PancakeSwap V2 is 9975/10000 (0.25%).</p>
+<p>Two consequences matter for a backtest. A larger swap gets a worse average rate,
+because it moves the reserves further. And the realized rate is below the
+marginal rate by an amount that grows with size: that gap is the price impact,
+and ignoring it makes a DEX strategy look more profitable than it is.</p>
+<h2 id="stableswap">Stableswap<a class="headerlink" href="#stableswap" title="Permanent link">&para;</a></h2>
+<p><code>StableSwapCurve</code> is a Curve stable pool (a 3pool of stablecoins), exact in
+integer. It blends constant-sum, for a flat one-for-one price near the peg, with
+constant-product, so the pool never empties, tuned by an amplification <code>A</code>. The
+balances are first normalized to a common scale by per-coin rates (3pool keeps
+DAI at 1e18 and lifts USDC and USDT by 1e12), and the invariant <code>D</code> and the
+output balance both come from integer Newton that stops when the step is within
+one unit, exactly as the contract does. The fee is taken on the output after the
+contract's defensive <code>-1</code>. <code>A * N</code> sets the amplification, the original
+StableSwap convention.</p>
+<p>One class covers 3pool and other plain stableswap pools: it is parameterized by
+the balances, the rates, <code>A</code>, and the fee, and <code>n</code> is the number of coins.</p>
+<h2 id="cryptoswap">Cryptoswap<a class="headerlink" href="#cryptoswap" title="Permanent link">&para;</a></h2>
+<p><code>CryptoswapCurve</code> is a Curve V2 pool (a tricrypto pool of volatile assets), exact
+in integer. It is a direct transcription of the contract's integer algorithm: the
+invariant <code>D</code> and the output balance come from the contract's Newton solvers, and
+the divisions floor exactly where the Vyper floors, so both the formula and the
+rounding match. The balances are normalized by per-coin precisions and an
+internal price scale, the amplification <code>A</code> and <code>gamma</code> come in their on-chain
+packing, and the fee is dynamic, taken on the output and computed from the
+post-swap balances so a lopsided pool charges more.</p>
+<p>This curve is the pricing surface, and it reproduces the live tricrypto2 get_dy
+to the wei. The price scale is a parameter held across a swap here; the internal
+repegging that moves the scale over time is a separate piece.</p>
+<h2 id="cryptoswap-repegging">Cryptoswap repegging<a class="headerlink" href="#cryptoswap-repegging" title="Permanent link">&para;</a></h2>
+<p><code>RepeggingCryptoswapPool</code> is a <code>CryptoswapCurve</code> whose price scale moves. On chain
+a Curve V2 pool re-centers its liquidity on the traded price, with no external
+oracle, when doing so pays for itself out of accumulated fees. <code>applySwap</code> runs
+the contract's <code>tweak_price</code> after the trade: it advances an EMA price oracle
+(through Balancer-style <code>halfpow</code>), updates the running fee profit and virtual
+price, and steps the price scale toward the oracle when the pool is far enough
+ahead, keeping the step only if it leaves the pool in profit. All in the
+contract's integer arithmetic, so the evolved scale, oracle, and profit match the
+chain. The pricing within a single swap is the exact <code>CryptoswapCurve</code>; this adds
+the state evolution across swaps.</p>
+<p>Each swap advances an internal clock by <code>dtPerSwap</code>, since the curve interface
+carries no wall-clock time; a backtest sets it to the spacing it wants between
+trades.</p>
+<h2 id="weighted">Weighted<a class="headerlink" href="#weighted" title="Permanent link">&para;</a></h2>
+<p><code>WeightedCurve</code> is a Balancer weighted pool of n assets, exact in integer. The
+output for swapping token i into token j is <code>balanceOut · (1 −
+(balanceIn/(balanceIn+amountInAfterFee))^(weightIn/weightOut))</code>, and the power
+goes through Balancer's own fixed-point <code>pow</code>, which is <code>exp(y · ln(x))</code> with
+signed fixed-point <code>ln</code> and <code>exp</code>. That signed math runs on <code>i256</code>, and the
+divisions truncate toward zero the way Solidity's <code>int256</code> does, so the rounding
+matches the contract. Equal weights reduce to constant-product, and the common
+integer exponents (1, 2, 4) take Balancer's fast paths without the transcendental.</p>
+<p><code>WeightedCurve</code> holds n balances, per-token scaling factors that carry native
+amounts into the 1e18 space the math works in, the normalized weights, and the
+swap fee.</p>
+<h2 id="concentrated-liquidity">Concentrated liquidity<a class="headerlink" href="#concentrated-liquidity" title="Permanent link">&para;</a></h2>
+<p><code>ConcentratedLiquidityCurve</code> is a Uniswap v3 style pool, exact in integer. The
+swap math is a transcription of the v3 SwapMath, SqrtPriceMath, and FullMath, so
+the Q64.96 sqrt-price steps and their up and down rounding match the contract. A
+swap walks the initialized ticks: within a range it is a single step on the
+active liquidity, and crossing an initialized tick changes the liquidity by that
+tick's liquidityNet. The state is the current sqrt price, the active liquidity,
+the fee, and the tick table; a large swap can cross several ticks, each on a
+different liquidity. It reproduces a v3 pool's QuoterV2 quote to the wei.</p>
+<p>A swap can be exact-input (spend a fixed input) or exact-output (take a fixed
+output), and the contract rounds the price the opposite way for each.
+<code>amountInForOutput</code> / <code>applySwapForOutput</code> are the exact-output side: the input
+needed to take a target output. Both branches are checked against live pool Swap
+logs -- the log carries the post sqrtPriceX96, so the curve replaying the swap must
+reproduce it -- and each reproduces its swaps to the wei.</p>
+<h2 id="solana-raydium-constant-product">Solana: Raydium constant product<a class="headerlink" href="#solana-raydium-constant-product" title="Permanent link">&para;</a></h2>
+<p>The exact-curve approach is not EVM-specific. <code>RaydiumCpCurve</code> is a Raydium
+constant-product pool on Solana, transcribed from its program
+(<code>CurveCalculator::swap_base_input</code>). The core is the same constant product as the
+EVM forks, <code>out = net * outVault / (inVault + net)</code> floored, but the fee handling
+is Raydium's, over a 1e6 denominator as a ceil-div. The trade fee comes off the
+input. The creator fee has two on-chain modes: on input, the trade and creator
+rates are summed and removed from the input in one ceil-div; on output, only the
+trade fee comes off the input and a ceil-div creator fee then comes off the
+swapped amount, so the user receives less than the pool releases. A pool with no
+creator fee, the common case, is identical either way.</p>
+<p>The two balances are the swappable reserves -- each vault's balance minus its
+accumulated protocol, fund, and creator fees, which is what the program feeds the
+curve. They move the way the program's result does: the input reserve grows by the
+input net of fees (the fee is set aside, not added to the reserve), and the output
+reserve falls by the full swapped amount. It is a separate class from
+<code>ConstantProductCurve</code>, sharing the formula but not the fee, and it implements the
+same <code>INTokenCurve</code> -- a Solana pool is just another curve, no interface change. It
+reproduces the program's own integer test vectors to the lamport.</p>
+<p>Solana state lives in account data rather than contract getters, and the programs
+have no quote view to ask, so a Solana curve is checked against the program's
+published test vectors and the protocol's off-chain SDK rather than a single
+on-chain call. The concentrated-liquidity Solana pools (Orca, Raydium) carry
+their own fixed-point and are separate transcriptions.</p>
+<h2 id="solana-orca-whirlpool-concentrated-liquidity">Solana: Orca Whirlpool concentrated liquidity<a class="headerlink" href="#solana-orca-whirlpool-concentrated-liquidity" title="Permanent link">&para;</a></h2>
+<p><code>OrcaWhirlpoolCurve</code> is an Orca Whirlpool, Solana's concentrated-liquidity pool.
+It is the Uniswap v3 swap math at a Q64.64 sqrt price instead of Q64.96, so it is
+a thin parameterization of <code>ConcentratedLiquidityCurve</code>, not a separate
+transcription: same delta and next-sqrt-price formulas, same tick walk, only the
+fixed-point unit and the min/max sqrt price change. The Whirlpool program writes
+<code>get_amount_delta_a</code> as one division over the full 256-bit numerator where v3
+nests two divisions, but those give the same result for every input
+(<code>ceil(ceil(a/b)/c) == ceil(a/(b·c))</code>, and the floor analogue), so the rounding is
+identical.</p>
+<p>The state is the current Q64.64 sqrt price, the active liquidity, the fee rate in
+hundredths of a basis point, and the table of initialized ticks. A swap within a
+range is one step on the active liquidity; a larger swap crosses ticks, each on a
+different liquidity, exactly as on chain. This models a static-fee Whirlpool, the
+common kind; the opt-in adaptive-fee extension (the program's volatility-tracking
+FeeRateManager) is a separate feature, not part of this curve, the same way the v3
+curve does not model v4 hooks.</p>
+<p>Validation is two-sided: the curve reproduces a faithful transcription of the
+program's swap to the unit on no-cross and tick-crossing cases, and a live
+Whirlpool read (the pool account plus its tick arrays, with each tick index
+converted to its sqrt price by the program's tick math) priced through the curve
+agrees with an independent Jupiter quote to a fraction of a basis point, the
+residual being the aggregator's cache lag, not the math.</p>
+<h2 id="solana-whirlpool-adaptive-fee">Solana: Whirlpool adaptive fee<a class="headerlink" href="#solana-whirlpool-adaptive-fee" title="Permanent link">&para;</a></h2>
+<p>A Whirlpool can opt into an adaptive fee, and <code>AdaptiveFeeWhirlpoolCurve</code> is the
+<code>OrcaWhirlpoolCurve</code> swap with it. The fee is no longer fixed: it rises with how far
+the price has moved across tick groups since a time-decayed reference, so the swap
+is priced per step. Each step is bounded to the next tick-group boundary so the fee
+is constant within it; a volatility accumulator updates as groups are crossed, and
+the step fee is the static fee plus an adaptive term quadratic in that accumulator.
+This is a transcription of the program's FeeRateManager and Oracle, minus the skip
+optimization (which bounds compute, not output, so omitting it is exact). The
+current tick and the swap timestamp come from the pool; the fee state -- the
+volatility accumulator and its reference, plus the constants -- comes from the
+pool's Oracle account.</p>
+<p>It is validated to the unit against the program's own pre-calculated fee-rate
+vector (the volatility-to-fee table), and the tick-group-bounded swap reduces
+exactly to the static <code>OrcaWhirlpoolCurve</code> when the adaptive control factor is zero
+(the program skips the bounding there), so the loop is anchored to a curve already
+checked against the chain. The full adaptive swap matches a faithful transcription
+of the program. Unlike the static curves, a live cross-check is weaker here: the
+volatility accumulator is time-dependent, so an aggregator's lagged state cannot be
+aligned -- the program's own vectors are the stronger gate.</p>
+<h2 id="solana-raydium-clmm">Solana: Raydium CLMM<a class="headerlink" href="#solana-raydium-clmm" title="Permanent link">&para;</a></h2>
+<p><code>RaydiumClmmCurve</code> is Raydium's concentrated-liquidity pool, the other large
+Solana CLMM. It is the same <code>ConcentratedLiquidityCurve</code> at Q64.64, a thin
+parameterization like the Whirlpool: Raydium's <code>get_delta_amount_0_unsigned</code>
+already uses the nested rounding the v3 core does, and its next-sqrt-price and 1e6
+fee match, so only the fixed-point unit and the maximum sqrt price differ from v3
+(and the maximum differs slightly from Orca's, because Raydium's tick math rounds
+the boundary differently). The standard fee-on-input pool is modelled; the
+fee-on-output path for transfer-fee mints and Token-2022 transfer fees are a
+separate boundary concern, not part of the curve.</p>
+<p>Validated to the unit against a faithful transcription of the program's swap on
+no-cross and tick-crossing cases. The live read differs from the Whirlpool only in
+the account layouts and the tick math constants (Raydium uses the Uniswap-style
+multiplicative tick table); the curve and its tick walk are the shared core.</p>
+<h2 id="solana-meteora-dlmm-discrete-bins">Solana: Meteora DLMM (discrete bins)<a class="headerlink" href="#solana-meteora-dlmm-discrete-bins" title="Permanent link">&para;</a></h2>
+<p><code>MeteoraDlmmCurve</code> is a Meteora DLMM (Liquidity Book) pool, and it is not a curve in
+the AMM sense: liquidity sits in discrete price bins, each a constant-sum segment at
+its own fixed price <code>(1 + bin_step/1e4)^id</code> in Q64.64, and a swap walks bins from the
+active one outward. The price is the program's Liquidity Book power -- a bit-
+decomposition with an inversion trick, an approximation of the real, so the bin
+price is the chain's value, not <code>1.001^id</code> exactly. Each bin fills constant-sum:
+output is <code>price * amount</code> or <code>amount / price</code> shifted by the Q64 scale.</p>
+<p>The fee is dynamic, like the Whirlpool adaptive fee: a base fee plus a variable fee
+quadratic in a volatility accumulator that grows as the swap crosses bins from a
+time-decayed reference. It is priced per bin -- the accumulator updates at each bin,
+and the fee comes off the input. This is a transcription of the program's quote for
+the dominant case: MM liquidity, exact-in, fee on input. Limit orders (a newer
+layer in each bin) and the fee-on-output mode are separate features, not modelled.</p>
+<p>Validated to the unit against a faithful transcription of the program's swap, and
+the bin prices match the program's Liquidity Book power exactly. As with the
+adaptive fee, a clean live cross-check is not the gate: the variable fee depends on
+the pool's volatility state, which is time-dependent, so a lagged aggregator cannot
+be aligned.</p>
+<h2 id="solana-saber-stableswap">Solana: Saber StableSwap<a class="headerlink" href="#solana-saber-stableswap" title="Permanent link">&para;</a></h2>
+<p>Saber is the Curve StableSwap on Solana, and it needs no new curve: it is a
+<code>StableSwapCurve</code>. The invariant is the same, the amplification is the same
+<code>Ann = A * N</code> convention (Saber's <code>ann = amp * N_COINS</code>), the output Newton and the
+defensive <code>dy = dest - y - 1</code> match, and a Saber pool is two coins with no rate
+scaling -- so it is a <code>StableSwapCurve</code> with identity rates and <code>n = 2</code>. Saber's
+fee is a numerator over a denominator rather than a fixed 1e10 scale; when the
+denominator divides 1e10, as Saber's powers of ten do, it maps onto the over-1e10
+fee exactly. So Saber pools are priced by the existing curve, validated to the
+unit against a transcription of Saber's <code>swap_to</code>, and read in the harness from
+Saber's packed (pre-Anchor) SwapInfo account and its two reserve vaults.</p>
+<h2 id="token-2022-transfer-fees">Token-2022 transfer fees<a class="headerlink" href="#token-2022-transfer-fees" title="Permanent link">&para;</a></h2>
+<p>A Solana mint can carry a transfer fee (the Token-2022 TransferFeeConfig
+extension), withheld on every transfer of that token. It changes the fill a swap
+delivers even when the pool curve is exact: the pool receives the input net of its
+transfer fee, and the user receives the output net of its transfer fee.
+<code>Token2022TransferFee</code> is that fee, exact per the program -- ceil(amount * basis
+points / 10000), capped at a maximum, with the rate the mint has in effect for the
+current epoch. <code>amountOutWithTransferFees</code> composes it with any curve: feed the
+pool the input net of its fee, take the curve output, and subtract the output
+token's fee. It is a boundary concern, parameterized by the mint's config, not a
+property of the curve, so it composes once and applies to every venue.</p>
+<h2 id="the-connector-boundary">The connector boundary<a class="headerlink" href="#the-connector-boundary" title="Permanent link">&para;</a></h2>
+<p><code>AmmDexConnector</code> presents one token pair of a pool as an order book the rest of
+the engine understands. It is the single place where native-wei u256 becomes the
+engine's <code>Quantity</code> and <code>Price</code>, using the two tokens' decimals. The connector
+prices its synthetic levels from the curve's <code>amountOut</code>, so the book reflects
+the real fill at depth. Where a backtest sources its pool state is the concern of
+the connector that drives the venue, not of the curve.</p>
+<p>The synthetic book is convenient for a strategy that reuses CEX book logic, but a
+fixed set of levels discretises away the curve's exactness -- the very thing the
+exact curves are for. So the connector also exposes the curve directly, as
+<code>IPoolQuoteView</code>: <code>quoteOut(amountIn, baseForQuote)</code> is the exact output for an
+arbitrary size with no book rounding, <code>reserves()</code> is the pool's exact composition
+(the virtual reserves for a concentrated pool), and <code>curve()</code> reaches venue-specific
+state a generic view cannot name -- a concentrated pool's sqrt price and liquidity,
+a stable pool's amplification. A DEX-native strategy (LP / MM accounting,
+impermanent loss, an exact-size taker swap) holds the view as a plain interface,
+never having to know the venue is a pool, and it always reflects the live curve as
+the replay applies swaps and checkpoints. The book stays as one optional view layered
+on top, not the only interface.</p>
+<h2 id="replaying-a-pool-over-time">Replaying a pool over time<a class="headerlink" href="#replaying-a-pool-over-time" title="Permanent link">&para;</a></h2>
+<p>A curve prices one state of a pool; a backtest needs the pool's state as it moved.
+<code>AmmPoolReplaySource</code> replays a recorded sequence of pool-state snapshots -- each a
+ready-to-price curve at a timestamp -- through an <code>AmmDexConnector</code>: at each
+snapshot it points the connector at that curve and republishes the synthetic book,
+stamped at the snapshot's time. Because a snapshot is just a curve, it is
+venue-agnostic -- the same driver replays a constant-product pool, a Whirlpool, or
+a Saber pool -- and it is reproducible, since the same snapshots replay
+identically. Where the snapshots come from (a recorded tape, a live account read)
+is the concern of whatever captured them; this is the engine-side glue that turns
+a pool's state-over-time into the book stream the rest of a backtest consumes.</p>
+<h2 id="the-pool-state-tape">The pool-state tape<a class="headerlink" href="#the-pool-state-tape" title="Permanent link">&para;</a></h2>
+<p>A pool-state tape records a pool's history as a delta log, not snapshots: a
+Descriptor (the venue and its static parameters), periodic Checkpoints (the full
+state), and the SwapDeltas that move it. A pool's state is <em>derived</em> by replaying
+the deltas through the exact curve -- a parsed swap replayed via <code>applySwap</code>
+reconstructs the post-state to the wei, which is what the exact curves are for -- so
+the tape is compact and a swap is both the trade and the state mutation, one stream.
+<code>PoolStateReplay</code> reads a tape and drives an <code>AmmDexConnector</code>: a Checkpoint rebuilds
+the curve, a SwapDelta is applied through <code>onSwap</code>. All amounts are u256, 32 bytes
+big-endian, chain-native.</p>
+<p>A Checkpoint is venue-shaped: reserves for a constant-product pool; the sqrt
+price, active liquidity, and tick array for a concentrated-liquidity pool (Uniswap
+v3, Orca Whirlpool, Raydium CLMM); the full balance vector for an n-token pool
+(StableSwap, Weighted -- Cryptoswap also carries its price scale, since the chain
+repegs it, so a repeg between checkpoints re-anchors rather than corrupts); and the
+bin book plus volatility-accumulator state for Meteora DLMM. The replay rebuilds
+the matching curve from whichever the Descriptor names, so a cross-tick swap is
+reconstructed through the exact v3 math and a DLMM swap through the exact bin walk,
+and the drift check compares the replayed and checkpoint states through
+<code>balances()</code>, which every venue exposes.</p>
+<p>An n-token venue's SwapDelta names its <code>(i, j)</code> pair explicitly. On the pair the
+connector presents it prints a trade; off it -- a 3pool USDC-&gt;USDT swap while the
+connector presents DAI/USDC -- the shared state still moves and the book
+republishes, because that swap changed the pool the presented pair prices from.</p>
+<p>It is checkpoint-anchored, not delta-only. Before a Checkpoint re-anchors, the
+replayed state is compared to it, and a mismatch is counted as drift -- an
+unobserved or unmodelled mutation (a donation, a rebasing token, an admin parameter
+change) is caught, never silently carried. Checkpoint cadence is a knob: the worst
+case for any chain is a Checkpoint per event, which always works; deltas are the win
+where the mutation is observable and exactly modelled. Where the deltas come from --
+EVM event logs, parsed Solana instructions -- is the per-chain ingest; the tape and
+replay know nothing about the chain.</p>
+<p>The records ride on the same binary-log timeline as trades and books. A pool record
+is an <code>EventType::PoolState</code> frame: a fixed header (timestamp, symbol, the record
+kind and venue) and the u256 payload, written through <code>BinaryLogWriter::writePoolState</code>
+alongside trades and surfaced by the readers in one timestamp-ordered stream. The
+frame is additive -- a reader that predates it skips it by its size -- so a strategy
+sees a pool's swaps and an unrelated instrument's trades interleaved in time, and a
+<code>PoolState</code> event's payload drives <code>PoolStateReplay::step</code> to evolve the curve. A
+chain ingest is then just "parse an event into a pool record, stamp it, append it."</p>
+<h2 id="live-with-reorgs">Live, with reorgs<a class="headerlink" href="#live-with-reorgs" title="Permanent link">&para;</a></h2>
+<p>A recorded tape is settled history; a live feed is not -- a chain can roll back an
+unfinalised block (an EVM reorg, a dropped Solana slot), so a swap is optimistic until
+its block finalises. <code>ReorgSafePoolFeed</code> keeps a finalised curve (the last
+irreversible state) and a buffer of optimistic swaps applied on top. A reorg drops the
+optimistic swaps above the rolled-back height and rebuilds the working curve from the
+finalised one, so a block that did not stick can never corrupt the state; finalising
+folds the now-irreversible swaps into the finalised curve. With no reorg the working
+curve is exactly what the tape replay produces from the same deltas, so a strategy
+sees an identical book live and from a tape -- the live transport (a poll, an
+<code>eth_subscribe</code>, a Geyser stream) only changes where the deltas come from.</p>
+<h2 id="what-it-does-not-touch">What it does not touch<a class="headerlink" href="#what-it-does-not-touch" title="Permanent link">&para;</a></h2>
+<p>The CLOB SimulatedExecutor is unchanged. A centralized-exchange backtest fills
+against the order book; only an AMM venue fills through a curve. The core engine
+stays on its int64 <code>Decimal</code> for orders, the book, positions, tapes, and
+bindings; the u256 curve math lives only in the curve layer and its native-wei
+boundary.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

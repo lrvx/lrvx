@@ -1,0 +1,3259 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/reference/codon/tools/">
+      
+      
+        <link rel="prev" href="../backtest/">
+      
+      
+        <link rel="next" href="../../quickjs/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Tools - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#tools" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Tools
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../portable-sockets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sockets across platforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../python/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../node/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node.js
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codon
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_5" id="__nav_8_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Codon
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runner & BacktestRunner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#order-books" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order books
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Order books">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#orderbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderBook
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#l3book" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        L3Book
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compositebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CompositeBook
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#position-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position tracking
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Position tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positiontracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PositionTracker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#positiongrouptracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PositionGroupTracker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ordertracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderTracker
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Profiles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#volumeprofile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VolumeProfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#marketprofile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MarketProfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#footprintbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FootprintBar
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statistics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bar-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bar aggregation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-io" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data I/O
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data I/O">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#datawriter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataWriter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datareader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataReader
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#binarylogrecorderhook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BinaryLogRecorderHook
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#partitioner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partitioner
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#segment-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Segment operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../quickjs/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JavaScript (embedded)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/capi/lrvx_capi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../errors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../api/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core (C++ internals)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#order-books" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order books
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Order books">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#orderbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderBook
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#l3book" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        L3Book
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compositebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CompositeBook
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#position-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Position tracking
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Position tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positiontracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PositionTracker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#positiongrouptracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PositionGroupTracker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ordertracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderTracker
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Profiles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#volumeprofile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VolumeProfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#marketprofile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MarketProfile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#footprintbar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FootprintBar
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statistics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bar-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bar aggregation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-io" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data I/O
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data I/O">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#datawriter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataWriter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#datareader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DataReader
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#binarylogrecorderhook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BinaryLogRecorderHook
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#partitioner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partitioner
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#segment-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Segment operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="tools">Tools<a class="headerlink" href="#tools" title="Permanent link">&para;</a></h1>
+<p>Utility classes for order books, position tracking, profiles, data I/O, and statistics.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>from lrvx.tools import (
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    OrderBook, L3Book, CompositeBook,
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    PositionTracker, PositionGroupTracker, OrderTracker,
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    VolumeProfile, MarketProfile, FootprintBar,
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    DataWriter, DataReader, BinaryLogRecorderHook, Partitioner,
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    correlation, profit_factor, win_rate,
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    permutation_test, bootstrap_ci,
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    validate_segment, merge_segments, merge_dir,
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    split_segment, export_segment, validate_segment_full, validate_dataset,
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    recompress_segment, extract_symbols, extract_time_range,
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>)
+</span></code></pre></div>
+<hr />
+<h2 id="order-books">Order books<a class="headerlink" href="#order-books" title="Permanent link">&para;</a></h2>
+<h3 id="orderbook">OrderBook<a class="headerlink" href="#orderbook" title="Permanent link">&para;</a></h3>
+<p>L2 order book.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>book = OrderBook(tick_size=0.01)
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>book.apply_snapshot(bid_prices, bid_qtys, ask_prices, ask_qtys)
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>bid = book.best_bid()
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apply_snapshot(bp, bq, ap, aq)</code></td>
+<td><code>None</code></td>
+<td>Full snapshot</td>
+</tr>
+<tr>
+<td><code>apply_delta(bp, bq, ap, aq)</code></td>
+<td><code>None</code></td>
+<td>Incremental update</td>
+</tr>
+<tr>
+<td><code>best_bid()</code></td>
+<td><code>Optional[float]</code></td>
+<td>Best bid price</td>
+</tr>
+<tr>
+<td><code>best_ask()</code></td>
+<td><code>Optional[float]</code></td>
+<td>Best ask price</td>
+</tr>
+<tr>
+<td><code>mid()</code></td>
+<td><code>Optional[float]</code></td>
+<td>Mid price</td>
+</tr>
+<tr>
+<td><code>spread()</code></td>
+<td><code>Optional[float]</code></td>
+<td>Bid-ask spread</td>
+</tr>
+<tr>
+<td><code>is_crossed()</code></td>
+<td><code>bool</code></td>
+<td>True if book is crossed</td>
+</tr>
+<tr>
+<td><code>clear()</code></td>
+<td><code>None</code></td>
+<td>Clear all levels</td>
+</tr>
+</tbody>
+</table>
+<p><code>tick_size</code> must be positive; the constructor raises <code>ValueError</code> otherwise. The
+smallest representable tick is <code>1e-8</code>, since prices are fixed-point with a scale
+of 1e8. The book covers 8192 consecutive ticks centred on the market and
+re-anchors that window as a delta feed walks the price away from the last
+snapshot. See
+<a href="../../../explanation/order-book-tick-window/">The order book's tick window</a>.</p>
+<h3 id="l3book">L3Book<a class="headerlink" href="#l3book" title="Permanent link">&para;</a></h3>
+<p>Order-level book with individual order tracking.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>book = L3Book()
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>book.add_order(order_id, price, qty, "buy")
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_order(order_id, price, qty, side)</code></td>
+<td><code>int</code></td>
+<td>0 on success</td>
+</tr>
+<tr>
+<td><code>remove_order(order_id)</code></td>
+<td><code>int</code></td>
+<td>0 on success</td>
+</tr>
+<tr>
+<td><code>modify_order(order_id, new_qty)</code></td>
+<td><code>int</code></td>
+<td>0 on success</td>
+</tr>
+<tr>
+<td><code>best_bid()</code></td>
+<td><code>Optional[float]</code></td>
+<td>Best bid price</td>
+</tr>
+<tr>
+<td><code>best_ask()</code></td>
+<td><code>Optional[float]</code></td>
+<td>Best ask price</td>
+</tr>
+<tr>
+<td><code>bid_at_price(price)</code></td>
+<td><code>float</code></td>
+<td>Total bid quantity at price</td>
+</tr>
+<tr>
+<td><code>ask_at_price(price)</code></td>
+<td><code>float</code></td>
+<td>Total ask quantity at price</td>
+</tr>
+</tbody>
+</table>
+<h3 id="compositebook">CompositeBook<a class="headerlink" href="#compositebook" title="Permanent link">&para;</a></h3>
+<p>Aggregates books across multiple exchanges per symbol.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>cb = CompositeBook()
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>result = cb.best_bid(symbol_id)  # Optional[Tuple[float, float]]
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>best_bid(symbol)</code></td>
+<td><code>Optional[Tuple[float, float]]</code></td>
+<td><code>(price, qty)</code> or <code>None</code></td>
+</tr>
+<tr>
+<td><code>best_ask(symbol)</code></td>
+<td><code>Optional[Tuple[float, float]]</code></td>
+<td><code>(price, qty)</code> or <code>None</code></td>
+</tr>
+<tr>
+<td><code>has_arbitrage(symbol)</code></td>
+<td><code>bool</code></td>
+<td>True if arbitrage opportunity exists</td>
+</tr>
+<tr>
+<td><code>mark_stale(exchange, symbol)</code></td>
+<td><code>None</code></td>
+<td>Mark exchange data as stale</td>
+</tr>
+<tr>
+<td><code>check_staleness(now_ns, threshold_ns)</code></td>
+<td><code>None</code></td>
+<td>Evict stale data</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="position-tracking">Position tracking<a class="headerlink" href="#position-tracking" title="Permanent link">&para;</a></h2>
+<h3 id="positiontracker">PositionTracker<a class="headerlink" href="#positiontracker" title="Permanent link">&para;</a></h3>
+<p>FIFO/average-cost position tracking.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>tracker = PositionTracker()          # FIFO (default)
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>tracker = PositionTracker(1)         # average cost
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>tracker.on_fill(symbol, "buy", price, qty)
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>pos = tracker.position(symbol)
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>on_fill(symbol, side, price, qty)</code></td>
+<td><code>None</code></td>
+<td>Record a fill</td>
+</tr>
+<tr>
+<td><code>position(symbol)</code></td>
+<td><code>float</code></td>
+<td>Current net position</td>
+</tr>
+<tr>
+<td><code>avg_entry_price(symbol)</code></td>
+<td><code>float</code></td>
+<td>Average entry price</td>
+</tr>
+<tr>
+<td><code>realized_pnl(symbol)</code></td>
+<td><code>float</code></td>
+<td>Realized PnL for symbol</td>
+</tr>
+<tr>
+<td><code>total_realized_pnl()</code></td>
+<td><code>float</code></td>
+<td>Total realized PnL</td>
+</tr>
+</tbody>
+</table>
+<h3 id="positiongrouptracker">PositionGroupTracker<a class="headerlink" href="#positiongrouptracker" title="Permanent link">&para;</a></h3>
+<p>Tracks individual named positions (open/partial-close/close).</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>tracker = PositionGroupTracker()
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pos_id = tracker.open_position(order_id, symbol, "buy", price, qty)
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>tracker.close_position(pos_id, exit_price)
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>open_position(order_id, symbol, side, price, qty)</code></td>
+<td><code>int</code> (position ID)</td>
+<td>Open a position</td>
+</tr>
+<tr>
+<td><code>close_position(position_id, exit_price)</code></td>
+<td><code>None</code></td>
+<td>Close fully</td>
+</tr>
+<tr>
+<td><code>partial_close(position_id, qty, exit_price)</code></td>
+<td><code>None</code></td>
+<td>Partial close</td>
+</tr>
+<tr>
+<td><code>net_position(symbol)</code></td>
+<td><code>float</code></td>
+<td>Net position for symbol</td>
+</tr>
+<tr>
+<td><code>realized_pnl(symbol)</code></td>
+<td><code>float</code></td>
+<td>Realized PnL for symbol</td>
+</tr>
+<tr>
+<td><code>total_realized_pnl()</code></td>
+<td><code>float</code></td>
+<td>Total realized PnL</td>
+</tr>
+<tr>
+<td><code>open_position_count(symbol)</code></td>
+<td><code>int</code></td>
+<td>Number of open positions</td>
+</tr>
+<tr>
+<td><code>prune()</code></td>
+<td><code>None</code></td>
+<td>Free closed position memory</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ordertracker">OrderTracker<a class="headerlink" href="#ordertracker" title="Permanent link">&para;</a></h3>
+<p>Tracks submitted/filled/canceled orders.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>tracker = OrderTracker()
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>tracker.on_submitted(order_id, symbol, "buy", price, qty)
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>tracker.on_filled(order_id, fill_qty)
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method / Property</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>on_submitted(order_id, symbol, side, price, qty)</code></td>
+<td><code>bool</code></td>
+<td>Register a submitted order</td>
+</tr>
+<tr>
+<td><code>on_filled(order_id, fill_qty)</code></td>
+<td><code>bool</code></td>
+<td>Record a fill</td>
+</tr>
+<tr>
+<td><code>on_canceled(order_id)</code></td>
+<td><code>bool</code></td>
+<td>Record a cancellation</td>
+</tr>
+<tr>
+<td><code>is_active(order_id)</code></td>
+<td><code>bool</code></td>
+<td>True if order is still active</td>
+</tr>
+<tr>
+<td><code>active_count</code></td>
+<td><code>int</code></td>
+<td>Number of active orders</td>
+</tr>
+<tr>
+<td><code>total_count</code></td>
+<td><code>int</code></td>
+<td>Total orders seen</td>
+</tr>
+<tr>
+<td><code>prune()</code></td>
+<td><code>None</code></td>
+<td>Free completed order memory</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
+<h3 id="volumeprofile">VolumeProfile<a class="headerlink" href="#volumeprofile" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>vp = VolumeProfile(tick_size=0.01)
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>vp.add_trade(price, qty, is_buy)
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>poc = vp.poc()
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_trade(price, qty, is_buy)</code></td>
+<td><code>None</code></td>
+<td>Feed a trade</td>
+</tr>
+<tr>
+<td><code>poc()</code></td>
+<td><code>float</code></td>
+<td>Point of control</td>
+</tr>
+<tr>
+<td><code>value_area_high()</code></td>
+<td><code>float</code></td>
+<td>Value area high</td>
+</tr>
+<tr>
+<td><code>value_area_low()</code></td>
+<td><code>float</code></td>
+<td>Value area low</td>
+</tr>
+<tr>
+<td><code>total_volume()</code></td>
+<td><code>float</code></td>
+<td>Total volume</td>
+</tr>
+<tr>
+<td><code>clear()</code></td>
+<td><code>None</code></td>
+<td>Reset</td>
+</tr>
+</tbody>
+</table>
+<h3 id="marketprofile">MarketProfile<a class="headerlink" href="#marketprofile" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>mp = MarketProfile(tick_size=0.01, period_minutes=30, session_start_ns=0)
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>mp.add_trade(timestamp_ns, price, qty, is_buy)
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_trade(ts_ns, price, qty, is_buy)</code></td>
+<td><code>None</code></td>
+<td>Feed a trade</td>
+</tr>
+<tr>
+<td><code>poc()</code></td>
+<td><code>float</code></td>
+<td>Point of control</td>
+</tr>
+<tr>
+<td><code>value_area_high()</code></td>
+<td><code>float</code></td>
+<td>Value area high</td>
+</tr>
+<tr>
+<td><code>value_area_low()</code></td>
+<td><code>float</code></td>
+<td>Value area low</td>
+</tr>
+<tr>
+<td><code>initial_balance_high()</code></td>
+<td><code>float</code></td>
+<td>Initial balance high</td>
+</tr>
+<tr>
+<td><code>initial_balance_low()</code></td>
+<td><code>float</code></td>
+<td>Initial balance low</td>
+</tr>
+<tr>
+<td><code>is_poor_high()</code></td>
+<td><code>bool</code></td>
+<td>Poor high</td>
+</tr>
+<tr>
+<td><code>is_poor_low()</code></td>
+<td><code>bool</code></td>
+<td>Poor low</td>
+</tr>
+<tr>
+<td><code>clear()</code></td>
+<td><code>None</code></td>
+<td>Reset</td>
+</tr>
+</tbody>
+</table>
+<h3 id="footprintbar">FootprintBar<a class="headerlink" href="#footprintbar" title="Permanent link">&para;</a></h3>
+<p>Buy/sell delta per price level.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>fp = FootprintBar(tick_size=0.01)
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>fp.add_trade(price, qty, is_buy)
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>delta = fp.total_delta()
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method / Property</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_trade(price, qty, is_buy)</code></td>
+<td><code>None</code></td>
+<td>Feed a trade</td>
+</tr>
+<tr>
+<td><code>total_delta()</code></td>
+<td><code>float</code></td>
+<td>Net buy minus sell volume</td>
+</tr>
+<tr>
+<td><code>total_volume()</code></td>
+<td><code>float</code></td>
+<td>Total volume</td>
+</tr>
+<tr>
+<td><code>num_levels</code></td>
+<td><code>int</code></td>
+<td>Number of price levels</td>
+</tr>
+<tr>
+<td><code>clear()</code></td>
+<td><code>None</code></td>
+<td>Reset</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="statistics">Statistics<a class="headerlink" href="#statistics" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>from lrvx.tools import correlation, profit_factor, win_rate, permutation_test, bootstrap_ci
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>r = correlation(x, y)
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>pf = profit_factor(pnl_list)
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>wr = win_rate(pnl_list)
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>p = permutation_test(group1, group2, num_permutations=10000)
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>lo, med, hi = bootstrap_ci(data, confidence=0.95, num_samples=10000)
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>correlation(x, y)</code></td>
+<td><code>float</code></td>
+<td>Pearson correlation</td>
+</tr>
+<tr>
+<td><code>profit_factor(pnl)</code></td>
+<td><code>float</code></td>
+<td>Gross profit / gross loss</td>
+</tr>
+<tr>
+<td><code>win_rate(pnl)</code></td>
+<td><code>float</code></td>
+<td>Fraction of positive values</td>
+</tr>
+<tr>
+<td><code>permutation_test(g1, g2, n=10000)</code></td>
+<td><code>float</code></td>
+<td>Two-sample permutation p-value</td>
+</tr>
+<tr>
+<td><code>bootstrap_ci(data, confidence=0.95, n=10000)</code></td>
+<td><code>Tuple[float, float, float]</code></td>
+<td><code>(lower, median, upper)</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="bar-aggregation">Bar aggregation<a class="headerlink" href="#bar-aggregation" title="Permanent link">&para;</a></h2>
+<p>Turn a raw trade array into bars in one call — no live engine required.
+See <a href="../../../how-to/bar-aggregation/">Bar aggregation</a> for the same helpers
+in Python and Node.js.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>from lrvx.tools import aggregate_renko_bars
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>bars = aggregate_renko_bars(timestamps, prices, quantities, is_buy,
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>                            brick_size=2.0)
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>for b in bars:
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    print(b.start_time_ns, b.open(), b.high(), b.low(), b.close())
+</span></code></pre></div>
+<p><code>AggBar</code> mirrors the C <code>LrvxBar</code> struct: <code>*_raw</code> fields are fixed-point
+(divide by <code>1e8</code>), plus float accessors <code>open()</code>, <code>high()</code>, <code>low()</code>,
+<code>close()</code>, <code>volume()</code>, <code>buy_volume()</code>, a plain <code>trade_count</code>, and
+<code>close_reason</code> -- why the bar closed (<code>0</code> threshold, <code>2</code> forced, <code>3</code> warmup;
+every bar this batch path returns closed on its own threshold, so <code>0</code> here).</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Threshold argument</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>aggregate_time_bars(ts, px, qty, is_buy, interval_seconds)</code></td>
+<td>seconds per bar</td>
+<td>Fixed-duration bars</td>
+</tr>
+<tr>
+<td><code>aggregate_tick_bars(ts, px, qty, is_buy, tick_count)</code></td>
+<td>trades per bar</td>
+<td>Fixed trade-count bars</td>
+</tr>
+<tr>
+<td><code>aggregate_volume_bars(ts, px, qty, is_buy, volume_threshold)</code></td>
+<td>traded volume</td>
+<td>Closes once volume crosses the threshold</td>
+</tr>
+<tr>
+<td><code>aggregate_range_bars(ts, px, qty, is_buy, range_size)</code></td>
+<td>price range</td>
+<td>Closes once price has moved <code>range_size</code> from the open</td>
+</tr>
+<tr>
+<td><code>aggregate_renko_bars(ts, px, qty, is_buy, brick_size)</code></td>
+<td>brick size</td>
+<td>Fixed-size Renko bricks</td>
+</tr>
+<tr>
+<td><code>aggregate_heikin_ashi_bars(ts, px, qty, is_buy, interval_seconds)</code></td>
+<td>seconds per bar</td>
+<td>Heikin-Ashi smoothed bars</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="data-io">Data I/O<a class="headerlink" href="#data-io" title="Permanent link">&para;</a></h2>
+<h3 id="datawriter">DataWriter<a class="headerlink" href="#datawriter" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>writer = DataWriter("./data", max_segment_mb=256, exchange_id=0)
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>writer.write_trade(exchange_ts_ns, recv_ts_ns, price, qty, trade_id, symbol_id, side)
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>writer.flush()
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>writer.close()
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>write_trade(exchange_ts_ns, recv_ts_ns, price, qty, trade_id, symbol_id, side)</code></td>
+<td><code>bool</code></td>
+<td>Write a trade record</td>
+</tr>
+<tr>
+<td><code>flush()</code></td>
+<td><code>None</code></td>
+<td>Flush to disk</td>
+</tr>
+<tr>
+<td><code>close()</code></td>
+<td><code>None</code></td>
+<td>Close and finalize</td>
+</tr>
+<tr>
+<td><code>stats()</code></td>
+<td><code>WriterStats</code></td>
+<td>Write statistics</td>
+</tr>
+</tbody>
+</table>
+<p><code>WriterStats</code> fields: <code>bytes_written</code>, <code>events_written</code>, <code>segments_created</code>, <code>trades_written</code>.</p>
+<h3 id="datareader">DataReader<a class="headerlink" href="#datareader" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>reader = DataReader("./data")
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>reader = DataReader.create_filtered("./data", from_ns=0, to_ns=0, symbols=[])
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>trades = reader.read_trades()
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>bbos = reader.read_bbo()
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>events = reader.read_book_updates()
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method / Property</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>count()</code></td>
+<td><code>int</code></td>
+<td>Total event count</td>
+</tr>
+<tr>
+<td><code>summary()</code></td>
+<td><code>DatasetSummary</code></td>
+<td>Dataset summary</td>
+</tr>
+<tr>
+<td><code>reader_stats()</code></td>
+<td><code>ReaderStats</code></td>
+<td>Read statistics</td>
+</tr>
+<tr>
+<td><code>read_trades(max_trades=0)</code></td>
+<td><code>List[TradeRecord]</code></td>
+<td>Read trades (all if <code>max_trades=0</code>)</td>
+</tr>
+<tr>
+<td><code>read_trades_from(start_ts_ns, max_trades=0)</code></td>
+<td><code>List[TradeRecord]</code></td>
+<td>Same as <code>read_trades</code> starting from <code>start_ts_ns</code></td>
+</tr>
+<tr>
+<td><code>read_bbo(max_events=0)</code></td>
+<td><code>List[BBO]</code></td>
+<td>Top of book per book update event</td>
+</tr>
+<tr>
+<td><code>read_bbo_from(start_ts_ns, max_events=0)</code></td>
+<td><code>List[BBO]</code></td>
+<td>Same as <code>read_bbo</code> starting from <code>start_ts_ns</code></td>
+</tr>
+<tr>
+<td><code>read_book_updates()</code></td>
+<td><code>List[BookUpdate]</code></td>
+<td>Full depth per book update event</td>
+</tr>
+<tr>
+<td><code>read_book_updates_from(start_ts_ns)</code></td>
+<td><code>List[BookUpdate]</code></td>
+<td>Same as <code>read_book_updates</code> starting from <code>start_ts_ns</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>DatasetSummary</code> fields: <code>first_event_ns</code>, <code>last_event_ns</code>, <code>total_events</code>, <code>segment_count</code>, <code>total_bytes</code>, <code>duration_seconds</code>.</p>
+<p><code>TradeRecord</code> fields: <code>exchange_ts_ns</code>, <code>recv_ts_ns</code>, <code>price_raw</code>, <code>qty_raw</code>, <code>trade_id</code>, <code>symbol_id</code>, <code>side</code>. Methods: <code>price()</code>, <code>qty()</code>, <code>is_buy()</code>.</p>
+<p><code>BBO</code> fields: <code>exchange_ts_ns</code>, <code>recv_ts_ns</code>, <code>seq</code>, <code>symbol_id</code>, <code>event_type</code> (2=snapshot, 3=delta), <code>bid_price_raw</code>, <code>bid_qty_raw</code>, <code>ask_price_raw</code>, <code>ask_qty_raw</code>. Methods: <code>bid_price()</code>, <code>ask_price()</code>, <code>bid_qty()</code>, <code>ask_qty()</code>.</p>
+<p><code>BookLevel</code> fields: <code>price_raw</code>, <code>qty_raw</code>, <code>side</code> (0=bid, 1=ask). Methods: <code>price()</code>, <code>qty()</code>.</p>
+<p><code>BookUpdate</code> fields: <code>exchange_ts_ns</code>, <code>recv_ts_ns</code>, <code>seq</code>, <code>symbol_id</code>, <code>event_type</code>, <code>bids: List[BookLevel]</code>, <code>asks: List[BookLevel]</code>.</p>
+<h3 id="binarylogrecorderhook">BinaryLogRecorderHook<a class="headerlink" href="#binarylogrecorderhook" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>hook = BinaryLogRecorderHook("./data", max_segment_mb=256,
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>                              exchange_id=0, compression="none")
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>hook.add_symbol(symbol_id, "BTCUSDT", base="BTC", quote="USDT")
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a># attach via the runner's market-data-recorder slot;
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a># lifecycle is driven by the engine.
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_symbol(symbol_id, name, base="", quote="", price_precision=8, qty_precision=8)</code></td>
+<td>Register a symbol in the recording metadata.</td>
+</tr>
+<tr>
+<td><code>flush()</code></td>
+<td>Flush buffered bytes to disk.</td>
+</tr>
+<tr>
+<td><code>stats()</code></td>
+<td>Returns trade / book / byte counters.</td>
+</tr>
+<tr>
+<td><code>close()</code></td>
+<td>Stop the underlying writer (idempotent).</td>
+</tr>
+<tr>
+<td><code>_as_recorder_handle()</code></td>
+<td>Borrowed <code>LrvxMarketDataRecorderHandle</code> for runner attach.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="partitioner">Partitioner<a class="headerlink" href="#partitioner" title="Permanent link">&para;</a></h2>
+<p>Splits a dataset into partitions for parallel backtesting.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>p = Partitioner("./data")
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>partitions = p.by_time(num_partitions=4, warmup_ns=0)
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>for part in partitions:
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>    # part.from_ns, part.to_ns, part.warmup_from_ns, ...
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>    pass
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>p.close()
+</span></code></pre></div>
+<p><code>Partition</code> fields: <code>partition_id</code>, <code>from_ns</code>, <code>to_ns</code>, <code>warmup_from_ns</code>, <code>estimated_events</code>, <code>estimated_bytes</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>by_time(num_partitions, warmup_ns=0)</code></td>
+<td>Split into N equal time slices</td>
+</tr>
+<tr>
+<td><code>by_duration(duration_ns, warmup_ns=0)</code></td>
+<td>Split by fixed duration</td>
+</tr>
+<tr>
+<td><code>by_calendar(unit=CALENDAR_MONTHLY, warmup_ns=0)</code></td>
+<td>Split by calendar unit</td>
+</tr>
+<tr>
+<td><code>by_symbol(num_partitions)</code></td>
+<td>Split by symbol group</td>
+</tr>
+<tr>
+<td><code>per_symbol()</code></td>
+<td>One partition per symbol</td>
+</tr>
+<tr>
+<td><code>by_event_count(num_partitions)</code></td>
+<td>Split by event count</td>
+</tr>
+<tr>
+<td><code>close()</code></td>
+<td>Free resources</td>
+</tr>
+</tbody>
+</table>
+<p>Calendar unit constants: <code>Partitioner.CALENDAR_DAILY = 0</code>, <code>CALENDAR_WEEKLY = 1</code>, <code>CALENDAR_MONTHLY = 2</code>.</p>
+<hr />
+<h2 id="segment-operations">Segment operations<a class="headerlink" href="#segment-operations" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>from lrvx.tools import validate_segment, merge_segments, merge_dir, split_segment, export_segment
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>validate_segment("path/to/seg")            # bool
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>merge_segments("input_dir", "output.bin")  # bool
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>validate_segment(path)</code></td>
+<td><code>bool</code></td>
+<td>Quick validation</td>
+</tr>
+<tr>
+<td><code>validate_segment_full(path, verify_crc=True, verify_timestamps=True)</code></td>
+<td><code>SegmentValidation</code></td>
+<td>Full validation</td>
+</tr>
+<tr>
+<td><code>validate_dataset(data_dir)</code></td>
+<td><code>DatasetValidation</code></td>
+<td>Validate all segments in directory</td>
+</tr>
+<tr>
+<td><code>merge_segments(input_dir, output_path)</code></td>
+<td><code>bool</code></td>
+<td>Merge directory into one file</td>
+</tr>
+<tr>
+<td><code>merge_dir(input_dir, output_dir)</code></td>
+<td><code>MergeResult</code></td>
+<td>Merge with result metadata</td>
+</tr>
+<tr>
+<td><code>split_segment(input_path, output_dir, mode=0, time_interval_ns=0, events_per_file=0)</code></td>
+<td><code>SplitResult</code></td>
+<td>Split segment</td>
+</tr>
+<tr>
+<td><code>export_segment(input_path, output_path, format=0, from_ns=0, to_ns=0, symbols=[])</code></td>
+<td><code>ExportResult</code></td>
+<td>Export to CSV or other format</td>
+</tr>
+<tr>
+<td><code>recompress_segment(input_path, output_path, compression=1)</code></td>
+<td><code>bool</code></td>
+<td>Recompress</td>
+</tr>
+<tr>
+<td><code>extract_symbols(input_path, output_path, symbols)</code></td>
+<td><code>int</code></td>
+<td>Extract specific symbols</td>
+</tr>
+<tr>
+<td><code>extract_time_range(input_path, output_path, from_ns, to_ns)</code></td>
+<td><code>int</code></td>
+<td>Extract time slice</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

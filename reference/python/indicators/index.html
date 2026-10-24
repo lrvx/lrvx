@@ -1,0 +1,3551 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/reference/python/indicators/">
+      
+      
+        <link rel="prev" href="../engine/">
+      
+      
+        <link rel="next" href="../aggregators/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Indicators - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#indicators" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Indicators
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../portable-sockets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sockets across platforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../_api_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full API index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine & Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming classes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#batch-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch functions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#moving-averages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moving Averages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Moving Averages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#emainput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ema(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smainput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sma(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rmainput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rma(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#demainput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dema(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#temainput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tema(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kamainput-period10-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kama(input, period=10) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oscillators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Oscillators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Oscillators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rsiinput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rsi(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#macdinput-fast12-slow26-signal9-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macd(input, fast=12, slow=26, signal=9) -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stochastichigh-low-close-k_period14-d_period3-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stochastic(high, low, close, k_period=14, d_period=3) -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ccihigh-low-close-period20-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cci(high, low, close, period=20) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Trend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adxhigh-low-close-period14-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        adx(high, low, close, period=14) -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chophigh-low-close-period14-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        chop(high, low, close, period=14) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slopeinput-length1-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        slope(input, length=1) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volatility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volatility
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Volatility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#atrhigh-low-close-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        atr(high, low, close, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bollingerinput-period20-stddev20-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bollinger(input, period=20, stddev=2.0) -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statistical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statistical
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Statistical">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skewnessinput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        skewness(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kurtosisinput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kurtosis(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolling_zscoreinput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rolling_zscore(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shannon_entropyinput-period-bins10-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shannon_entropy(input, period, bins=10) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parkinson_volhigh-low-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parkinson_vol(high, low, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rogers_satchell_volopen-high-low-close-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rogers_satchell_vol(open, high, low, close, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolling_correlationx-y-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rolling_correlation(x, y, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#autocorrelationinput-window-lag-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        autocorrelation(input, window, lag) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#series-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Series diagnostics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Series diagnostics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adfinput-max_lag4-regressionc-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        adf(input, max_lag=4, regression='c') -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hurst_dfareturns-scalesnone-float" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hurst_dfa(returns, scales=None) -&gt; float
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolling_hurstprices-window1080-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rolling_hurst(prices, window=1080) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#realized_volreturns-periods_per_year-float" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        realized_vol(returns, periods_per_year) -&gt; float
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whites_reality_checkreturns-num_bootstrap10000-avg_block_size00-seed42-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        whites_reality_check(returns, num_bootstrap=10000, avg_block_size=0.0, seed=42) -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list_indicators-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list_indicators() -&gt; list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volume
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Volume">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vwapclose-volume-window96-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vwap(close, volume, window=96) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#obvclose-volume-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        obv(close, volume) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cvdopen-high-low-close-volume-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cvd(open, high, low, close, volume) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#strategy-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy Helpers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Strategy Helpers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bar_returnssignal_long-signal_short-log_returns-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bar_returns(signal_long, signal_short, log_returns) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trade_pnlsignal_long-signal_short-log_returns-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        trade_pnl(signal_long, signal_short, log_returns) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#profit_factorreturns-float" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        profit_factor(returns) -&gt; float
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#win_ratetrade_pnls-float" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        win_rate(trade_pnls) -&gt; float
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indicator-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indicator catalog
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aggregators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../books/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order Books
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../positions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Positions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../segment_ops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Segment Ops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimizer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy Class
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../node/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node.js
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../codon/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codon
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../quickjs/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JavaScript (embedded)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/capi/lrvx_capi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../errors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../api/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core (C++ internals)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming classes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#batch-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch functions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#moving-averages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moving Averages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Moving Averages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#emainput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ema(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#smainput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sma(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rmainput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rma(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#demainput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dema(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#temainput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        tema(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kamainput-period10-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kama(input, period=10) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oscillators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Oscillators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Oscillators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rsiinput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rsi(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#macdinput-fast12-slow26-signal9-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macd(input, fast=12, slow=26, signal=9) -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stochastichigh-low-close-k_period14-d_period3-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stochastic(high, low, close, k_period=14, d_period=3) -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ccihigh-low-close-period20-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cci(high, low, close, period=20) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Trend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adxhigh-low-close-period14-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        adx(high, low, close, period=14) -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chophigh-low-close-period14-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        chop(high, low, close, period=14) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slopeinput-length1-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        slope(input, length=1) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volatility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volatility
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Volatility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#atrhigh-low-close-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        atr(high, low, close, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bollingerinput-period20-stddev20-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bollinger(input, period=20, stddev=2.0) -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statistical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statistical
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Statistical">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skewnessinput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        skewness(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kurtosisinput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        kurtosis(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolling_zscoreinput-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rolling_zscore(input, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shannon_entropyinput-period-bins10-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        shannon_entropy(input, period, bins=10) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parkinson_volhigh-low-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parkinson_vol(high, low, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rogers_satchell_volopen-high-low-close-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rogers_satchell_vol(open, high, low, close, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolling_correlationx-y-period-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rolling_correlation(x, y, period) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#autocorrelationinput-window-lag-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        autocorrelation(input, window, lag) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#series-diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Series diagnostics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Series diagnostics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adfinput-max_lag4-regressionc-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        adf(input, max_lag=4, regression='c') -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hurst_dfareturns-scalesnone-float" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hurst_dfa(returns, scales=None) -&gt; float
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rolling_hurstprices-window1080-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rolling_hurst(prices, window=1080) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#realized_volreturns-periods_per_year-float" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        realized_vol(returns, periods_per_year) -&gt; float
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#whites_reality_checkreturns-num_bootstrap10000-avg_block_size00-seed42-dict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        whites_reality_check(returns, num_bootstrap=10000, avg_block_size=0.0, seed=42) -&gt; dict
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#list_indicators-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        list_indicators() -&gt; list
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volume
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Volume">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vwapclose-volume-window96-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vwap(close, volume, window=96) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#obvclose-volume-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        obv(close, volume) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cvdopen-high-low-close-volume-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cvd(open, high, low, close, volume) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#strategy-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy Helpers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Strategy Helpers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bar_returnssignal_long-signal_short-log_returns-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bar_returns(signal_long, signal_short, log_returns) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trade_pnlsignal_long-signal_short-log_returns-ndarray" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        trade_pnl(signal_long, signal_short, log_returns) -&gt; ndarray
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#profit_factorreturns-float" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        profit_factor(returns) -&gt; float
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#win_ratetrade_pnls-float" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        win_rate(trade_pnls) -&gt; float
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indicator-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indicator catalog
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="indicators">Indicators<a class="headerlink" href="#indicators" title="Permanent link">&para;</a></h1>
+<p>Vectorized technical indicators operating on numpy arrays. All functions release the GIL for parallel computation.</p>
+<h2 id="streaming-classes">Streaming classes<a class="headerlink" href="#streaming-classes" title="Permanent link">&para;</a></h2>
+<p>All streaming indicators share the same interface:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">ind</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">EMA</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">result</span> <span class="o">=</span> <span class="n">ind</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">price</span><span class="p">)</span>  <span class="c1"># None during warmup, float when ready</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">ind</span><span class="o">.</span><span class="n">value</span>                   <span class="c1"># None or float</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">ind</span><span class="o">.</span><span class="n">ready</span>                   <span class="c1"># bool</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">ind</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>                 <span class="c1"># clear state, keep config</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">ind</span><span class="o">.</span><span class="n">count</span>                   <span class="c1"># number of samples fed so far</span>
+</span></code></pre></div>
+<p>During warmup, <code>update()</code> and <code>.value</code> return <code>None</code>. Check with <code>if result is not None</code> or use <code>.ready</code>.</p>
+<p><strong>Single value</strong> — <code>update(value) -&gt; float | None</code>:</p>
+<p><code>SMA(period)</code>, <code>EMA(period)</code>, <code>RMA(period)</code>, <code>RSI(period)</code>, <code>DEMA(period)</code>, <code>TEMA(period)</code>, <code>KAMA(period, fast=2, slow=30)</code>, <code>Slope(length)</code>, <code>Skewness(period)</code>, <code>Kurtosis(period)</code>, <code>RollingZScore(period)</code>, <code>ShannonEntropy(period, bins=10)</code>, <code>AutoCorrelation(window, lag)</code></p>
+<p><strong>Multi-output</strong> — <code>update(value) -&gt; float | None</code>, named properties instead of <code>.value</code>:</p>
+<p><code>MACD(fast=12, slow=26, signal=9)</code> → <code>.line</code>, <code>.signal</code>, <code>.histogram</code><br />
+<code>Bollinger(period=20, multiplier=2.0)</code> → <code>.upper</code>, <code>.middle</code>, <code>.lower</code></p>
+<p><strong>OHLC / multi-input:</strong></p>
+<p><code>ATR(period)</code> — <code>update(high, low, close)</code><br />
+<code>Stochastic(k_period=14, d_period=3)</code> — <code>update(high, low, close)</code> → <code>.k</code>, <code>.d</code><br />
+<code>CCI(period=20)</code> — <code>update(high, low, close)</code><br />
+<code>ParkinsonVol(period)</code> — <code>update(high, low)</code><br />
+<code>RogersSatchellVol(period)</code> — <code>update(open, high, low, close)</code><br />
+<code>Correlation(period)</code> — <code>update(x, y)</code></p>
+<p>Volume indicators (<code>obv</code>, <code>vwap</code>, <code>cvd</code>) exist as batch functions only — there are no streaming classes for them.</p>
+<hr />
+<h2 id="batch-functions">Batch functions<a class="headerlink" href="#batch-functions" title="Permanent link">&para;</a></h2>
+<h2 id="moving-averages">Moving Averages<a class="headerlink" href="#moving-averages" title="Permanent link">&para;</a></h2>
+<h3 id="emainput-period-ndarray"><code>ema(input, period) -&gt; ndarray</code><a class="headerlink" href="#emainput-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Exponential Moving Average.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">ema</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="smainput-period-ndarray"><code>sma(input, period) -&gt; ndarray</code><a class="headerlink" href="#smainput-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Simple Moving Average.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">sma</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="rmainput-period-ndarray"><code>rma(input, period) -&gt; ndarray</code><a class="headerlink" href="#rmainput-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Wilder's Moving Average (alpha = 1/period). Used internally by RSI and ATR.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">rma</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="demainput-period-ndarray"><code>dema(input, period) -&gt; ndarray</code><a class="headerlink" href="#demainput-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Double EMA: <code>2*EMA - EMA(EMA)</code>. Reduces lag versus standard EMA.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">dema</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="temainput-period-ndarray"><code>tema(input, period) -&gt; ndarray</code><a class="headerlink" href="#temainput-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Triple EMA: <code>3*EMA - 3*EMA(EMA) + EMA(EMA(EMA))</code>. Further lag reduction.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">tema</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="kamainput-period10-ndarray"><code>kama(input, period=10) -&gt; ndarray</code><a class="headerlink" href="#kamainput-period10-ndarray" title="Permanent link">&para;</a></h3>
+<p>Kaufman Adaptive Moving Average. Adjusts smoothing based on market efficiency.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">kama</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</span></code></pre></div>
+<hr />
+<h2 id="oscillators">Oscillators<a class="headerlink" href="#oscillators" title="Permanent link">&para;</a></h2>
+<h3 id="rsiinput-period-ndarray"><code>rsi(input, period) -&gt; ndarray</code><a class="headerlink" href="#rsiinput-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Relative Strength Index (0–100).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">rsi</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="macdinput-fast12-slow26-signal9-dict"><code>macd(input, fast=12, slow=26, signal=9) -&gt; dict</code><a class="headerlink" href="#macdinput-fast12-slow26-signal9-dict" title="Permanent link">&para;</a></h3>
+<p>Moving Average Convergence Divergence. Returns a dict with three arrays.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">macd</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">fast</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">slow</span><span class="o">=</span><span class="mi">26</span><span class="p">,</span> <span class="n">signal</span><span class="o">=</span><span class="mi">9</span><span class="p">)</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="c1"># result['line'], result['signal'], result['histogram']</span>
+</span></code></pre></div>
+<h3 id="stochastichigh-low-close-k_period14-d_period3-dict"><code>stochastic(high, low, close, k_period=14, d_period=3) -&gt; dict</code><a class="headerlink" href="#stochastichigh-low-close-k_period14-d_period3-dict" title="Permanent link">&para;</a></h3>
+<p>Stochastic oscillator (%K and %D).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">stochastic</span><span class="p">(</span><span class="n">highs</span><span class="p">,</span> <span class="n">lows</span><span class="p">,</span> <span class="n">closes</span><span class="p">,</span> <span class="n">k_period</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">d_period</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">k</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">'k'</span><span class="p">]</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">d</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s1">'d'</span><span class="p">]</span>
+</span></code></pre></div>
+<h3 id="ccihigh-low-close-period20-ndarray"><code>cci(high, low, close, period=20) -&gt; ndarray</code><a class="headerlink" href="#ccihigh-low-close-period20-ndarray" title="Permanent link">&para;</a></h3>
+<p>Commodity Channel Index.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">cci</span><span class="p">(</span><span class="n">highs</span><span class="p">,</span> <span class="n">lows</span><span class="p">,</span> <span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<hr />
+<h2 id="trend">Trend<a class="headerlink" href="#trend" title="Permanent link">&para;</a></h2>
+<h3 id="adxhigh-low-close-period14-dict"><code>adx(high, low, close, period=14) -&gt; dict</code><a class="headerlink" href="#adxhigh-low-close-period14-dict" title="Permanent link">&para;</a></h3>
+<p>Average Directional Index with directional indicators.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">adx</span><span class="p">(</span><span class="n">highs</span><span class="p">,</span> <span class="n">lows</span><span class="p">,</span> <span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="c1"># result['adx'], result['plus_di'], result['minus_di']</span>
+</span></code></pre></div>
+<h3 id="chophigh-low-close-period14-ndarray"><code>chop(high, low, close, period=14) -&gt; ndarray</code><a class="headerlink" href="#chophigh-low-close-period14-ndarray" title="Permanent link">&para;</a></h3>
+<p>Choppiness Index (0–100). High values indicate ranging markets.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">chop</span><span class="p">(</span><span class="n">highs</span><span class="p">,</span> <span class="n">lows</span><span class="p">,</span> <span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="slopeinput-length1-ndarray"><code>slope(input, length=1) -&gt; ndarray</code><a class="headerlink" href="#slopeinput-length1-ndarray" title="Permanent link">&para;</a></h3>
+<p>Linear slope over a lookback window.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">slope</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span></code></pre></div>
+<hr />
+<h2 id="volatility">Volatility<a class="headerlink" href="#volatility" title="Permanent link">&para;</a></h2>
+<h3 id="atrhigh-low-close-period-ndarray"><code>atr(high, low, close, period) -&gt; ndarray</code><a class="headerlink" href="#atrhigh-low-close-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Average True Range.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">atr</span><span class="p">(</span><span class="n">highs</span><span class="p">,</span> <span class="n">lows</span><span class="p">,</span> <span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="bollingerinput-period20-stddev20-dict"><code>bollinger(input, period=20, stddev=2.0) -&gt; dict</code><a class="headerlink" href="#bollingerinput-period20-stddev20-dict" title="Permanent link">&para;</a></h3>
+<p>Bollinger Bands.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">bollinger</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">stddev</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="c1"># result['upper'], result['middle'], result['lower']</span>
+</span></code></pre></div>
+<hr />
+<h2 id="statistical">Statistical<a class="headerlink" href="#statistical" title="Permanent link">&para;</a></h2>
+<h3 id="skewnessinput-period-ndarray"><code>skewness(input, period) -&gt; ndarray</code><a class="headerlink" href="#skewnessinput-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Rolling Fisher-Pearson skewness. Measures distribution asymmetry. Requires period &gt;= 3. NaN if std = 0.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">skewness</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="kurtosisinput-period-ndarray"><code>kurtosis(input, period) -&gt; ndarray</code><a class="headerlink" href="#kurtosisinput-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Rolling Fisher excess kurtosis. Measures tail heaviness. Requires period &gt;= 4. NaN if std = 0.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">kurtosis</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="rolling_zscoreinput-period-ndarray"><code>rolling_zscore(input, period) -&gt; ndarray</code><a class="headerlink" href="#rolling_zscoreinput-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Rolling z-score normalization: <code>(x - mean) / std</code>. NaN if std = 0.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">rolling_zscore</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="shannon_entropyinput-period-bins10-ndarray"><code>shannon_entropy(input, period, bins=10) -&gt; ndarray</code><a class="headerlink" href="#shannon_entropyinput-period-bins10-ndarray" title="Permanent link">&para;</a></h3>
+<p>Rolling Shannon entropy with histogram binning, normalized to [0, 1]. Zero = all values identical, 1 = uniform distribution.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">shannon_entropy</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="parkinson_volhigh-low-period-ndarray"><code>parkinson_vol(high, low, period) -&gt; ndarray</code><a class="headerlink" href="#parkinson_volhigh-low-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Parkinson high-low volatility estimator: <code>sqrt(mean(ln(H/L)^2) / (4*ln(2)))</code>. More efficient than close-to-close volatility.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">parkinson_vol</span><span class="p">(</span><span class="n">highs</span><span class="p">,</span> <span class="n">lows</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="rogers_satchell_volopen-high-low-close-period-ndarray"><code>rogers_satchell_vol(open, high, low, close, period) -&gt; ndarray</code><a class="headerlink" href="#rogers_satchell_volopen-high-low-close-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Rogers-Satchell OHLC volatility estimator. Unbiased with drift, suitable for trending markets.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">rogers_satchell_vol</span><span class="p">(</span><span class="n">opens</span><span class="p">,</span> <span class="n">highs</span><span class="p">,</span> <span class="n">lows</span><span class="p">,</span> <span class="n">closes</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="rolling_correlationx-y-period-ndarray"><code>rolling_correlation(x, y, period) -&gt; ndarray</code><a class="headerlink" href="#rolling_correlationx-y-period-ndarray" title="Permanent link">&para;</a></h3>
+<p>Rolling Pearson correlation between two series. NaN if either series is constant within the window.</p>
+<p><code>lrvx.correlation(x, y)</code> (no <code>period</code>) is the single-number Pearson coefficient — see <a href="../optimizer/#correlation">Optimizer</a>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">rolling_correlation</span><span class="p">(</span><span class="n">closes_btc</span><span class="p">,</span> <span class="n">closes_eth</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="autocorrelationinput-window-lag-ndarray"><code>autocorrelation(input, window, lag) -&gt; ndarray</code><a class="headerlink" href="#autocorrelationinput-window-lag-ndarray" title="Permanent link">&para;</a></h3>
+<p>Rolling autocorrelation of a series against itself at a fixed <code>lag</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">autocorrelation</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">lag</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span></code></pre></div>
+<hr />
+<h2 id="series-diagnostics">Series diagnostics<a class="headerlink" href="#series-diagnostics" title="Permanent link">&para;</a></h2>
+<h3 id="adfinput-max_lag4-regressionc-dict"><code>adf(input, max_lag=4, regression='c') -&gt; dict</code><a class="headerlink" href="#adfinput-max_lag4-regressionc-dict" title="Permanent link">&para;</a></h3>
+<p>Augmented Dickey-Fuller unit-root test. <code>regression</code> selects the deterministic terms. Returns <code>test_stat</code>, <code>p_value</code>, <code>used_lag</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">adf</span><span class="p">(</span><span class="n">spread</span><span class="p">,</span> <span class="n">max_lag</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s1">'p_value'</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">0.05</span><span class="p">:</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">"spread is stationary"</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="hurst_dfareturns-scalesnone-float"><code>hurst_dfa(returns, scales=None) -&gt; float</code><a class="headerlink" href="#hurst_dfareturns-scalesnone-float" title="Permanent link">&para;</a></h3>
+<p>Hurst exponent via Detrended Fluctuation Analysis. Input is a series of <strong>returns</strong>, not prices. <code>H ~ 0.5</code> random, <code>H &gt; 0.5</code> persistent/trending, <code>H &lt; 0.5</code> mean-reverting. <code>scales=None</code> uses a log-spaced grid from 4 to <code>N/4</code>. Returns NaN for inputs shorter than 32 or degenerate ones.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">h</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">hurst_dfa</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">closes</span><span class="p">)))</span>
+</span></code></pre></div>
+<h3 id="rolling_hurstprices-window1080-ndarray"><code>rolling_hurst(prices, window=1080) -&gt; ndarray</code><a class="headerlink" href="#rolling_hurstprices-window1080-ndarray" title="Permanent link">&para;</a></h3>
+<p>Rolling DFA-Hurst on price levels. For bar <code>i</code> it computes the Hurst exponent of the previous <code>window</code> log-returns; <code>output[i]</code> is NaN for <code>i &lt;= window</code>. Output length matches input.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">rolling_hurst</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">1080</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="realized_volreturns-periods_per_year-float"><code>realized_vol(returns, periods_per_year) -&gt; float</code><a class="headerlink" href="#realized_volreturns-periods_per_year-float" title="Permanent link">&para;</a></h3>
+<p>Annualized realized volatility from log returns: sample stdev times <code>sqrt(periods_per_year)</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="n">rv</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">realized_vol</span><span class="p">(</span><span class="n">log_returns</span><span class="p">,</span> <span class="n">periods_per_year</span><span class="o">=</span><span class="mi">365</span> <span class="o">*</span> <span class="mi">24</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="whites_reality_checkreturns-num_bootstrap10000-avg_block_size00-seed42-dict"><code>whites_reality_check(returns, num_bootstrap=10000, avg_block_size=0.0, seed=42) -&gt; dict</code><a class="headerlink" href="#whites_reality_checkreturns-num_bootstrap10000-avg_block_size00-seed42-dict" title="Permanent link">&para;</a></h3>
+<p>White's reality check via stationary bootstrap. Tests whether the best of <code>K</code> candidate strategies beats zero after multiple-comparison correction. <code>returns</code> is a <code>(K, T)</code> array of <strong>excess</strong> returns relative to a benchmark. Returns <code>p_value</code>, <code>best_stat</code>, <code>best_index</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">whites_reality_check</span><span class="p">(</span><span class="n">excess_returns</span><span class="p">)</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s1">'best_index'</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="s1">'p_value'</span><span class="p">])</span>
+</span></code></pre></div>
+<h3 id="list_indicators-list"><code>list_indicators() -&gt; list</code><a class="headerlink" href="#list_indicators-list" title="Permanent link">&para;</a></h3>
+<p>Names of every indicator class registered in this build.</p>
+<hr />
+<h2 id="volume">Volume<a class="headerlink" href="#volume" title="Permanent link">&para;</a></h2>
+<h3 id="vwapclose-volume-window96-ndarray"><code>vwap(close, volume, window=96) -&gt; ndarray</code><a class="headerlink" href="#vwapclose-volume-window96-ndarray" title="Permanent link">&para;</a></h3>
+<p>Rolling Volume-Weighted Average Price.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">vwap</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">volumes</span><span class="p">,</span> <span class="n">window</span><span class="o">=</span><span class="mi">96</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="obvclose-volume-ndarray"><code>obv(close, volume) -&gt; ndarray</code><a class="headerlink" href="#obvclose-volume-ndarray" title="Permanent link">&para;</a></h3>
+<p>On-Balance Volume.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">obv</span><span class="p">(</span><span class="n">closes</span><span class="p">,</span> <span class="n">volumes</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="cvdopen-high-low-close-volume-ndarray"><code>cvd(open, high, low, close, volume) -&gt; ndarray</code><a class="headerlink" href="#cvdopen-high-low-close-volume-ndarray" title="Permanent link">&para;</a></h3>
+<p>Cumulative Volume Delta. Estimates buying/selling pressure from OHLCV data.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">cvd</span><span class="p">(</span><span class="n">opens</span><span class="p">,</span> <span class="n">highs</span><span class="p">,</span> <span class="n">lows</span><span class="p">,</span> <span class="n">closes</span><span class="p">,</span> <span class="n">volumes</span><span class="p">)</span>
+</span></code></pre></div>
+<hr />
+<h2 id="strategy-helpers">Strategy Helpers<a class="headerlink" href="#strategy-helpers" title="Permanent link">&para;</a></h2>
+<h3 id="bar_returnssignal_long-signal_short-log_returns-ndarray"><code>bar_returns(signal_long, signal_short, log_returns) -&gt; ndarray</code><a class="headerlink" href="#bar_returnssignal_long-signal_short-log_returns-ndarray" title="Permanent link">&para;</a></h3>
+<p>Compute per-bar returns given position signals and log returns.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="n">returns</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">bar_returns</span><span class="p">(</span><span class="n">signal_long</span><span class="p">,</span> <span class="n">signal_short</span><span class="p">,</span> <span class="n">log_returns</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>signal_long</code> and <code>signal_short</code> are <code>int8[]</code> (+1 or 0 / -1 or 0). <code>log_returns</code> is <code>float64[]</code>.</p>
+<h3 id="trade_pnlsignal_long-signal_short-log_returns-ndarray"><code>trade_pnl(signal_long, signal_short, log_returns) -&gt; ndarray</code><a class="headerlink" href="#trade_pnlsignal_long-signal_short-log_returns-ndarray" title="Permanent link">&para;</a></h3>
+<p>Extract per-trade PnL from position signals.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="n">pnls</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">trade_pnl</span><span class="p">(</span><span class="n">signal_long</span><span class="p">,</span> <span class="n">signal_short</span><span class="p">,</span> <span class="n">log_returns</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="profit_factorreturns-float"><code>profit_factor(returns) -&gt; float</code><a class="headerlink" href="#profit_factorreturns-float" title="Permanent link">&para;</a></h3>
+<p>Ratio of gross profit to gross loss. Values &gt; 1.0 indicate profitability.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="n">pf</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">profit_factor</span><span class="p">(</span><span class="n">returns</span><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="win_ratetrade_pnls-float"><code>win_rate(trade_pnls) -&gt; float</code><a class="headerlink" href="#win_ratetrade_pnls-float" title="Permanent link">&para;</a></h3>
+<p>Fraction of trades with positive PnL.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="n">wr</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">win_rate</span><span class="p">(</span><span class="n">pnls</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="indicator-catalog">Indicator catalog<a class="headerlink" href="#indicator-catalog" title="Permanent link">&para;</a></h2>
+<!-- INDICATOR-LIST-START -->
+
+<p>Every indicator below is <strong>one Python class</strong> with both a batch
+<code>compute()</code> method and streaming <code>update()</code>/<code>value</code>/<code>ready</code>/<code>reset()</code>.
+Same instance, two ways to use it:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">lrvx</span>
+</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="n">ema</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">EMA</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="n">out</span> <span class="o">=</span> <span class="n">ema</span><span class="o">.</span><span class="n">compute</span><span class="p">(</span><span class="n">prices</span><span class="p">)</span>             <span class="c1"># batch</span>
+</span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">stream</span><span class="p">:</span>
+</span><span id="__span-36-5"><a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>    <span class="n">ema</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+</span><span id="__span-36-6"><a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a>    <span class="k">if</span> <span class="n">ema</span><span class="o">.</span><span class="n">ready</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="n">ema</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>    <span class="c1"># streaming on the same instance</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Indicator</th>
+<th>Constructor</th>
+<th>Kind</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EMA</code></td>
+<td><code>lrvx.EMA(period)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>SMA</code></td>
+<td><code>lrvx.SMA(period)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>RMA</code></td>
+<td><code>lrvx.RMA(period)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>RSI</code></td>
+<td><code>lrvx.RSI(period)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>KAMA</code></td>
+<td><code>lrvx.KAMA(period, fast, slow)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>DEMA</code></td>
+<td><code>lrvx.DEMA(period)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>TEMA</code></td>
+<td><code>lrvx.TEMA(period)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>Slope</code></td>
+<td><code>lrvx.Slope(length)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>Skewness</code></td>
+<td><code>lrvx.Skewness(period)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>Kurtosis</code></td>
+<td><code>lrvx.Kurtosis(period)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>RollingZScore</code></td>
+<td><code>lrvx.RollingZScore(period)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>ShannonEntropy</code></td>
+<td><code>lrvx.ShannonEntropy(period, bins)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>AutoCorrelation</code></td>
+<td><code>lrvx.AutoCorrelation(window, lag)</code></td>
+<td>SingleInput</td>
+</tr>
+<tr>
+<td><code>ATR</code></td>
+<td><code>lrvx.ATR(period)</code></td>
+<td>BarInput</td>
+</tr>
+<tr>
+<td><code>CCI</code></td>
+<td><code>lrvx.CCI(period)</code></td>
+<td>BarInput</td>
+</tr>
+<tr>
+<td><code>Stochastic</code></td>
+<td><code>lrvx.Stochastic(k_period, d_period)</code></td>
+<td>BarInput</td>
+</tr>
+<tr>
+<td><code>ParkinsonVol</code></td>
+<td><code>lrvx.ParkinsonVol(period)</code></td>
+<td>HighLowInput</td>
+</tr>
+<tr>
+<td><code>RogersSatchellVol</code></td>
+<td><code>lrvx.RogersSatchellVol(period)</code></td>
+<td>OhlcInput</td>
+</tr>
+<tr>
+<td><code>Correlation</code></td>
+<td><code>lrvx.Correlation(period)</code></td>
+<td>PairInput</td>
+</tr>
+<tr>
+<td><code>MACD</code></td>
+<td><code>lrvx.MACD(fast, slow, signal)</code></td>
+<td>MultiOutput</td>
+</tr>
+<tr>
+<td><code>Bollinger</code></td>
+<td><code>lrvx.Bollinger(period, stddev)</code></td>
+<td>MultiOutput</td>
+</tr>
+</tbody>
+</table>
+<p>Discovery: <code>lrvx.list_indicators()</code> returns the full list at runtime.</p>
+<!-- INDICATOR-LIST-END -->
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

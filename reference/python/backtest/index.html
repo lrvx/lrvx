@@ -1,0 +1,3063 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/reference/python/backtest/">
+      
+      
+        <link rel="prev" href="../segment_ops/">
+      
+      
+        <link rel="next" href="../optimizer/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Backtest Components - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#backtest-components" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Backtest Components
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../portable-sockets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sockets across platforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../_api_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full API index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine & Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aggregators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../books/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order Books
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../positions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Positions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../segment_ops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Segment Ops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Components
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#simulatedexecutor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SimulatedExecutor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SimulatedExecutor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Properties
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backtestresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BacktestResult
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BacktestResult">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stats-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stats() keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#structured-dtypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured Dtypes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Structured Dtypes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pyfill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyFill
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pytraderecord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyTradeRecord
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyequitypoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyEquityPoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimizer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy Class
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../node/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node.js
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../codon/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codon
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../quickjs/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JavaScript (embedded)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/capi/lrvx_capi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../errors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../api/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core (C++ internals)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#simulatedexecutor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SimulatedExecutor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SimulatedExecutor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Properties
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backtestresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BacktestResult
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BacktestResult">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#methods_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stats-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stats() keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#structured-dtypes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Structured Dtypes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Structured Dtypes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pyfill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyFill
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pytraderecord" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyTradeRecord
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pyequitypoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PyEquityPoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="backtest-components">Backtest Components<a class="headerlink" href="#backtest-components" title="Permanent link">&para;</a></h1>
+<p>Standalone simulated exchange for step-by-step backtesting and fill analysis.</p>
+<h2 id="simulatedexecutor">SimulatedExecutor<a class="headerlink" href="#simulatedexecutor" title="Permanent link">&para;</a></h2>
+<p>A simulated exchange that matches orders against bar closes and trade prices. Supports market, limit, stop, take-profit, and trailing stop orders.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">executor</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">SimulatedExecutor</span><span class="p">()</span>
+</span></code></pre></div>
+<h3 id="methods">Methods<a class="headerlink" href="#methods" title="Permanent link">&para;</a></h3>
+<h4 id="submit_orderid-side-price-quantity-typemarket-symbol1-tifgtc-reduce_onlyfalse-expires_at_ns0-account_id0-trigger00-trailing_offset00-trailing_bps0"><code>submit_order(id, side, price, quantity, type="market", symbol=1, tif="gtc", reduce_only=False, expires_at_ns=0, account_id=0, trigger=0.0, trailing_offset=0.0, trailing_bps=0)</code><a class="headerlink" href="#submit_orderid-side-price-quantity-typemarket-symbol1-tifgtc-reduce_onlyfalse-expires_at_ns0-account_id0-trigger00-trailing_offset00-trailing_bps0" title="Permanent link">&para;</a></h4>
+<p>Submit an order to the simulated exchange.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">submit_order</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="s2">"buy"</span><span class="p">,</span> <span class="n">price</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">quantity</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                       <span class="nb">type</span><span class="o">=</span><span class="s2">"market"</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>int</code></td>
+<td>—</td>
+<td>Order ID</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td><code>str</code></td>
+<td>—</td>
+<td><code>"buy"</code> or <code>"sell"</code></td>
+</tr>
+<tr>
+<td><code>price</code></td>
+<td><code>float</code></td>
+<td>—</td>
+<td>Limit/trigger price (0 for market)</td>
+</tr>
+<tr>
+<td><code>quantity</code></td>
+<td><code>float</code></td>
+<td>—</td>
+<td>Order size</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td><code>str</code></td>
+<td><code>"market"</code></td>
+<td>Order type (see below)</td>
+</tr>
+<tr>
+<td><code>symbol</code></td>
+<td><code>int</code></td>
+<td><code>1</code></td>
+<td>Symbol ID</td>
+</tr>
+<tr>
+<td><code>tif</code></td>
+<td><code>str</code></td>
+<td><code>"gtc"</code></td>
+<td>Time in force: <code>"gtc"</code>, <code>"ioc"</code>, <code>"fok"</code>, <code>"gtd"</code>, <code>"post_only"</code></td>
+</tr>
+<tr>
+<td><code>reduce_only</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+<td>Only reduce an existing position</td>
+</tr>
+<tr>
+<td><code>expires_at_ns</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+<td>GTD deadline</td>
+</tr>
+<tr>
+<td><code>account_id</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+<td>Self-trade-prevention account identifier</td>
+</tr>
+<tr>
+<td><code>trigger</code></td>
+<td><code>float</code></td>
+<td><code>0.0</code></td>
+<td>Trigger price for the conditional order types; falls back to <code>price</code> when unset</td>
+</tr>
+<tr>
+<td><code>trailing_offset</code></td>
+<td><code>float</code></td>
+<td><code>0.0</code></td>
+<td>Fixed-price offset for <code>"trailing_stop"</code></td>
+</tr>
+<tr>
+<td><code>trailing_bps</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+<td>Bps offset for <code>"trailing_stop"</code> — set exactly one of the two</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Order types:</strong> <code>"limit"</code>, <code>"market"</code>, <code>"stop_market"</code>, <code>"stop_limit"</code>, <code>"tp_market"</code>, <code>"tp_limit"</code>, <code>"trailing_stop"</code>, <code>"iceberg"</code> — the canonical set, also readable as <code>lrvx.ORDER_TYPE_NAMES</code>. Anything else raises <code>ValueError</code> naming the accepted set; it is never quietly turned into a market order.</p>
+<h4 id="cancel_orderorder_id"><code>cancel_order(order_id)</code><a class="headerlink" href="#cancel_orderorder_id" title="Permanent link">&para;</a></h4>
+<p>Cancel an order by ID.</p>
+<h4 id="cancel_allsymbol"><code>cancel_all(symbol)</code><a class="headerlink" href="#cancel_allsymbol" title="Permanent link">&para;</a></h4>
+<p>Cancel all orders for a symbol.</p>
+<h4 id="on_barsymbol-close_price"><code>on_bar(symbol, close_price)</code><a class="headerlink" href="#on_barsymbol-close_price" title="Permanent link">&para;</a></h4>
+<p>Feed a bar close price for order matching. Limit orders are matched against this price.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">on_bar</span><span class="p">(</span><span class="n">symbol</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">close_price</span><span class="o">=</span><span class="mf">50000.0</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="on_bar_ohlcsymbol-open-high-low-close"><code>on_bar_ohlc(symbol, open, high, low, close)</code><a class="headerlink" href="#on_bar_ohlcsymbol-open-high-low-close" title="Permanent link">&para;</a></h4>
+<p>The manual bar path: feed a full OHLC bar instead of a close price alone. Moves
+the market to <code>open</code> — releasing any order held from a prior
+<code>begin_bar_callback_window()</code> / <code>end_bar_callback_window()</code> pair at that
+price — then walks <code>low -&gt; high -&gt; close</code> so resting stops and targets match
+the bar's intrabar extremes, not just its close. Use this, not <code>on_bar</code>, when
+driving <code>SimulatedExecutor</code> by hand: <code>BacktestRunner.run_bars</code> uses this
+overload internally, so <code>on_bar</code> alone gives a caller neither the bar's open
+nor its intrabar extremes.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">on_bar_ohlc</span><span class="p">(</span><span class="n">symbol</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">open</span><span class="o">=</span><span class="mf">50000.0</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mf">50500.0</span><span class="p">,</span> <span class="n">low</span><span class="o">=</span><span class="mf">49800.0</span><span class="p">,</span> <span class="n">close</span><span class="o">=</span><span class="mf">50200.0</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="begin_bar_callback_window-end_bar_callback_window"><code>begin_bar_callback_window()</code> / <code>end_bar_callback_window()</code><a class="headerlink" href="#begin_bar_callback_window-end_bar_callback_window" title="Permanent link">&para;</a></h4>
+<p>Bracket a hand-driven strategy callback so orders it submits are held instead
+of matched immediately — matching against a bar's own high/low/close from
+inside its callback is look-ahead, since the market has already been walked
+through that bar by the time the callback runs. Held orders release at the
+next <code>on_bar_ohlc</code> call's open.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">on_bar_ohlc</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">open</span><span class="o">=</span><span class="mf">50000.0</span><span class="p">,</span> <span class="n">high</span><span class="o">=</span><span class="mf">50500.0</span><span class="p">,</span> <span class="n">low</span><span class="o">=</span><span class="mf">49800.0</span><span class="p">,</span> <span class="n">close</span><span class="o">=</span><span class="mf">50200.0</span><span class="p">)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">executor</span><span class="o">.</span><span class="n">begin_bar_callback_window</span><span class="p">()</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">executor</span><span class="o">.</span><span class="n">submit_order</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"buy"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="s2">"market"</span><span class="p">,</span> <span class="n">symbol</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">executor</span><span class="o">.</span><span class="n">end_bar_callback_window</span><span class="p">()</span>
+</span></code></pre></div>
+<h4 id="on_tradesymbol-price-is_buy"><code>on_trade(symbol, price, is_buy)</code><a class="headerlink" href="#on_tradesymbol-price-is_buy" title="Permanent link">&para;</a></h4>
+<p>Feed a trade for order matching.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">on_trade</span><span class="p">(</span><span class="n">symbol</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">price</span><span class="o">=</span><span class="mf">50000.0</span><span class="p">,</span> <span class="n">is_buy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="on_trade_qtysymbol-price-qty-is_buy"><code>on_trade_qty(symbol, price, qty, is_buy)</code><a class="headerlink" href="#on_trade_qtysymbol-price-qty-is_buy" title="Permanent link">&para;</a></h4>
+<p>Feed a trade with quantity. Required for <code>QUEUE_FULL</code> queue simulation.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">on_trade_qty</span><span class="p">(</span><span class="n">symbol</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">price</span><span class="o">=</span><span class="mf">50000.0</span><span class="p">,</span> <span class="n">qty</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">is_buy</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="on_best_levelssymbol-bid_price-bid_qty-ask_price-ask_qty"><code>on_best_levels(symbol, bid_price, bid_qty, ask_price, ask_qty)</code><a class="headerlink" href="#on_best_levelssymbol-bid_price-bid_qty-ask_price-ask_qty" title="Permanent link">&para;</a></h4>
+<p>Feed a top-of-book snapshot.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">on_best_levels</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mf">49999.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">50001.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="set_default_slippagemodel-ticks0-tick_size00-bps00-impact_coeff00"><code>set_default_slippage(model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)</code><a class="headerlink" href="#set_default_slippagemodel-ticks0-tick_size00-bps00-impact_coeff00" title="Permanent link">&para;</a></h4>
+<p>Configure slippage for all symbols. <code>model</code> is a string.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">set_default_slippage</span><span class="p">(</span><span class="s2">"fixed_bps"</span><span class="p">,</span> <span class="n">bps</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th><code>model</code></th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"none"</code></td>
+<td>No slippage</td>
+</tr>
+<tr>
+<td><code>"fixed_ticks"</code></td>
+<td>Fixed tick count — uses <code>ticks</code> and <code>tick_size</code></td>
+</tr>
+<tr>
+<td><code>"fixed_bps"</code></td>
+<td>Fixed basis points — uses <code>bps</code></td>
+</tr>
+<tr>
+<td><code>"volume_impact"</code></td>
+<td>Volume-proportional impact — uses <code>impact_coeff</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>tick_size</code> is in price units; <code>0.0</code> falls back to one raw price unit.</p>
+<h4 id="set_symbol_slippagesymbol-model-ticks0-tick_size00-bps00-impact_coeff00"><code>set_symbol_slippage(symbol, model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)</code><a class="headerlink" href="#set_symbol_slippagesymbol-model-ticks0-tick_size00-bps00-impact_coeff00" title="Permanent link">&para;</a></h4>
+<p>Per-symbol slippage override. Same parameters as <code>set_default_slippage</code>.</p>
+<h4 id="set_queue_modelmodel-depth1"><code>set_queue_model(model, depth=1)</code><a class="headerlink" href="#set_queue_modelmodel-depth1" title="Permanent link">&para;</a></h4>
+<p>Configure limit order queue simulation. <code>model</code> is a string.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">set_queue_model</span><span class="p">(</span><span class="s2">"tob"</span><span class="p">,</span> <span class="n">depth</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th><code>model</code></th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"none"</code></td>
+<td>Fill limit orders immediately at price</td>
+</tr>
+<tr>
+<td><code>"tob"</code></td>
+<td>Fill only when price trades through level</td>
+</tr>
+<tr>
+<td><code>"full"</code></td>
+<td>Model queue position; fill as volume passes</td>
+</tr>
+<tr>
+<td><code>"pro_rata"</code></td>
+<td>Split each trade across the level proportionally to size</td>
+</tr>
+<tr>
+<td><code>"pro_rata_with_fifo"</code></td>
+<td>First N orders at a level fill FIFO (<code>set_queue_fifo_top_n</code>), the rest pro-rata</td>
+</tr>
+<tr>
+<td><code>"top_pro_lmm"</code></td>
+<td>Reserve a share for the queue front (<code>set_top_priority_share</code>), then pro-rata with an LMM bonus</td>
+</tr>
+<tr>
+<td><code>"pro_rata_with_priority"</code></td>
+<td>Pro-rata weighted by <code>set_order_priority_multiplier</code></td>
+</tr>
+</tbody>
+</table>
+<h4 id="advance_clocktimestamp_ns"><code>advance_clock(timestamp_ns)</code><a class="headerlink" href="#advance_clocktimestamp_ns" title="Permanent link">&para;</a></h4>
+<p>Advance the simulation clock.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">advance_clock</span><span class="p">(</span><span class="n">timestamp_ns</span><span class="o">=</span><span class="mi">1704067200_000_000_000</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="reset"><code>reset()</code><a class="headerlink" href="#reset" title="Permanent link">&para;</a></h4>
+<p>Drop fills and run-scoped state (held/conditional orders, queue positions,
+net positions, brackets, in-flight acks, market state) while keeping
+installed configuration — slippage, queue model, latency distributions, rate
+limits, STP, callbacks, attached venue availability. Seeded RNGs go back to
+their configured seeds. Call between passes when replaying several
+hand-driven runs through one executor, so each reports only its own fills.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">executor</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="k">assert</span> <span class="n">executor</span><span class="o">.</span><span class="n">fill_count</span> <span class="o">==</span> <span class="mi">0</span>
+</span></code></pre></div>
+<h4 id="fills-ndarray"><code>fills() -&gt; ndarray</code><a class="headerlink" href="#fills-ndarray" title="Permanent link">&para;</a></h4>
+<p>Get all fills as a numpy structured array with <code>PyFill</code> dtype.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">fills</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">fills</span><span class="p">()</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">fills</span><span class="p">)):</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Fill: order=</span><span class="si">{</span><span class="n">fills</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">'order_id'</span><span class="p">]</span><span class="si">}</span><span class="s2">, price=</span><span class="si">{</span><span class="n">fills</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">'price_raw'</span><span class="p">]</span><span class="o">/</span><span class="mf">1e8</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="fills_list-listdict"><code>fills_list() -&gt; list[dict]</code><a class="headerlink" href="#fills_list-listdict" title="Permanent link">&para;</a></h4>
+<p>Get fills as a list of dicts (more convenient, less performant).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">for</span> <span class="n">fill</span> <span class="ow">in</span> <span class="n">executor</span><span class="o">.</span><span class="n">fills_list</span><span class="p">():</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">fill</span><span class="p">[</span><span class="s1">'side'</span><span class="p">]</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">fill</span><span class="p">[</span><span class="s1">'quantity'</span><span class="p">]</span><span class="si">}</span><span class="s2"> @ </span><span class="si">{</span><span class="n">fill</span><span class="p">[</span><span class="s1">'price'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order_id</code></td>
+<td><code>int</code></td>
+<td>Order ID</td>
+</tr>
+<tr>
+<td><code>symbol</code></td>
+<td><code>int</code></td>
+<td>Symbol ID</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td><code>str</code></td>
+<td><code>"buy"</code> or <code>"sell"</code></td>
+</tr>
+<tr>
+<td><code>price</code></td>
+<td><code>float</code></td>
+<td>Fill price</td>
+</tr>
+<tr>
+<td><code>quantity</code></td>
+<td><code>float</code></td>
+<td>Fill quantity</td>
+</tr>
+<tr>
+<td><code>timestamp_ns</code></td>
+<td><code>int</code></td>
+<td>Fill timestamp</td>
+</tr>
+</tbody>
+</table>
+<h3 id="properties">Properties<a class="headerlink" href="#properties" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fill_count</code></td>
+<td><code>int</code></td>
+<td>Number of fills</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="backtestresult">BacktestResult<a class="headerlink" href="#backtestresult" title="Permanent link">&para;</a></h2>
+<p>Computes statistics and equity curve from a <code>SimulatedExecutor</code>'s fills.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">BacktestResult</span><span class="p">(</span><span class="n">initial_capital</span><span class="o">=</span><span class="mf">10_000.0</span><span class="p">,</span> <span class="n">fee_rate</span><span class="o">=</span><span class="mf">0.0004</span><span class="p">)</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">result</span><span class="o">.</span><span class="n">ingest_executor</span><span class="p">(</span><span class="n">executor</span><span class="p">)</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">stats</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">stats</span><span class="p">()</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">stats</span><span class="p">[</span><span class="s1">'net_pnl'</span><span class="p">],</span> <span class="n">stats</span><span class="p">[</span><span class="s1">'sharpe_ratio'</span><span class="p">])</span>
+</span></code></pre></div>
+<h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">lrvx</span><span class="o">.</span><span class="n">BacktestResult</span><span class="p">(</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>    <span class="n">initial_capital</span><span class="o">=</span><span class="mf">100000.0</span><span class="p">,</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    <span class="n">fee_rate</span><span class="o">=</span><span class="mf">0.0001</span><span class="p">,</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>    <span class="n">use_percentage_fee</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>    <span class="n">fixed_fee_per_trade</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>    <span class="n">risk_free_rate</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>    <span class="n">annualization_factor</span><span class="o">=</span><span class="mf">252.0</span><span class="p">,</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="p">)</span>
+</span></code></pre></div>
+<h3 id="methods_1">Methods<a class="headerlink" href="#methods_1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>record_fill(order_id, symbol, side, price, quantity, timestamp_ns)</code></td>
+<td><code>None</code></td>
+<td>Record a single fill</td>
+</tr>
+<tr>
+<td><code>ingest_executor(executor)</code></td>
+<td><code>None</code></td>
+<td>Drain all fills from a <code>SimulatedExecutor</code> in FIFO order</td>
+</tr>
+<tr>
+<td><code>stats()</code></td>
+<td><code>dict</code></td>
+<td>Compute and return statistics</td>
+</tr>
+<tr>
+<td><code>trades()</code></td>
+<td><code>ndarray</code></td>
+<td>Closed trades as a <code>PyTradeRecord</code> structured array</td>
+</tr>
+<tr>
+<td><code>equity_curve()</code></td>
+<td><code>ndarray</code></td>
+<td>Equity curve as a <code>PyEquityPoint</code> structured array</td>
+</tr>
+<tr>
+<td><code>write_equity_curve_csv(path)</code></td>
+<td><code>bool</code></td>
+<td>Write equity curve to CSV (<code>timestamp_ns,equity,drawdown_pct</code> header)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="stats-keys"><code>stats()</code> keys<a class="headerlink" href="#stats-keys" title="Permanent link">&para;</a></h3>
+<p>The <a href="../engine/#stats"><code>Stats</code></a> object returned by <code>Engine.run()</code> is a different, smaller set, but the key names are the same.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>total_trades</code></td>
+<td><code>int</code></td>
+<td>Round-trip trade count</td>
+</tr>
+<tr>
+<td><code>winning_trades</code></td>
+<td><code>int</code></td>
+<td>Profitable trade count</td>
+</tr>
+<tr>
+<td><code>losing_trades</code></td>
+<td><code>int</code></td>
+<td>Losing trade count</td>
+</tr>
+<tr>
+<td><code>max_consecutive_wins</code></td>
+<td><code>int</code></td>
+<td>Longest winning streak</td>
+</tr>
+<tr>
+<td><code>max_consecutive_losses</code></td>
+<td><code>int</code></td>
+<td>Longest losing streak</td>
+</tr>
+<tr>
+<td><code>initial_capital</code></td>
+<td><code>float</code></td>
+<td>Starting capital</td>
+</tr>
+<tr>
+<td><code>final_capital</code></td>
+<td><code>float</code></td>
+<td>Ending capital</td>
+</tr>
+<tr>
+<td><code>total_pnl</code></td>
+<td><code>float</code></td>
+<td>Gross PnL</td>
+</tr>
+<tr>
+<td><code>total_fees</code></td>
+<td><code>float</code></td>
+<td>Total fees paid</td>
+</tr>
+<tr>
+<td><code>net_pnl</code></td>
+<td><code>float</code></td>
+<td>PnL after fees</td>
+</tr>
+<tr>
+<td><code>gross_profit</code></td>
+<td><code>float</code></td>
+<td>Sum of winning trades</td>
+</tr>
+<tr>
+<td><code>gross_loss</code></td>
+<td><code>float</code></td>
+<td>Sum of losing trades</td>
+</tr>
+<tr>
+<td><code>max_drawdown</code></td>
+<td><code>float</code></td>
+<td>Maximum drawdown (absolute)</td>
+</tr>
+<tr>
+<td><code>max_drawdown_pct</code></td>
+<td><code>float</code></td>
+<td>Maximum drawdown (percentage)</td>
+</tr>
+<tr>
+<td><code>win_rate</code></td>
+<td><code>float</code></td>
+<td>Fraction of winning trades</td>
+</tr>
+<tr>
+<td><code>profit_factor</code></td>
+<td><code>float</code></td>
+<td>Gross profit / gross loss</td>
+</tr>
+<tr>
+<td><code>avg_win</code></td>
+<td><code>float</code></td>
+<td>Average winning trade</td>
+</tr>
+<tr>
+<td><code>avg_loss</code></td>
+<td><code>float</code></td>
+<td>Average losing trade</td>
+</tr>
+<tr>
+<td><code>avg_win_loss_ratio</code></td>
+<td><code>float</code></td>
+<td>Average win over average loss</td>
+</tr>
+<tr>
+<td><code>avg_trade_duration_ns</code></td>
+<td><code>int</code></td>
+<td>Mean trade holding time (ns)</td>
+</tr>
+<tr>
+<td><code>median_trade_duration_ns</code></td>
+<td><code>int</code></td>
+<td>Median trade holding time (ns)</td>
+</tr>
+<tr>
+<td><code>max_trade_duration_ns</code></td>
+<td><code>int</code></td>
+<td>Longest trade holding time (ns)</td>
+</tr>
+<tr>
+<td><code>sharpe_ratio</code></td>
+<td><code>float</code></td>
+<td>Annualized Sharpe ratio</td>
+</tr>
+<tr>
+<td><code>sortino_ratio</code></td>
+<td><code>float</code></td>
+<td>Annualized Sortino ratio</td>
+</tr>
+<tr>
+<td><code>calmar_ratio</code></td>
+<td><code>float</code></td>
+<td>Calmar ratio</td>
+</tr>
+<tr>
+<td><code>time_weighted_return</code></td>
+<td><code>float</code></td>
+<td>Time-weighted return</td>
+</tr>
+<tr>
+<td><code>return_pct</code></td>
+<td><code>float</code></td>
+<td>Net return percentage</td>
+</tr>
+<tr>
+<td><code>start_time_ns</code></td>
+<td><code>int</code></td>
+<td>First fill timestamp</td>
+</tr>
+<tr>
+<td><code>end_time_ns</code></td>
+<td><code>int</code></td>
+<td>Last fill timestamp</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="structured-dtypes">Structured Dtypes<a class="headerlink" href="#structured-dtypes" title="Permanent link">&para;</a></h2>
+<h3 id="pyfill">PyFill<a class="headerlink" href="#pyfill" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order_id</code></td>
+<td><code>uint64</code></td>
+<td>Order ID</td>
+</tr>
+<tr>
+<td><code>symbol</code></td>
+<td><code>uint32</code></td>
+<td>Symbol ID</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td><code>uint8</code></td>
+<td>0 = buy, 1 = sell</td>
+</tr>
+<tr>
+<td><code>price_raw</code></td>
+<td><code>int64</code></td>
+<td>Fill price * 10^8</td>
+</tr>
+<tr>
+<td><code>quantity_raw</code></td>
+<td><code>int64</code></td>
+<td>Fill quantity * 10^8</td>
+</tr>
+<tr>
+<td><code>timestamp_ns</code></td>
+<td><code>int64</code></td>
+<td>Fill timestamp (ns)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pytraderecord">PyTradeRecord<a class="headerlink" href="#pytraderecord" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>symbol</code></td>
+<td><code>uint32</code></td>
+<td>Symbol ID</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td><code>uint8</code></td>
+<td>0 = buy, 1 = sell</td>
+</tr>
+<tr>
+<td><code>entry_price_raw</code></td>
+<td><code>int64</code></td>
+<td>Entry price * 10^8</td>
+</tr>
+<tr>
+<td><code>exit_price_raw</code></td>
+<td><code>int64</code></td>
+<td>Exit price * 10^8</td>
+</tr>
+<tr>
+<td><code>quantity_raw</code></td>
+<td><code>int64</code></td>
+<td>Trade quantity * 10^8</td>
+</tr>
+<tr>
+<td><code>entry_time_ns</code></td>
+<td><code>int64</code></td>
+<td>Entry timestamp</td>
+</tr>
+<tr>
+<td><code>exit_time_ns</code></td>
+<td><code>int64</code></td>
+<td>Exit timestamp</td>
+</tr>
+<tr>
+<td><code>pnl_raw</code></td>
+<td><code>int64</code></td>
+<td>PnL * 10^8</td>
+</tr>
+<tr>
+<td><code>fee_raw</code></td>
+<td><code>int64</code></td>
+<td>Fee * 10^8</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pyequitypoint">PyEquityPoint<a class="headerlink" href="#pyequitypoint" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timestamp_ns</code></td>
+<td><code>int64</code></td>
+<td>Sample timestamp (ns)</td>
+</tr>
+<tr>
+<td><code>equity</code></td>
+<td><code>float64</code></td>
+<td>Account equity</td>
+</tr>
+<tr>
+<td><code>drawdown_pct</code></td>
+<td><code>float64</code></td>
+<td>Drawdown from peak (percentage)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">lrvx</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">executor</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">SimulatedExecutor</span><span class="p">()</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="c1"># Simulate a simple trade</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="n">executor</span><span class="o">.</span><span class="n">advance_clock</span><span class="p">(</span><span class="mi">1_000_000_000</span><span class="p">)</span>  <span class="c1"># t=1s</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="n">executor</span><span class="o">.</span><span class="n">submit_order</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="s2">"buy"</span><span class="p">,</span> <span class="n">price</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">quantity</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="n">executor</span><span class="o">.</span><span class="n">on_bar</span><span class="p">(</span><span class="n">symbol</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">close_price</span><span class="o">=</span><span class="mf">50000.0</span><span class="p">)</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="n">executor</span><span class="o">.</span><span class="n">advance_clock</span><span class="p">(</span><span class="mi">2_000_000_000</span><span class="p">)</span>  <span class="c1"># t=2s</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="n">executor</span><span class="o">.</span><span class="n">submit_order</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="s2">"sell"</span><span class="p">,</span> <span class="n">price</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">quantity</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</span><span id="__span-16-12"><a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a><span class="n">executor</span><span class="o">.</span><span class="n">on_bar</span><span class="p">(</span><span class="n">symbol</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">close_price</span><span class="o">=</span><span class="mf">51000.0</span><span class="p">)</span>
+</span><span id="__span-16-13"><a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a>
+</span><span id="__span-16-14"><a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="k">for</span> <span class="n">fill</span> <span class="ow">in</span> <span class="n">executor</span><span class="o">.</span><span class="n">fills_list</span><span class="p">():</span>
+</span><span id="__span-16-15"><a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">fill</span><span class="p">[</span><span class="s1">'side'</span><span class="p">]</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">fill</span><span class="p">[</span><span class="s1">'quantity'</span><span class="p">]</span><span class="si">}</span><span class="s2"> @ </span><span class="si">{</span><span class="n">fill</span><span class="p">[</span><span class="s1">'price'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</span></code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

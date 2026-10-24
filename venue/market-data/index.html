@@ -1,0 +1,2749 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/venue/market-data/">
+      
+      
+        <link rel="prev" href="../runtime/">
+      
+      
+        <link rel="next" href="../perimeter/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Market data - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#market-data" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Market data
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Venue
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building with/without the venue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build profiles (venue-lite)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Matching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clearing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clearing and the ledger
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../risk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Derivatives risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market data
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Messages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-enginetsns-and-sendtsns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time: engineTsNs and sendTsNs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trading status
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Trading status">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#closed-is-not-halted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closed is not Halted
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#derivatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derivatives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Derivatives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-funding-calendar-is-state-not-a-formula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The funding calendar is state, not a formula
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequencing-restarts-and-epochs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequencing, restarts and epochs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gap-detection-client-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gap detection (client side)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshot-and-recovery-tcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot and recovery (TCP)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Snapshot and recovery (TCP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-a-snapshot-carries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a snapshot carries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exposing-the-recovery-channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exposing the recovery channel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#automatic-client-recovery-recoveringmdsubscriber" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic client recovery (RecoveringMdSubscriber)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-a-transport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a transport
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#unicast-distribution-mddistributionserver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unicast distribution (MdDistributionServer)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pluggable-encodings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pluggable encodings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fix-market-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FIX market data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#icebergs-and-the-public-feed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Icebergs and the public feed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depth-is-the-aggregate-kept-in-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Depth is the aggregate, kept in step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbe-codec-and-multicast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SBE codec and multicast
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tape
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../perimeter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perimeter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fix-initiator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting over FIX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fix-quoting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quoting over FIX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-agent simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Messages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-enginetsns-and-sendtsns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time: engineTsNs and sendTsNs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trading-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trading status
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Trading status">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#closed-is-not-halted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closed is not Halted
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#derivatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Derivatives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Derivatives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-funding-calendar-is-state-not-a-formula" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The funding calendar is state, not a formula
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequencing-restarts-and-epochs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequencing, restarts and epochs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gap-detection-client-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gap detection (client side)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snapshot-and-recovery-tcp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snapshot and recovery (TCP)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Snapshot and recovery (TCP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-a-snapshot-carries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a snapshot carries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exposing-the-recovery-channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exposing the recovery channel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#automatic-client-recovery-recoveringmdsubscriber" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automatic client recovery (RecoveringMdSubscriber)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-a-transport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a transport
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#unicast-distribution-mddistributionserver" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unicast distribution (MdDistributionServer)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pluggable-encodings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pluggable encodings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fix-market-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FIX market data
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#icebergs-and-the-public-feed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Icebergs and the public feed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depth-is-the-aggregate-kept-in-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Depth is the aggregate, kept in step
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sbe-codec-and-multicast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SBE codec and multicast
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tape
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="market-data">Market data<a class="headerlink" href="#market-data" title="Permanent link">&para;</a></h1>
+<p>The engine emits <code>OutboundEvent</code>s about individual orders. A market data feed
+is an ordered, sequenced stream that subscribers can apply to rebuild the
+book. <code>MarketDataPublisher</code> is the bridge between the two.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">MarketDataPublisher</span><span class="o">&lt;&gt;</span><span class="w"> </span><span class="n">md</span><span class="p">([](</span><span class="k">const</span><span class="w"> </span><span class="n">MdMessage</span><span class="o">&amp;</span><span class="w"> </span><span class="n">m</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">multicast</span><span class="p">(</span><span class="n">m</span><span class="p">);</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">                         </span><span class="cm">/*tickSize*/</span><span class="w"> </span><span class="n">Price</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mf">0.01</span><span class="p">),</span><span class="w"> </span><span class="cm">/*symbol*/</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">MatchingEngine</span><span class="o">&lt;</span><span class="n">MatchingBook</span><span class="o">&gt;</span><span class="w"> </span><span class="n">venue</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="o">&amp;</span><span class="p">](</span><span class="k">const</span><span class="w"> </span><span class="n">OutboundEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">                                   </span><span class="p">{</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">                                     </span><span class="c1">// The engine's sequencer time stamps the feed;</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">                                     </span><span class="c1">// the publisher never reads a clock for it.</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">                                     </span><span class="n">md</span><span class="p">.</span><span class="n">onEvent</span><span class="p">(</span><span class="n">e</span><span class="p">,</span><span class="w"> </span><span class="n">venue</span><span class="p">.</span><span class="n">engineTimeNs</span><span class="p">());</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">                                     </span><span class="n">ledgerOrMetrics</span><span class="p">(</span><span class="n">e</span><span class="p">);</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">                                   </span><span class="p">});</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">md</span><span class="p">.</span><span class="n">book</span><span class="p">();</span><span class="w">   </span><span class="c1">// lrvx::NLevelOrderBook kept in step with the venue book</span>
+</span></code></pre></div>
+<h2 id="messages">Messages<a class="headerlink" href="#messages" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th><code>MdType</code></th>
+<th>Meaning</th>
+<th><code>price</code> field</th>
+<th><code>qty</code> field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AddOrder</code></td>
+<td>an order joined the book</td>
+<td>limit price</td>
+<td>shown quantity</td>
+</tr>
+<tr>
+<td><code>Trade</code></td>
+<td>a print (<code>id</code> is the taker)</td>
+<td>trade price</td>
+<td>executed quantity</td>
+</tr>
+<tr>
+<td><code>Executed</code></td>
+<td>a resting order was hit</td>
+<td>resting price</td>
+<td>displayed remaining</td>
+</tr>
+<tr>
+<td><code>Cancel</code></td>
+<td>an order left the book</td>
+<td>resting price</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>Replace</code></td>
+<td>an order was repriced/resized</td>
+<td>new price</td>
+<td>displayed remaining</td>
+</tr>
+<tr>
+<td><code>Triggered</code></td>
+<td>a stop fired</td>
+<td>reference price</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>TradingStatus</code></td>
+<td>halt / pause / auction transition</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>DerivativesUpdate</code></td>
+<td>mark, funding, open interest</td>
+<td>mark price</td>
+<td>open interest</td>
+</tr>
+</tbody>
+</table>
+<p>Every message carries <code>(symbol, epoch, seq)</code>: <code>seq</code> is contiguous from 1
+within one publisher lifetime, <code>epoch</code> is a random value minted when the
+publisher is constructed. One publisher serves one symbol; several publishers
+may share a multicast group, and the symbol in every root block is what a
+consumer demultiplexes on before any gap accounting.</p>
+<h2 id="time-enginetsns-and-sendtsns">Time: <code>engineTsNs</code> and <code>sendTsNs</code><a class="headerlink" href="#time-enginetsns-and-sendtsns" title="Permanent link">&para;</a></h2>
+<p>Every message on every path carries two nanosecond timestamps, and they mean
+different things on purpose.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Source</th>
+<th>Reproducible on replay?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>engineTsNs</code></td>
+<td>the sequencer-ts of the command that caused the event (<code>MatchingEngine::engineTimeNs()</code>)</td>
+<td><strong>yes</strong></td>
+</tr>
+<tr>
+<td><code>sendTsNs</code></td>
+<td>wall clock when the publisher sent <em>this copy</em></td>
+<td><strong>no</strong></td>
+</tr>
+</tbody>
+</table>
+<p><code>engineTsNs</code> is journaled input, so replaying the same command stream produces
+the same value on every message — it is what time bars, a faithful tape and
+any metric with time as a variable are built on, and it is safe to fold into a
+determinism digest. The publisher does not invent it: an <code>OutboundEvent</code>
+carries no time of its own, so the caller — which knows the engine's time —
+passes it to <code>onEvent</code>.</p>
+<p><code>sendTsNs</code> is a wall-clock read at send time and is deliberately <strong>not</strong>
+reproducible. A resend of the same message carries a later <code>sendTsNs</code> than the
+original, which is exactly how a consumer tells a replayed copy from live
+flow. <code>sendTsNs - engineTsNs</code> is the venue's own outbound latency. It must
+never enter an event hash or a determinism comparison (<code>hashEvent</code> does not
+see it: the timestamps are added by the publisher, below the event layer).</p>
+<p>Both are non-decreasing within one publisher: <code>engineTsNs</code> because sequencer
+time is, <code>sendTsNs</code> because the publisher latches the maximum it has issued —
+a backwards step of the system clock cannot make the feed look reordered.</p>
+<p>On the wire:</p>
+<ul>
+<li><strong>SBE</strong> — two trailing <code>int64</code> fields (<code>engineTs</code>, <code>sendTs</code>, <code>sinceVersion=3</code>)
+  appended to the end of every incremental root block, exactly as <code>epoch</code> was
+  in version 1. A version-1/2 reader skips them via the header's <code>blockLength</code>
+  and decodes everything else byte for byte.</li>
+<li><strong>FIX</strong> — <code>52 SendingTime</code> carries <code>sendTsNs</code>, <code>60 TransactTime</code> and
+  <code>273 MDEntryTime</code> carry <code>engineTsNs</code>. All standard fields; a message from a
+  publisher that has no timestamp (0) omits the tag rather than printing the
+  epoch.</li>
+</ul>
+<h2 id="trading-status">Trading status<a class="headerlink" href="#trading-status" title="Permanent link">&para;</a></h2>
+<p>Halts, volatility pauses and auction phases are published as transitions, from
+the engine's own state changes — a subscriber never has to infer a halt from a
+feed that went quiet, and never sees a repeat for a state that did not change.</p>
+<table>
+<thead>
+<tr>
+<th><code>TradingStatus</code></th>
+<th>Meaning</th>
+<th><code>untilNs</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Trading</code></td>
+<td>continuous matching</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>Halted</code></td>
+<td>operator halt; new orders rejected</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>LuldPause</code></td>
+<td>timed limit-up/limit-down volatility pause</td>
+<td>pause deadline (sequencer time)</td>
+</tr>
+<tr>
+<td><code>AuctionPreOpen</code></td>
+<td>pre-open accumulation, no matching</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>AuctionUncross</code></td>
+<td>the uncross itself</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>Closed</code></td>
+<td>the session is closed; new orders rejected, the book stands</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>Delisted</code></td>
+<td>withdrawn from trading, with no scheduled return; the book was pulled</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>The transitions between them are one table in <code>lrvx-venue/engine/session.h</code>,
+written out in <a href="../matching/#the-session-automaton">matching.md</a>.</p>
+<p><code>TradingStatusReason</code> says why: <code>Administrative</code> (an operator <code>AdminCmd</code>),
+<code>LuldBreach</code>, <code>LuldPauseElapsed</code> (the timed pause ran out and trading
+resumed), <code>Auction</code>, <code>Session</code> (a session boundary).</p>
+<p><code>untilNs</code> is the deadline of the <strong>timed pause and of nothing else</strong>. Any other
+state publishes 0, even when a pause deadline is still stored underneath it — a
+subscriber is never handed an expiry for a state that does not expire.</p>
+<p>An opening auction publishes three transitions — <code>AuctionPreOpen</code>,
+<code>AuctionUncross</code>, <code>Trading</code> — so the uncross fills sit between the last two and
+can be attributed to the auction rather than to continuous trading.</p>
+<h3 id="closed-is-not-halted"><code>Closed</code> is not <code>Halted</code><a class="headerlink" href="#closed-is-not-halted" title="Permanent link">&para;</a></h3>
+<p>They are different states on purpose. A halt is an <em>exception</em> — something went
+wrong and an operator stopped the instrument, with no promise about when it
+resumes. A closed session is the instrument's <em>normal</em> out-of-hours condition.
+A subscriber that cannot tell them apart cannot tell a broken market from a
+sleeping one, and the two reject an order with different reasons
+(<code>Halted</code> vs <code>MarketClosed</code>).</p>
+<ul>
+<li><code>Closed</code> is the outermost state: it wins over an auction phase and over a
+  halt in <code>tradingStatus()</code>, and the halt or auction underneath it is left
+  untouched — a close during a halt reopens <strong>still halted</strong>, because a session
+  boundary must not silently clear an exception an operator raised.</li>
+<li>Closing does <strong>not</strong> pull the book (that is <code>HaltAndCancelAll</code>). Resting
+  orders stand across the close, and a cancel is still accepted: a client must
+  be able to get out of what it cannot add to.</li>
+<li>Transitions arrive as the sequenced <code>AdminCmd</code> actions <code>CloseSession</code> /
+  <code>OpenSession</code>, so they journal, replay, hash and checkpoint like a halt.</li>
+</ul>
+<p>What the engine deliberately does <strong>not</strong> own is the <strong>calendar</strong>. Nothing here
+fires on a clock; the schedule that decides <em>when</em> to send <code>CloseSession</code> /
+<code>OpenSession</code> belongs to the operator / control plane (see
+<a href="../runtime/">runtime.md</a>), which drives it through the control-plane <code>session</code>
+verb.</p>
+<p>On the wire the value is appended at the end of the enum, so no root block
+changes and a reader of the previous schema decodes every field of the message
+and sees only an unrecognised status code — which it must treat as <strong>not
+tradeable</strong>, never as <code>Trading</code>. On FIX it is <code>326 = 18</code> (<em>Not available for
+trading</em>, FIX 4.4's end-of-session value), deliberately not the halt code <code>2</code>.</p>
+<p>The engine reaches the feed through a new <code>OutboundEvent</code>,
+<code>TradingStatusChanged</code>, which is hashed like every other event
+(<code>untilNs</code> is sequencer time, so it replays). It carries no account: the
+order-entry codecs have no exec-report form for it, exactly like
+<code>MmpTriggered</code> / <code>FeeCharged</code> / <code>Liquidation</code>.</p>
+<p>On FIX it is the standard <code>35=f SecurityStatus</code>:
+<code>326 SecurityTradingStatus</code> = <code>17</code> trading, <code>2</code> halt (both an operator halt
+and a volatility pause), <code>21</code> pre-open, <code>22</code> opening rotation, with the
+distinction FIX 4.4 cannot express in <code>326</code> spelled out in <code>58 Text</code>. It is
+sent regardless of the subscription's <code>MDEntryType</code> filter — a subscriber that
+asked for trades only still has to be told the instrument stopped trading.</p>
+<h2 id="derivatives">Derivatives<a class="headerlink" href="#derivatives" title="Permanent link">&para;</a></h2>
+<p><code>DerivativesUpdate</code> carries what a perp holder needs to value a position:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>price</code></td>
+<td>mark price (the last <code>SetMark</code> the engine was given)</td>
+</tr>
+<tr>
+<td><code>fundingRateRaw</code></td>
+<td>last applied funding rate, at <code>kFundingRateScale</code> (= the price/qty scale, 1e-8). A rate never travels as a float</td>
+</tr>
+<tr>
+<td><code>nextFundingNs</code></td>
+<td>next settlement boundary; <strong>0 = the venue does not fund this instrument</strong></td>
+</tr>
+<tr>
+<td><code>qty</code></td>
+<td>open interest: the long side of the open positions the engine tracks (equal to the short side)</td>
+</tr>
+</tbody>
+</table>
+<p>It is emitted from the sequenced <code>SetMark</code>, <code>ApplyFunding</code> and
+<code>SetFundingSchedule</code> commands — all journaled, so mark, rate, calendar and open
+interest all replay. Open interest is published <em>with the mark</em>, not on every
+fill: a per-trade open-interest message would multiply the feed's rate for a
+number consumers read at mark cadence.</p>
+<h3 id="the-funding-calendar-is-state-not-a-formula">The funding calendar is state, not a formula<a class="headerlink" href="#the-funding-calendar-is-state-not-a-formula" title="Permanent link">&para;</a></h3>
+<p><code>nextFundingNs</code> is engine state, not a computation over
+<code>(now, SymbolConfig::fundingIntervalNs)</code>. Deriving it from startup config would
+drift from reality the moment an operator changes the interval or shifts a
+settlement:</p>
+<ul>
+<li><strong><code>SetFundingSchedule{symbol, intervalNs, nextFundingNs}</code></strong> — a sequenced,
+  journaled command (control-plane verb of the same name). The operator owns the
+  calendar; the engine holds it.</li>
+<li><strong><code>ApplyFunding</code> advances it</strong> by one whole interval, and by further whole
+  intervals if the settlement ran late enough that one step would still leave
+  the boundary in the past (an operator catching up after an outage does not
+  leave a stale boundary in the feed).</li>
+<li>It is <strong>hashed and checkpointed</strong> (<code>RestoreFunding</code>), so a restored engine
+  publishes the boundary the venue will actually settle on.</li>
+<li>With <strong>no schedule set</strong> the historical derivation from
+  <code>SymbolConfig::fundingIntervalNs</code> still applies, unchanged — an engine that
+  never learned a schedule behaves exactly as it did before the command
+  existed. A non-positive interval or boundary clears the schedule back to it.</li>
+</ul>
+<p>The engine still settles funding only when told to (<code>ApplyFunding</code>). This is
+the calendar it publishes and advances, <strong>not</strong> a timer that fires payments.</p>
+<p>The funding <strong>rate</strong> likewise survives a checkpoint now (same <code>RestoreFunding</code>
+record), so an engine restored from a snapshot publishes the real rate instead
+of <code>0</code> until the next <code>ApplyFunding</code>.</p>
+<p>One honest limit remains: on an instrument the engine has never been given a
+mark for, no <code>DerivativesUpdate</code> is published at all — the feed says nothing
+rather than publishing a zero mark. A schedule set before the first mark is in
+force but silent until that mark arrives.</p>
+<p>On FIX the layer travels as a <code>35=X</code> with two standard MDEntries —
+<code>269=6</code> SettlementPrice for the mark and <code>269=C</code> OpenInterest — plus the
+funding rate and next funding time in the user-defined tag range, because FIX
+4.4 predates the instrument and has no field for either:</p>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>5001</code></td>
+<td>funding rate (exact decimal, same printing path as prices)</td>
+</tr>
+<tr>
+<td><code>5002</code></td>
+<td>next funding time (UTCTimestamp)</td>
+</tr>
+<tr>
+<td><code>5003</code></td>
+<td>volatility-pause deadline on <code>35=f</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="sequencing-restarts-and-epochs">Sequencing, restarts and epochs<a class="headerlink" href="#sequencing-restarts-and-epochs" title="Permanent link">&para;</a></h2>
+<p>Sequence numbers are deliberately not persisted across restarts. The book is
+rebuildable from matching state, so a restarted publisher mints a new epoch
+and starts over at <code>seq=1</code> instead of carrying seq durability it does not
+need. A consumer that sees the epoch change knows every prior seq is void and
+re-snapshots; without the epoch, a restarted feed would look like an endless
+stream of duplicates to a surviving consumer (a live but empty feed).</p>
+<h2 id="gap-detection-client-side">Gap detection (client side)<a class="headerlink" href="#gap-detection-client-side" title="Permanent link">&para;</a></h2>
+<p><code>GapDetector</code> (<code>resend_buffer.h</code>) is the client-side sequencer. Fed the raw
+(possibly reordered, duplicated, gapped) datagram stream, it delivers messages
+strictly in seq order per <code>(symbol, epoch)</code>:</p>
+<ul>
+<li>A message ahead of the next expected seq is held, not delivered; when the
+  missing seq arrives — a late, reordered datagram, not a duplicate — the
+  contiguous run drains in order. If held messages exceed <code>maxHeld</code>, the gap
+  is abandoned and the held run is delivered in seq order rather than lost.</li>
+<li><code>onGap(symbol, epoch, fromSeq)</code> fires when a gap opens and re-fires every
+  <code>reraiseAfter</code> further messages while it stays unfilled, so a lost resend
+  request does not strand the consumer.</li>
+<li>An epoch change drops held state, resets the stream to seq 1 and fires
+  <code>onEpoch</code> so the consumer can re-snapshot.</li>
+<li><code>reset()</code> fast-forwards a stream after a snapshot was applied.</li>
+</ul>
+<p><code>UdpMdSubscriber::setGapDetector</code> wires this into <code>recv()</code>: with a detector
+attached, <code>recv()</code> only surfaces in-order messages; without one it is the raw
+decode path, unchanged.</p>
+<h2 id="snapshot-and-recovery-tcp">Snapshot and recovery (TCP)<a class="headerlink" href="#snapshot-and-recovery-tcp" title="Permanent link">&para;</a></h2>
+<p><code>MarketDataPublisher::snapshotAtomic()</code> returns a consistent
+<code>(orders, lastSeq, epoch)</code> triple — taken under the same lock as the live
+emit path, so no increment with <code>seq &lt;= lastSeq</code> is missing from the snapshot
+and none with <code>seq &gt; lastSeq</code> is included. The publisher also keeps a bounded
+ring of recent increments (<code>resendCapacity</code>, default 1024) for tail replay.</p>
+<p><code>MdRecoveryServer</code> (<code>md_recovery.h</code>) serves both over TCP with
+length-prefixed frames, one request per connection:</p>
+<ul>
+<li>client sends <code>ResendRequest{symbol, fromSeq}</code> (<code>fromSeq=0</code> = late joiner);</li>
+<li>if <code>fromSeq</code> is inside the ring, the server replays the increments with
+  <code>seq &gt;= fromSeq</code> and closes (EOF terminates the replay);</li>
+<li>otherwise it answers <code>SnapshotRequired</code> followed by <code>SnapshotBegin</code> + the
+  instrument's current state + <code>AddOrder</code> body messages (<code>seq=0</code>, epoch set) +
+  <code>SnapshotEnd{lastSeq}</code>; the consumer applies the body and resumes the
+  incremental feed at <code>lastSeq+1</code>.</li>
+</ul>
+<h3 id="what-a-snapshot-carries">What a snapshot carries<a class="headerlink" href="#what-a-snapshot-carries" title="Permanent link">&para;</a></h3>
+<p>A book alone is not a startable state: a halted, paused or pre-open instrument
+looks exactly like a quiet one, and a perp position cannot be valued without a
+mark. So a snapshot carries the <strong>current</strong> <code>TradingStatus</code> and
+<code>DerivativesUpdate</code> (whichever the publisher has published) as <code>seq=0</code> body
+records placed <strong>between <code>SnapshotBegin</code> and the orders</strong>, so a subscriber
+knows the instrument is halted before it applies a single order.</p>
+<p><code>SnapshotBegin::orderCount</code> still counts <code>AddOrder</code> messages only, and
+<code>MdRecoveryClient::Result</code> keeps them out of <code>messages</code> (the book body) in
+<code>hasStatus</code>/<code>status</code> and <code>hasDerivatives</code>/<code>derivatives</code>. On a <strong>resend</strong> the
+same two message types are ordinary sequenced increments and stay in the
+stream — diverting them there would punch a hole in the seq run.
+<code>RecoveringMdSubscriber::onSnapshotState</code> is the optional hook for consumers
+that track halts or value positions; a consumer that only rebuilds a book
+ignores it.</p>
+<p>On FIX the snapshot leads with <code>35=f SecurityStatus</code> and the derivatives
+<code>35=X</code> before the <code>35=W</code> full refresh, whose entries each carry <code>273
+MDEntryTime</code>.</p>
+<p><code>MdRecoveryClient</code> (same header) is the consumer-side counterpart: one
+<code>recover(symbol, fromSeq, out)</code> call opens the connection, sends the request
+and returns the classified reply — <code>snapshot</code> flag, the replayed increments or
+the snapshot body, and the <code>lastSeq</code>/<code>epoch</code> resume point (feed
+<code>resetSequencer(symbol, epoch, lastSeq + 1)</code> to the <code>GapDetector</code> and continue
+the incremental feed). The socket carries a receive timeout; an unreachable
+server is a <code>ConnectError</code> status, a stalled reply a <code>Timeout</code>, and a
+truncated snapshot a <code>ProtocolError</code> — never an exception. The low-level
+protocol cases in <code>test_venue_md_recovery</code> drive it directly (they are the
+protocol's documentation); the late-joiner and publisher-restart cases run
+through <code>RecoveringMdSubscriber</code> below.</p>
+<p><code>MdCounters</code> tracks the paths: <code>resendServed</code>, <code>snapshotsServed</code>, and
+<code>sendDrops</code> (below).</p>
+<h3 id="exposing-the-recovery-channel">Exposing the recovery channel<a class="headerlink" href="#exposing-the-recovery-channel" title="Permanent link">&para;</a></h3>
+<p><code>MdRecoveryServer::start(port, bindIp)</code> binds loopback by default
+(<code>bindIp = nullptr</code>, the historical behaviour). Passing an explicit address
+(<code>"0.0.0.0"</code>, a NIC address) exposes the channel to other hosts, and an
+unparseable address fails the start rather than silently falling back to
+loopback.</p>
+<p>The hardening contract is the same as for the order-entry gateways: the
+recovery protocol carries <strong>no authentication and no encryption</strong> of its own,
+so anything reachable off-host must sit behind TLS termination and/or a
+firewall / private network, exactly like the control plane. Binding
+externally is a deployment decision, not a default.</p>
+<h2 id="automatic-client-recovery-recoveringmdsubscriber">Automatic client recovery (<code>RecoveringMdSubscriber</code>)<a class="headerlink" href="#automatic-client-recovery-recoveringmdsubscriber" title="Permanent link">&para;</a></h2>
+<p><code>GapDetector</code> reports; <code>MdRecoveryClient</code> fetches; <code>RecoveringMdSubscriber</code>
+(<code>md_recovery.h</code>) is the two composed into the whole consumer protocol, so a
+subscriber implements neither. It wraps a <code>UdpMdSubscriber</code> (which must NOT
+have its own detector attached — this class owns sequencing) and keeps a
+<code>recv()</code>-style API: only in-order messages surface, recovery is invisible
+except through the <code>onSnapshot</code> callback and the counters.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">UdpMdSubscriber</span><span class="w"> </span><span class="n">sub</span><span class="p">;</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">sub</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">group</span><span class="p">,</span><span class="w"> </span><span class="n">port</span><span class="p">,</span><span class="w"> </span><span class="cm">/*multicast*/</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">RecoveringMdSubscriber</span><span class="o">::</span><span class="n">Config</span><span class="w"> </span><span class="n">cfg</span><span class="p">{</span><span class="n">host</span><span class="p">,</span><span class="w"> </span><span class="n">recoveryPort</span><span class="p">,</span><span class="w"> </span><span class="cm">/*maxGapBeforeSnapshot*/</span><span class="w"> </span><span class="mi">256</span><span class="p">};</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">RecoveringMdSubscriber</span><span class="w"> </span><span class="nf">rsub</span><span class="p">(</span><span class="n">sub</span><span class="p">,</span><span class="w"> </span><span class="n">cfg</span><span class="p">);</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">rsub</span><span class="p">.</span><span class="n">onSnapshot</span><span class="p">([</span><span class="o">&amp;</span><span class="p">](</span><span class="n">SymbolId</span><span class="w"> </span><span class="n">sym</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">MdSnapshotBegin</span><span class="o">&amp;</span><span class="w"> </span><span class="n">b</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">MdMessage</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">orders</span><span class="p">)</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">                </span><span class="p">{</span><span class="w"> </span><span class="n">book</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">orders</span><span class="p">)</span><span class="w"> </span><span class="n">book</span><span class="p">.</span><span class="n">apply</span><span class="p">(</span><span class="n">m</span><span class="p">);</span><span class="w"> </span><span class="p">});</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">MdMessage</span><span class="w"> </span><span class="n">m</span><span class="p">;</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">rsub</span><span class="p">.</span><span class="n">recv</span><span class="p">(</span><span class="n">m</span><span class="p">))</span><span class="w"> </span><span class="n">book</span><span class="p">.</span><span class="n">apply</span><span class="p">(</span><span class="n">m</span><span class="p">);</span><span class="w">   </span><span class="c1">// strictly in seq order, holes already recovered</span>
+</span></code></pre></div>
+<ul>
+<li><strong>Gap</strong> → <code>ResendRequest{fromSeq}</code>; the replayed increments are woven back
+  through the detector, so they fill the hole in seq order and drain whatever
+  was held behind it.</li>
+<li><strong>Epoch change</strong> (publisher restart) or a gap deeper than
+  <code>maxGapBeforeSnapshot</code> → snapshot recovery (<code>fromSeq = 0</code>): the body goes to
+  <code>onSnapshot</code>, the sequencer fast-forwards to <code>lastSeq + 1</code> and the
+  incremental feed continues. A deep gap takes this path because the server
+  would route it there anyway once the ring has trimmed.</li>
+<li><strong>Failure</strong> → bounded retries with doubling backoff (<code>maxAttempts</code>,
+  <code>initialBackoff</code>), never an eternal loop. On exhaustion the incident is
+  counted in <code>recoveriesFailed()</code> and the stream falls back to plain gap
+  semantics — the detector re-raises on further traffic and recovery re-arms
+  (a test drives exactly that: server down → bounded failure → clean <code>recv()</code>
+  timeout → server back → the re-raised gap recovers through the ring).</li>
+<li>Counters: <code>gapsDetected</code>, <code>epochChanges</code>, <code>resendsRecovered</code>,
+  <code>snapshotsRecovered</code>, <code>recoveriesFailed</code>.</li>
+</ul>
+<p>Single-threaded like the subscriber itself: all recovery work happens inside
+<code>recv()</code> on the calling thread (the backoff sleeps block the caller, as any
+synchronous recovery would).</p>
+<h2 id="choosing-a-transport">Choosing a transport<a class="headerlink" href="#choosing-a-transport" title="Permanent link">&para;</a></h2>
+<p>Two transports carry the same feed. They differ in reach, not in content: a
+subscriber on either sees the same messages with the same <code>seq</code> under the same
+<code>epoch</code>.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Multicast (<code>udp_multicast.h</code>)</th>
+<th>Unicast TCP (<code>md_distribution.h</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reach</td>
+<td>one layer-2 segment</td>
+<td>anywhere the venue is reachable</td>
+</tr>
+<tr>
+<td>Fan-out cost</td>
+<td>one datagram per message, any number of consumers</td>
+<td>one encode + one write per subscriber</td>
+</tr>
+<tr>
+<td>Delivery</td>
+<td>best effort; holes are the consumer's to recover</td>
+<td>in order, on a reliable stream</td>
+</tr>
+<tr>
+<td>Snapshot / resend</td>
+<td>separate channel (<code>MdRecoveryServer</code>)</td>
+<td>inline on the same connection</td>
+</tr>
+<tr>
+<td>Encodings</td>
+<td>SBE</td>
+<td>SBE, FIX, or another registered one</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pick multicast when the consumer is colocated</strong> — inside the same segment,
+on the data NIC. It is the lowest-latency, lowest-cost fan-out there is, and
+the venue does the same work for one consumer as for a hundred.</p>
+<p><strong>Pick unicast TCP for everybody else.</strong> Multicast does not survive a WAN hop,
+most cloud networks do not route it, and a consumer behind NAT cannot join a
+group. That is not a tuning problem — it is the reason an external consumer
+has no multicast option at all.</p>
+<p>Running both is the normal arrangement: fan the publisher's sink into the
+multicast publisher and the distribution server together.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">MdDistributionServer</span><span class="w"> </span><span class="nf">dist</span><span class="p">(</span><span class="o">&amp;</span><span class="n">counters</span><span class="p">);</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">MarketDataPublisher</span><span class="o">&lt;&gt;</span><span class="w"> </span><span class="n">md</span><span class="p">([</span><span class="o">&amp;</span><span class="p">](</span><span class="k">const</span><span class="w"> </span><span class="n">MdMessage</span><span class="o">&amp;</span><span class="w"> </span><span class="n">m</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">                         </span><span class="p">{</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">                           </span><span class="n">udpPub</span><span class="p">.</span><span class="n">publish</span><span class="p">(</span><span class="n">m</span><span class="p">);</span><span class="w">   </span><span class="c1">// colocated consumers</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">                           </span><span class="n">dist</span><span class="p">.</span><span class="n">publish</span><span class="p">(</span><span class="n">m</span><span class="p">);</span><span class="w">     </span><span class="c1">// everybody else</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">                         </span><span class="p">},</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">                         </span><span class="cm">/*tickSize*/</span><span class="w"> </span><span class="n">Price</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mf">0.01</span><span class="p">),</span><span class="w"> </span><span class="cm">/*symbol*/</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">dist</span><span class="p">.</span><span class="n">addPublisher</span><span class="p">(</span><span class="n">md</span><span class="p">);</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">dist</span><span class="p">.</span><span class="n">start</span><span class="p">(</span><span class="cm">/*port*/</span><span class="w"> </span><span class="mi">9010</span><span class="p">,</span><span class="w"> </span><span class="cm">/*bindIp*/</span><span class="w"> </span><span class="s">"0.0.0.0"</span><span class="p">);</span>
+</span></code></pre></div>
+<h2 id="unicast-distribution-mddistributionserver">Unicast distribution (<code>MdDistributionServer</code>)<a class="headerlink" href="#unicast-distribution-mddistributionserver" title="Permanent link">&para;</a></h2>
+<p>A long-lived TCP session per subscriber. Nothing about sequencing is
+reinvented: <code>MarketDataPublisher</code> stays the source of truth for <code>seq</code>, the
+<code>epoch</code>, <code>snapshotAtomic()</code> and the resend ring, and the server is a fan-out
+in front of it.</p>
+<p><strong>Verbs</strong> (SBE templates 11/12 and the existing 7; the FIX equivalents are
+below):</p>
+<ul>
+<li><code>Subscribe{symbol, fromSeq, snapshotOnly}</code> — start streaming. <code>fromSeq = 0</code>
+  asks for the atomic snapshot followed by increments; <code>fromSeq &gt; 0</code> resumes
+  at that seq. <code>snapshotOnly</code> serves one book and leaves no subscription.</li>
+<li><code>Unsubscribe{symbol}</code> — stop that symbol; the others keep flowing. One
+  connection carries any number of symbols.</li>
+<li><code>ResendRequest{symbol, fromSeq}</code> — the same verb the recovery channel uses,
+  answered inline on this connection.</li>
+</ul>
+<p><strong>Subscribing mid-stream.</strong> A snapshot taken while the feed is moving must
+neither lose an increment nor let one jump ahead of the book it belongs to.
+The symbol is registered <em>unarmed</em> first, so every increment from that instant
+is encoded and parked in a bounded buffer; the snapshot is then taken outside
+the session lock; finally the snapshot frames are queued, the parked
+increments past <code>lastSeq</code> are queued behind them, and the subscription arms at
+<code>lastSeq + 1</code>. A test drives exactly that race and checks the joiner's book
+against a consumer that watched from the first message.</p>
+<p><strong>Resend.</strong> <code>fromSeq</code> inside the ring is replayed from it
+(<code>MdCounters::resendServed</code>). <code>fromSeq</code> older than the ring's tail gets the
+explicit <code>SnapshotRequired</code> followed by a full snapshot
+(<code>MdCounters::snapshotsServed</code>) — the same two-way answer the recovery channel
+gives, without a second connection. Replayed increments may arrive behind
+newer live ones; a consumer sequences with <code>GapDetector</code> exactly as on the
+multicast path.</p>
+<p><strong>Slow consumers.</strong> Each subscriber has a bounded outbound queue drained by
+its own writer thread, the same shape as the order-entry session writer. The
+publishing thread encodes and enqueues; it never waits on a socket. A full
+queue is the verdict: the connection is shut down, its frames are dropped and
+<code>MdCounters::slowConsumerDisconnects</code> is bumped. One wedged subscriber cannot
+delay another and cannot delay the engine. There is deliberately no send
+timeout on the socket — a blocked writer thread is fine, and a socket timer
+would misreport a slow reader as a broken connection. <code>sendBufferBytes</code> bounds
+<code>SO_SNDBUF</code> so the kernel does not hide backlog the queue is meant to see.
+Conflation is not the v1 policy; the bounded queue and the disconnect are.</p>
+<p><strong>Liveness.</strong> No inbound byte within <code>idleTimeoutMs</code> drops the subscriber
+(<code>MdCounters::idleDisconnects</code>), the same policy the order-entry gateways
+hold. The server sends its own beat every <code>heartbeatMs</code> when the connection is
+quiet — an empty frame on the binary encoding, <code>35=0</code> on FIX. A subscriber is
+expected to beat back.</p>
+<p><strong>Publisher restart.</strong> A message whose <code>epoch</code> differs from the
+subscription's resets the delivery position, so a feed that restarted at
+<code>seq = 1</code> is not filtered out as stale by a subscription still expecting
+<code>seq = 500</code>. The subscriber sees the epoch change and re-subscribes.</p>
+<p><strong>Counters.</strong> <code>subscribers</code> (live sessions), <code>slowConsumerDisconnects</code>,
+<code>idleDisconnects</code>, <code>subscribeRejects</code>, plus the shared <code>resendServed</code> /
+<code>snapshotsServed</code>.</p>
+<p><strong>Exposure.</strong> <code>start(port, bindIp)</code> binds loopback unless given an explicit
+address. The protocol carries no authentication and no encryption of its own,
+so anything reachable off-host belongs behind TLS termination and/or a
+firewall — the same contract as the recovery channel and the order-entry
+gateways.</p>
+<h2 id="pluggable-encodings">Pluggable encodings<a class="headerlink" href="#pluggable-encodings" title="Permanent link">&para;</a></h2>
+<p>Transport and encoding are independent axes. <code>MdEncoder</code> (<code>md_encoder.h</code>) owns
+the bytes and knows nothing about subscriptions, snapshots or sequencing; the
+distribution server owns those and knows nothing about the bytes. Framing
+belongs to the encoder — every method appends complete, self-framed wire bytes
+that the session writes verbatim, which is what lets one port carry a
+length-prefixed binary encoding and a self-delimiting text one. Adding an
+encoding is writing one <code>MdEncoder</code> and registering it; no distribution logic
+changes.</p>
+<p>The encoding is chosen per connection <strong>from its first byte, peeked and not
+consumed</strong>, so both protocols still start at their own first byte and an
+off-the-shelf implementation of either connects unmodified:</p>
+<table>
+<thead>
+<tr>
+<th>First byte</th>
+<th>Encoding</th>
+<th>Why it is unambiguous</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x00</code></td>
+<td>SBE</td>
+<td>the high byte of the u32 frame length; feed frames are tens of bytes</td>
+</tr>
+<tr>
+<td><code>'8'</code></td>
+<td>FIX</td>
+<td>the first byte of the BeginString <code>8=FIX.4.4</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>registerEncoding(leadByte, factory)</code> adds a third.
+<code>MdDistributionConfig::encoding</code> pins a port to one encoding instead, for a
+deployment that prefers a port per protocol. One encoder instance lives per
+connection, so an encoder may hold session state; every call on it is
+serialized by the session.</p>
+<h2 id="fix-market-data">FIX market data<a class="headerlink" href="#fix-market-data" title="Permanent link">&para;</a></h2>
+<p><code>fix_md_codec.h</code>. The framing, the checksum, the exact decimal printing and
+the UTCTimestamp all come from the order-entry codec unchanged — prices and
+sizes go through <code>decwire</code>, never through a double, so <code>100.25</code> prints as
+<code>100.25</code>.</p>
+<p>It is a separate header because market data is a different message family:
+order entry is flat <code>tag=value</code> and <code>FixCodec::parseFields</code> deliberately
+collapses repeats into a map, while market data is built on repeating groups
+(146, 267, 268) where the repeats <em>are</em> the payload.</p>
+<p><strong>Inbound — MarketDataRequest (35=V)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Field</th>
+<th>Handling</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>262</td>
+<td>MDReqID</td>
+<td>required; echoed on every W/X/Y</td>
+</tr>
+<tr>
+<td>263</td>
+<td>SubscriptionRequestType</td>
+<td><code>0</code> snapshot, <code>1</code> snapshot + updates, <code>2</code> unsubscribe; anything else → <code>35=Y</code>, <code>281=4</code></td>
+</tr>
+<tr>
+<td>264</td>
+<td>MarketDepth</td>
+<td><code>0</code> or absent = full book; a positive depth → <code>35=Y</code>, <code>281=5</code></td>
+</tr>
+<tr>
+<td>267 / 269</td>
+<td>MDEntryTypes</td>
+<td><code>0</code> bid, <code>1</code> offer, <code>2</code> trade; omitted = all three; unknown → <code>35=Y</code>, <code>281=8</code></td>
+</tr>
+<tr>
+<td>146 / 55</td>
+<td>Symbols</td>
+<td>one subscription per symbol; none → <code>35=Y</code>, <code>281=0</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Outbound</strong></p>
+<ul>
+<li><strong>35=W MarketDataSnapshotFullRefresh</strong> — 262, 55, 268 <code>NoMDEntries</code>, then
+  per entry 269 <code>MDEntryType</code>, 270 <code>MDEntryPx</code>, 271 <code>MDEntrySize</code>, 273
+  <code>MDEntryTime</code> (the engine time the order was accepted at), 278 <code>MDEntryID</code>.
+  The feed is order-level, so every entry carries its order id. The current
+  <code>35=f</code> and the derivatives <code>35=X</code> are sent ahead of it.</li>
+<li><strong>35=X MarketDataIncrementalRefresh</strong> — 262, 60 <code>TransactTime</code>, 268, then
+  279 <code>MDUpdateAction</code> (<code>0</code> New, <code>1</code> Change, <code>2</code> Delete), 269, 55, 270, 271,
+  273, 278. <code>AddOrder</code> and a trade print map to New, <code>Cancel</code> and a fully
+  consumed order to Delete, <code>Replace</code> and a partial fill to Change. A stop
+  trigger has no market-data entry and is not sent. The derivatives layer uses
+  the same message with two entries (<code>269=6</code> mark, <code>269=C</code> open interest) plus
+  tags 5001/5002.</li>
+<li><strong>35=f SecurityStatus</strong> — 324, 55, 326 <code>SecurityTradingStatus</code>, 60, 58, and
+  5003 for a volatility-pause deadline. Sent on every trading-status
+  transition regardless of the <code>MDEntryType</code> filter.</li>
+<li><strong>35=Y MarketDataRequestReject</strong> — 262, 281 <code>MDReqRejReason</code>, 58.</li>
+</ul>
+<p><strong>Session layer.</strong> Deliberately a light one — Logon (35=A), Heartbeat (35=0),
+TestRequest (35=1), Logout (35=5) and a monotonic outbound MsgSeqNum — not
+<code>FixSessionHost</code>/<code>FixConnection</code>. That session layer is built around order
+entry: accounts, the <code>SessionRegistry</code> exec-report log, application-level
+resend with PossDup. None of it has a meaning for a broadcast feed. Market
+data is not account-scoped, and a consumer recovers from a hole with the
+feed's own tools (a fresh MarketDataRequest, or a seq-based resend on the
+binary encoding), never by replaying a per-account message log. FIX market
+data has no seq-based resend at all, so a re-request is answered with a fresh
+full refresh. A message before the Logon is answered with a Logout; an
+unsupported MsgType with a session Reject (35=3) rather than silence.</p>
+<h2 id="icebergs-and-the-public-feed">Icebergs and the public feed<a class="headerlink" href="#icebergs-and-the-public-feed" title="Permanent link">&para;</a></h2>
+<p>An iceberg shows a peak and hides the rest. The public feed must only ever see
+the peak, or the book can be probed for hidden size by watching what the feed
+reports.</p>
+<p>That is why <code>OrderExecuted</code> carries two quantities:</p>
+<ul>
+<li><code>leavesQty</code>: the whole remaining (peak + hidden), for the owner's execution
+  report. You should see your own order in full.</li>
+<li><code>displayLeaves</code>: the displayed peak, for the public feed.</li>
+</ul>
+<p>The publisher drives depth from <code>displayLeaves</code>. Using the whole remaining
+would leak the reserve and, on a partial peak fill, corrupt the level
+aggregate.</p>
+<h2 id="depth-is-the-aggregate-kept-in-step">Depth is the aggregate, kept in step<a class="headerlink" href="#depth-is-the-aggregate-kept-in-step" title="Permanent link">&para;</a></h2>
+<p>The publisher maintains a <code>lrvx::NLevelOrderBook</code>, the same aggregate book
+type strategies consume elsewhere in lrvx, so market-data depth and the
+venue's internal order-level book stay in agreement. A test drives 300k
+commands and periodically compares the publisher's full depth against the
+engine's book.</p>
+<h2 id="sbe-codec-and-multicast">SBE codec and multicast<a class="headerlink" href="#sbe-codec-and-multicast" title="Permanent link">&para;</a></h2>
+<p><code>sbe_md_codec.h</code> encodes <code>MdMessage</code> in SBE (Simple Binary Encoding): a
+canonical SBE message header (<code>blockLength</code>, <code>templateId</code>, <code>schemaId</code>,
+<code>version</code>) followed by a per-type little-endian root block. One template per
+<code>MdType</code>, each carrying only the fields that type needs, plus the recovery
+templates (<code>ResendRequest</code>, <code>SnapshotBegin</code>, <code>SnapshotEnd</code>,
+<code>SnapshotRequired</code>) and the distribution verbs (<code>Subscribe</code>, <code>Unsubscribe</code>,
+<code>SubscribeReject</code>), the instrument-wide messages (<code>TradingStatus</code>,
+<code>DerivativesUpdate</code>). Schema version 1 appended a trailing <code>epoch</code> (u64) to
+every incremental template — the SBE-sanctioned extension path: a version-0
+reader skips it via the header's <code>blockLength</code>, and the decoder accepts v0
+frames (epoch reads as 0). Version 2 added the three distribution templates
+and nothing else: no existing root block changed, so a version-1 reader
+decodes every incremental and recovery message byte for byte as before.
+Version 3 added the two instrument-wide templates and, on every incremental
+template, the two trailing timestamps (<code>engineTs</code>, <code>sendTs</code>) at the end of the
+root block — again the same path, so a version-1/2 reader decodes every field
+it knows out of a version-3 frame unchanged and skips the rest. Template ids
+1..6 mirror the order-level <code>MdType</code>s (<code>templateId = MdType + 1</code>); the two new
+ones are 14 and 15 and are mapped explicitly, since 7..13 were already taken by
+the recovery and session verbs. Enumerations extend the same way fields do —
+new values are appended (<code>TradingStatus::Closed</code>, <code>StatusReason::Session</code>), so
+no root block changes and an older reader decodes every field of the message,
+seeing only a status code it does not recognise. A consumer must treat an
+unknown <code>TradingStatus</code> as <em>not tradeable</em>. The schema in <code>venue/schema/md-sbe.xml</code> is the
+source of truth; the codec is hand-written against it (no Java codegen in the
+build). This is the venue's own SBE schema, not Nasdaq ITCH.</p>
+<p><code>UdpMdPublisher</code> (<code>udp_multicast.h</code>) publishes frames over IP multicast, with
+<code>UdpMdSubscriber</code> on the receiving end. Both take an optional interface selector
+(<code>ifaceIp</code>): the default (<code>nullptr</code>) lets the kernel routing table pick the
+egress NIC -- the production default so the feed reaches co-located clients on
+other hosts; pass <code>"127.0.0.1"</code> to pin loopback for same-host use.</p>
+<p>The publisher socket is non-blocking and <code>publish()</code> checks the <code>sendto</code>
+result: a datagram that cannot be handed to the kernel (full socket buffer,
+closed fd) is a counted drop (<code>MdCounters::sendDrops</code>), never a stall of the
+matching thread and never a silent loss the venue cannot see. Consumers
+recover the hole through gap detection and the recovery channel.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">uint8_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">buf</span><span class="p">;</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">SbeMdCodec</span><span class="o">::</span><span class="n">encode</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">);</span><span class="w">                        </span><span class="c1">// header + template block</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">MdMessage</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">const</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">ok</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">SbeMdCodec</span><span class="o">::</span><span class="n">decode</span><span class="p">(</span><span class="n">buf</span><span class="p">.</span><span class="n">data</span><span class="p">(),</span><span class="w"> </span><span class="n">buf</span><span class="p">.</span><span class="n">size</span><span class="p">(),</span><span class="w"> </span><span class="n">out</span><span class="p">);</span><span class="w">  </span><span class="c1">// false if short/foreign</span>
+</span></code></pre></div>
+<p>The decoder validates the SBE header (rejects a foreign <code>schemaId</code>), uses
+<code>blockLength</code> to skip trailing fields a newer schema version appended (forward
+compatible), and bounds-checks before reading. The parser fuzz drives it with
+hostile input alongside the FIX / SBE order-entry / REST parsers.</p>
+<h2 id="tape">Tape<a class="headerlink" href="#tape" title="Permanent link">&para;</a></h2>
+<p><code>tape_recorder.h</code> records trade prints only: it filters <code>Trade</code> events out of
+the outbound stream and persists them through <code>BinaryLogWriter</code>, the same
+binary format the rest of lrvx reads. The trade tape a venue produces can be
+replayed by ordinary lrvx tooling; the non-trade events (adds, cancels,
+replaces) are not on the tape.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

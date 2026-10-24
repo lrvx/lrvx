@@ -1,0 +1,2437 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/reference/codon/strategy/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../types/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Strategy - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#strategy" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Strategy
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../portable-sockets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sockets across platforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../python/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../node/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node.js
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codon
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_5" id="__nav_8_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Codon
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#class-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class: Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-a-callback-reaches-your-subclass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a callback reaches your subclass
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#overridable-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overridable Callbacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-emission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal Emission
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#context-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context Queries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#string-symbol-convenience-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        String-Symbol Convenience API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-timeframe-bar-ring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Timeframe Bar Ring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Properties
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runner & BacktestRunner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../quickjs/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JavaScript (embedded)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/capi/lrvx_capi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../errors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../api/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core (C++ internals)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#class-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class: Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-a-callback-reaches-your-subclass" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a callback reaches your subclass
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#overridable-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overridable Callbacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-emission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal Emission
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#context-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context Queries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#string-symbol-convenience-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        String-Symbol Convenience API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multi-timeframe-bar-ring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Timeframe Bar Ring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Properties
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="strategy">Strategy<a class="headerlink" href="#strategy" title="Permanent link">&para;</a></h1>
+<p>Base class for Codon event-driven strategies. Mirrors C++ <code>lrvx::Strategy</code>.</p>
+<h2 id="class-strategy">Class: <code>Strategy</code><a class="headerlink" href="#class-strategy" title="Permanent link">&para;</a></h2>
+<h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Strategy(symbols: List[int], strategy_id: int = 1, registry: cobj = cobj())
+</span></code></pre></div>
+<p><strong>Parameters:</strong></p>
+<ul>
+<li><code>symbols</code> -- List of symbol IDs to subscribe to</li>
+<li><code>strategy_id</code> -- Subscriber id, default <code>1</code></li>
+<li><code>registry</code> -- Symbol-registry handle. When omitted, the underlying handle is created empty and
+  <code>Runner.add_strategy</code> rebuilds it once a registry is present. Pass the strategy into a <code>Runner</code> to
+  give it an event source; on its own it has none.</li>
+</ul>
+<h3 id="how-a-callback-reaches-your-subclass">How a callback reaches your subclass<a class="headerlink" href="#how-a-callback-reaches-your-subclass" title="Permanent link">&para;</a></h3>
+<p>Your overrides are called through a table of C function pointers that the
+engine holds. Codon fills that table when the strategy is handed to a runner,
+not when it is constructed, and this is not an implementation detail you can
+ignore: a strategy that is never attached never receives anything.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>strat = MyStrategy([btc])
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>runner.add_strategy(strat)        # installs the callbacks
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a># or
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>backtest.set_strategy(strat)      # same, for BacktestRunner
+</span></code></pre></div>
+<p>The reason for the timing is that the trampolines are generated against your
+concrete subclass. Codon resolves method calls statically, so a trampoline
+written against <code>Strategy</code> would call the empty base method rather than your
+override. <code>add_strategy</code> and <code>set_strategy</code> are generic in the strategy's
+type, which is the last point where that type is still visible -- inside
+<code>Strategy.__init__</code> a subclass has already been erased by <code>super()</code>.</p>
+<p>Two consequences worth knowing:</p>
+<ul>
+<li>Attaching one strategy to a runner is what makes it live. Constructing it is
+  not enough, and a strategy with no callbacks installed raises rather than
+  running silently through a backtest that would finish and print a result
+  your logic took no part in.</li>
+<li>An exception raised inside a callback is caught at the boundary and reported
+  on stderr, naming the callback. It is not allowed to unwind into the C++
+  frame that called it, because that is undefined behaviour and the engine
+  cannot recover from it.</li>
+</ul>
+<h3 id="overridable-callbacks">Overridable Callbacks<a class="headerlink" href="#overridable-callbacks" title="Permanent link">&para;</a></h3>
+<h4 id="on_tradectx-trade"><code>on_trade(ctx, trade)</code><a class="headerlink" href="#on_tradectx-trade" title="Permanent link">&para;</a></h4>
+<p>Called on each trade event for subscribed symbols.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>def on_trade(self, ctx: SymbolContext, trade: TradeData):
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    price = trade.price.to_double()
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    # strategy logic here
+</span></code></pre></div>
+<h4 id="on_book_updatectx"><code>on_book_update(ctx)</code><a class="headerlink" href="#on_book_updatectx" title="Permanent link">&para;</a></h4>
+<p>Called on each order book update for subscribed symbols.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>def on_book_update(self, ctx: SymbolContext):
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    spread = ctx.book_spread()
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    # strategy logic here
+</span></code></pre></div>
+<h4 id="on_barctx-bar"><code>on_bar(ctx, bar)</code><a class="headerlink" href="#on_barctx-bar" title="Permanent link">&para;</a></h4>
+<p>Called on each closed OHLC bar.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>def on_bar(self, ctx: SymbolContext, bar: BarData):
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    # bar.open, bar.high, bar.low, bar.close, bar.volume, ...
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    if bar.close &gt; bar.open and self.position() == 0.0:
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        self.market_buy(0.01)
+</span></code></pre></div>
+<h4 id="on_start-on_stop"><code>on_start()</code> / <code>on_stop()</code><a class="headerlink" href="#on_start-on_stop" title="Permanent link">&para;</a></h4>
+<p>Lifecycle callbacks.</p>
+<h4 id="on_fillctx-ev"><code>on_fill(ctx, ev)</code><a class="headerlink" href="#on_fillctx-ev" title="Permanent link">&para;</a></h4>
+<p>Called on each fill (status <code>PARTIALLY_FILLED</code> or <code>FILLED</code>) for orders this strategy emitted. <code>ev</code> is
+an <code>OrderEventData</code>, described under <a href="../types/">Types</a>; it carries <code>order_id</code>, <code>side</code>, <code>fill_qty</code>,
+<code>fill_price</code>, <code>exchange_ts_ns</code>.</p>
+<h4 id="on_order_updatectx-ev"><code>on_order_update(ctx, ev)</code><a class="headerlink" href="#on_order_updatectx-ev" title="Permanent link">&para;</a></h4>
+<p>Called on every order-lifecycle status change for orders this strategy emitted: <code>NEW</code>, <code>ACCEPTED</code>,
+<code>CANCELED</code>, <code>REJECTED</code>, <code>REPLACED</code>, <code>TRIGGERED</code>, <code>TRAILING_UPDATED</code>. Fills come through here too —
+override <code>on_fill</code> instead if you only want fills.</p>
+<h4 id="on_queue_position_changectx-ev"><code>on_queue_position_change(ctx, ev)</code><a class="headerlink" href="#on_queue_position_changectx-ev" title="Permanent link">&para;</a></h4>
+<p>A resting limit order's queue position moved with no other lifecycle transition. <code>ev.queue_ahead</code> and
+<code>ev.queue_total</code> carry the current snapshot. Backtest only.</p>
+<h4 id="on_market_position_changectx-ev"><code>on_market_position_change(ctx, ev)</code><a class="headerlink" href="#on_market_position_changectx-ev" title="Permanent link">&para;</a></h4>
+<p>A resting limit order's categorical market position transitioned (best, behind_best, mid_spread,
+level_empty, crossed). <code>ev.market_position</code> is the new state; <code>ev.distance_to_best_ticks</code> is signed
+ticks from best on our side. Backtest only.</p>
+<h3 id="signal-emission">Signal Emission<a class="headerlink" href="#signal-emission" title="Permanent link">&para;</a></h3>
+<h4 id="emit_market_buysymbol-qty-int"><code>emit_market_buy(symbol, qty) -&gt; int</code><a class="headerlink" href="#emit_market_buysymbol-qty-int" title="Permanent link">&para;</a></h4>
+<p>Submit a market buy order. Returns order ID.</p>
+<h4 id="emit_market_sellsymbol-qty-int"><code>emit_market_sell(symbol, qty) -&gt; int</code><a class="headerlink" href="#emit_market_sellsymbol-qty-int" title="Permanent link">&para;</a></h4>
+<p>Submit a market sell order. Returns order ID.</p>
+<h4 id="emit_limit_buysymbol-price-qty-int"><code>emit_limit_buy(symbol, price, qty) -&gt; int</code><a class="headerlink" href="#emit_limit_buysymbol-price-qty-int" title="Permanent link">&para;</a></h4>
+<p>Submit a limit buy order. Returns order ID.</p>
+<h4 id="emit_limit_sellsymbol-price-qty-int"><code>emit_limit_sell(symbol, price, qty) -&gt; int</code><a class="headerlink" href="#emit_limit_sellsymbol-price-qty-int" title="Permanent link">&para;</a></h4>
+<p>Submit a limit sell order. Returns order ID.</p>
+<h4 id="emit_cancelorder_id"><code>emit_cancel(order_id)</code><a class="headerlink" href="#emit_cancelorder_id" title="Permanent link">&para;</a></h4>
+<p>Cancel an order by ID.</p>
+<h4 id="emit_cancel_allsymbol"><code>emit_cancel_all(symbol)</code><a class="headerlink" href="#emit_cancel_allsymbol" title="Permanent link">&para;</a></h4>
+<p>Cancel all orders for a symbol.</p>
+<h4 id="emit_modifyorder_id-new_price-new_qty"><code>emit_modify(order_id, new_price, new_qty)</code><a class="headerlink" href="#emit_modifyorder_id-new_price-new_qty" title="Permanent link">&para;</a></h4>
+<p>Modify an existing order's price and quantity.</p>
+<h4 id="emit_stop_marketsymbol-side-trigger-qty-int"><code>emit_stop_market(symbol, side, trigger, qty) -&gt; int</code><a class="headerlink" href="#emit_stop_marketsymbol-side-trigger-qty-int" title="Permanent link">&para;</a></h4>
+<p>Submit a stop market order. <code>side</code>: 0=BUY, 1=SELL.</p>
+<h4 id="emit_stop_limitsymbol-side-trigger-limit_price-qty-int"><code>emit_stop_limit(symbol, side, trigger, limit_price, qty) -&gt; int</code><a class="headerlink" href="#emit_stop_limitsymbol-side-trigger-limit_price-qty-int" title="Permanent link">&para;</a></h4>
+<p>Submit a stop limit order.</p>
+<h4 id="emit_take_profit_marketsymbol-side-trigger-qty-int"><code>emit_take_profit_market(symbol, side, trigger, qty) -&gt; int</code><a class="headerlink" href="#emit_take_profit_marketsymbol-side-trigger-qty-int" title="Permanent link">&para;</a></h4>
+<p>Submit a take profit market order.</p>
+<h4 id="emit_take_profit_limitsymbol-side-trigger-limit_price-qty-int"><code>emit_take_profit_limit(symbol, side, trigger, limit_price, qty) -&gt; int</code><a class="headerlink" href="#emit_take_profit_limitsymbol-side-trigger-limit_price-qty-int" title="Permanent link">&para;</a></h4>
+<p>Submit a take profit limit order.</p>
+<h4 id="emit_trailing_stopsymbol-side-offset-qty-int"><code>emit_trailing_stop(symbol, side, offset, qty) -&gt; int</code><a class="headerlink" href="#emit_trailing_stopsymbol-side-offset-qty-int" title="Permanent link">&para;</a></h4>
+<p>Submit a trailing stop order.</p>
+<h4 id="emit_trailing_stop_percentsymbol-side-callback_bps-qty-int"><code>emit_trailing_stop_percent(symbol, side, callback_bps, qty) -&gt; int</code><a class="headerlink" href="#emit_trailing_stop_percentsymbol-side-callback_bps-qty-int" title="Permanent link">&para;</a></h4>
+<p>Submit a trailing stop with percentage callback. <code>callback_bps</code>: 100 = 1%.</p>
+<h4 id="emit_limit_buy_tifsymbol-price-qty-tif-int"><code>emit_limit_buy_tif(symbol, price, qty, tif) -&gt; int</code><a class="headerlink" href="#emit_limit_buy_tifsymbol-price-qty-tif-int" title="Permanent link">&para;</a></h4>
+<p>Submit a limit buy with TimeInForce. <code>tif</code>: 0=GTC, 1=IOC, 2=FOK, 4=POST_ONLY.</p>
+<h4 id="emit_limit_sell_tifsymbol-price-qty-tif-int"><code>emit_limit_sell_tif(symbol, price, qty, tif) -&gt; int</code><a class="headerlink" href="#emit_limit_sell_tifsymbol-price-qty-tif-int" title="Permanent link">&para;</a></h4>
+<p>Submit a limit sell with TimeInForce.</p>
+<h4 id="emit_close_positionsymbol-int"><code>emit_close_position(symbol) -&gt; int</code><a class="headerlink" href="#emit_close_positionsymbol-int" title="Permanent link">&para;</a></h4>
+<p>Close entire position with a reduce-only market order.</p>
+<h3 id="context-queries">Context Queries<a class="headerlink" href="#context-queries" title="Permanent link">&para;</a></h3>
+<h4 id="positionsymbolnone-float"><code>position(symbol=None) -&gt; float</code><a class="headerlink" href="#positionsymbolnone-float" title="Permanent link">&para;</a></h4>
+<p>Current position quantity. If <code>symbol</code> is None, uses the first subscribed symbol.</p>
+<h4 id="ctxsymbolnone-symbolcontext"><code>ctx(symbol=None) -&gt; SymbolContext</code><a class="headerlink" href="#ctxsymbolnone-symbolcontext" title="Permanent link">&para;</a></h4>
+<p>Get a <code>SymbolContext</code> for querying per-symbol state.</p>
+<h4 id="get_order_statusorder_id-int"><code>get_order_status(order_id) -&gt; int</code><a class="headerlink" href="#get_order_statusorder_id-int" title="Permanent link">&para;</a></h4>
+<p>Get order status. Returns -1 if not found.</p>
+<h3 id="string-symbol-convenience-api">String-Symbol Convenience API<a class="headerlink" href="#string-symbol-convenience-api" title="Permanent link">&para;</a></h3>
+<p>These take an optional symbol <strong>name</strong> and resolve it through the strategy's own name map, falling
+back to the primary symbol when omitted. Prices and quantities are plain <code>float</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>market_buy(qty, symbol=None)</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>market_sell(qty, symbol=None)</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>limit_buy(price, qty, symbol=None, tif="gtc")</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>limit_sell(price, qty, symbol=None, tif="gtc")</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>stop_market(side, trigger, qty, symbol=None)</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>stop_limit(side, trigger, limit_price, qty, symbol=None)</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>take_profit_market(side, trigger, qty, symbol=None)</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>take_profit_limit(side, trigger, limit_price, qty, symbol=None)</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>trailing_stop(side, offset, qty, symbol=None)</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>trailing_stop_percent(side, callback_bps, qty, symbol=None)</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>close_position(symbol=None)</code></td>
+<td><code>int</code> order id</td>
+</tr>
+<tr>
+<td><code>cancel_order(order_id)</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>cancel_all_orders(symbol=None)</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>modify_order(order_id, new_price, new_qty)</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>pos(symbol=None)</code></td>
+<td><code>float</code> position</td>
+</tr>
+<tr>
+<td><code>last_price(symbol=None)</code></td>
+<td><code>float</code></td>
+</tr>
+<tr>
+<td><code>best_bid(symbol=None)</code></td>
+<td><code>Optional[float]</code>, <code>None</code> when the bid side has no level; <code>0.0</code> is a price</td>
+</tr>
+<tr>
+<td><code>best_ask(symbol=None)</code></td>
+<td><code>Optional[float]</code>, <code>None</code> when the ask side has no level</td>
+</tr>
+<tr>
+<td><code>mid_price(symbol=None)</code></td>
+<td><code>Optional[float]</code>, <code>None</code> unless both sides have a level</td>
+</tr>
+<tr>
+<td><code>order_status(order_id)</code></td>
+<td><code>int</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>side</code> and <code>tif</code> are lowercase strings here (<code>'buy'</code> / <code>'sell'</code>, <code>'gtc'</code> / <code>'ioc'</code> / ...), unlike the
+<code>emit_*</code> methods which take the integer constants from <a href="../types/"><code>lrvx.types</code></a>. An unrecognised
+<code>side</code> falls back to buy and an unrecognised <code>tif</code> to GTC. An unknown symbol name raises
+<code>ValueError</code>.</p>
+<h3 id="multi-timeframe-bar-ring">Multi-Timeframe Bar Ring<a class="headerlink" href="#multi-timeframe-bar-ring" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>last_closed_bar(symbol, bar_type, param) -&gt; Optional[BarData]</code></td>
+<td>Most recent closed bar for that (symbol, timeframe), or <code>None</code> before one has closed</td>
+</tr>
+<tr>
+<td><code>last_n_closed_bars(symbol, bar_type, param, n) -&gt; List[BarData]</code></td>
+<td>Most recent <code>n</code> bars, oldest first</td>
+</tr>
+<tr>
+<td><code>bar_ring_capacity() -&gt; int</code></td>
+<td>Bars retained per (symbol, timeframe)</td>
+</tr>
+<tr>
+<td><code>set_bar_ring_capacity(n)</code></td>
+<td>Set the retention count</td>
+</tr>
+</tbody>
+</table>
+<p><code>param</code> is nanoseconds for time bars, a count for tick bars, a threshold for volume bars.</p>
+<h3 id="properties">Properties<a class="headerlink" href="#properties" title="Permanent link">&para;</a></h3>
+<h4 id="primary_symbol-int"><code>primary_symbol -&gt; int</code><a class="headerlink" href="#primary_symbol-int" title="Permanent link">&para;</a></h4>
+<p>Returns the first symbol in the subscription list.</p>
+<h4 id="primary_symbol_name-str"><code>primary_symbol_name -&gt; str</code><a class="headerlink" href="#primary_symbol_name-str" title="Permanent link">&para;</a></h4>
+<p>The name of the primary symbol, as resolved through the registry.</p>
+<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>from lrvx.strategy import Strategy
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>from lrvx.context import SymbolContext
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>from lrvx.types import TradeData
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>from lrvx.indicators import EMA
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>class EmaCrossover(Strategy):
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    fast_ema: EMA
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    slow_ema: EMA
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    def __init__(self, symbols: List[int]):
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>        super().__init__(symbols)
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>        self.fast_ema = EMA(12)
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        self.slow_ema = EMA(26)
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    def on_trade(self, ctx: SymbolContext, trade: TradeData):
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>        price = trade.price.to_double()
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>        fast = self.fast_ema.update(price)
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>        slow = self.slow_ema.update(price)
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>        if not self.slow_ema.ready:
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>            return
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>        sym = self.primary_symbol
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>        if fast &gt; slow and ctx.is_flat():
+</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>            self.emit_market_buy(sym, 1.0)
+</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>        elif fast &lt; slow and ctx.is_long():
+</span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>            self.emit_close_position(sym)
+</span></code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

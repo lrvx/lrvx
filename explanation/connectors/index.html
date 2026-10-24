@@ -1,0 +1,2367 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/explanation/connectors/">
+      
+      
+        <link rel="prev" href="../indicators/">
+      
+      
+        <link rel="next" href="../venue-types/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Connectors - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#connectors" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Connectors
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clock-domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clock Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disruptor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disruptor Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../memory-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-state-ownership/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol strategy state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-control-plane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connectors
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#adapters-in-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adapters in tree
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Adapters in tree">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#order-type-and-flag-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order-type and flag coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#threading-the-transport-and-the-rate-limit-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Threading: the transport and the rate-limit gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-live-fill-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The live fill contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feed-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feed health
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-monorepo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why monorepo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hyperliquid-signing-daemon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hyperliquid signing daemon
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-venue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new venue
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../per-symbol-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../order-book-tick-window/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order book tick window
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../onchain-order-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    On-chain order lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../liquidity-provision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Liquidity-provision signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../position-valuation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Position valuation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amm-pricing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM pricing in backtests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-making-quoter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market-making quoter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amm-dex-connector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM DEX connector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../replay-equivalence-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replay-equivalence gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-close-ordering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar-close ordering on tied timestamps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node-threaded-runner-lifetime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threaded Runner lifetime in Node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../javascript-value-boundary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The JavaScript value boundary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-stack-reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue-stack reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build/feature-flags/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build feature flags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../contributors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#adapters-in-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adapters in tree
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Adapters in tree">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#order-type-and-flag-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order-type and flag coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#threading-the-transport-and-the-rate-limit-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Threading: the transport and the rate-limit gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-live-fill-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The live fill contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feed-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feed health
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-monorepo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why monorepo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hyperliquid-signing-daemon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hyperliquid signing daemon
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-venue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new venue
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="connectors">Connectors<a class="headerlink" href="#connectors" title="Permanent link">&para;</a></h1>
+<p>lrvx ships native exchange connectors as part of the same repo. They live under <a href="https://github.com/lrvx/lrvx/tree/main/connectors"><code>connectors/</code></a> and build into a single <code>lrvx::connectors</code> static library that links against <code>lrvx::lrvx</code>.</p>
+<p>The module is gated by <code>LRVX_BUILD_CONNECTORS</code> in CMake. It is <strong>off</strong> by default — backtest-only and research builds skip the dependency cost (OpenSSL, libcurl, zlib, plus ixwebsocket and simdjson via FetchContent at configure time).</p>
+<h2 id="adapters-in-tree">Adapters in tree<a class="headerlink" href="#adapters-in-tree" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Venue</th>
+<th>Trades</th>
+<th>BBO</th>
+<th>Book</th>
+<th>Orders</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bybit (V5)</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Bitget (V2)</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Hyperliquid</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Polymarket</td>
+<td>✓</td>
+<td>✓</td>
+<td>—</td>
+<td>✓</td>
+</tr>
+</tbody>
+</table>
+<p>(No position query/stream is implemented in any connector yet — the earlier "Positions" column was aspirational.)</p>
+<p>Each adapter sits under <code>connectors/src/&lt;venue&gt;/</code> with public headers under <code>connectors/include/lrvx-connectors/&lt;venue&gt;/</code>. The header layout uses the <code>lrvx-connectors/</code> prefix so consumers' include sites are stable across the repo move.</p>
+<h3 id="order-type-and-flag-coverage">Order-type and flag coverage<a class="headerlink" href="#order-type-and-flag-coverage" title="Permanent link">&para;</a></h3>
+<p>The "Orders" column above means "submit/cancel/replace exists," not "every <code>OrderType</code> and flag is supported." Coverage differs per venue and is enforced at submit time — an order the connector cannot serialize correctly is rejected rather than sent as an approximation:</p>
+<ul>
+<li><code>TimeInForce</code> and reduce-only are serialized on all four venues. Post-only maps to the venue's maker-only token (Bybit <code>PostOnly</code>, Bitget <code>post_only</code>, Hyperliquid <code>Alo</code>); <code>GTD</code> has no native equivalent on any of the four and is rejected rather than silently downgraded to <code>GTC</code>.</li>
+<li>Stop-market, stop-limit, take-profit-market and take-profit-limit route through Bitget's plan-order endpoint and Bybit's conditional-order fields on the regular order endpoint. Hyperliquid has no trigger-order implementation in this connector and rejects them.</li>
+<li>A conditional order carries its execution price. Bitget's plan-order endpoint takes an order type of its own, so <code>STOP_LIMIT</code> and <code>TAKE_PROFIT_LIMIT</code> are sent as plan orders of type <code>limit</code> with the <code>price</code> field the strategy asked for; the market variants are sent as <code>market</code> with no price at all. A limit-typed conditional order with no limit price is rejected rather than downgraded to a stop-market, which would silently remove the bound on what it may fill at.</li>
+<li>Prices are formatted at the instrument's own precision, taken from <code>SymbolInfo::tickSize</code> in the registry the executor already holds. Venues validate a price against the symbol's precision and reject one with more digits than the instrument quotes, and rounding to a fixed digit count instead moves a protective trigger — on a symbol priced below the rounding granularity, to zero.</li>
+<li><code>TRAILING_STOP</code> and <code>ICEBERG</code> are not implemented on any of the three CEX connectors (Polymarket has no order-side concept of either) and are rejected at submit time. Bybit's trailing stop in particular lives on a different endpoint (<code>/v5/position/trading-stop</code>) than the rest of order submission, which this connector does not call.</li>
+</ul>
+<p>A rejected order publishes <code>OrderEventStatus::REJECTED</code> on the venue's <code>OrderExecutionBus</code> with a reason string identifying the unsupported type or flag — it never reaches the exchange as a same-looking order with the unsupported part silently dropped.</p>
+<h2 id="threading-the-transport-and-the-rate-limit-gate">Threading: the transport and the rate-limit gate<a class="headerlink" href="#threading-the-transport-and-the-rate-limit-gate" title="Permanent link">&para;</a></h2>
+<p>Order submission is called from the strategy / event-bus consumer thread. Nothing on that path may wait for a venue, because a venue that accepts the connection and then says nothing is indistinguishable from a healthy one until a timeout fires — and while the thread waits, the engine processes no events at all, market data included.</p>
+<p>Two components own that rule.</p>
+<p><strong><code>CurlTransport</code> is asynchronous.</strong> <code>post()</code> copies the request, hands it to a sender thread and returns; <code>curl_easy_perform</code> and both completion callbacks run on that thread. The outcome reaches the strategy the way it always did — as an <code>OrderEvent</code> on the <code>OrderExecutionBus</code>, published from the callback — so a submit that fails on the wire still produces a <code>REJECTED</code> with the transport's reason, and nothing is dropped quietly. The defaults in <code>CurlDispatchConfig</code> are one sender thread, so requests leave in the order they were handed over (a cancel submitted after a place is sent after it), and a bounded queue: a full queue answers <code>onError</code> instead of growing, because a venue that has stopped draining is a condition the caller has to hear about rather than a buffer to absorb.</p>
+<p>Timeouts are milliseconds throughout — <code>CurlTimeoutConfig</code> and <code>postWithTimeout()</code> map onto <code>CURLOPT_TIMEOUT_MS</code> / <code>CURLOPT_CONNECTTIMEOUT_MS</code>, so 1500 ms is 1500 ms and 250 ms is 250 ms. Second-resolution options truncated both to one second, which is the whole resolution an order path needs.</p>
+<p><strong>The rate-limit policy is a gate, not a check.</strong> Every send path of every executor — submit, cancel, replace, and on Bitget also <code>setLeverage</code>, <code>submitOrderWithLeverage</code>, <code>placePosTpsl</code> and <code>modifyPosTpsl</code> — hands its request to <code>ActiveRateLimitPolicy::gate()</code>, which decides whether it may leave and when. A path that consults nothing is a path the venue budget does not cover, and the trailing stop walks <code>modifyPosTpsl</code> on every bar.</p>
+<ul>
+<li>A request that takes a token is sent inline on the calling thread: unchanged ordering, unchanged latency, nothing queued.</li>
+<li><code>RateLimitPolicy::REJECT</code> and <code>CALLBACK</code> refuse it and publish <code>REJECTED_RATE_LIMIT</code> on the bus, so a cancel that never left the process cannot leave the tracker reporting the order live.</li>
+<li><code>RateLimitPolicy::WAIT</code> defers: the request is queued on the policy's own sender thread, <code>gate()</code> returns immediately, and the sender sends it once the bucket really has a token — re-checking the budget after every sleep, since several deferred requests wake into the same refill and only the one that takes the token may send. The deferral queue is bounded; past its depth the request is refused through the same <code>REJECTED_RATE_LIMIT</code> path as <code>REJECT</code>.</li>
+</ul>
+<p>Because a deferred request runs after its entry point returned, each send path owns what it needs — it copies the order, or re-reads the tracker — instead of borrowing from the caller's frame.</p>
+<h2 id="the-live-fill-contract">The live fill contract<a class="headerlink" href="#the-live-fill-contract" title="Permanent link">&para;</a></h2>
+<p>Every connector that reports fills must honour all of the following. The engine has no way to detect a violation — a fill that breaks one of these rules looks exactly like a correct fill, and the damage shows up as a wrong position or a wrong PnL much later.</p>
+<ul>
+<li><strong><code>fillQty</code> is the size that just traded</strong>, not the order's size and not the cumulative filled quantity. A venue that reports cumulatively (Bybit's <code>cumExecQty</code>, Bitget's <code>accBaseVolume</code>) must be differenced against what the connector has already published. The cumulative number belongs in <code>order.filledQuantity</code>.</li>
+<li><strong><code>fillPrice</code> is the price it traded at.</strong> <code>PositionTracker::onOrderPartiallyFilled(order, fillQty, fillPrice)</code> builds cost basis and realized PnL from it, so an unset <code>fillPrice</code> books the position at zero.</li>
+<li><strong>No fill without a price.</strong> A fill is published only when the venue has reported the price it traded at. <code>Price</code> has no unset state — its default and a parsed <code>"0"</code> are the same bits — so an unpriced fill and a fill that traded at zero reach a listener as the same event, and the cost basis is built at zero. Bybit's order topic reports <code>avgPrice</code> <code>"0"</code> until something trades, which makes this the everyday shape rather than an edge case. An unpriced increment is <em>held</em>, not dropped: the watermark is left where it was, so the next report that does carry a price publishes the whole quantity the venue has accumulated since. The order's own status and cumulative quantity still go out, demoted to <code>ACCEPTED</code> so nothing moves a position.</li>
+<li><strong>One event per execution.</strong> Where a venue announces the same execution on more than one channel (Bybit's <code>order</code> and <code>execution</code> topics both report it), the connector publishes it once. Identity is the venue's own execution id or, where there is none, a per-order cumulative watermark: the first channel to report an execution advances the watermark and publishes the increment, the second computes a zero increment and publishes nothing.</li>
+<li><strong><code>order.id</code> is the id the engine issued</strong>, never the venue's. Executors send the engine's <code>OrderId</code> as the venue's client order id (Bybit <code>orderLinkId</code>, Bitget <code>clientOid</code>, Hyperliquid <code>cloid</code>) and the connector reads it back off every private frame. The venue's own order id is the fallback for orders this engine did not place, and it belongs in the tracker's <code>exchangeOrderId</code>, not in <code>OrderEvent::order.id</code>.</li>
+<li><strong>A venue rejection publishes <code>REJECTED</code> with the venue's own reason text</strong> and leaves no live order behind, in the tracker or in the strategy's belief.</li>
+<li><strong><code>recvNs</code> is stamped on receipt and <code>sourceExchange</code> names the venue</strong> on every event. Both are covered in <a href="../../how-to/custom-connector/">Building a custom connector</a>: without <code>sourceExchange</code>, <code>CompositeBookMatrix</code> drops the update and the cross-venue book is empty in live; without <code>recvNs</code>, its staleness sweep skips the venue and a frozen feed keeps being quoted.</li>
+</ul>
+<p><code>connectors/tests/unit_test_*_fill_contract.cpp</code> pins this per venue, offline, by feeding recorded frames into the connector's message handlers and asserting on what a real <code>IOrderExecutionListener</code> receives from a real <code>OrderExecutionBus</code>.</p>
+<h2 id="feed-health">Feed health<a class="headerlink" href="#feed-health" title="Permanent link">&para;</a></h2>
+<p><code>IExchangeConnector</code> carries the framework's only generic health surface —
+<code>setErrorCallbacks(onDisconnect, onSequenceGap, onStaleData)</code> — and every
+connector in tree honours the same contract, so a supervisor wires the three
+callbacks once and hears about all four venues the same way.</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Every connector raises it when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>onDisconnect</code></td>
+<td>The WebSocket closed. Delivered from the socket's own close handler through the connector's public <code>handleDisconnect(code, reason)</code>; the reason carries both the close code and the venue's text. Both the public market-data socket and, where a venue has one, the private order stream report — losing the private stream stops fills reaching the engine.</td>
+</tr>
+<tr>
+<td><code>onSequenceGap</code></td>
+<td>The venue's own continuity field broke, so the local book is no longer a valid continuation of the venue's: Bybit's orderbook update id <code>u</code> skipped, Bitget's <code>seq</code> skipped, or a Bitget snapshot failed its checksum. In every case the offending frame is dropped, further deltas are suppressed, and the topic is re-subscribed so the venue re-sends a snapshot — the event never replaces the invalidation, it reports it.</td>
+</tr>
+<tr>
+<td><code>onStaleData</code></td>
+<td>A subscribed symbol stopped ticking. This is the failure a close handler cannot catch: the socket stays open and the data stops.</td>
+</tr>
+</tbody>
+</table>
+<p>A gap event carries <code>(expected, received)</code> update ids. A Bitget checksum
+failure means the same thing — the book is wrong and must be re-baselined —
+and rides the same callback carrying the computed and received CRC32 values
+instead; the log line at <code>error</code> level says which of the two fired.</p>
+<p>Staleness is polled, not timed: no connector owns a timer, so the supervisor
+calls <code>pollFeedHealth(now)</code> on its own cadence and each connector compares
+<code>now</code> against its per-symbol last-arrival stamp. The window is
+<code>&lt;Config&gt;::staleDataTimeoutMs</code> and defaults to <strong>0, which disables the
+check</strong> — the right window is a property of the instrument's liquidity, not
+of the venue, so there is no default the connector can pick. A symbol is
+reported once per staleness episode, and fresh data re-arms it. Each
+connector stamps every subscribed symbol at <code>start()</code>, so a feed that never
+delivers a single frame ages out like one that stopped.</p>
+<h2 id="build">Build<a class="headerlink" href="#build" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>cmake<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>-DLRVX_BUILD_CONNECTORS<span class="o">=</span>ON
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>cmake<span class="w"> </span>--build<span class="w"> </span>build<span class="w"> </span>--target<span class="w"> </span>lrvx-connectors
+</span></code></pre></div>
+<p>The result is <code>build/connectors/liblrvx-connectors.a</code>. To link against another target:</p>
+<div class="language-cmake highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">my_target</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="s">lrvx::connectors</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The Polymarket executor is a Rust FFI library. If <code>cargo</code> isn't on the path, the executor source is excluded from the build and a CMake warning surfaces instead of a configure error. Pass <code>-DLRVX_ENABLE_POLYMARKET_ORDER_EXECUTOR=OFF</code> to silence the warning when Rust isn't desired.</p>
+<h2 id="why-monorepo">Why monorepo<a class="headerlink" href="#why-monorepo" title="Permanent link">&para;</a></h2>
+<p>The connector code used to live in a separate <code>lrvx-connectors</code> repo, pulled in as a git submodule. Three reasons it moved:</p>
+<ul>
+<li>Cross-repo changes (a new event type in core needing a new field on the connector side) cost two PRs with submodule pinning. For a one-contributor project, the overhead is pure friction.</li>
+<li>AI agents reading lrvx without recursing into submodules saw zero connector code, which made the polyglot positioning weaker than it actually was.</li>
+<li>Single dependency policy. <code>connectors/CMakeLists.txt</code> now uses the same <code>FetchContent</code> mechanism the parent uses for <code>lz4</code> and <code>tracy</code>, instead of bundling its own external/ submodule tree.</li>
+</ul>
+<p>The trade-off: every push that touches connectors runs the full lrvx CI. The <code>connectors-build</code> job stays minimal (no tests, no platform matrix beyond ubuntu) so the cost is bounded.</p>
+<h2 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h2>
+<p><code>connectors/tests/</code> holds two kinds of test:</p>
+<ul>
+<li><code>unit_test_*.cpp</code> are offline — no sockets, no exchange credentials. Order-serialization tests fake the transport (<code>ITransport</code>) or the client-provided injection point and assert on the exact request body a connector builds; protocol tests feed raw WebSocket frames straight into a connector's message handler. They build and register with <code>ctest</code> whenever <code>LRVX_BUILD_CONNECTORS=ON</code> and <code>LRVX_BUILD_TESTS=ON</code> — no extra flag — and run in the default CI matrix.</li>
+<li><code>integration_test_*.cpp</code> connect to real exchange WebSocket endpoints. Building them is gated by both <code>LRVX_BUILD_TESTS=ON</code> and <code>LRVX_BUILD_CONNECTOR_INTEGRATION_TESTS=ON</code>; running them via <code>ctest</code> requires the further <code>LRVX_RUN_CONNECTOR_INTEGRATION_TESTS=ON</code>. The default lrvx CI build skips them entirely.</li>
+</ul>
+<p>To build the integration tests locally:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cmake<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>-DLRVX_BUILD_CONNECTORS<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">                </span>-DLRVX_BUILD_TESTS<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">                </span>-DLRVX_BUILD_CONNECTOR_INTEGRATION_TESTS<span class="o">=</span>ON
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>cmake<span class="w"> </span>--build<span class="w"> </span>build
+</span></code></pre></div>
+<h2 id="hyperliquid-signing-daemon">Hyperliquid signing daemon<a class="headerlink" href="#hyperliquid-signing-daemon" title="Permanent link">&para;</a></h2>
+<p>Hyperliquid uses an off-process Python daemon for order signing — the C++ executor talks to it over a local socket. The daemon wraps the official <a href="https://github.com/hyperliquid-dex/hyperliquid-python-sdk"><code>hyperliquid-python-sdk</code></a>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span>git+https://github.com/hyperliquid-dex/hyperliquid-python-sdk.git
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>python3<span class="w"> </span>connectors/utils/hl_signerd.py
+</span></code></pre></div>
+<p>Out-of-process signing keeps the secret out of the trading binary's address space and avoids shipping a Rust crypto stack into every lrvx build.</p>
+<p><strong>Transport rule: the key travels over a Unix socket private to its owner, or it does not travel.</strong> The signing request contains the raw private key in its body, so the transport <em>is</em> the access control:</p>
+<ul>
+<li>The client speaks <code>AF_UNIX</code> only. There is no TCP fallback — loopback authenticates neither end, and any local process that binds the port first harvests the key.</li>
+<li>The socket path is <code>LRVX_HL_SIGNER_SOCKET</code>, defaulting to <code>/dev/shm/hl_sign.sock</code>. Set it on any host without <code>/dev/shm</code> (macOS, for one) rather than expecting a fallback.</li>
+<li>Before a byte is written the client checks the path itself: it must be a socket (checked with <code>lstat</code>, so a symlink is refused rather than followed), owned by the calling user, with no group or other permission bits. The daemon creates it <code>0600</code> under a narrowed umask so it is private from the moment it exists, not from the moment a <code>chmod</code> lands.</li>
+<li>The reply's length header comes from the peer, so it is a request for an allocation rather than a fact. A signature is a few hundred bytes; anything above 4 KiB is refused before memory is reserved.</li>
+</ul>
+<p>With no daemon reachable, signing fails and returns no signature. It never falls back to a transport it cannot authenticate.</p>
+<h2 id="adding-a-new-venue">Adding a new venue<a class="headerlink" href="#adding-a-new-venue" title="Permanent link">&para;</a></h2>
+<p>The expected pattern for a new connector:</p>
+<ol>
+<li>Create <code>connectors/src/&lt;venue&gt;/</code> and <code>connectors/include/lrvx-connectors/&lt;venue&gt;/</code>.</li>
+<li>Implement the venue-specific subclasses of the connector / executor abstractions in <code>lrvx::IExchangeConnector</code> (<code>lrvx/connector/abstract_exchange_connector.h</code>) and <code>lrvx::IOrderExecutor</code> (<code>lrvx/execution/abstract_executor.h</code>) — both live directly in namespace <code>lrvx</code>.</li>
+<li>The CMake glob in <code>connectors/CMakeLists.txt</code> picks up new <code>.cpp</code> files automatically — no CMakeLists edit needed.</li>
+<li>Add an integration test under <code>connectors/tests/integration_test_&lt;venue&gt;.cpp</code> (build-only by default).</li>
+</ol>
+<p>The existing four adapters are concrete worked examples; a Hyperliquid-style off-process signer or a Polymarket-style Rust FFI is supported via the same gating pattern.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

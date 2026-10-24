@@ -1,0 +1,2895 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/explanation/indicators/">
+      
+      
+        <link rel="prev" href="../mcp-control-plane/">
+      
+      
+        <link rel="next" href="../connectors/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Indicators - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#indicators" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Indicators
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clock-domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clock Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disruptor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disruptor Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../memory-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-state-ownership/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol strategy state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-control-plane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#moving-averages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moving averages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Moving averages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DEMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TEMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kama" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KAMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oscillators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Oscillators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Oscillators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rsi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RSI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#macd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MACD
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stochastic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stochastic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CCI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bollinger-bands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bollinger Bands
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Trend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADX
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CHOP
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volatility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volatility
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Volatility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#atr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ATR
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parkinson-volatility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parkinson volatility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rogers-satchell-volatility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rogers-Satchell volatility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volume
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Volume">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#obv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OBV
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vwap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VWAP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cvd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CVD
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statistical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statistical
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Statistical">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rolling-z-score" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rolling z-score
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skewness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skewness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kurtosis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kurtosis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shannon-entropy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shannon entropy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#autocorrelation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Autocorrelation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#correlation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correlation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../per-symbol-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../order-book-tick-window/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order book tick window
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../onchain-order-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    On-chain order lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../liquidity-provision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Liquidity-provision signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../position-valuation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Position valuation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amm-pricing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM pricing in backtests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-making-quoter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market-making quoter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amm-dex-connector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM DEX connector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../replay-equivalence-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replay-equivalence gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-close-ordering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar-close ordering on tied timestamps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node-threaded-runner-lifetime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threaded Runner lifetime in Node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../javascript-value-boundary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The JavaScript value boundary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-stack-reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue-stack reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build/feature-flags/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build feature flags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../contributors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#moving-averages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Moving averages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Moving averages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DEMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TEMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kama" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KAMA
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#slope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Slope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#oscillators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Oscillators
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Oscillators">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rsi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RSI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#macd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MACD
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stochastic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stochastic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CCI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bollinger-bands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bollinger Bands
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#trend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trend
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Trend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADX
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CHOP
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volatility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volatility
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Volatility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#atr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ATR
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parkinson-volatility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parkinson volatility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rogers-satchell-volatility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rogers-Satchell volatility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volume
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Volume">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#obv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OBV
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vwap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VWAP
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cvd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CVD
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statistical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statistical
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Statistical">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#rolling-z-score" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rolling z-score
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skewness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Skewness
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kurtosis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kurtosis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shannon-entropy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shannon entropy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#autocorrelation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Autocorrelation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#correlation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correlation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="indicators">Indicators<a class="headerlink" href="#indicators" title="Permanent link">&para;</a></h1>
+<p>lrvx has 21 streaming indicator classes plus several batch-only functions, split across moving averages, oscillators, trend, volatility, volume, and statistics. The same set is exposed by every binding — Python, Node.js, Codon, and the C++ core all share one implementation.</p>
+<p>Most of them work in two modes: batch (pass an array, get an array back) and streaming (call <code>.update()</code> each tick, check <code>.ready</code> before reading <code>.value</code>). Several are batch-only — a free function but no indicator class or streaming mode: <strong>ADX</strong>, <strong>CHOP</strong>, <strong>OBV</strong>, <strong>VWAP</strong>, <strong>CVD</strong>, plus the statistical <strong>ADF</strong> stationarity test and <strong>Hurst/DFA</strong> (<code>hurst_dfa</code>, <code>rolling_hurst</code>). The 21 streaming classes are the ones in <code>include/lrvx/indicator/registry.def</code>; <code>lrvx.list_indicators()</code> returns exactly that list at runtime.</p>
+<p>This page covers what each one actually measures and when you'd want it.</p>
+<hr />
+<h2 id="moving-averages">Moving averages<a class="headerlink" href="#moving-averages" title="Permanent link">&para;</a></h2>
+<h3 id="sma">SMA<a class="headerlink" href="#sma" title="Permanent link">&para;</a></h3>
+<p>Arithmetic mean over a sliding window. Every bar gets equal weight.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>SMA(n) = (x₁ + x₂ + ... + xₙ) / n
+</span></code></pre></div>
+<p>Responds slowly to recent price movement, which makes it less useful for short-term signals but reasonable as a long-term trend reference. If you need a baseline to compare against, this is the simplest one.</p>
+<h3 id="ema">EMA<a class="headerlink" href="#ema" title="Permanent link">&para;</a></h3>
+<p>Weighted average where recent bars count more. Smoothing factor: <code>α = 2/(period+1)</code>.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>EMA = α × price + (1 − α) × EMA_prev
+</span></code></pre></div>
+<p>Responds faster than SMA. MACD, ATR smoothing, and most other indicators build on it. The default choice when you need a moving average and have no strong reason to pick something else.</p>
+<h3 id="rma">RMA<a class="headerlink" href="#rma" title="Permanent link">&para;</a></h3>
+<p>Same structure as EMA but <code>α = 1/period</code> — slower. RSI and ATR use it internally (it's Wilder's smoothing).</p>
+<p>You probably won't use RMA directly unless you're reimplementing RSI/ATR from scratch or need exact TradingView parity.</p>
+<h3 id="dema">DEMA<a class="headerlink" href="#dema" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>DEMA = 2 × EMA − EMA(EMA)
+</span></code></pre></div>
+<p>Less lag than EMA. Warmup takes <code>2 × period</code> bars. Worth trying when EMA crossover signals are consistently arriving a bar or two late.</p>
+<h3 id="tema">TEMA<a class="headerlink" href="#tema" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>TEMA = 3 × EMA − 3 × EMA(EMA) + EMA(EMA(EMA))
+</span></code></pre></div>
+<p>More lag reduction than DEMA. Warmup is <code>3 × period</code>. Very reactive — expect more false signals in choppy markets.</p>
+<h3 id="kama">KAMA<a class="headerlink" href="#kama" title="Permanent link">&para;</a></h3>
+<p>Kaufman Adaptive Moving Average. Adjusts the smoothing factor based on an "efficiency ratio": how much price moved versus how much it oscillated. Goes fast in trending markets, slow in sideways ones.</p>
+<p>Useful if you want one MA that self-adjusts across regimes rather than manually switching between a fast and a slow EMA.</p>
+<h3 id="slope">Slope<a class="headerlink" href="#slope" title="Permanent link">&para;</a></h3>
+<p>Two-point rate of change over a rolling window, not a linear regression: the difference between the current value and the value <code>length</code> bars back, divided by the window length.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>slope = (x[i] − x[i − length]) / length
+</span></code></pre></div>
+<p>This is cheaper than an OLS fit and reacts only to the window's two endpoints, ignoring the points between them. On a clean straight line the two formulas agree, so the difference is easy to miss in a simple example; on a noisy series they can diverge by 50% or more, since the two-point version does not average away the noise the way a regression slope does.</p>
+<p>Positive = upward trend. Magnitude is the steepness. Good for momentum filtering.</p>
+<hr />
+<h2 id="oscillators">Oscillators<a class="headerlink" href="#oscillators" title="Permanent link">&para;</a></h2>
+<h3 id="rsi">RSI<a class="headerlink" href="#rsi" title="Permanent link">&para;</a></h3>
+<p>Ratio of average gains to average losses over <code>period</code> bars, scaled to 0–100.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>RSI = 100 − 100 / (1 + RS)
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>RS  = avg_gain / avg_loss   (Wilder's RMA)
+</span></code></pre></div>
+<p>The classic levels (70 = overbought, 30 = oversold) work well in ranging markets. In a strong trend, RSI can stay above 70 for a long time; whether that helps or hurts depends on your strategy. Period 14 is standard; shorter periods make it noisier.</p>
+<p>A window with zero gain and zero loss (the instrument hasn't moved at all) reports the neutral 50, not 100: on a flat market, "maximally overbought" would be a misleading signal. A genuine uptrend (all gains) still reports 100, and a decline followed by a flat plateau still reports 0.</p>
+<h3 id="macd">MACD<a class="headerlink" href="#macd" title="Permanent link">&para;</a></h3>
+<p>Difference between a fast EMA and a slow EMA, with a signal line on top.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>MACD line   = EMA(fast) − EMA(slow)    [default: 12, 26]
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>signal line = EMA(MACD line, 9)
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>histogram   = MACD line − signal line
+</span></code></pre></div>
+<p>Crossing zero signals a momentum shift. The histogram slope shows whether momentum is accelerating or fading. Watching the histogram flatten before the line crossover is a common entry filter.</p>
+<h3 id="stochastic">Stochastic<a class="headerlink" href="#stochastic" title="Permanent link">&para;</a></h3>
+<p>Where is the close relative to the recent high-low range?</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>%K = 100 × (close − lowest_low) / (highest_high − lowest_low)
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>%D = SMA(%K, d_period)
+</span></code></pre></div>
+<p>Ranges 0–100. Common levels: 80 overbought, 20 oversold. The %D line smooths %K. Main signals are the %K/%D crossover and divergence between price and the indicator.</p>
+<h3 id="cci">CCI<a class="headerlink" href="#cci" title="Permanent link">&para;</a></h3>
+<p>Distance of the typical price from its SMA, divided by mean absolute deviation.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>TP  = (high + low + close) / 3
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>CCI = (TP − SMA(TP)) / (0.015 × mean_deviation)
+</span></code></pre></div>
+<p>Scaled so roughly 70% of values fall between −100 and +100. Values outside that band signal unusual strength or weakness. Often used as a momentum filter rather than a primary entry signal.</p>
+<h3 id="bollinger-bands">Bollinger Bands<a class="headerlink" href="#bollinger-bands" title="Permanent link">&para;</a></h3>
+<p>SMA with bands at ±N standard deviations.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>middle = SMA(price, period)
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>upper  = middle + multiplier × std(price, period)
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>lower  = middle − multiplier × std(price, period)
+</span></code></pre></div>
+<p>Bands widen in volatile markets and contract when price quiets down. The squeeze — when bands get unusually narrow — often comes before a directional move. Price touching a band is context, not a signal by itself.</p>
+<hr />
+<h2 id="trend">Trend<a class="headerlink" href="#trend" title="Permanent link">&para;</a></h2>
+<h3 id="adx">ADX<a class="headerlink" href="#adx" title="Permanent link">&para;</a></h3>
+<p><em>Batch-only — <code>adx(high, low, close, period)</code>. No streaming class.</em></p>
+<p>Measures trend strength, not direction. Comes with two directional indicators.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>+DI  = Wilder(upward movement, period)
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>−DI  = Wilder(downward movement, period)
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>ADX  = Wilder(|+DI − −DI| / (+DI + −DI), period)
+</span></code></pre></div>
+<p>ADX above 25 typically means there's a trend worth following. Below 20 is choppy. +DI and −DI tell you direction; ADX tells you whether to care.</p>
+<h3 id="chop">CHOP<a class="headerlink" href="#chop" title="Permanent link">&para;</a></h3>
+<p><em>Batch-only — <code>chop(high, low, close, period)</code>. No streaming class.</em></p>
+<p>How much price moved as a fraction of the maximum possible range over the period.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>CHOP = 100 × log₁₀(Σ ATR / (highest_high − lowest_low)) / log₁₀(period)
+</span></code></pre></div>
+<p>High CHOP (near 100) means directionless. Low (near 0) means trending. More useful for switching between strategy modes than as a signal itself.</p>
+<hr />
+<h2 id="volatility">Volatility<a class="headerlink" href="#volatility" title="Permanent link">&para;</a></h2>
+<h3 id="atr">ATR<a class="headerlink" href="#atr" title="Permanent link">&para;</a></h3>
+<p>Average range per bar, accounting for gaps.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>true_range = max(high − low, |high − prev_close|, |low − prev_close|)
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>ATR        = RMA(true_range, period)
+</span></code></pre></div>
+<p>Not directional. Standard use: position sizing (stop = N × ATR from entry) and filtering signals by volatility regime.</p>
+<h3 id="parkinson-volatility">Parkinson volatility<a class="headerlink" href="#parkinson-volatility" title="Permanent link">&para;</a></h3>
+<p>Uses high-low ranges instead of close-to-close returns.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>σ = sqrt(mean(ln(H/L)²) / (4 × ln(2)))
+</span></code></pre></div>
+<p>More efficient than close-to-close when you have intraday OHLC data. Underestimates if the market gaps frequently, since gaps don't show in the H-L range.</p>
+<h3 id="rogers-satchell-volatility">Rogers-Satchell volatility<a class="headerlink" href="#rogers-satchell-volatility" title="Permanent link">&para;</a></h3>
+<p>OHLC volatility estimator designed to handle drift (trending markets) without bias.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>σ² = mean(ln(H/C) × ln(H/O) + ln(L/C) × ln(L/O))
+</span></code></pre></div>
+<p>Better than Parkinson for trending assets. Both can be annualized by multiplying by <code>sqrt(periods_per_year)</code>.</p>
+<hr />
+<h2 id="volume">Volume<a class="headerlink" href="#volume" title="Permanent link">&para;</a></h2>
+<h3 id="obv">OBV<a class="headerlink" href="#obv" title="Permanent link">&para;</a></h3>
+<p><em>Batch-only — <code>obv(close, volume)</code>. No streaming class.</em></p>
+<p>Running total: add volume on up bars, subtract on down bars.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>OBV = OBV_prev + (close &gt; prev_close ? +volume : −volume)
+</span></code></pre></div>
+<p>The absolute value is meaningless — you're looking at the trend of OBV and divergences from price. Price makes a new high but OBV doesn't: the rally may not have conviction.</p>
+<h3 id="vwap">VWAP<a class="headerlink" href="#vwap" title="Permanent link">&para;</a></h3>
+<p><em>Batch-only — <code>vwap(close, volume, window)</code>. No streaming class.</em></p>
+<p>Average price weighted by volume, over a rolling window.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>VWAP = Σ(price × volume) / Σ(volume)
+</span></code></pre></div>
+<p>Price above VWAP = buyers have been in control over that window. Used as a fair-value reference and order execution benchmark. Institutions care about VWAP when filling large orders.</p>
+<h3 id="cvd">CVD<a class="headerlink" href="#cvd" title="Permanent link">&para;</a></h3>
+<p><em>Batch-only — <code>cvd(open, high, low, close, volume)</code>. No streaming class.</em></p>
+<p>Running total of buying minus selling volume, inferred from OHLCV.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>CVD = CVD_prev + buy_volume − sell_volume
+</span></code></pre></div>
+<p>Similar to OBV but directional. Divergence between CVD and price is one of the more reliable short-term signals when it appears.</p>
+<hr />
+<h2 id="statistical">Statistical<a class="headerlink" href="#statistical" title="Permanent link">&para;</a></h2>
+<h3 id="rolling-z-score">Rolling z-score<a class="headerlink" href="#rolling-z-score" title="Permanent link">&para;</a></h3>
+<p>How many standard deviations is the current value from the rolling mean?</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>z = (x − mean(x, period)) / std(x, period)
+</span></code></pre></div>
+<p>Standard use is mean-reversion signals: z &gt; 2 or &lt; −2 marks statistically unusual levels. Returns NaN when std = 0.</p>
+<h3 id="skewness">Skewness<a class="headerlink" href="#skewness" title="Permanent link">&para;</a></h3>
+<p>Fisher-Pearson skewness of a rolling window — measures distribution asymmetry.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>skew = (n / ((n−1)(n−2))) × Σ((x − mean) / std)³
+</span></code></pre></div>
+<p>Positive = right tail (large gains skew the distribution). Negative = left tail. Common in volatility forecasting and regime detection. Requires period ≥ 3; NaN if std = 0.</p>
+<h3 id="kurtosis">Kurtosis<a class="headerlink" href="#kurtosis" title="Permanent link">&para;</a></h3>
+<p>Tail heaviness relative to a normal distribution (Fisher excess kurtosis, so a normal distribution = 0).</p>
+<p>High kurtosis means fat tails: more outliers than a normal distribution would predict. Used in risk models to understand tail exposure. Requires period ≥ 4; NaN if std = 0.</p>
+<h3 id="shannon-entropy">Shannon entropy<a class="headerlink" href="#shannon-entropy" title="Permanent link">&para;</a></h3>
+<p>How random is the recent price distribution? Normalized to [0, 1] using histogram binning.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>H = −Σ p(x) × ln(p(x)) / ln(bins)
+</span></code></pre></div>
+<p>1 = uniform distribution (maximum uncertainty). 0 = all values identical. Entropy tends to drop before trends develop and rise in choppy, uncertain markets. That makes it usable as a regime filter.</p>
+<h3 id="autocorrelation">Autocorrelation<a class="headerlink" href="#autocorrelation" title="Permanent link">&para;</a></h3>
+<p>Rolling Pearson correlation of a series with itself at a fixed lag.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>AC(window, lag) = corr(x[t], x[t − lag])   over the trailing `window`
+</span></code></pre></div>
+<p>Constructed as <code>AutoCorrelation(window, lag)</code>. Positive values mean the series continues in the same direction at that lag (momentum); negative values mean it reverses (mean reversion). Useful for picking a holding horizon or deciding whether a series is worth a momentum model at all. Returns NaN when the window is constant.</p>
+<h3 id="correlation">Correlation<a class="headerlink" href="#correlation" title="Permanent link">&para;</a></h3>
+<p>Rolling Pearson correlation between two series.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>r = Σ(x − x̄)(y − ȳ) / sqrt(Σ(x − x̄)² × Σ(y − ȳ)²)
+</span></code></pre></div>
+<p>Range [−1, 1]. Used for pairs construction, cross-asset filters, or detecting when a relationship is breaking down. Returns NaN when either series is constant within the window.</p>
+<p>For the cross-symbol case (<code>Correlation(BTC, ETH)</code> from a live strategy or paired bar arrays), the engine does <strong>not</strong> auto-align timestamps — the caller must synchronise the streams first. See <a href="../../how-to/cross-symbol-indicators/">the cross-symbol how-to</a> for the alignment recipe.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

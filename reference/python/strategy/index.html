@@ -1,0 +1,3410 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/reference/python/strategy/">
+      
+      
+        <link rel="prev" href="../optimizer/">
+      
+      
+        <link rel="next" href="../../node/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Strategy Class - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#strategy-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Strategy Class
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../portable-sockets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sockets across platforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_3" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../_api_index/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Full API index
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine & Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aggregators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../books/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order Books
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../positions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Positions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../replay/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replay
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../segment_ops/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Segment Ops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimizer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimizer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy Class
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy Class
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxsymbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.Symbol
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxsymbolregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.SymbolRegistry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxstrategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class: lrvx.Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#overridable-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overridable Callbacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#order-emission-shorthand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order Emission — Shorthand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#order-emission-explicit-emit_-variants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order Emission — Explicit (emit_* variants)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#context-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context Queries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#closed-bar-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closed-bar history
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxsymbolcontext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.SymbolContext
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxtradedata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.TradeData
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxrunner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.Runner
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class: lrvx.Runner">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hook-setters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook setters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trace-recording" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trace recording
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal object
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxbacktestrunner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.BacktestRunner
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class: lrvx.BacktestRunner">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hook-setters_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook setters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stats-dict-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stats dict keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../node/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node.js
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../codon/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codon
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../quickjs/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JavaScript (embedded)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/capi/lrvx_capi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../errors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../api/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core (C++ internals)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxsymbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.Symbol
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxsymbolregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.SymbolRegistry
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxstrategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.Strategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class: lrvx.Strategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#constructor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Constructor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#overridable-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overridable Callbacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#order-emission-shorthand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order Emission — Shorthand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#order-emission-explicit-emit_-variants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order Emission — Explicit (emit_* variants)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#context-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Context Queries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#closed-bar-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Closed-bar history
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxsymbolcontext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.SymbolContext
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxtradedata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.TradeData
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxrunner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.Runner
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class: lrvx.Runner">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hook-setters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook setters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trace-recording" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trace recording
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal object
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#class-lrvxbacktestrunner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Class: lrvx.BacktestRunner
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Class: lrvx.BacktestRunner">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hook-setters_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook setters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stats-dict-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stats dict keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="strategy-api">Strategy API<a class="headerlink" href="#strategy-api" title="Permanent link">&para;</a></h1>
+<p>Event-driven strategy classes for Python. Mirrors C++ <code>lrvx::Strategy</code>.</p>
+<h2 id="class-lrvxsymbol">Class: <code>lrvx.Symbol</code><a class="headerlink" href="#class-lrvxsymbol" title="Permanent link">&para;</a></h2>
+<p>Returned by <code>SymbolRegistry.add_symbol</code>. Works transparently as an <code>int</code> wherever a symbol ID is expected.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>int</code></td>
+<td>Numeric symbol ID</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td>Symbol name, e.g. <code>"BTCUSDT"</code></td>
+</tr>
+<tr>
+<td><code>exchange</code></td>
+<td><code>str</code></td>
+<td>Exchange name, e.g. <code>"binance"</code></td>
+</tr>
+<tr>
+<td><code>tick_size</code></td>
+<td><code>float</code></td>
+<td>Minimum price increment</td>
+</tr>
+</tbody>
+</table>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">int</span><span class="p">(</span><span class="n">btc</span><span class="p">)</span>   <span class="c1"># 1</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">btc</span><span class="p">)</span> <span class="c1"># Symbol(binance:BTCUSDT, id=1)</span>
+</span></code></pre></div>
+<h2 id="class-lrvxsymbolregistry">Class: <code>lrvx.SymbolRegistry</code><a class="headerlink" href="#class-lrvxsymbolregistry" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">SymbolRegistry</span><span class="p">()</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">btc</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">add_symbol</span><span class="p">(</span><span class="s2">"binance"</span><span class="p">,</span> <span class="s2">"BTCUSDT"</span><span class="p">,</span> <span class="n">tick_size</span><span class="o">=</span><span class="mf">0.01</span><span class="p">)</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_symbol(exchange, symbol, tick_size=0.01)</code></td>
+<td><code>Symbol</code></td>
+<td>Register a symbol and return its <code>Symbol</code> object</td>
+</tr>
+<tr>
+<td><code>symbol_count()</code></td>
+<td><code>int</code></td>
+<td>Number of registered symbols</td>
+</tr>
+</tbody>
+</table>
+<h2 id="class-lrvxstrategy">Class: <code>lrvx.Strategy</code><a class="headerlink" href="#class-lrvxstrategy" title="Permanent link">&para;</a></h2>
+<h3 id="constructor">Constructor<a class="headerlink" href="#constructor" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">Strategy</span><span class="p">(</span><span class="n">symbols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Symbol</span> <span class="o">|</span> <span class="nb">int</span><span class="p">])</span>
+</span></code></pre></div>
+<p><code>symbols</code> — list of <code>Symbol</code> objects or raw integer IDs to subscribe to.</p>
+<h3 id="overridable-callbacks">Overridable Callbacks<a class="headerlink" href="#overridable-callbacks" title="Permanent link">&para;</a></h3>
+<h4 id="on_tradectx-symbolcontext-trade-tradedata"><code>on_trade(ctx: SymbolContext, trade: TradeData)</code><a class="headerlink" href="#on_tradectx-symbolcontext-trade-tradedata" title="Permanent link">&para;</a></h4>
+<p>Called on each trade event for subscribed symbols.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_trade</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">trade</span><span class="p">):</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">is_flat</span><span class="p">():</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">market_buy</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="on_book_updatectx-symbolcontext"><code>on_book_update(ctx: SymbolContext)</code><a class="headerlink" href="#on_book_updatectx-symbolcontext" title="Permanent link">&para;</a></h4>
+<p>Called on each order book update.</p>
+<h4 id="on_barctx-symbolcontext-bar-bardata"><code>on_bar(ctx: SymbolContext, bar: BarData)</code><a class="headerlink" href="#on_barctx-symbolcontext-bar-bardata" title="Permanent link">&para;</a></h4>
+<p>Called on each closed OHLC bar. <code>bar</code> exposes <code>open</code>, <code>high</code>, <code>low</code>, <code>close</code>,
+<code>volume</code>, <code>buy_volume</code>, <code>start_time_ns</code>, <code>end_time_ns</code>, <code>bar_type</code>,
+<code>bar_type_param</code>, <code>close_reason</code>. Use <code>BacktestRunner.run_bars(...)</code> to replay
+historical bars or <code>Runner.on_bar(...)</code> to push live bars.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_bar</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">bar</span><span class="p">):</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="c1"># detect breakout on bar close</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="k">if</span> <span class="n">bar</span><span class="o">.</span><span class="n">close</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">prev_high</span> <span class="ow">and</span> <span class="n">ctx</span><span class="o">.</span><span class="n">is_flat</span><span class="p">():</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">market_buy</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">prev_high</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"prev_high"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="n">bar</span><span class="o">.</span><span class="n">high</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="on_fillctx-symbolcontext-event-ordereventdata"><code>on_fill(ctx: SymbolContext, event: OrderEventData)</code><a class="headerlink" href="#on_fillctx-symbolcontext-event-ordereventdata" title="Permanent link">&para;</a></h4>
+<p>Called on every fill this strategy's own orders produce (status
+<code>PARTIALLY_FILLED</code> or <code>FILLED</code>).</p>
+<h4 id="on_order_updatectx-symbolcontext-event-ordereventdata"><code>on_order_update(ctx: SymbolContext, event: OrderEventData)</code><a class="headerlink" href="#on_order_updatectx-symbolcontext-event-ordereventdata" title="Permanent link">&para;</a></h4>
+<p>Called on every order-lifecycle status change: <code>NEW</code>, <code>ACCEPTED</code>, <code>CANCELED</code>,
+<code>REJECTED</code>, <code>REPLACED</code>, <code>TRIGGERED</code>, <code>TRAILING_UPDATED</code>. Fills fire here too —
+use <code>on_fill</code> if you only care about those.</p>
+<h4 id="on_queue_position_changectx-symbolcontext-event-ordereventdata"><code>on_queue_position_change(ctx: SymbolContext, event: OrderEventData)</code><a class="headerlink" href="#on_queue_position_changectx-symbolcontext-event-ordereventdata" title="Permanent link">&para;</a></h4>
+<p>Called when a resting limit order's queue position moved with no other
+lifecycle transition. <code>event.queue_ahead</code> and <code>event.queue_total</code> carry the
+snapshot. Backtest only.</p>
+<h4 id="on_market_position_changectx-symbolcontext-event-ordereventdata"><code>on_market_position_change(ctx: SymbolContext, event: OrderEventData)</code><a class="headerlink" href="#on_market_position_changectx-symbolcontext-event-ordereventdata" title="Permanent link">&para;</a></h4>
+<p>Called when a resting limit order's categorical market position transitioned.
+Backtest only.</p>
+<h4 id="on_start-on_stop"><code>on_start()</code> / <code>on_stop()</code><a class="headerlink" href="#on_start-on_stop" title="Permanent link">&para;</a></h4>
+<p>Lifecycle callbacks.</p>
+<h3 id="order-emission-shorthand">Order Emission — Shorthand<a class="headerlink" href="#order-emission-shorthand" title="Permanent link">&para;</a></h3>
+<p>These methods use the first registered symbol when <code>symbol</code> is omitted. <code>symbol</code> is a symbol name.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>market_buy(qty, symbol=None)</code></td>
+<td>Market buy</td>
+</tr>
+<tr>
+<td><code>market_sell(qty, symbol=None)</code></td>
+<td>Market sell</td>
+</tr>
+<tr>
+<td><code>limit_buy(price, qty, symbol=None, tif='gtc')</code></td>
+<td>Limit buy</td>
+</tr>
+<tr>
+<td><code>limit_sell(price, qty, symbol=None, tif='gtc')</code></td>
+<td>Limit sell</td>
+</tr>
+<tr>
+<td><code>stop_market(side, trigger, qty, symbol=None)</code></td>
+<td>Stop market</td>
+</tr>
+<tr>
+<td><code>stop_limit(side, trigger, limit_price, qty, symbol=None)</code></td>
+<td>Stop limit</td>
+</tr>
+<tr>
+<td><code>take_profit_market(side, trigger, qty, symbol=None)</code></td>
+<td>Take profit market</td>
+</tr>
+<tr>
+<td><code>take_profit_limit(side, trigger, limit_price, qty, symbol=None)</code></td>
+<td>Take profit limit</td>
+</tr>
+<tr>
+<td><code>trailing_stop(side, offset, qty, symbol=None)</code></td>
+<td>Trailing stop, fixed offset</td>
+</tr>
+<tr>
+<td><code>trailing_stop_percent(side, callback_bps, qty, symbol=None)</code></td>
+<td>Trailing stop, bps callback</td>
+</tr>
+<tr>
+<td><code>close_position(symbol=None)</code></td>
+<td>Close position (reduce-only)</td>
+</tr>
+<tr>
+<td><code>cancel_order(order_id)</code></td>
+<td>Cancel an order</td>
+</tr>
+<tr>
+<td><code>cancel_all_orders(symbol=None)</code></td>
+<td>Cancel every order for a symbol</td>
+</tr>
+<tr>
+<td><code>modify_order(order_id, new_price, new_qty)</code></td>
+<td>Modify a resting order</td>
+</tr>
+</tbody>
+</table>
+<p><code>tif</code> accepts <code>"gtc"</code>, <code>"ioc"</code>, <code>"fok"</code>, <code>"gtd"</code>, <code>"post_only"</code>.</p>
+<h3 id="order-emission-explicit-emit_-variants">Order Emission — Explicit (emit_* variants)<a class="headerlink" href="#order-emission-explicit-emit_-variants" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>emit_market_buy(symbol, qty)</code></td>
+<td><code>int</code></td>
+<td>Market buy, returns order ID</td>
+</tr>
+<tr>
+<td><code>emit_market_sell(symbol, qty)</code></td>
+<td><code>int</code></td>
+<td>Market sell</td>
+</tr>
+<tr>
+<td><code>emit_limit_buy(symbol, price, qty)</code></td>
+<td><code>int</code></td>
+<td>Limit buy</td>
+</tr>
+<tr>
+<td><code>emit_limit_sell(symbol, price, quantity)</code></td>
+<td><code>int</code></td>
+<td>Limit sell</td>
+</tr>
+<tr>
+<td><code>emit_limit_buy_tif(symbol, price, quantity, tif='gtc')</code></td>
+<td><code>int</code></td>
+<td>Limit buy with an explicit time in force</td>
+</tr>
+<tr>
+<td><code>emit_limit_sell_tif(symbol, price, quantity, tif='gtc')</code></td>
+<td><code>int</code></td>
+<td>Limit sell with an explicit time in force</td>
+</tr>
+<tr>
+<td><code>emit_cancel(order_id)</code></td>
+<td><code>None</code></td>
+<td>Cancel order</td>
+</tr>
+<tr>
+<td><code>emit_cancel_all(symbol)</code></td>
+<td><code>None</code></td>
+<td>Cancel all orders for symbol</td>
+</tr>
+<tr>
+<td><code>emit_modify(order_id, new_price, new_quantity)</code></td>
+<td><code>None</code></td>
+<td>Modify existing order</td>
+</tr>
+<tr>
+<td><code>emit_stop_market(symbol, side, trigger, quantity)</code></td>
+<td><code>int</code></td>
+<td>Stop market order</td>
+</tr>
+<tr>
+<td><code>emit_stop_limit(symbol, side, trigger, limit_price, quantity)</code></td>
+<td><code>int</code></td>
+<td>Stop limit order</td>
+</tr>
+<tr>
+<td><code>emit_take_profit_market(symbol, side, trigger, quantity)</code></td>
+<td><code>int</code></td>
+<td>Take profit market</td>
+</tr>
+<tr>
+<td><code>emit_take_profit_limit(symbol, side, trigger, limit_price, quantity)</code></td>
+<td><code>int</code></td>
+<td>Take profit limit</td>
+</tr>
+<tr>
+<td><code>emit_trailing_stop(symbol, side, offset, quantity)</code></td>
+<td><code>int</code></td>
+<td>Trailing stop, fixed offset</td>
+</tr>
+<tr>
+<td><code>emit_trailing_stop_percent(symbol, side, callback_bps, quantity)</code></td>
+<td><code>int</code></td>
+<td>Trailing stop, bps callback</td>
+</tr>
+<tr>
+<td><code>emit_provide_liquidity(pool, price_lower, price_upper, liquidity)</code></td>
+<td><code>int</code></td>
+<td>Provide AMM liquidity in a price range</td>
+</tr>
+<tr>
+<td><code>emit_withdraw_liquidity(pool, liquidity)</code></td>
+<td><code>int</code></td>
+<td>Withdraw AMM liquidity</td>
+</tr>
+<tr>
+<td><code>emit_close_position(symbol)</code></td>
+<td><code>int</code></td>
+<td>Close position (reduce-only)</td>
+</tr>
+</tbody>
+</table>
+<p><code>emit_market_buy</code> and the rest take a numeric symbol ID; <code>side</code> is <code>"buy"</code> or <code>"sell"</code>.</p>
+<h3 id="context-queries">Context Queries<a class="headerlink" href="#context-queries" title="Permanent link">&para;</a></h3>
+<p><code>symbol</code> defaults to the first registered symbol when omitted.</p>
+<table>
+<thead>
+<tr>
+<th>Method / Property</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>position(symbol=None)</code></td>
+<td><code>float</code></td>
+<td>Current position quantity</td>
+</tr>
+<tr>
+<td><code>pos(symbol=None)</code></td>
+<td><code>float</code></td>
+<td>Alias of <code>position</code></td>
+</tr>
+<tr>
+<td><code>ctx(symbol=None)</code></td>
+<td><code>SymbolContext</code></td>
+<td>Per-symbol context snapshot</td>
+</tr>
+<tr>
+<td><code>last_price(symbol=None)</code></td>
+<td><code>float</code></td>
+<td>Last trade price</td>
+</tr>
+<tr>
+<td><code>best_bid(symbol=None)</code></td>
+<td><code>float \| None</code></td>
+<td>Best bid; <code>None</code> when the bid side has no level. A book may be quoted at exactly zero, so <code>0.0</code> is a price, never "no quote"</td>
+</tr>
+<tr>
+<td><code>best_ask(symbol=None)</code></td>
+<td><code>float \| None</code></td>
+<td>Best ask; <code>None</code> when the ask side has no level</td>
+</tr>
+<tr>
+<td><code>mid_price(symbol=None)</code></td>
+<td><code>float \| None</code></td>
+<td>Mid price; <code>None</code> unless both sides have a level</td>
+</tr>
+<tr>
+<td><code>get_order_status(order_id)</code></td>
+<td><code>int</code></td>
+<td>Order status (-1 if not found)</td>
+</tr>
+<tr>
+<td><code>order_status(order_id)</code></td>
+<td><code>int</code></td>
+<td>Alias of <code>get_order_status</code></td>
+</tr>
+<tr>
+<td><code>symbols</code></td>
+<td><code>list[int]</code></td>
+<td>Subscribed symbol IDs (property)</td>
+</tr>
+<tr>
+<td><code>symbol_names</code></td>
+<td><code>list[str]</code></td>
+<td>Subscribed symbol names (property)</td>
+</tr>
+<tr>
+<td><code>primary_symbol_name</code></td>
+<td><code>str</code></td>
+<td>Name of the first subscribed symbol (property)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="closed-bar-history">Closed-bar history<a class="headerlink" href="#closed-bar-history" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>last_closed_bar(symbol_id, bar_type=0, param=0)</code></td>
+<td><code>dict \| None</code></td>
+<td>Last closed bar for <code>(symbol, bar_type, param)</code>, or <code>None</code> if that timeframe has emitted nothing yet</td>
+</tr>
+<tr>
+<td><code>last_n_closed_bars(symbol_id, bar_type, param, n)</code></td>
+<td><code>list</code></td>
+<td>Up to <code>n</code> most recent closed bars for that timeframe, oldest first</td>
+</tr>
+<tr>
+<td><code>bar_ring_capacity()</code></td>
+<td><code>int</code></td>
+<td>Current per-timeframe ring size</td>
+</tr>
+<tr>
+<td><code>set_bar_ring_capacity(n)</code></td>
+<td><code>None</code></td>
+<td>Resize the per-timeframe ring</td>
+</tr>
+</tbody>
+</table>
+<p><code>bar_type</code>: 0=Time, 1=Tick, 2=Volume, 3=Renko, 4=Range, 5=HeikinAshi,
+6=BpsRange. <code>param</code> is the time-bar interval in nanoseconds, or the tick /
+volume / range threshold the aggregator was configured with.</p>
+<h2 id="class-lrvxsymbolcontext">Class: <code>lrvx.SymbolContext</code><a class="headerlink" href="#class-lrvxsymbolcontext" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>symbol_id</code></td>
+<td><code>int</code></td>
+<td>Symbol identifier</td>
+</tr>
+<tr>
+<td><code>symbol</code></td>
+<td><code>str</code></td>
+<td>Symbol name</td>
+</tr>
+<tr>
+<td><code>position</code></td>
+<td><code>float</code></td>
+<td>Current position</td>
+</tr>
+<tr>
+<td><code>last_trade_price</code></td>
+<td><code>float</code></td>
+<td>Last trade price</td>
+</tr>
+<tr>
+<td><code>best_bid</code></td>
+<td><code>float \| None</code></td>
+<td>Best bid price; <code>None</code> when the bid side has no level (<code>0.0</code> is a price)</td>
+</tr>
+<tr>
+<td><code>best_ask</code></td>
+<td><code>float \| None</code></td>
+<td>Best ask price; <code>None</code> when the ask side has no level</td>
+</tr>
+<tr>
+<td><code>mid_price</code></td>
+<td><code>float \| None</code></td>
+<td>Mid price; <code>None</code> unless both sides have a level</td>
+</tr>
+<tr>
+<td><code>unrealized_pnl</code></td>
+<td><code>float</code></td>
+<td>Unrealized P&amp;L, or <code>NaN</code> when the position manager reports no entry price (see below)</td>
+</tr>
+<tr>
+<td><code>book_spread()</code></td>
+<td><code>float \| None</code></td>
+<td>Bid-ask spread; <code>None</code> unless both sides have a level</td>
+</tr>
+<tr>
+<td><code>is_long()</code></td>
+<td><code>bool</code></td>
+<td>True if long</td>
+</tr>
+<tr>
+<td><code>is_short()</code></td>
+<td><code>bool</code></td>
+<td>True if short</td>
+</tr>
+<tr>
+<td><code>is_flat()</code></td>
+<td><code>bool</code></td>
+<td>True if no position</td>
+</tr>
+</tbody>
+</table>
+<p><code>unrealized_pnl</code> needs an average entry price, which comes from the position
+manager attached to the strategy. A manager that keeps no cost basis reports
+none, and the field is <code>NaN</code> rather than a number. Check it with
+<code>math.isnan()</code> before comparing against a threshold; the two shipped managers,
+<code>PositionTracker</code> and <code>MultiModePositionTracker</code>, always report one while a
+position is open.</p>
+<h2 id="class-lrvxtradedata">Class: <code>lrvx.TradeData</code><a class="headerlink" href="#class-lrvxtradedata" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>symbol</code></td>
+<td><code>int</code></td>
+<td>Symbol ID</td>
+</tr>
+<tr>
+<td><code>symbol_name</code></td>
+<td><code>str</code></td>
+<td>Symbol name</td>
+</tr>
+<tr>
+<td><code>price</code></td>
+<td><code>float</code></td>
+<td>Trade price</td>
+</tr>
+<tr>
+<td><code>quantity</code></td>
+<td><code>float</code></td>
+<td>Trade quantity</td>
+</tr>
+<tr>
+<td><code>is_buy</code></td>
+<td><code>bool</code></td>
+<td>Buy-side aggressor</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td><code>str</code></td>
+<td><code>"buy"</code> or <code>"sell"</code></td>
+</tr>
+<tr>
+<td><code>timestamp_ns</code></td>
+<td><code>int</code></td>
+<td>Local timestamp (nanoseconds)</td>
+</tr>
+<tr>
+<td><code>exchange_ts_ns</code></td>
+<td><code>int</code></td>
+<td>Exchange timestamp (nanoseconds)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="class-lrvxrunner">Class: <code>lrvx.Runner</code><a class="headerlink" href="#class-lrvxrunner" title="Permanent link">&para;</a></h2>
+<p>Feeds market data into strategies and routes emitted signals to a callback.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">runner</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">Runner</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">on_signal</span><span class="p">)</span>                  <span class="c1"># synchronous</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">runner</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">Runner</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">on_signal</span><span class="p">,</span> <span class="n">threaded</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>   <span class="c1"># Disruptor background thread</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">runner</span><span class="o">.</span><span class="n">add_strategy</span><span class="p">(</span><span class="n">strategy</span><span class="p">)</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">runner</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">runner</span><span class="o">.</span><span class="n">on_trade</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">price</span><span class="p">,</span> <span class="n">qty</span><span class="p">,</span> <span class="n">is_buy</span><span class="p">,</span> <span class="n">ts_ns</span><span class="p">)</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">runner</span><span class="o">.</span><span class="n">on_book_snapshot</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">bid_prices</span><span class="p">,</span> <span class="n">bid_qtys</span><span class="p">,</span> <span class="n">ask_prices</span><span class="p">,</span> <span class="n">ask_qtys</span><span class="p">,</span> <span class="n">ts_ns</span><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">runner</span><span class="o">.</span><span class="n">on_bar</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="nb">open</span><span class="p">,</span> <span class="n">high</span><span class="p">,</span> <span class="n">low</span><span class="p">,</span> <span class="n">close</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">runner</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_strategy(strategy)</code></td>
+<td>Register a strategy instance</td>
+</tr>
+<tr>
+<td><code>replace_strategy(index, strategy)</code></td>
+<td>Atomically swap the strategy at <code>index</code>. The old strategy's <code>on_stop</code> fires, the bridge's internal state survives, the new strategy's <code>on_start</code> fires afterwards. WebSocket / gRPC connections are unaffected</td>
+</tr>
+<tr>
+<td><code>start()</code></td>
+<td>Start the runner</td>
+</tr>
+<tr>
+<td><code>stop()</code></td>
+<td>Stop the runner</td>
+</tr>
+<tr>
+<td><code>on_trade(symbol, price, qty, is_buy, ts_ns=0)</code></td>
+<td>Inject a trade event</td>
+</tr>
+<tr>
+<td><code>on_book_snapshot(symbol, bid_prices, bid_qtys, ask_prices, ask_qtys, ts_ns=0)</code></td>
+<td>Inject an order book snapshot</td>
+</tr>
+<tr>
+<td><code>on_bar(symbol, open, high, low, close, volume=0, buy_volume=0, start_time_ns=0, end_time_ns=0, bar_type=0, bar_type_param=0, close_reason=0)</code></td>
+<td>Inject a closed OHLC bar</td>
+</tr>
+</tbody>
+</table>
+<p><code>symbol</code> accepts a <code>Symbol</code> object or a raw <code>int</code>.</p>
+<h3 id="hook-setters">Hook setters<a class="headerlink" href="#hook-setters" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_pnl_tracker(tracker)</code></td>
+<td>Attach a <code>PnLTracker</code></td>
+</tr>
+<tr>
+<td><code>set_storage_sink(sink)</code></td>
+<td>Attach a <code>StorageSink</code></td>
+</tr>
+<tr>
+<td><code>set_risk_manager(rm)</code></td>
+<td>Attach a <code>RiskManager</code></td>
+</tr>
+<tr>
+<td><code>set_kill_switch(ks)</code></td>
+<td>Attach a <code>KillSwitch</code></td>
+</tr>
+<tr>
+<td><code>set_order_validator(ov)</code></td>
+<td>Attach an <code>OrderValidator</code></td>
+</tr>
+<tr>
+<td><code>set_market_data_recorder(recorder)</code></td>
+<td>Attach a <code>MarketDataRecorderHook</code> or <code>BinaryLogRecorderHook</code></td>
+</tr>
+<tr>
+<td><code>set_executor(executor)</code></td>
+<td>Replace the executor</td>
+</tr>
+</tbody>
+</table>
+<h3 id="trace-recording">Trace recording<a class="headerlink" href="#trace-recording" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>attach_trace_recorder(recorder)</code></td>
+<td>Auto-capture every signal into a <code>.lrvxrun</code> recorder</td>
+</tr>
+<tr>
+<td><code>set_trace_feed_ts_ns(feed_ts_ns)</code></td>
+<td>Stamp every recorded signal with this <code>feed_ts_ns</code> until the next call</td>
+</tr>
+<tr>
+<td><code>trace_order_event(order_id, parent_signal_id, symbol_id, event_kind, side, order_type, price, qty, flags=0)</code></td>
+<td>Mirror an order event into the attached recorder</td>
+</tr>
+<tr>
+<td><code>trace_fill(order_id, fill_id, price, qty, fee, symbol_id, side, liquidity=0)</code></td>
+<td>Mirror a fill into the attached recorder</td>
+</tr>
+</tbody>
+</table>
+<h3 id="signal-object">Signal object<a class="headerlink" href="#signal-object" title="Permanent link">&para;</a></h3>
+<p>Passed to the <code>on_signal</code> callback.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>order_id</code></td>
+<td><code>int</code></td>
+<td>Internal order ID</td>
+</tr>
+<tr>
+<td><code>symbol</code></td>
+<td><code>int</code></td>
+<td>Symbol ID</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td><code>str</code></td>
+<td><code>"buy"</code> or <code>"sell"</code></td>
+</tr>
+<tr>
+<td><code>order_type</code></td>
+<td><code>str</code></td>
+<td><code>"market"</code>, <code>"limit"</code>, etc.</td>
+</tr>
+<tr>
+<td><code>price</code></td>
+<td><code>float</code></td>
+<td>Limit price (0 for market)</td>
+</tr>
+<tr>
+<td><code>quantity</code></td>
+<td><code>float</code></td>
+<td>Order quantity</td>
+</tr>
+<tr>
+<td><code>trigger_price</code></td>
+<td><code>float</code></td>
+<td>Trigger price for conditional orders</td>
+</tr>
+<tr>
+<td><code>trailing_offset</code></td>
+<td><code>float</code></td>
+<td>Fixed-price trailing offset</td>
+</tr>
+<tr>
+<td><code>trailing_bps</code></td>
+<td><code>int</code></td>
+<td>Bps trailing callback</td>
+</tr>
+<tr>
+<td><code>new_price</code></td>
+<td><code>float</code></td>
+<td>Replacement price on a modify</td>
+</tr>
+<tr>
+<td><code>new_quantity</code></td>
+<td><code>float</code></td>
+<td>Replacement quantity on a modify</td>
+</tr>
+</tbody>
+</table>
+<h2 id="class-lrvxbacktestrunner">Class: <code>lrvx.BacktestRunner</code><a class="headerlink" href="#class-lrvxbacktestrunner" title="Permanent link">&para;</a></h2>
+<p>Runs a strategy against historical CSV data.</p>
+<p><code>fee_rate</code> defaults to <code>0.0004</code> here, a taker rate. <code>lrvx.BacktestResult</code> and the C++
+<code>BacktestConfig</code> default to <code>0.0001</code>, so pass the rate explicitly when a runner result is
+compared with a result scored by hand.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">bt</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">BacktestRunner</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">fee_rate</span><span class="o">=</span><span class="mf">0.0004</span><span class="p">,</span> <span class="n">initial_capital</span><span class="o">=</span><span class="mi">10_000</span><span class="p">)</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">bt</span><span class="o">.</span><span class="n">set_strategy</span><span class="p">(</span><span class="n">strategy</span><span class="p">)</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">stats</span> <span class="o">=</span> <span class="n">bt</span><span class="o">.</span><span class="n">run_csv</span><span class="p">(</span><span class="s2">"data.csv"</span><span class="p">)</span>             <span class="c1"># auto-detects symbol from registry</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">stats</span> <span class="o">=</span> <span class="n">bt</span><span class="o">.</span><span class="n">run_csv</span><span class="p">(</span><span class="s2">"data.csv"</span><span class="p">,</span> <span class="s2">"BTCUSDT"</span><span class="p">)</span>  <span class="c1"># explicit symbol name</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_strategy(strategy)</code></td>
+<td>Set the strategy to backtest</td>
+</tr>
+<tr>
+<td><code>run_csv(path, symbol='')</code></td>
+<td>Run backtest against a CSV file, returns stats dict</td>
+</tr>
+<tr>
+<td><code>run_ohlcv(ts, close, symbol='')</code></td>
+<td>Replay close-only bars as synthetic trades (<code>Strategy.on_trade</code> fires)</td>
+</tr>
+<tr>
+<td><code>run_bars(start_time_ns, end_time_ns, open, high, low, close, volume, symbol='', bar_type=0, bar_type_param=0)</code></td>
+<td>Replay full OHLCV bars (<code>Strategy.on_bar</code> fires)</td>
+</tr>
+<tr>
+<td><code>run_tape(path)</code></td>
+<td>Run against a <code>.lrvx</code> tape directory — the canonical recorded artifact <code>lrvx tape record</code> writes. Same stats shape as <code>run_csv</code></td>
+</tr>
+<tr>
+<td><code>run_tapes(paths)</code></td>
+<td>Run against N <code>.lrvx</code> tapes merged on read. Symbols are rekeyed by <code>(metadata.exchange, name)</code>, so two captures of the same venue/symbol collapse and two venues stay distinct. <code>run_tapes([t])</code> equals <code>run_tape(t)</code></td>
+</tr>
+<tr>
+<td><code>equity_curve()</code></td>
+<td>Equity curve from the most recent run, as a dict of numpy arrays (<code>timestamp_ns</code>, <code>equity</code>, <code>drawdown_pct</code>)</td>
+</tr>
+<tr>
+<td><code>trades()</code></td>
+<td>Closed trades from the most recent run, as a dict of numpy arrays (<code>symbol</code>, <code>side</code>, <code>entry_price</code>, <code>exit_price</code>, <code>quantity</code>, <code>pnl</code>, <code>fee</code>, <code>entry_time_ns</code>, <code>exit_time_ns</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>An empty <code>symbol</code> resolves to <code>"default"</code>.</p>
+<h3 id="hook-setters_1">Hook setters<a class="headerlink" href="#hook-setters_1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>set_executor(executor)</code></td>
+<td>Replace the built-in simulated executor</td>
+</tr>
+<tr>
+<td><code>add_execution_listener(listener)</code></td>
+<td>Attach an <code>ExecutionListener</code></td>
+</tr>
+<tr>
+<td><code>set_pnl_tracker(tracker)</code></td>
+<td>Attach a PnL tracker; fires <code>on_signal(signal)</code> for every fill the simulator dispatches</td>
+</tr>
+<tr>
+<td><code>set_risk_manager(rm)</code></td>
+<td>Attach a pre-trade risk manager. Reduce-only orders bypass the gate by design</td>
+</tr>
+<tr>
+<td><code>set_kill_switch(ks)</code></td>
+<td>Attach a kill switch. Reduce-only orders bypass, so tightening caps cannot strand a position</td>
+</tr>
+<tr>
+<td><code>set_order_validator(ov)</code></td>
+<td>Attach an order validator. Reduce-only orders bypass</td>
+</tr>
+</tbody>
+</table>
+<p>Each setter takes <code>None</code> to detach.</p>
+<h3 id="stats-dict-keys">Stats dict keys<a class="headerlink" href="#stats-dict-keys" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>return_pct</code></td>
+<td>Net return percentage</td>
+</tr>
+<tr>
+<td><code>net_pnl</code></td>
+<td>Net P&amp;L after fees</td>
+</tr>
+<tr>
+<td><code>total_trades</code></td>
+<td>Round-trip trade count</td>
+</tr>
+<tr>
+<td><code>win_rate</code></td>
+<td>Winning trade fraction</td>
+</tr>
+<tr>
+<td><code>sharpe_ratio</code></td>
+<td>Annualized Sharpe ratio</td>
+</tr>
+<tr>
+<td><code>max_drawdown_pct</code></td>
+<td>Peak-to-trough drawdown (%)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">lrvx</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">SymbolRegistry</span><span class="p">()</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">btc</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">add_symbol</span><span class="p">(</span><span class="s2">"binance"</span><span class="p">,</span> <span class="s2">"BTCUSDT"</span><span class="p">,</span> <span class="n">tick_size</span><span class="o">=</span><span class="mf">0.01</span><span class="p">)</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="k">class</span><span class="w"> </span><span class="nc">SMAcross</span><span class="p">(</span><span class="n">lrvx</span><span class="o">.</span><span class="n">Strategy</span><span class="p">):</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">symbols</span><span class="p">):</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">symbols</span><span class="p">)</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">fast</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">SMA</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">slow</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">SMA</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">on_trade</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">trade</span><span class="p">):</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>        <span class="n">f</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fast</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">trade</span><span class="o">.</span><span class="n">price</span><span class="p">)</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>        <span class="n">s</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">slow</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">trade</span><span class="o">.</span><span class="n">price</span><span class="p">)</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>        <span class="k">if</span> <span class="n">f</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">s</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>            <span class="k">return</span>
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>        <span class="k">if</span> <span class="n">f</span> <span class="o">&gt;</span> <span class="n">s</span> <span class="ow">and</span> <span class="n">ctx</span><span class="o">.</span><span class="n">is_flat</span><span class="p">():</span>
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">market_buy</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)</span>
+</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>        <span class="k">elif</span> <span class="n">f</span> <span class="o">&lt;</span> <span class="n">s</span> <span class="ow">and</span> <span class="n">ctx</span><span class="o">.</span><span class="n">is_long</span><span class="p">():</span>
+</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>            <span class="bp">self</span><span class="o">.</span><span class="n">close_position</span><span class="p">()</span>
+</span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>
+</span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="c1"># Live</span>
+</span><span id="__span-7-23"><a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_signal</span><span class="p">(</span><span class="n">sig</span><span class="p">):</span>
+</span><span id="__span-7-24"><a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">sig</span><span class="o">.</span><span class="n">side</span><span class="p">,</span> <span class="n">sig</span><span class="o">.</span><span class="n">order_type</span><span class="p">,</span> <span class="n">sig</span><span class="o">.</span><span class="n">quantity</span><span class="p">)</span>
+</span><span id="__span-7-25"><a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a>
+</span><span id="__span-7-26"><a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a><span class="n">runner</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">Runner</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">on_signal</span><span class="p">)</span>
+</span><span id="__span-7-27"><a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a><span class="n">runner</span><span class="o">.</span><span class="n">add_strategy</span><span class="p">(</span><span class="n">SMAcross</span><span class="p">([</span><span class="n">btc</span><span class="p">]))</span>
+</span><span id="__span-7-28"><a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a><span class="n">runner</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+</span><span id="__span-7-29"><a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a>
+</span><span id="__span-7-30"><a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a><span class="c1"># Backtest</span>
+</span><span id="__span-7-31"><a id="__codelineno-7-31" name="__codelineno-7-31" href="#__codelineno-7-31"></a><span class="n">bt</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">BacktestRunner</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">fee_rate</span><span class="o">=</span><span class="mf">0.0004</span><span class="p">,</span> <span class="n">initial_capital</span><span class="o">=</span><span class="mi">10_000</span><span class="p">)</span>
+</span><span id="__span-7-32"><a id="__codelineno-7-32" name="__codelineno-7-32" href="#__codelineno-7-32"></a><span class="n">bt</span><span class="o">.</span><span class="n">set_strategy</span><span class="p">(</span><span class="n">SMAcross</span><span class="p">([</span><span class="n">btc</span><span class="p">]))</span>
+</span><span id="__span-7-33"><a id="__codelineno-7-33" name="__codelineno-7-33" href="#__codelineno-7-33"></a><span class="n">stats</span> <span class="o">=</span> <span class="n">bt</span><span class="o">.</span><span class="n">run_csv</span><span class="p">(</span><span class="s2">"btcusdt_trades.csv"</span><span class="p">,</span> <span class="s2">"BTCUSDT"</span><span class="p">)</span>
+</span><span id="__span-7-34"><a id="__codelineno-7-34" name="__codelineno-7-34" href="#__codelineno-7-34"></a><span class="nb">print</span><span class="p">(</span><span class="n">stats</span><span class="p">)</span>
+</span></code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

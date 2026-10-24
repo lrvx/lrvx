@@ -1,0 +1,144 @@
+# lrvx
+
+> lrvx is a C++23 high-performance trading framework with first-class bindings for Python, Node.js, Codon, and embedded JavaScript. Use it to build strategies, backtest on historical data, and run live trading from any of these languages — the same C++ core powers all of them, so behavior is identical across runtimes.
+
+Documentation is grouped below by Diátaxis category — pick the section matching the task. The companion `llms-full.txt` contains the full body of every page listed here, in the same order, for agents that prefer one large context dump.
+
+## Overview
+
+- [Project overview](https://docs.lrvx.dev/): What lrvx is and how the pieces fit
+- [Bindings overview](https://docs.lrvx.dev/bindings/): Pick a language: Python, Node, Codon, JavaScript, C
+
+## Bindings (language entry points)
+
+- [Python binding](https://docs.lrvx.dev/bindings/python/): pybind11 module: install, import, lifecycle
+- [Node.js binding](https://docs.lrvx.dev/bindings/node/): NAPI addon: install, require, lifecycle
+- [Codon binding](https://docs.lrvx.dev/bindings/codon/): Codon strategy module and runner
+- [Embedded JavaScript](https://docs.lrvx.dev/bindings/javascript/): QuickJS runner for in-process JS strategies
+- [C API](https://docs.lrvx.dev/bindings/capi/): ABI-stable C surface for FFI from any language
+
+## Quickstart tutorials
+
+- [Tutorials index](https://docs.lrvx.dev/tutorials/): Learning-oriented walkthroughs
+- [Python quickstart](https://docs.lrvx.dev/tutorials/python-quickstart/): First Python strategy in ~10 minutes
+- [Node.js quickstart](https://docs.lrvx.dev/tutorials/node-quickstart/): First Node strategy
+- [Codon quickstart](https://docs.lrvx.dev/tutorials/codon-strategy/): First Codon strategy
+- [C++ quickstart](https://docs.lrvx.dev/tutorials/quickstart/): First C++ strategy
+- [First strategy walkthrough](https://docs.lrvx.dev/tutorials/first-strategy/): End-to-end strategy structure
+- [Multi-timeframe strategy](https://docs.lrvx.dev/tutorials/multi-timeframe-strategy/): Aggregating multiple bar intervals
+- [Recording market data](https://docs.lrvx.dev/tutorials/recording-data/): Capture trades and books for replay
+- [Backtesting tutorial](https://docs.lrvx.dev/tutorials/backtesting/): Replay recorded data through a strategy
+- [Run the demo](https://docs.lrvx.dev/tutorials/demo/): Bundled end-to-end demo
+
+## Working examples
+
+- [Examples index](https://docs.lrvx.dev/examples/): Complete runnable examples
+- [Python: backtest and live](https://docs.lrvx.dev/examples/python-backtest-vs-live/): Same strategy, two runners
+- [Python: multi-symbol](https://docs.lrvx.dev/examples/python-multi-symbol/): Strategy across multiple symbols
+- [Python: live via CCXT](https://docs.lrvx.dev/examples/python-ccxt-live/): CCXT-backed live execution
+- [Node: backtest and live](https://docs.lrvx.dev/examples/node-backtest-vs-live/): Same strategy in Node
+- [Codon: backtest and live](https://docs.lrvx.dev/examples/codon-backtest-vs-live/): Same strategy in Codon
+- [Codon: full backtest API](https://docs.lrvx.dev/examples/codon-full-backtest/): All Codon backtest pieces wired
+- [C++: SMA backtest](https://docs.lrvx.dev/examples/cpp-sma-backtest/): Plain C++ backtest of an SMA crossover
+
+## How-to: strategy and backtest
+
+- [How-to index](https://docs.lrvx.dev/how-to/): Task-oriented recipes
+- [Strategy class shapes](https://docs.lrvx.dev/how-to/strategy-classes/): Strategy, SignalStrategy, when to pick which
+- [Run a backtest](https://docs.lrvx.dev/how-to/backtest/): Replay-driven backtest setup
+- [Realistic fills](https://docs.lrvx.dev/how-to/backtest-realistic-fills/): Slippage and queue simulation
+- [Interactive backtest](https://docs.lrvx.dev/how-to/interactive-backtest/): Step through a backtest
+- [Grid search](https://docs.lrvx.dev/how-to/grid-search/): Parameter sweep with the optimizer
+- [Advanced orders](https://docs.lrvx.dev/how-to/advanced-orders/): Bracket, OCO, and conditional orders
+- [Multi-exchange trading](https://docs.lrvx.dev/how-to/multi-exchange-trading/): Route across venues
+
+## How-to: indicators and aggregation
+
+- [Indicator graph](https://docs.lrvx.dev/how-to/indicator-graph/): Wire indicators into the engine
+- [Multi-symbol indicators](https://docs.lrvx.dev/how-to/multi-symbol-indicators/): Per-symbol state isolation
+- [Bar aggregation](https://docs.lrvx.dev/how-to/bar-aggregation/): Aggregate trades into bars
+- [Custom bar policy](https://docs.lrvx.dev/how-to/custom-bar-policy/): Build your own bar trigger
+- [Volume profile](https://docs.lrvx.dev/how-to/use-volume-profile/): Volume-by-price analysis
+- [Aggregate tape events](https://docs.lrvx.dev/how-to/aggregate-tape-events/): Streaming aggregator framework: 5 native aggregators in one decompression pass
+
+## How-to: performance and extension (C++)
+
+- [Optimize performance](https://docs.lrvx.dev/how-to/optimize-performance/): System-level performance guide
+- [CPU affinity](https://docs.lrvx.dev/how-to/cpu-affinity/): Pin threads for latency
+- [Add a new indicator](https://docs.lrvx.dev/how-to/add-an-indicator/): Add an indicator to the C++ registry
+- [Custom connector](https://docs.lrvx.dev/how-to/custom-connector/): Add a new exchange connector
+
+## How-to: project ops
+
+- [Configuration](https://docs.lrvx.dev/how-to/configuration/): Engine and strategy configuration
+- [CI configuration](https://docs.lrvx.dev/how-to/ci/): Continuous integration setup
+- [Contributing](https://docs.lrvx.dev/how-to/contributing/): How to contribute
+
+## Errors
+
+- [Error code reference](https://docs.lrvx.dev/errors/): Catalog of LrvxError codes, format, and lifecycle
+- [E_SYM_001 — Symbol is not registered](https://docs.lrvx.dev/errors/E_SYM_001/): Fix: call Engine.add_symbol() before referencing the symbol
+
+## AI tooling (MCP)
+
+- [lrvx-mcp — Model Context Protocol server](https://docs.lrvx.dev/mcp/): Local MCP server that gives AI agents grounded access to indicators, error codes, and the C API
+
+## Reference: Python
+
+- [Python reference index](https://docs.lrvx.dev/reference/python/): All Python binding modules
+- [Full Python API index](https://docs.lrvx.dev/reference/python/_api_index/): Auto-generated alphabetical list of every public symbol with signature
+- [Engine and Backtest](https://docs.lrvx.dev/reference/python/engine/): Engine + backtest entry points
+- [Strategy class](https://docs.lrvx.dev/reference/python/strategy/): Base Strategy from Python
+- [Indicators](https://docs.lrvx.dev/reference/python/indicators/): Indicator wrappers
+- [Aggregators](https://docs.lrvx.dev/reference/python/aggregators/): Bar aggregators
+- [Order books](https://docs.lrvx.dev/reference/python/books/): Order book wrappers
+- [Profiles](https://docs.lrvx.dev/reference/python/profiles/): Volume profile, market profile
+- [Positions](https://docs.lrvx.dev/reference/python/positions/): Position tracking
+- [Replay](https://docs.lrvx.dev/reference/python/replay/): Binary log replay
+- [Segment ops](https://docs.lrvx.dev/reference/python/segment_ops/): Segment manipulation
+- [Backtest components](https://docs.lrvx.dev/reference/python/backtest/): Slippage, simulated executor, etc.
+- [Optimizer](https://docs.lrvx.dev/reference/python/optimizer/): Backtest optimizer
+
+## Reference: Node.js
+
+- [Node reference index](https://docs.lrvx.dev/reference/node/): All Node binding modules
+- [Strategy and Runner](https://docs.lrvx.dev/reference/node/strategy/): Base Strategy from Node
+- [Backtest components](https://docs.lrvx.dev/reference/node/backtest/): Backtest pieces
+- [Indicators](https://docs.lrvx.dev/reference/node/indicators/): Indicator wrappers
+- [Bar aggregation](https://docs.lrvx.dev/reference/node/aggregators/): Bar aggregators
+- [Order books](https://docs.lrvx.dev/reference/node/books/): Order book wrappers
+- [Position tracking](https://docs.lrvx.dev/reference/node/positions/): Position trackers
+- [Profiles and stats](https://docs.lrvx.dev/reference/node/profiles/): Volume profile, statistics
+- [Data I/O](https://docs.lrvx.dev/reference/node/data/): Loading and recording data
+
+## Reference: Codon
+
+- [Codon reference index](https://docs.lrvx.dev/reference/codon/): All Codon modules
+- [Strategy](https://docs.lrvx.dev/reference/codon/strategy/): Codon Strategy class
+- [Types](https://docs.lrvx.dev/reference/codon/types/): Core Codon types
+- [Indicators](https://docs.lrvx.dev/reference/codon/indicators/): Codon indicators
+- [Runner and BacktestRunner](https://docs.lrvx.dev/reference/codon/runner/): Codon runners
+- [Backtest components](https://docs.lrvx.dev/reference/codon/backtest/): Codon backtest pieces
+- [Tools](https://docs.lrvx.dev/reference/codon/tools/): Codon tooling
+
+## Reference: embedded JavaScript
+
+- [QuickJS reference index](https://docs.lrvx.dev/reference/quickjs/): All embedded-JS APIs
+- [Strategy](https://docs.lrvx.dev/reference/quickjs/strategy/): JS Strategy
+- [Indicators](https://docs.lrvx.dev/reference/quickjs/indicators/): JS indicators
+- [Tools](https://docs.lrvx.dev/reference/quickjs/tools/): JS tools
+- [Backtest and runtime](https://docs.lrvx.dev/reference/quickjs/backtest/): JS backtest entry points
+
+## Reference: C API
+
+- [C API surface](https://docs.lrvx.dev/reference/api/capi/lrvx_capi/): ABI-stable C symbols and lifecycle
+
+## Concepts (explanation)
+
+- [Explanation index](https://docs.lrvx.dev/explanation/): Conceptual background
+- [Architecture](https://docs.lrvx.dev/explanation/architecture/): How the engine is structured
+- [Integration flow](https://docs.lrvx.dev/explanation/integration-flow/): Data flow end-to-end
+- [Bar types](https://docs.lrvx.dev/explanation/bar-types/): Time, tick, volume, dollar bars
+- [Indicators concept](https://docs.lrvx.dev/explanation/indicators/): How indicators participate in the graph
+- [Disruptor pattern](https://docs.lrvx.dev/explanation/disruptor/): Single-producer ringbuffer model
+- [Memory model](https://docs.lrvx.dev/explanation/memory-model/): Pools, refcounting, lifetime

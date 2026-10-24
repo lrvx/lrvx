@@ -1,0 +1,2502 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/spec/lrvx/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../lrvxrun/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>lrvx tape format v1.0 - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#lrvx-binary-tape-format-specification" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              lrvx tape format v1.0
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Specifications
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lrvx tape format v1.0
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lrvx tape format v1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout-on-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout on disk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#magic-numbers-and-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Magic numbers and constants
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#segment-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Segment file
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Segment file">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#segmentheader-64-bytes-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SegmentHeader (64 bytes, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#segmentflags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SegmentFlags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frame-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frame stream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frameheader-12-bytes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FrameHeader (12 bytes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#traderecord-48-bytes-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TradeRecord (48 bytes, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bookrecordheader-40-bytes-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BookRecordHeader (40 bytes, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#booklevel-16-bytes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BookLevel (16 bytes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compressed-block-when-flagscompressed-is-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compressed block (when flags.Compressed is set)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sparse-index-when-flagshasindex-is-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sparse index (when flags.HasIndex is set)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexentry-16-bytes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IndexEntry (16 bytes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Manifest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#manifestheader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ManifestHeader
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manifestsegmententry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ManifestSegmentEntry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instrument-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instrument codes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#numeric-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numeric conventions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference implementations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-example-a-7-trade-tape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked example: a 7-trade tape
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compatibility-commitments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compatibility commitments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reporting-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reporting issues
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lrvxrun/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lrvxrun strategy-trace format v1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout-on-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout on disk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#magic-numbers-and-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Magic numbers and constants
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#segment-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Segment file
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Segment file">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#segmentheader-64-bytes-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SegmentHeader (64 bytes, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#segmentflags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SegmentFlags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frame-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frame stream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frameheader-12-bytes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FrameHeader (12 bytes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#traderecord-48-bytes-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TradeRecord (48 bytes, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bookrecordheader-40-bytes-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BookRecordHeader (40 bytes, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#booklevel-16-bytes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BookLevel (16 bytes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compressed-block-when-flagscompressed-is-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compressed block (when flags.Compressed is set)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sparse-index-when-flagshasindex-is-set" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sparse index (when flags.HasIndex is set)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexentry-16-bytes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IndexEntry (16 bytes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Manifest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#manifestheader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ManifestHeader
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manifestsegmententry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ManifestSegmentEntry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#instrument-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instrument codes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#numeric-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numeric conventions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reference-implementations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference implementations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-example-a-7-trade-tape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked example: a 7-trade tape
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compatibility-commitments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compatibility commitments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reporting-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reporting issues
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="lrvx-binary-tape-format-specification"><code>.lrvx</code> binary tape format specification<a class="headerlink" href="#lrvx-binary-tape-format-specification" title="Permanent link">&para;</a></h1>
+<p><strong>Version 1, last revised 2026-07-22.</strong> This is the on-disk format lrvx uses for deterministic event capture and replay. The format is published so third-party tooling can read and write tapes without depending on lrvx itself.</p>
+<h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">&para;</a></h2>
+<p>A <code>.lrvx</code> is a directory of segment files plus two sidecars. Segments hold trades, order-book updates and side-channel records as length-prefixed CRC-checked frames in one interleaved, timestamp-ordered stream, optionally LZ4-compressed in fixed-size blocks. Each segment can carry a sparse index for seek. Timestamps are integer nanoseconds since Unix epoch; prices and quantities are int64 fixed-point with a scale of <code>1e8</code>.</p>
+<p>Everything is little-endian. All structures are 8-byte aligned. CRC32 uses the standard reflected polynomial <code>0xEDB88320</code> (ISO 3309).</p>
+<h2 id="layout-on-disk">Layout on disk<a class="headerlink" href="#layout-on-disk" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>my-tape.lrvx/
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── .manifest            # binary segment index (optional, rebuildable)
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── metadata.json        # human-readable recording metadata (optional)
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── 1714123456000000000.lrvx
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── 1714123459000000000.lrvx
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>└── ...
+</span></code></pre></div>
+<p>Segment files are named <code>&lt;created_ns&gt;.lrvx</code>, where <code>created_ns</code> is the wall-clock nanosecond timestamp at which the writer opened the segment. A custom rotation callback can override the naming. There is <strong>no</strong> per-type split: trades, book snapshots, book deltas and the side-channel record types all live interleaved in the same frame stream, ordered by timestamp.</p>
+<p>Segments named <code>&lt;created_ns&gt;.floxlog</code>, the extension tapes recorded under the FLOX name carry, are segments too: every directory scan (reader, inspector, validator, manifest, index builder, merge, <code>lrvx tape view</code>) accepts both extensions, so a directory mixing <code>.floxlog</code> and <code>.lrvx</code> segments reads as one tape in filename order. Writers always produce <code>.lrvx</code>.</p>
+<p>A writer rotates when the segment reaches its size bound, measured on the bytes written to the file. An uncompressed segment rotates between frames; a compressed one rotates between blocks, since a block is the unit the reader decompresses. A segment may therefore overshoot the bound by at most one block plus the index appended when it closes.</p>
+<p>Segments are independently parseable; both sidecars are conveniences, not requirements.</p>
+<p><code>.manifest</code> is a <strong>binary</strong> file — see <a href="#manifest">Manifest</a> — not JSON. It can be rebuilt from the segments at any time.</p>
+<p><code>metadata.json</code> is the only JSON sidecar. It carries recording-level metadata the segment headers do not: <code>recording_id</code>, <code>description</code>, <code>exchange</code>, <code>exchange_type</code>, <code>instrument_type</code>, <code>connector_version</code>, the symbol table, <code>has_trades</code> / <code>has_book_snapshots</code> / <code>has_book_deltas</code>, <code>total_trades</code>, <code>total_book_updates</code>, <code>book_depth</code>, <code>recording_start</code> / <code>recording_end</code> (ISO 8601), <code>price_scale</code> / <code>qty_scale</code>, <code>hostname</code>, <code>timezone</code>, <code>lrvx_version</code>, and a free-form <code>custom</code> string map. It is written by <code>BinaryLogWriter::close()</code> and only when metadata was set on the writer.</p>
+<h2 id="magic-numbers-and-constants">Magic numbers and constants<a class="headerlink" href="#magic-numbers-and-constants" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MAGIC_SEGMENT</code></td>
+<td><code>0x584F4C46</code> (<code>"FLOX"</code>)</td>
+<td>Segment header sentinel.</td>
+</tr>
+<tr>
+<td><code>MAGIC_BLOCK</code></td>
+<td><code>0x4B4C4246</code> (<code>"FBLK"</code>)</td>
+<td>Compressed block header sentinel.</td>
+</tr>
+<tr>
+<td><code>MAGIC_INDEX</code></td>
+<td><code>0x58444E49</code> (<code>"INDX"</code>)</td>
+<td>Sparse index header sentinel.</td>
+</tr>
+<tr>
+<td><code>MAGIC_MANIFEST</code></td>
+<td><code>0x464D414E</code> (<code>"FMAN"</code>)</td>
+<td>Binary manifest header sentinel.</td>
+</tr>
+<tr>
+<td><code>FORMAT_VERSION</code></td>
+<td><code>1</code></td>
+<td>Bump triggers a new <code>.lrvx</code> major.</td>
+</tr>
+<tr>
+<td><code>INDEX_VERSION</code></td>
+<td><code>1</code></td>
+<td>Bump triggers a new index format minor.</td>
+</tr>
+<tr>
+<td><code>MANIFEST_VERSION</code></td>
+<td><code>1</code></td>
+<td>Manifest header version.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="segment-file">Segment file<a class="headerlink" href="#segment-file" title="Permanent link">&para;</a></h2>
+<p>A segment is a <code>SegmentHeader</code> followed by a stream of frames. If <code>Compressed</code> is set, the stream is partitioned into <code>CompressedBlock</code>s, each holding LZ4-compressed frame bytes plus an inline header. If <code>HasIndex</code> is set, the index trailer lives at <code>index_offset</code> from the file start.</p>
+<h3 id="segmentheader-64-bytes-8-byte-aligned"><code>SegmentHeader</code> (64 bytes, 8-byte aligned)<a class="headerlink" href="#segmentheader-64-bytes-8-byte-aligned" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">4</td>
+<td><code>magic</code></td>
+<td><code>MAGIC_SEGMENT</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+<td><code>version</code></td>
+<td><code>1</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">1</td>
+<td><code>flags</code></td>
+<td>Bitfield. See below.</td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">1</td>
+<td><code>exchange_id</code></td>
+<td>Numeric exchange tag; <code>0</code> if not used.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+<td><code>created_ns</code></td>
+<td>Wall-clock nanoseconds when the segment was opened.</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">8</td>
+<td><code>first_event_ns</code></td>
+<td>Earliest event timestamp in segment.</td>
+</tr>
+<tr>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">8</td>
+<td><code>last_event_ns</code></td>
+<td>Latest event timestamp.</td>
+</tr>
+<tr>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">4</td>
+<td><code>event_count</code></td>
+<td>Total events written.</td>
+</tr>
+<tr>
+<td style="text-align: right;">36</td>
+<td style="text-align: right;">4</td>
+<td><code>symbol_count</code></td>
+<td>Distinct symbols seen.</td>
+</tr>
+<tr>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">8</td>
+<td><code>index_offset</code></td>
+<td>Byte offset of the index trailer; <code>0</code> if absent.</td>
+</tr>
+<tr>
+<td style="text-align: right;">48</td>
+<td style="text-align: right;">1</td>
+<td><code>compression</code></td>
+<td><code>0</code> = none, <code>1</code> = LZ4.</td>
+</tr>
+<tr>
+<td style="text-align: right;">49</td>
+<td style="text-align: right;">15</td>
+<td><code>reserved[15]</code></td>
+<td>Zero-filled. Bumping any reserved byte requires a version bump.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="segmentflags"><code>SegmentFlags</code><a class="headerlink" href="#segmentflags" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Bit</th>
+<th>Name</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><code>0x01</code></td>
+<td><code>HasIndex</code></td>
+<td>Sparse index trailer present.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>0x02</code></td>
+<td><code>Compressed</code></td>
+<td>Frame stream is partitioned into <code>CompressedBlock</code>s.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>0x04</code></td>
+<td><code>Encrypted</code></td>
+<td>Reserved. Not used by lrvx 1.0.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>0x08</code></td>
+<td><code>Sorted</code></td>
+<td>Writer guarantees <code>exchange_ts_ns</code> is monotonically non-decreasing across all events in the segment.</td>
+</tr>
+</tbody>
+</table>
+<p>A reader that sees an unknown flag set must reject the segment with a clear error. New flags need a new minor version of the format.</p>
+<p><code>Sorted</code> is set at close on any segment -- compressed or not -- whose events all reached the writer in non-decreasing <code>exchange_ts_ns</code> order. It is a per-segment promise and says nothing about the segments around it: a reader may stream a <code>Sorted</code> segment as it stands, and must not drop its leading events because an earlier segment of the same dataset ended later in time. Segments whose time ranges overlap are a recording fault the validator reports; they are not licence to discard recorded frames.</p>
+<h3 id="frame-stream">Frame stream<a class="headerlink" href="#frame-stream" title="Permanent link">&para;</a></h3>
+<p>A frame is a <code>FrameHeader</code> followed by <code>size</code> bytes of payload. Payload meaning depends on <code>type</code>:</p>
+<ul>
+<li><code>type = 1</code> → <code>TradeRecord</code></li>
+<li><code>type = 2</code> → <code>BookRecordHeader</code> followed by <code>bid_count + ask_count</code> <code>BookLevel</code> entries (book snapshot)</li>
+<li><code>type = 3</code> → same shape as <code>type = 2</code>, but the levels are deltas (positive qty = upsert, qty == 0 = remove)</li>
+<li><code>type = 4</code> → <code>OptionQuoteRecord</code> (112 bytes) — option side-channel: mark price, index price, underlying forward, implied vol, best bid/ask with sizes and IVs, open interest</li>
+<li><code>type = 5</code> → <code>PoolStateRecordHeader</code> (32 bytes) followed by <code>payload_len</code> bytes of u256-native DEX pool payload</li>
+</ul>
+<p>Types 4 and 5 are <strong>additive</strong>. A reader that does not know a type skips the frame using <code>FrameHeader.size</code> and continues; it must not reject the segment. Unknown types are therefore not an error, unlike unknown <code>flags</code> bits or an unknown <code>rec_version</code>.</p>
+<p>If <code>Compressed</code> is set, the entire frame stream from the byte after the segment header lives inside one or more <code>CompressedBlock</code>s.</p>
+<h3 id="frameheader-12-bytes"><code>FrameHeader</code> (12 bytes)<a class="headerlink" href="#frameheader-12-bytes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">4</td>
+<td><code>size</code></td>
+<td>Payload bytes, excluding this header.</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">4</td>
+<td><code>crc32</code></td>
+<td>CRC32 of the payload bytes (header excluded).</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">1</td>
+<td><code>type</code></td>
+<td><code>1</code> Trade, <code>2</code> BookSnapshot, <code>3</code> BookDelta, <code>4</code> OptionQuote, <code>5</code> PoolState.</td>
+</tr>
+<tr>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">1</td>
+<td><code>rec_version</code></td>
+<td>Per-record version. <code>1</code> for the layouts below.</td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">2</td>
+<td><code>flags</code></td>
+<td>Reserved. Must be zero.</td>
+</tr>
+</tbody>
+</table>
+<p>A reader that sees an unknown <code>rec_version</code> must reject the frame.</p>
+<h3 id="traderecord-48-bytes-8-byte-aligned"><code>TradeRecord</code> (48 bytes, 8-byte aligned)<a class="headerlink" href="#traderecord-48-bytes-8-byte-aligned" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Units</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">8</td>
+<td><code>exchange_ts_ns</code></td>
+<td>Exchange-side timestamp, integer nanoseconds.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+<td><code>recv_ts_ns</code></td>
+<td>Receiver-side wall-clock timestamp at frame write.</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">8</td>
+<td><code>price_raw</code></td>
+<td>Fixed-point price, scale <code>1e8</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">8</td>
+<td><code>qty_raw</code></td>
+<td>Fixed-point quantity, scale <code>1e8</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">8</td>
+<td><code>trade_id</code></td>
+<td>Exchange trade id; <code>0</code> if unknown.</td>
+</tr>
+<tr>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">4</td>
+<td><code>symbol_id</code></td>
+<td>Numeric symbol tag from the writer's registry.</td>
+</tr>
+<tr>
+<td style="text-align: right;">44</td>
+<td style="text-align: right;">1</td>
+<td><code>side</code></td>
+<td><code>0</code> buy, <code>1</code> sell.</td>
+</tr>
+<tr>
+<td style="text-align: right;">45</td>
+<td style="text-align: right;">1</td>
+<td><code>instrument</code></td>
+<td><code>0</code> spot, <code>1</code> perp, etc. (see Instrument codes).</td>
+</tr>
+<tr>
+<td style="text-align: right;">46</td>
+<td style="text-align: right;">2</td>
+<td><code>exchange_id</code></td>
+<td>Numeric exchange tag.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="side-byte">Side byte<a class="headerlink" href="#side-byte" title="Permanent link">&para;</a></h4>
+<p><code>side</code> is the aggressor of the trade, never the resting maker, and it is encoded as <code>lrvx::Side</code>: <strong><code>0</code> = buy, <code>1</code> = sell</strong>. Every writer of the format has always used that encoding -- the C++ recorder hook, <code>lrvx_data_writer_write_trade</code>, the Node and Python <code>DataWriter</code>s and all the exchange-archive importers -- so the bytes on disk are what this table says and no tape needs migrating.</p>
+<p>What was wrong was the read side. Until this was fixed, <code>ReplayConnector</code>, <code>BacktestRunner::runTape</code>, <code>StrategyPump</code> and <code>preagg_bars</code> decoded <code>side == 1</code> as the buy and so <strong>inverted</strong> the aggressor of every tape they replayed, while the aggregators (<code>BinCountAggregator</code>, <code>VolumeBinAggregator</code>) and the Node and QuickJS readers decoded the same byte correctly. Anything derived from the aggressor through one of those four readers -- queue position, maker/taker classification, buy/sell-driven strategy logic, signed volume -- is inverted in results produced before the fix and has to be recomputed. The tapes themselves are unaffected, which is why the format carries no marker for this: a marker would say something about the writer, and the writer was never the side that was wrong.</p>
+<h3 id="bookrecordheader-40-bytes-8-byte-aligned"><code>BookRecordHeader</code> (40 bytes, 8-byte aligned)<a class="headerlink" href="#bookrecordheader-40-bytes-8-byte-aligned" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">8</td>
+<td><code>exchange_ts_ns</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+<td><code>recv_ts_ns</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">8</td>
+<td><code>seq</code></td>
+<td>Monotonic sequence number from the source. <code>0</code> if not provided.</td>
+</tr>
+<tr>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">4</td>
+<td><code>symbol_id</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">28</td>
+<td style="text-align: right;">2</td>
+<td><code>bid_count</code></td>
+<td>Number of <code>BookLevel</code> entries that follow on the bid side.</td>
+</tr>
+<tr>
+<td style="text-align: right;">30</td>
+<td style="text-align: right;">2</td>
+<td><code>ask_count</code></td>
+<td>Number of <code>BookLevel</code> entries on the ask side.</td>
+</tr>
+<tr>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">1</td>
+<td><code>type</code></td>
+<td><code>2</code> snapshot, <code>3</code> delta. Mirrors the frame type.</td>
+</tr>
+<tr>
+<td style="text-align: right;">33</td>
+<td style="text-align: right;">1</td>
+<td><code>instrument</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">34</td>
+<td style="text-align: right;">2</td>
+<td><code>exchange_id</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">36</td>
+<td style="text-align: right;">4</td>
+<td><code>_pad</code></td>
+<td>Zero.</td>
+</tr>
+</tbody>
+</table>
+<p>Followed by <code>bid_count + ask_count</code> <code>BookLevel</code> entries, bids first.</p>
+<h3 id="booklevel-16-bytes"><code>BookLevel</code> (16 bytes)<a class="headerlink" href="#booklevel-16-bytes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">8</td>
+<td><code>price_raw</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+<td><code>qty_raw</code></td>
+</tr>
+</tbody>
+</table>
+<p>Snapshot semantics: the listed levels replace the entire side. Delta semantics: positive <code>qty_raw</code> upserts a price level; <code>qty_raw == 0</code> removes the level.</p>
+<h3 id="compressed-block-when-flagscompressed-is-set">Compressed block (when <code>flags.Compressed</code> is set)<a class="headerlink" href="#compressed-block-when-flagscompressed-is-set" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">4</td>
+<td><code>magic</code></td>
+<td><code>MAGIC_BLOCK</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">4</td>
+<td><code>compressed_size</code></td>
+<td>Bytes of LZ4 payload that follow this header.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">4</td>
+<td><code>original_size</code></td>
+<td>Decompressed size in bytes.</td>
+</tr>
+<tr>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">2</td>
+<td><code>event_count</code></td>
+<td>Number of frames packed into this block.</td>
+</tr>
+<tr>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">2</td>
+<td><code>flags</code></td>
+<td>Reserved.</td>
+</tr>
+</tbody>
+</table>
+<p>The block header is 16 bytes; the payload that follows is exactly <code>compressed_size</code> LZ4-compressed bytes which decompress to <code>original_size</code> bytes of frame stream. Blocks are concatenated until end of segment (or until <code>index_offset</code> if present).</p>
+<p>LZ4 frame format: raw block, no LZ4 frame wrapper. Use the LZ4 block API directly.</p>
+<h3 id="sparse-index-when-flagshasindex-is-set">Sparse index (when <code>flags.HasIndex</code> is set)<a class="headerlink" href="#sparse-index-when-flagshasindex-is-set" title="Permanent link">&para;</a></h3>
+<p>The trailer at <code>index_offset</code>:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">4</td>
+<td><code>magic</code></td>
+<td><code>MAGIC_INDEX</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+<td><code>version</code></td>
+<td><code>1</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">2</td>
+<td><code>interval</code></td>
+<td>Events between consecutive index entries. The writer stores its configured <code>index_interval</code>; the default is <code>1000</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">4</td>
+<td><code>entry_count</code></td>
+<td>Number of <code>IndexEntry</code> rows that follow.</td>
+</tr>
+<tr>
+<td style="text-align: right;">12</td>
+<td style="text-align: right;">4</td>
+<td><code>crc32</code></td>
+<td>CRC32 over the entries section.</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">8</td>
+<td><code>first_ts_ns</code></td>
+<td>First indexed timestamp.</td>
+</tr>
+<tr>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">8</td>
+<td><code>last_ts_ns</code></td>
+<td>Last indexed timestamp.</td>
+</tr>
+</tbody>
+</table>
+<p>Followed by <code>entry_count</code> <code>IndexEntry</code> rows.</p>
+<h3 id="indexentry-16-bytes"><code>IndexEntry</code> (16 bytes)<a class="headerlink" href="#indexentry-16-bytes" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">8</td>
+<td><code>timestamp_ns</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+<td><code>file_offset</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>file_offset</code> points at the start of a <code>FrameHeader</code> (or, for compressed segments, the start of a <code>CompressedBlock</code>). Indexes are sparse: a reader that wants timestamp <code>T</code> finds the largest indexed entry with <code>timestamp_ns &lt;= T</code>, seeks there, and scans forward.</p>
+<h2 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h2>
+<p><code>.manifest</code> is a binary file: one <code>ManifestHeader</code>, then <code>segment_count</code> <code>ManifestSegmentEntry</code> rows, read and written with plain struct I/O. It is a cache — <code>SegmentManifest::build(dir)</code> regenerates it from the segments — so a reader may ignore it entirely.</p>
+<h3 id="manifestheader"><code>ManifestHeader</code><a class="headerlink" href="#manifestheader" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">4</td>
+<td><code>magic</code></td>
+<td><code>MAGIC_MANIFEST</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td><code>version</code></td>
+<td><code>MANIFEST_VERSION</code> (<code>1</code>).</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td><code>reserved[3]</code></td>
+<td>Zero-filled.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><code>segment_count</code></td>
+<td>Number of <code>ManifestSegmentEntry</code> rows that follow.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><code>total_events</code></td>
+<td>Across all segments.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><code>first_timestamp_ns</code></td>
+<td>Earliest event in the tape.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><code>last_timestamp_ns</code></td>
+<td>Latest event in the tape.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><code>total_bytes</code></td>
+<td>Sum of segment file sizes.</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td><code>symbol_count</code></td>
+<td>Distinct symbols across the tape.</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td><code>checksum</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>A header whose <code>magic</code> or <code>version</code> does not match is treated as absent; the reader falls back to rebuilding.</p>
+<h3 id="manifestsegmententry"><code>ManifestSegmentEntry</code><a class="headerlink" href="#manifestsegmententry" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">256</td>
+<td><code>filename[256]</code></td>
+<td>NUL-padded, relative to the tape directory.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><code>first_event_ns</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><code>last_event_ns</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><code>event_count</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><code>file_size</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td><code>flags</code></td>
+<td><code>0x01</code> = segment has an index, <code>0x02</code> = segment is compressed.</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td><code>reserved</code></td>
+<td>Zero.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="instrument-codes">Instrument codes<a class="headerlink" href="#instrument-codes" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td>spot</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td>perp</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>future</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>option</td>
+</tr>
+<tr>
+<td style="text-align: right;">4-255</td>
+<td>reserved</td>
+</tr>
+</tbody>
+</table>
+<h2 id="numeric-conventions">Numeric conventions<a class="headerlink" href="#numeric-conventions" title="Permanent link">&para;</a></h2>
+<ul>
+<li>All multi-byte integers are <strong>little-endian</strong>.</li>
+<li><code>price_raw</code> and <code>qty_raw</code> are signed int64 fixed-point with <strong>scale 1e8</strong>. To convert to a double price, divide by <code>1e8</code>. To go from a double to fixed-point, round to nearest then clamp to int64 range. Negative values are valid (used for short-side qty in some derived analytics, never in raw recorded fields).</li>
+<li>Timestamps are <strong>integer nanoseconds since Unix epoch (UTC)</strong>. No leap-second adjustment. Writers should pull from <code>clock_gettime(CLOCK_REALTIME)</code> or its OS equivalent.</li>
+</ul>
+<h2 id="versioning-policy">Versioning policy<a class="headerlink" href="#versioning-policy" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>format_version</code> follows semantic versioning at the major level. A new major is incompatible. Old readers of a new tape must reject with a clear error.</li>
+<li>New <code>EventType</code> codes are <strong>additive within the same <code>format_version</code></strong>. Because every frame is length-prefixed, a reader that meets an unknown <code>type</code> skips <code>FrameHeader.size</code> bytes and carries on. <code>OptionQuote</code> (4) and <code>PoolState</code> (5) were both added this way under <code>format_version = 1</code>.</li>
+<li>New <code>flags</code> bits, new <code>Instrument</code> codes, and new fields in reserved space do require a new major: unlike frame types, an unknown flag changes how the rest of the segment must be parsed, so it cannot be skipped.</li>
+<li>Adding new <code>rec_version</code> values for a single record type within the same <code>format_version</code> is allowed when the record's size grows monotonically and the new version stays parseable as a prefix of the new layout. This path is rarely worth the complexity; prefer a new major.</li>
+</ul>
+<p>The layouts above are stable: existing offsets and sizes do not move within <code>format_version = 1</code>. Any change that would move them ships as version 2 with migration guidance in the corresponding spec revision.</p>
+<h2 id="reference-implementations">Reference implementations<a class="headerlink" href="#reference-implementations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>C++.</strong> <code>include/lrvx/replay/binary_format_v1.h</code> is the canonical layout. <code>src/replay/binary_log_writer.cpp</code> and <code>src/replay/binary_log_reader.cpp</code> implement read and write.</li>
+<li><strong>Python.</strong> <code>lrvx.DataWriter</code> and <code>lrvx.DataReader</code> are pybind11 bindings of the C++ writer and reader. They are the simplest entry point for tooling outside lrvx.</li>
+<li><strong>Round-trip exercise.</strong> <code>docs/examples/python_tape_roundtrip.py</code> writes synthetic trades through <code>lrvx.DataWriter</code>, reads them back through <code>lrvx.DataReader</code>, and asserts byte-equality field by field. CI runs it on every push, so the reference impl never silently drifts from this spec.</li>
+</ul>
+<h2 id="worked-example-a-7-trade-tape">Worked example: a 7-trade tape<a class="headerlink" href="#worked-example-a-7-trade-tape" title="Permanent link">&para;</a></h2>
+<p>The replay-equivalence CI gate (<code>scripts/replay_equivalence_gate.py</code>) writes a fixed 7-trade tape, runs four frozen order scenarios against it, and compares each scenario's captured output with its frozen <code>expected_output.json</code> field by field over the parsed JSON, not byte for byte. The tape generator (<code>tests/replay-equivalence/build_tape.py</code>) builds a tape from scratch: it registers one symbol, plugs <code>lrvx.tape.make_recorder_hook</code> (the in-tree <code>BinaryLogWriter</code> behind <code>lrvx.BinaryLogRecorderHook</code>) into an <code>lrvx.Runner</code> as its market-data recorder, and feeds the seven trades, each with an explicit exchange timestamp, through <code>runner.on_trade</code>. Read it before writing your own implementation; everything important about the writer's calling convention is there.</p>
+<h2 id="compatibility-commitments">Compatibility commitments<a class="headerlink" href="#compatibility-commitments" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Files written by <code>lrvx</code> 0.5.x and later remain readable by every lrvx 1.x release.</li>
+<li>A reader for an older lrvx must refuse to load a newer tape rather than skip frames it does not understand.</li>
+<li>New <code>EventType</code> codes must be additive and skippable via <code>FrameHeader.size</code>. New <code>flags</code> bits are not skippable: a reader must reject a segment whose <code>SegmentFlags</code> carry a bit it does not know.</li>
+</ul>
+<h2 id="reporting-issues">Reporting issues<a class="headerlink" href="#reporting-issues" title="Permanent link">&para;</a></h2>
+<p>Bugs in this spec or in the reference implementation: open an issue on the public repository with the byte ranges that failed to parse and the sha256 of the offending segment. Include the writer version and any LZ4 library version if compression was used.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

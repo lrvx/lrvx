@@ -1,0 +1,3232 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/explanation/disruptor/">
+      
+      
+        <link rel="prev" href="../clock-domains/">
+      
+      
+        <link rel="next" href="../memory-model/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Disruptor Pattern - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#the-disruptor-pattern" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Disruptor Pattern
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clock-domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clock Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disruptor Pattern
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disruptor Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-disruptor-solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Disruptor Solution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lrvx-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lrvx Implementation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="lrvx Implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consuming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consuming
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequence-gating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequence Gating
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cache-line-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache-Line Optimization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#busy-spin-vs-blocking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Busy-Spin vs. Blocking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parking-the-consumer-that-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parking: the consumer that blocks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consumers-without-a-thread-of-their-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consumers without a thread of their own
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consumers without a thread of their own">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-wait-point-over-many-buses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One wait point over many buses
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sleeping-until-the-earlier-of-two-things" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sleeping until the earlier of two things
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multiple-consumers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple Consumers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#required-vs-optional-consumers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required vs. Optional Consumers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#batch-publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Publishing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bounded-publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded Publishing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stopping-and-restarting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stopping and Restarting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Stopping and Restarting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#draining" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Draining
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#static-subscription" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Static Subscription
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-characteristics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Characteristics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-disruptor-shines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When Disruptor Shines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#degradation-modes-and-consumer-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Degradation modes and consumer health
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Further Reading
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../memory-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-state-ownership/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol strategy state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-control-plane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../per-symbol-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../order-book-tick-window/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order book tick window
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../onchain-order-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    On-chain order lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../liquidity-provision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Liquidity-provision signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../position-valuation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Position valuation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amm-pricing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM pricing in backtests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-making-quoter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market-making quoter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amm-dex-connector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM DEX connector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../replay-equivalence-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replay-equivalence gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-close-ordering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar-close ordering on tied timestamps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node-threaded-runner-lifetime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threaded Runner lifetime in Node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../javascript-value-boundary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The JavaScript value boundary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-stack-reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue-stack reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build/feature-flags/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build feature flags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../contributors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-disruptor-solution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Disruptor Solution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lrvx-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lrvx Implementation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="lrvx Implementation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consuming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consuming
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequence-gating" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequence Gating
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cache-line-optimization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache-Line Optimization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#busy-spin-vs-blocking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Busy-Spin vs. Blocking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parking-the-consumer-that-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parking: the consumer that blocks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#consumers-without-a-thread-of-their-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consumers without a thread of their own
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Consumers without a thread of their own">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-wait-point-over-many-buses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One wait point over many buses
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sleeping-until-the-earlier-of-two-things" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sleeping until the earlier of two things
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multiple-consumers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multiple Consumers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#required-vs-optional-consumers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Required vs. Optional Consumers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#batch-publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch Publishing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bounded-publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bounded Publishing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stopping-and-restarting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stopping and Restarting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Stopping and Restarting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#draining" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Draining
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#static-subscription" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Static Subscription
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-characteristics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Characteristics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-disruptor-shines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When Disruptor Shines
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#degradation-modes-and-consumer-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Degradation modes and consumer health
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#further-reading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Further Reading
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="the-disruptor-pattern">The Disruptor Pattern<a class="headerlink" href="#the-disruptor-pattern" title="Permanent link">&para;</a></h1>
+<div class="admonition info">
+<p class="admonition-title">Internals — for context only</p>
+<p>This page describes how the C++ engine delivers events between threads. If you write strategies in Python, Node.js, or Codon, you don't see any of this directly — you just receive events in your callbacks. Read this if you want to understand <em>why</em> lrvx scales the way it does, not because you need it to write code.</p>
+</div>
+<p>Why lrvx uses ring buffers for event delivery.</p>
+<h2 id="the-problem">The Problem<a class="headerlink" href="#the-problem" title="Permanent link">&para;</a></h2>
+<p>Traditional publish-subscribe systems have bottlenecks:</p>
+<pre class="mermaid"><code>flowchart LR
+    P[Producer] --&gt; Q[Queue]
+    Q --&gt; C[Consumer]
+    Q -.-&gt;|Contention| X[Locks&lt;br/&gt;Allocations&lt;br/&gt;Cache misses]</code></pre>
+<p>For each event:</p>
+<ol>
+<li><strong>Lock acquisition</strong> — Wait for mutex</li>
+<li><strong>Memory allocation</strong> — Create queue node</li>
+<li><strong>Cache invalidation</strong> — Producer and consumer fight over cache lines</li>
+</ol>
+<p>At millions of events per second, these costs add up.</p>
+<h2 id="the-disruptor-solution">The Disruptor Solution<a class="headerlink" href="#the-disruptor-solution" title="Permanent link">&para;</a></h2>
+<p>The Disruptor pattern (from LMAX Exchange) eliminates these costs:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>              Ring Buffer (pre-allocated)
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>  [0] [1] [2] [3] [4] [5] [6] [7]
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>       ↑               ↑
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    Consumer       Producer
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    Sequence       Sequence
+</span></code></pre></div>
+<p>Key insights:</p>
+<ol>
+<li><strong>Pre-allocated array</strong> — No allocation during publishing</li>
+<li><strong>Sequence numbers</strong> — Atomic counters replace locks</li>
+<li><strong>Cache-line padding</strong> — False sharing eliminated</li>
+<li><strong>Batching</strong> — Consumers can process multiple events</li>
+</ol>
+<h2 id="lrvx-implementation">lrvx Implementation<a class="headerlink" href="#lrvx-implementation" title="Permanent link">&para;</a></h2>
+<p>lrvx's <code>EventBus</code> implements a Disruptor-style ring buffer:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">typename</span><span class="w"> </span><span class="nc">Event</span><span class="p">,</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">          </span><span class="kt">size_t</span><span class="w"> </span><span class="n">CapacityPow2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span><span class="o">::</span><span class="n">DEFAULT_EVENTBUS_CAPACITY</span><span class="p">,</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">          </span><span class="kt">size_t</span><span class="w"> </span><span class="n">MaxConsumers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span><span class="o">::</span><span class="n">DEFAULT_EVENTBUS_MAX_CONSUMERS</span><span class="o">&gt;</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">EventBus</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">ISubsystem</span><span class="p">;</span>
+</span></code></pre></div>
+<h3 id="publishing">Publishing<a class="headerlink" href="#publishing" title="Permanent link">&para;</a></h3>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1">// Producer claims slot via atomic increment</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kt">int64_t</span><span class="w"> </span><span class="n">seq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_next</span><span class="p">.</span><span class="n">fetch_add</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1">// Wait for consumers to free the slot</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">seq</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">CapacityPow2</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">minConsumerSequence</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="n">backoff</span><span class="p">.</span><span class="n">pause</span><span class="p">();</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">}</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1">// Write event directly into ring buffer</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">_storage</span><span class="p">[</span><span class="n">seq</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Mask</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">event</span><span class="p">;</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">_published</span><span class="p">[</span><span class="n">seq</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Mask</span><span class="p">].</span><span class="n">store</span><span class="p">(</span><span class="n">seq</span><span class="p">);</span><span class="w">  </span><span class="c1">// Signal consumers</span>
+</span></code></pre></div>
+<h3 id="consuming">Consuming<a class="headerlink" href="#consuming" title="Permanent link">&para;</a></h3>
+<p>Consuming is one step; running it forever is a separate decision:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1">// The step: everything published and contiguous right now, up to a run cap.</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1">// Returns false when there was nothing for this consumer.</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kt">bool</span><span class="w"> </span><span class="nf">pollOnce</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">listener</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">_published</span><span class="p">[</span><span class="n">seq</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Mask</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">seq</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">maxRun</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="n">listener</span><span class="o">-&gt;</span><span class="n">onTrade</span><span class="p">(</span><span class="n">_storage</span><span class="p">[</span><span class="n">seq</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Mask</span><span class="p">]);</span><span class="w">  </span><span class="c1">// dispatch</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="o">++</span><span class="n">seq</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">run</span><span class="p">;</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">nothing</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="n">_consumers</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">seq</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">last</span><span class="p">);</span><span class="w">              </span><span class="c1">// progress, published once</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="p">}</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="c1">// The default way to keep taking it: one thread per consumer.</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">running</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">pollOnce</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="w"> </span><span class="n">listener</span><span class="p">))</span><span class="w"> </span><span class="n">backoff</span><span class="p">.</span><span class="n">pause</span><span class="p">();</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>By default each consumer gets that thread. See
+<a href="#consumers-without-a-thread-of-their-own">Consumers without a thread of their own</a>
+for when to take the step yourself.</p>
+<h2 id="sequence-gating">Sequence Gating<a class="headerlink" href="#sequence-gating" title="Permanent link">&para;</a></h2>
+<p>Producers wait for the slowest consumer before overwriting slots:</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant P as Producer
+    participant RB as Ring Buffer
+    participant CA as Consumer A
+    participant CB as Consumer B
+
+    Note over RB: Capacity = 8
+
+    P-&gt;&gt;RB: publish(seq=107)
+    RB--&gt;&gt;P: Wait! Slot 99 (107-8) not consumed
+
+    Note over CA: seq = 105
+    Note over CB: seq = 102 (slowest)
+
+    CB-&gt;&gt;RB: consume(seq=103)
+    Note over CB: seq = 103
+
+    RB--&gt;&gt;P: Slot 99 free, continue
+    P-&gt;&gt;RB: write event at slot 107</code></pre>
+<p><strong>Gating Logic:</strong>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Producer Sequence: 107
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>Consumer A Sequence: 105
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Consumer B Sequence: 102  ← Slowest (gating sequence)
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>Ring Buffer Size: 8
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>Producer can advance to: 102 + 8 = 110
+</span></code></pre></div></p>
+<p>This provides <strong>backpressure</strong> — fast producers can't overwhelm slow consumers.</p>
+<h2 id="cache-line-optimization">Cache-Line Optimization<a class="headerlink" href="#cache-line-optimization" title="Permanent link">&para;</a></h2>
+<p>The Disruptor uses padding to prevent false sharing:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">// Without padding: False sharing</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">struct</span><span class="w"> </span><span class="nc">Bad</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">producer_seq</span><span class="p">;</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">consumer_seq</span><span class="p">;</span><span class="w">  </span><span class="c1">// Same cache line!</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">};</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1">// With padding: No false sharing</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="k">alignas</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">producer_seq</span><span class="p">;</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="k">alignas</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">consumer_seq</span><span class="p">;</span>
+</span></code></pre></div>
+<p>lrvx uses <code>alignas(64)</code> throughout <code>EventBus</code>:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">alignas</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="w"> </span><span class="n">_running</span><span class="p">{</span><span class="nb">false</span><span class="p">};</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">alignas</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">_next</span><span class="p">{</span><span class="mi">-1</span><span class="p">};</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">alignas</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">_cachedMin</span><span class="p">{</span><span class="mi">-1</span><span class="p">};</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1">// ...</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="k">alignas</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">array</span><span class="o">&lt;</span><span class="n">ConsumerSlot</span><span class="p">,</span><span class="w"> </span><span class="n">MaxConsumers</span><span class="o">&gt;</span><span class="w"> </span><span class="n">_consumers</span><span class="p">{};</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="k">alignas</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">array</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">atomic</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">MaxConsumers</span><span class="o">&gt;</span><span class="w"> </span><span class="n">_gating</span><span class="p">{};</span>
+</span></code></pre></div>
+<h2 id="busy-spin-vs-blocking">Busy-Spin vs. Blocking<a class="headerlink" href="#busy-spin-vs-blocking" title="Permanent link">&para;</a></h2>
+<p>Consumers use configurable backoff with three modes:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">BackoffMode</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="n">AGGRESSIVE</span><span class="p">,</span><span class="w">  </span><span class="c1">// Dedicated colo: busy-spin with CPU pause, minimal yields</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="n">RELAXED</span><span class="p">,</span><span class="w">     </span><span class="c1">// Shared VPS/cloud: early sleep, minimal CPU burn</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="n">ADAPTIVE</span><span class="w">     </span><span class="c1">// Auto-adjust: starts aggressive, backs off under contention</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="p">};</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">BusyBackoff</span><span class="w"> </span><span class="nf">backoff</span><span class="p">(</span><span class="n">BackoffMode</span><span class="o">::</span><span class="n">ADAPTIVE</span><span class="p">);</span><span class="w">  </span><span class="c1">// Default</span>
+</span></code></pre></div>
+<p><strong>AGGRESSIVE</strong> — for dedicated hardware with isolated cores:</p>
+<ul>
+<li>2048 spins with CPU pause</li>
+<li>Then yield, reset at 4096</li>
+</ul>
+<p><strong>RELAXED</strong> — for shared VPS/cloud environments:</p>
+<ul>
+<li>8 spins, then yield</li>
+<li>Sleep 100μs after 16 spins</li>
+<li>Sleep 500μs for sustained idle</li>
+</ul>
+<p><strong>ADAPTIVE</strong> (default) — auto-adjusts based on contention:</p>
+<ul>
+<li>128 spins with CPU pause (low-latency burst handling)</li>
+<li>512 spins with yield (medium contention)</li>
+<li>Sleep 10μs up to 2048 spins</li>
+<li>Sleep 100μs and reset to medium level</li>
+</ul>
+<p>This balances latency (busy-spin) with CPU usage (sleep) based on deployment environment.</p>
+<p>Note what backoff does <strong>not</strong> do: a consumer never blocks. Even at its
+laziest, ADAPTIVE wakes on a 100 μs sleep — ten thousand times a second, per
+consumer, with nothing to do. On a 14-core machine one idle consumer thread
+costs about 0.15–0.2 of a core. That is the right trade for one bus on
+hardware it owns, and the wrong one for a process holding hundreds.</p>
+<h2 id="parking-the-consumer-that-blocks">Parking: the consumer that blocks<a class="headerlink" href="#parking-the-consumer-that-blocks" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">bus</span><span class="p">.</span><span class="n">subscribe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">listener</span><span class="p">,</span><span class="w"> </span><span class="cm">/*required=*/</span><span class="nb">true</span><span class="p">,</span><span class="w"> </span><span class="n">ConsumerWaitMode</span><span class="o">::</span><span class="n">PARKED</span><span class="p">);</span>
+</span></code></pre></div>
+<p>A parked consumer waits on a condition variable and is woken by the
+publisher. Active waiting stays the default; parking is per consumer, so one
+bus can carry both.</p>
+<p>Measured on 14 cores (4096-slot ring, ADAPTIVE backoff for the active case):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>idle CPU per consumer</th>
+<th>wake-up after 2 ms idle</th>
+<th>worst wake-up</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>active</td>
+<td>~0.2 core, always</td>
+<td>~10 μs</td>
+<td>~35 μs</td>
+</tr>
+<tr>
+<td>parked</td>
+<td>0</td>
+<td>~38 μs</td>
+<td>~1.2 ms</td>
+</tr>
+</tbody>
+</table>
+<p>That is the whole trade: parking gives back the core and costs roughly 4× on
+a typical wake-up, with a tail that belongs to the scheduler rather than to
+the bus. Publishing itself does not get slower — a bus with no parked
+consumer pays one predictable branch, and a publisher that finds nobody
+sleeping pays one atomic load.</p>
+<p><strong>When to park:</strong> many buses in one process (a venue with hundreds of
+shards); a machine shared with anything else; consumers whose work is
+measured in milliseconds anyway — persistence, reporting, anything that
+already touches a disk or a socket.</p>
+<p><strong>When not to:</strong> one bus on hardware it owns, where the burning core IS the
+product; the matching path of a latency-sensitive instrument.</p>
+<p>How the wake-up cannot be lost: the consumer raises the waiter count <em>before</em>
+its last look at the ring, with a sequentially consistent fence on both
+sides, and holds the park mutex across the look and the wait — so a publisher
+that misses the count cannot also be missed by the look, and one that sees it
+cannot slip its notify into the gap. A timed wait sits under both as a net
+(50 ms), which nothing is expected to reach: a test fails if wake-ups start
+arriving on its schedule.</p>
+<p>Parking is per consumer, and the condition variable belongs to one bus. That
+is enough while a consumer IS a thread and nothing more; a thread stepping
+consumers across many buses needs a wait point that does not belong to any of
+them — see <a href="#one-wait-point-over-many-buses">one wait point over many buses</a>.</p>
+<h2 id="consumers-without-a-thread-of-their-own">Consumers without a thread of their own<a class="headerlink" href="#consumers-without-a-thread-of-their-own" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">bus</span><span class="p">.</span><span class="n">setOwnConsumerThreads</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span><span class="w">   </span><span class="c1">// before start()</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">bus</span><span class="p">.</span><span class="n">subscribe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">listener</span><span class="p">);</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">bus</span><span class="p">.</span><span class="n">start</span><span class="p">();</span><span class="w">                        </span><span class="c1">// spawns nothing</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1">// Your thread, your cadence, across as many consumers and buses as you like.</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">running</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">any</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">bus</span><span class="p">.</span><span class="n">consumerCount</span><span class="p">();</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="n">any</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">bus</span><span class="p">.</span><span class="n">pollConsumer</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">any</span><span class="p">)</span><span class="w"> </span><span class="n">backoff</span><span class="p">.</span><span class="n">pause</span><span class="p">();</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Which shape to take:</p>
+<p>These two are separate decisions: a consumer stepped from outside (below)
+does its own waiting, so <code>WaitMode</code> applies to consumers the bus runs itself.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>thread per consumer (default)</th>
+<th>stepped from outside</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>when</td>
+<td>one bus on a machine it owns; latency is the budget</td>
+<td>many buses in one process; threads are the budget</td>
+</tr>
+<tr>
+<td>idle cost</td>
+<td>~0.14 core per consumer, always</td>
+<td>one waiting thread, however many consumers</td>
+</tr>
+<tr>
+<td>latency</td>
+<td>the measured numbers below</td>
+<td>plus the time to get round to this consumer</td>
+</tr>
+<tr>
+<td>who waits</td>
+<td>the consumer</td>
+<td>you, after every consumer came back empty</td>
+</tr>
+</tbody>
+</table>
+<p>Measured on 14 cores (publish to handler entry, 4096-slot ring, ADAPTIVE):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>hot (consumer already spinning)</th>
+<th>after 2 ms idle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>latency</td>
+<td>~170 ns</td>
+<td>~9.3 μs</td>
+</tr>
+</tbody>
+</table>
+<p>The rules for stepping consumers yourself:</p>
+<ul>
+<li><strong>One stepper per consumer at a time.</strong> <code>pollConsumer(i)</code> is the ring's
+  single reader; two threads on one index is the same bug as two consumers
+  sharing a gating slot, and nothing detects it.</li>
+<li><strong>Do not mix.</strong> A consumer with its own thread must not also be stepped.</li>
+<li><strong>A slot can fail without taking you with it.</strong> If a listener throws, that
+  consumer is marked failed (<code>consumerFailed(i)</code>, and <code>DEAD</code> to the health
+  layer), further steps on it do nothing, and every other consumer keeps
+  going. Stepping many consumers means one bad handler must not stop the rest.</li>
+<li><strong>Health is progress, not presence.</strong> A consumer nobody steps while work is
+  pending reports <code>STALLED</code> after <code>stallThreshold</code> — the same as a consumer
+  whose thread is stuck.</li>
+<li><strong>Drain before stop.</strong> <code>drainConsumer(i)</code> hands over what is left in the
+  ring; <code>stop()</code> also does it for you when <code>enableDrainOnStop()</code> is set and
+  nobody owns a consumer thread.</li>
+</ul>
+<h3 id="one-wait-point-over-many-buses">One wait point over many buses<a class="headerlink" href="#one-wait-point-over-many-buses" title="Permanent link">&para;</a></h3>
+<p>A thread stepping consumers across many buses cannot block on any single one
+of them without going deaf to the rest, so <code>WaitMode::PARKED</code> does nothing
+for it and it has to spin — the cost parking exists to remove, moved up a
+level and left there.</p>
+<p><code>WakeSet</code> is the wait point such a thread is missing: one condition variable,
+one mutex, one waiter count, however many rings hang off it. Point every bus
+the thread steps at the same set, and a publisher into any of them wakes it.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">lrvx</span><span class="o">::</span><span class="n">WakeSet</span><span class="w"> </span><span class="n">set</span><span class="p">;</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">bus</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">buses</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span><span class="n">bus</span><span class="o">-&gt;</span><span class="n">setOwnConsumerThreads</span><span class="p">(</span><span class="nb">false</span><span class="p">);</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span><span class="n">bus</span><span class="o">-&gt;</span><span class="n">setWakeSet</span><span class="p">(</span><span class="o">&amp;</span><span class="n">set</span><span class="p">);</span><span class="w">          </span><span class="c1">// both before start()</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span><span class="n">bus</span><span class="o">-&gt;</span><span class="n">subscribe</span><span class="p">(</span><span class="o">&amp;</span><span class="n">listener</span><span class="p">);</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="n">bus</span><span class="o">-&gt;</span><span class="n">start</span><span class="p">();</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="p">}</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">running</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">any</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">bus</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">buses</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">bus</span><span class="o">-&gt;</span><span class="n">consumerCount</span><span class="p">();</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">      </span><span class="n">any</span><span class="w"> </span><span class="o">|=</span><span class="w"> </span><span class="n">bus</span><span class="o">-&gt;</span><span class="n">pollConsumer</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-10-17"><a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">any</span><span class="p">)</span><span class="w"> </span><span class="k">continue</span><span class="p">;</span>
+</span><span id="__span-10-18"><a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="w">  </span><span class="c1">// The last look at every ring, taken inside the set's discipline.</span>
+</span><span id="__span-10-19"><a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a><span class="w">  </span><span class="n">set</span><span class="p">.</span><span class="n">parkUnless</span><span class="p">([</span><span class="o">&amp;</span><span class="p">]</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-20"><a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a><span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">bus</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">buses</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-21"><a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a><span class="w">      </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">bus</span><span class="o">-&gt;</span><span class="n">consumerCount</span><span class="p">();</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-22"><a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">bus</span><span class="o">-&gt;</span><span class="n">consumerHasPending</span><span class="p">(</span><span class="n">i</span><span class="p">))</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+</span><span id="__span-10-23"><a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a><span class="w">      </span><span class="p">}</span>
+</span><span id="__span-10-24"><a id="__codelineno-10-24" name="__codelineno-10-24" href="#__codelineno-10-24"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-10-25"><a id="__codelineno-10-25" name="__codelineno-10-25" href="#__codelineno-10-25"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span>
+</span><span id="__span-10-26"><a id="__codelineno-10-26" name="__codelineno-10-26" href="#__codelineno-10-26"></a><span class="w">  </span><span class="p">});</span>
+</span><span id="__span-10-27"><a id="__codelineno-10-27" name="__codelineno-10-27" href="#__codelineno-10-27"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><code>parkUnless</code> takes the predicate rather than being called after a check
+because the check has to happen <em>inside</em> the set's discipline: the window
+between a waiter's last look and it raising its hand is exactly where a
+wake-up gets lost. Same rules as <code>park()</code> — the count goes up before the
+look, with a sequentially consistent fence on either side, and the mutex is
+held across both the look and the wait. The predicate therefore runs under
+that mutex: keep it to <code>consumerHasPending</code>, and never deliver from it.</p>
+<p><code>consumerHasPending(i)</code> is the look <code>pollConsumer(i)</code> starts with, without
+the delivery. It reads the stepping driver's own cursor, so it belongs to
+whoever steps that consumer and to nobody else.</p>
+<h3 id="sleeping-until-the-earlier-of-two-things">Sleeping until the earlier of two things<a class="headerlink" href="#sleeping-until-the-earlier-of-two-things" title="Permanent link">&para;</a></h3>
+<p>A driver rarely only waits for a publisher. It sweeps, it watches a threshold,
+it has periodic business of its own -- and what it wants is to sleep until the
+<em>earlier</em> of "somebody published" and "the next thing is due". <code>parkUnless</code>
+bounds the sleep only by the net, and a 50 ms net under a cadence measured in
+single-digit milliseconds is not a net, it is the schedule.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kt">int64_t</span><span class="w"> </span><span class="n">nextSweep</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lrvx</span><span class="o">::</span><span class="n">venue</span><span class="o">::</span><span class="n">venueMonoNs</span><span class="p">();</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">running</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="kt">int64_t</span><span class="w"> </span><span class="n">now</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">lrvx</span><span class="o">::</span><span class="n">venue</span><span class="o">::</span><span class="n">venueMonoNs</span><span class="p">();</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">now</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="n">nextSweep</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="n">nextSweep</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">now</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">cadenceNs</span><span class="p">;</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">    </span><span class="n">sweep</span><span class="p">();</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">step</span><span class="p">())</span><span class="w"> </span><span class="k">continue</span><span class="p">;</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">  </span><span class="n">set</span><span class="p">.</span><span class="n">parkUntil</span><span class="p">(</span><span class="n">nextSweep</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="o">&amp;</span><span class="p">]</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="o">!</span><span class="n">running</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="n">pending</span><span class="p">();</span><span class="w"> </span><span class="p">});</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><code>parkUntil(deadlineNs, pred)</code> is the same sleep under the same discipline,
+with a ceiling on it: it returns on a publish, on the predicate, or on the
+deadline -- whichever is first, and the caller loops either way, because a
+return says only "look again" and never why. <code>deadlineNs</code> is on the steady
+clock; a deadline already in the past is "look once and come straight back".
+<code>parkUnless(pred)</code> is <code>parkUntil(WakeSet::kNoDeadline, pred)</code>.</p>
+<p>Measured on 14 cores, one thread over N buses, 1024-slot rings, ADAPTIVE
+backoff for the spinning case (the numbers for one consumer on its own thread
+are in <a href="#parking-the-consumer-that-blocks">Parking</a> above):</p>
+<table>
+<thead>
+<tr>
+<th>buses on the thread</th>
+<th>idle CPU, backoff</th>
+<th>idle CPU, wake set</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>0.11 core</td>
+<td>0</td>
+</tr>
+<tr>
+<td>3</td>
+<td>0.11 core</td>
+<td>0</td>
+</tr>
+<tr>
+<td>16</td>
+<td>0.11 core</td>
+<td>0</td>
+</tr>
+<tr>
+<td>64</td>
+<td>0.12 core</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>The backoff figure is flat because it is one thread either way — that is the
+point of stepping — and it is the whole thread, idle, forever. Wake-up
+latency, publish to handler entry after 2 ms of quiet, same run:</p>
+<table>
+<thead>
+<tr>
+<th>wait</th>
+<th>wake-up</th>
+<th>worst</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>backoff, 3 buses</td>
+<td>9.1 μs</td>
+<td>51 μs</td>
+</tr>
+<tr>
+<td>backoff, 16 buses</td>
+<td>10.8 μs</td>
+<td>101 μs</td>
+</tr>
+<tr>
+<td>wake set, 3 buses</td>
+<td>5.7 μs</td>
+<td>9.8 μs</td>
+</tr>
+<tr>
+<td>wake set, 16 buses</td>
+<td>5.9 μs</td>
+<td>28 μs</td>
+</tr>
+</tbody>
+</table>
+<p>So the set is not a latency trade here, unlike parking a single consumer: a
+thread that has to walk N rings before it can find anything is slower at
+noticing than one that is woken and told to look. The tail behaves better for
+the same reason.</p>
+<p>A bus nobody points at a set is untouched: <code>setWakeSet</code> is what turns the
+wake-up on, the publish path reads one flag covering both it and parked
+consumers, and a bus with neither pays one predictable branch.</p>
+<h2 id="multiple-consumers">Multiple Consumers<a class="headerlink" href="#multiple-consumers" title="Permanent link">&para;</a></h2>
+<p>lrvx supports multiple consumers per bus:</p>
+<pre class="mermaid"><code>flowchart LR
+    subgraph Producer
+        P[Connector Thread]
+    end
+
+    subgraph RB[Ring Buffer]
+        direction LR
+        S0[E0] --- S1[E1] --- S2[E2] --- S3[E3]
+    end
+
+    subgraph Consumers[Consumer Threads]
+        C1[Strategy A&lt;br/&gt;seq=5]
+        C2[Strategy B&lt;br/&gt;seq=3]
+        C3[Logger&lt;br/&gt;seq=2]
+    end
+
+    P --&gt;|publish| RB
+    RB --&gt;|deliver| C1
+    RB --&gt;|deliver| C2
+    RB --&gt;|deliver| C3
+
+    style C3 fill:#fdd</code></pre>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">tradeBus</span><span class="o">-&gt;</span><span class="n">subscribe</span><span class="p">(</span><span class="n">strategyA</span><span class="p">.</span><span class="n">get</span><span class="p">());</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">tradeBus</span><span class="o">-&gt;</span><span class="n">subscribe</span><span class="p">(</span><span class="n">strategyB</span><span class="p">.</span><span class="n">get</span><span class="p">());</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">tradeBus</span><span class="o">-&gt;</span><span class="n">subscribe</span><span class="p">(</span><span class="n">logger</span><span class="p">.</span><span class="n">get</span><span class="p">());</span>
+</span></code></pre></div>
+<p>Each consumer:</p>
+<ul>
+<li>Gets a dedicated thread</li>
+<li>Maintains its own sequence</li>
+<li>Processes events independently</li>
+</ul>
+<p>The producer waits for the <strong>slowest</strong> consumer before overwriting.</p>
+<h2 id="required-vs-optional-consumers">Required vs. Optional Consumers<a class="headerlink" href="#required-vs-optional-consumers" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1">// Required (default): affects backpressure</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">tradeBus</span><span class="o">-&gt;</span><span class="n">subscribe</span><span class="p">(</span><span class="n">strategyA</span><span class="p">.</span><span class="n">get</span><span class="p">(),</span><span class="w"> </span><span class="cm">/*required=*/</span><span class="nb">true</span><span class="p">);</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1">// Optional: does not gate wrap, but still gates the reclaim fence by default</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="n">tradeBus</span><span class="o">-&gt;</span><span class="n">subscribe</span><span class="p">(</span><span class="n">logger</span><span class="p">.</span><span class="n">get</span><span class="p">(),</span><span class="w"> </span><span class="cm">/*required=*/</span><span class="nb">false</span><span class="p">);</span>
+</span></code></pre></div>
+<p>Optional consumers:</p>
+<ul>
+<li>Do not gate the producer at wrap, but the reclaim fence still scans every
+  consumer (use-after-free protection), so by default a slow optional consumer
+  DOES stall <code>publish()</code>. Enable <code>dropBehindOptional</code> in <code>HealthConfig</code> to let
+  them jump ahead instead.</li>
+<li>With <code>dropBehindOptional</code>, may miss events if too slow (skipped events are
+  counted, never silently lost); without it, they block rather than miss.</li>
+<li>Useful for monitoring, logging, metrics</li>
+</ul>
+<h2 id="batch-publishing">Batch Publishing<a class="headerlink" href="#batch-publishing" title="Permanent link">&para;</a></h2>
+<p>WebSocket feeds already deliver batches: a depth message carries every level
+that changed, and a busy trade stream packs several trades into one frame.
+<code>publishBatch</code> keeps that shape instead of splitting it into per-event
+publishes:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1">// evs is a contiguous array, 1 &lt;= count &lt;= CapacityPow2 / 2</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kt">int64_t</span><span class="w"> </span><span class="n">lastSeq</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tradeBus</span><span class="o">-&gt;</span><span class="n">publishBatch</span><span class="p">(</span><span class="n">evs</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">);</span>
+</span></code></pre></div>
+<p>The bound is enforced, not assumed: an empty batch and one larger than half the
+ring are both refused with -1, in every build, and nothing is published. It is
+the ring's bound rather than a style rule -- a range wider than the ring
+reserves slots it wraps back onto, so the wrap gate would wait on sequences
+inside the same batch that only this publisher can stamp, and the publisher
+would never return. The refusal is always a return.</p>
+<p>One call reserves the whole sequence range at once, waits once for ring
+space, then stamps every slot under a single release fence. Per-event
+<code>publish()</code> pays a sequence reservation, a wrap check and a release store
+for every event; the batch pays each of those once. On our benchmark
+hardware that is the difference between ~19M and ~275M events/s with one
+consumer (<code>benchmarks/batch_delivery_benchmark.cpp</code>).</p>
+<p>Batching costs nothing on the latency side. A batch is whatever the producer
+already has in hand, so a single event still goes through alone, and
+delivery latency under bursty load measures the same as the per-event path.</p>
+<p>Consumers batch on their own: a consumer that wakes up delivers the whole
+contiguous run of published events (up to 1024) and stores its progress once
+at the end of the run, instead of updating two atomics per event. This works
+for both publish paths and needs nothing from the caller.</p>
+<h2 id="bounded-publishing">Bounded Publishing<a class="headerlink" href="#bounded-publishing" title="Permanent link">&para;</a></h2>
+<p><code>publish()</code> waits as long as it takes. <code>tryPublish()</code> gives the producer a
+deadline instead, and returns what happened:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">result</span><span class="p">,</span><span class="w"> </span><span class="n">seq</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tradeBus</span><span class="o">-&gt;</span><span class="n">tryPublish</span><span class="p">(</span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">chrono</span><span class="o">::</span><span class="n">microseconds</span><span class="p">{</span><span class="mi">500</span><span class="p">});</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">result</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">MyBus</span><span class="o">::</span><span class="n">PublishResult</span><span class="o">::</span><span class="n">TIMEOUT</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="c1">// the ring was full for 500us; the event was not published</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>A timeout means the event never entered the ring. Nothing was reserved, no
+slot was written, no sequence number was spent, and the next accepted publish
+takes the sequence this one would have had. Events already in the ring are
+untouched and keep flowing to consumers. <code>stats().dropped</code> counts the refusals,
+so backpressure stays visible.</p>
+<p>The two publish paths get there differently. Blocking <code>publish()</code> takes its
+sequence first, with one atomic increment, then waits for ring space; it never
+gives up, so the sequence it took is always honoured. A bounded publish cannot
+work that way. A sequence taken and then abandoned still has to be written into
+the ring for consumers to get past it, and that write lands on the slot of an
+event the slowest consumer has not read yet. So <code>tryPublish()</code> takes its
+sequence last, with a compare-exchange, once the ring already has room. Giving
+up before that point costs nothing.</p>
+<p>Backpressure on <code>tryPublish()</code> is a normal condition. Handle the <code>TIMEOUT</code>
+(drop, retry, shed load) and keep publishing.</p>
+<h2 id="stopping-and-restarting">Stopping and Restarting<a class="headerlink" href="#stopping-and-restarting" title="Permanent link">&para;</a></h2>
+<p><code>EventBus</code> is an <code>ISubsystem</code>: it has <code>start()</code> and <code>stop()</code>, and a bus can go
+through that cycle more than once. A reconnect that rebuilds a feed stops its
+subsystems and starts them again.</p>
+<p><code>stop()</code> closes publishing, waits out the publishers that are already inside
+the ring, joins every consumer thread, destroys whatever events the ring still
+holds, and puts the gating lines back where a fresh bus starts. A restarted bus
+numbers its events from zero again, so sequence numbers are unique within a run,
+not across runs. Anything that persists a <code>tickSequence</code> past a restart needs
+its own run identifier.</p>
+<p>A publish racing <code>stop()</code> has one of two outcomes, and the publisher can tell
+them apart from the return value: it is refused (-1, or <code>STOPPED</code>), or the event
+is in the ring and the shutdown will not throw it away before the consumers that
+were going to get it have had their chance. There is no third outcome where the
+bus accepted an event, handed back a sequence number, and dropped it on the way
+down -- which is a loss the publisher had no way to learn about.</p>
+<p>Why a flag cannot deliver that: a publisher reads "is the bus running" once, on
+the way in, and can be preempted between that read and its claim for as long as
+the scheduler likes, so by the time it constructs into a slot the answer may be
+hours old. What <code>stop()</code> closes instead is the sequence line itself, in one
+atomic step: every claim taken afterwards comes back refused, and every claim
+taken before it is one <code>stop()</code> can count and wait for. The publish path pays
+nothing for this -- it announces nothing on the way in, and the counter it bumps
+on the way out is the one it already bumped.</p>
+<p>So <code>stop()</code> returns only when no publisher is writing into a slot, which is what
+makes it safe to destroy or restart the bus. It waits for a publisher parked
+inside the event's own copy constructor, and it does not wait for one parked at
+the wrap gate or the reclaim fence: those give up instead, so a stalled consumer
+cannot keep a shutdown from finishing.</p>
+<h3 id="draining">Draining<a class="headerlink" href="#draining" title="Permanent link">&para;</a></h3>
+<p>By default <code>stop()</code> drops whatever the consumers have not reached yet.
+<code>enableDrainOnStop()</code> makes each consumer finish the events already published
+before its thread exits:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">tradeBus</span><span class="o">-&gt;</span><span class="n">enableDrainOnStop</span><span class="p">();</span>
+</span></code></pre></div>
+<p>The drain delivers them through the same path as the running loop, end-of-batch
+edge included. A listener that batches its work needs that edge: it commits what
+it was handed only when it is told the ingress is drained, which is where one
+durability barrier covers a whole batch instead of one per event. The drain
+gives it that edge at the end, and every 1024 events along the way, so a
+shutdown commits what it applied rather than leaving it staged.</p>
+<h2 id="static-subscription">Static Subscription<a class="headerlink" href="#static-subscription" title="Permanent link">&para;</a></h2>
+<p><code>subscribe()</code> takes a listener interface pointer and dispatches through a
+virtual call. <code>subscribeStatic</code> takes a concrete type instead:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">struct</span><span class="w"> </span><span class="nc">PriceLogger</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="p">{</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="kt">void</span><span class="w"> </span><span class="nf">onTrade</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">TradeEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">ev</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* ... */</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="p">};</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="n">PriceLogger</span><span class="w"> </span><span class="n">logger</span><span class="p">;</span>
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="n">tradeBus</span><span class="o">-&gt;</span><span class="n">subscribeStatic</span><span class="p">(</span><span class="o">&amp;</span><span class="n">logger</span><span class="p">);</span>
+</span></code></pre></div>
+<p>The consumer loop is instantiated around the concrete type, so the handler
+call is direct and can inline. The type only needs the handler methods the
+event's dispatcher calls; it does not have to derive from the listener
+interface. On a live bus the difference is small, because the producer side
+dominates. The same mechanism is what makes StrategyPump fast in replay,
+where there is no producer to hide behind.</p>
+<h2 id="performance-characteristics">Performance Characteristics<a class="headerlink" href="#performance-characteristics" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Publish latency</td>
+<td>Wait-free when the ring has space; blocks with backoff (see Degradation) when a consumer lags</td>
+</tr>
+<tr>
+<td>Consume latency</td>
+<td>Depends on backoff strategy and load</td>
+</tr>
+<tr>
+<td>Throughput</td>
+<td>Limited by slowest consumer</td>
+</tr>
+<tr>
+<td>Memory overhead</td>
+<td>Fixed: <code>sizeof(Event) × Capacity</code></td>
+</tr>
+</tbody>
+</table>
+<p>Actual numbers depend heavily on:
+- CPU architecture and cache hierarchy
+- Whether cores are isolated
+- Event size and consumer callback complexity
+- System load</p>
+<p>Run benchmarks on your target hardware to establish baseline.</p>
+<h2 id="when-disruptor-shines">When Disruptor Shines<a class="headerlink" href="#when-disruptor-shines" title="Permanent link">&para;</a></h2>
+<p><strong>Good fit:</strong></p>
+<ul>
+<li>High-throughput, low-latency requirements</li>
+<li>Predictable memory usage</li>
+<li>Single producer, multiple consumers</li>
+<li>Events are processed in order</li>
+</ul>
+<p><strong>Not ideal for:</strong></p>
+<ul>
+<li>Multiple producers (requires coordination)</li>
+<li>Unbounded queues</li>
+<li>Very uneven consumer speeds</li>
+</ul>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1">// Custom capacity and consumer limit</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">using</span><span class="w"> </span><span class="n">MyBus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">EventBus</span><span class="o">&lt;</span><span class="n">TradeEvent</span><span class="p">,</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">                       </span><span class="cm">/*CapacityPow2=*/</span><span class="mi">16384</span><span class="p">,</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">                       </span><span class="cm">/*MaxConsumers=*/</span><span class="mi">32</span><span class="o">&gt;</span><span class="p">;</span>
+</span></code></pre></div>
+<p>Capacity must be a power of 2 (for fast modulo via bitmask).</p>
+<h2 id="degradation-modes-and-consumer-health">Degradation modes and consumer health<a class="headerlink" href="#degradation-modes-and-consumer-health" title="Permanent link">&para;</a></h2>
+<p>A stalled consumer freezes the whole bus, and without instrumentation it
+freezes silently. Configure the health layer if you run the bus anywhere a
+frozen publisher costs money.</p>
+<p>Why a single consumer can stop everything: a required consumer that stops
+advancing blocks the publisher at wrap gating, and an optional one blocks
+it at the reclaim fence, because use-after-free protection waits for every
+consumer before destroying old events. In both cases the publisher spins in
+<code>publish()</code> and nothing in the logs says why.</p>
+<p>The health layer gives each failure mode a detector and a policy:</p>
+<ul>
+<li>Stalls. <code>checkHealth()</code> sweeps all consumers and fires the callback with
+  <code>STALLED</code> when one has pending work but no progress for
+  <code>stallThreshold</code>, then <code>HEALTHY</code> again on recovery. Call it from your own
+  health thread or set <code>enableMonitorThread</code> to poll automatically, on a
+  period of <code>monitorPeriod(stallThreshold)</code> -- half the threshold, floored at
+  1 ms so that a sub-millisecond threshold cannot turn the sweep into a spin.
+  One sweeping thread at a time; the bookkeeping is not synchronized between
+  checkers.</li>
+<li>Slow optional consumers. With <code>dropBehindOptional</code>, an optional consumer
+  more than <code>dropBehindSlack</code> events behind jumps to the head instead of
+  blocking the reclaim fence. The skipped count is in
+  <code>stats().droppedBehind</code>. Required consumers never drop events.</li>
+<li>Dead consumers. A handler that throws kills its consumer loop and logs an
+  error. Swallowing the exception would keep a broken handler running, and
+  rethrowing would terminate the process, so the consumer dies and the next
+  sweep reports <code>DEAD</code>. For a required consumer, <code>deadPolicy</code> picks between
+  <code>ALERT</code> and <code>STOP_BUS</code>.</li>
+</ul>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">MyBus</span><span class="o">::</span><span class="n">HealthConfig</span><span class="w"> </span><span class="n">cfg</span><span class="p">;</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">cfg</span><span class="p">.</span><span class="n">stallThreshold</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">chrono</span><span class="o">::</span><span class="n">milliseconds</span><span class="p">(</span><span class="mi">50</span><span class="p">);</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="n">cfg</span><span class="p">.</span><span class="n">dropBehindOptional</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="n">cfg</span><span class="p">.</span><span class="n">enableMonitorThread</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="n">cfg</span><span class="p">.</span><span class="n">callback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[](</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">idx</span><span class="p">,</span><span class="w"> </span><span class="n">MyBus</span><span class="o">::</span><span class="n">ConsumerHealth</span><span class="w"> </span><span class="n">st</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* metrics */</span><span class="w"> </span><span class="p">};</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="n">bus</span><span class="p">.</span><span class="n">setHealthConfig</span><span class="p">(</span><span class="n">cfg</span><span class="p">);</span><span class="w">  </span><span class="c1">// before start()</span>
+</span></code></pre></div>
+<p>The callback is edge-triggered. For the level-triggered question -- who is
+unhealthy right now -- <code>consumerHealth(i)</code> and <code>healthSnapshot()</code> read what the
+last sweep recorded, from any thread, while the sweep is running and after the
+bus has stopped. <code>consumerHealthReport(i)</code> adds the two numbers a supervisor
+needs to act: the sequence the consumer had reached and the instant it last
+moved, taken from the same sweep as the state. A report that mixed the sequence
+from one sweep with the instant from another would describe progress that never
+happened, so <code>lastChange</code> moves only together with <code>lastSeen</code>.</p>
+<h2 id="further-reading">Further Reading<a class="headerlink" href="#further-reading" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://lmax-exchange.github.io/disruptor/disruptor.html">LMAX Disruptor Paper</a></li>
+<li><a href="../memory-model/">Memory Model</a> — How lrvx handles event ownership</li>
+<li><a href="../architecture/">Architecture Overview</a> — Full system design</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,3520 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/venue/matching/">
+      
+      
+        <link rel="prev" href="../build-profiles/">
+      
+      
+        <link rel="next" href="../clearing/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Matching - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#matching" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Matching
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Venue
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building with/without the venue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build profiles (venue-lite)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Matching
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Matching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-books-one-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two books, one interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#matching-policies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matching policies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Matching policies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#self-trade-prevention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-trade prevention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#last-look-and-the-option-inside-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Last look, and the option inside it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#live-risk-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live risk limits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#client-order-ids-and-how-long-they-are-reserved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client order ids and how long they are reserved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#correcting-a-position-by-hand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correcting a position by hand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delisting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delisting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-session-automaton" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The session automaton
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#admission-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admission profiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#order-types-and-time-in-force" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order types and time in force
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Order types and time in force">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-a-modify-preserves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a modify preserves
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fill-or-kill-and-the-depth-that-cannot-fill-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fill-or-kill and the depth that cannot fill it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The engine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-the-code-lives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the code lives
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-trade-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-trade risk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#market-maker-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Market-maker features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#last-look-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Last-look lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#client-order-id-dedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client order id dedup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#who-may-act-on-an-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who may act on an order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auctions-and-halts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auctions and halts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#order-paths-and-the-gates-on-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order paths and the gates on them
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clearing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clearing and the ledger
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../risk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Derivatives risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../perimeter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perimeter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fix-initiator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting over FIX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fix-quoting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quoting over FIX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-agent simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-books-one-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two books, one interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#matching-policies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matching policies
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Matching policies">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#self-trade-prevention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-trade prevention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#last-look-and-the-option-inside-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Last look, and the option inside it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#live-risk-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live risk limits
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#client-order-ids-and-how-long-they-are-reserved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client order ids and how long they are reserved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#correcting-a-position-by-hand" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correcting a position by hand
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delisting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delisting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-session-automaton" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The session automaton
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#admission-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admission profiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#order-types-and-time-in-force" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order types and time in force
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Order types and time in force">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-a-modify-preserves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a modify preserves
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fill-or-kill-and-the-depth-that-cannot-fill-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fill-or-kill and the depth that cannot fill it
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The engine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The engine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-the-code-lives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the code lives
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pre-trade-risk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-trade risk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#market-maker-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Market-maker features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#last-look-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Last-look lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#client-order-id-dedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client order id dedup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#who-may-act-on-an-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who may act on an order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auctions-and-halts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Auctions and halts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#order-paths-and-the-gates-on-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order paths and the gates on them
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="matching">Matching<a class="headerlink" href="#matching" title="Permanent link">&para;</a></h1>
+<h2 id="two-books-one-interface">Two books, one interface<a class="headerlink" href="#two-books-one-interface" title="Permanent link">&para;</a></h2>
+<p>Matching needs individual orders -- to keep time priority, cancel by id, and
+refill icebergs -- so the matcher's resting books are distinct from
+<code>NLevelOrderBook</code>, which aggregates per-level totals for market data. The
+performance book <code>LadderBook</code> lives in core (<code>lrvx/book/ladder_book.h</code>); the
+reference <code>MatchingBook</code> lives in the module (<code>lrvx-venue/matching_book.h</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Book</th>
+<th>Shape</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MatchingBook</code></td>
+<td><code>std::map</code> + <code>std::list</code>, allocates</td>
+<td>Reference oracle. Easy to reason about.</td>
+</tr>
+<tr>
+<td><code>LadderBook</code></td>
+<td>tick-indexed dense ladders, intrusive FIFO over a node pool, occupancy bitmap</td>
+<td>Performance path. O(1) best, O(1) next level, no steady-state allocation.</td>
+</tr>
+</tbody>
+</table>
+<p><code>LadderBook</code>'s O(1) claims are per-operation with no amortised term, which is
+what a matching pass needs: best and next-level are a bitmap word scan, and
+order id -&gt; node is an open-addressed table with linear probing and
+<strong>backward-shift deletion</strong>. There are no tombstones and therefore no rehash
+-- a cancel closes the hole by moving back the tail of its own probe chain, so
+the table after any amount of churn is the table the resting orders would have
+built from empty, and a lookup costs what it cost on the first order of the
+day. Nothing allocates after construction: the ladders, the node pool and the
+id table are all sized by <code>Config</code>.</p>
+<p>They are interchangeable (<code>MatchingEngine&lt;MatchingBook&gt;</code> /
+<code>MatchingEngine&lt;LadderBook&gt;</code>), and a differential fuzz keeps them
+observationally identical over a random stream; the golden replay corpus
+(<code>venue/tests/test_venue_golden_replay.cpp</code>) runs the SAME hand-picked
+scenarios on both and checks <code>LadderBook</code> against the exact numbers recorded
+for <code>MatchingBook</code> -- one table, because the two are contractually required
+to agree. See <a href="../verification/">Verification</a>.</p>
+<p>They agree <strong>within the ladder's bounds</strong>, which is the one thing the map book
+does not have. <code>LadderBook</code> is finite in both price (<code>numLevels</code> ticks from
+<code>basePriceRaw</code>) and order count (<code>maxOrders</code>), and an order it cannot take it
+<strong>refuses</strong> -- <code>addResting</code> answers <code>BookAddResult</code> and the engine turns the
+answer into a report rather than acking an order the book never took:</p>
+<table>
+<thead>
+<tr>
+<th>refusal</th>
+<th>engine answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>price with no level (below <code>basePriceRaw</code>, or past the top of the ladder)</td>
+<td><code>OrderRejected</code> / <code>CancelRejected</code> with <code>InvalidPrice</code></td>
+</tr>
+<tr>
+<td>node pool exhausted (<code>full()</code>)</td>
+<td><code>OrderRejected</code> with <code>BookCapacityExceeded</code></td>
+</tr>
+<tr>
+<td>either one, for an order that has already printed</td>
+<td><code>OrderCanceled</code> with <code>BookRefused</code> -- a reject cannot follow its own executions</td>
+</tr>
+</tbody>
+</table>
+<p><code>validate()</code> (and the amend path) ask <code>canRest()</code> before the order is committed
+to matching, so an unrepresentable price is refused before it can trade;
+<code>full()</code> is asked at the last node, after matching, because a marketable order
+frees nodes as it consumes makers and must not be refused for a pool its own
+fills empty. A deployment sizes <code>numLevels</code>/<code>basePriceRaw</code> to cover the
+instrument's collar (<code>minPrice</code>/<code>maxPrice</code>) and <code>maxOrders</code> to cover its book:
+within those bounds the two books are interchangeable, outside them
+<code>MatchingBook</code> (a <code>std::map</code>, bounded only by the allocator) accepts what
+<code>LadderBook</code> refuses.</p>
+<p>The level of a price is <code>floor((price - base) / tick)</code>, floored and not
+truncated: truncation mapped the whole window <code>(base - tick, base)</code> onto level
+0 -- the base level -- so an ask at 995 with a base of 1000 was filed under
+1000 while the order kept its own price, and the ladder quoted liquidity at a
+price nothing rested at.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">LadderBook</span><span class="w"> </span><span class="n">book</span><span class="p">(</span><span class="n">LadderBook</span><span class="o">::</span><span class="n">Config</span><span class="p">{</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="p">.</span><span class="n">basePriceRaw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="p">.</span><span class="n">tickRaw</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="n">Price</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mf">0.01</span><span class="p">).</span><span class="n">raw</span><span class="p">(),</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="p">.</span><span class="n">numLevels</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="mi">20000</span><span class="p">,</span><span class="w">     </span><span class="c1">// price band height, in ticks</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="p">.</span><span class="n">maxOrders</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">20</span><span class="p">});</span><span class="w"> </span><span class="c1">// node pool capacity</span>
+</span></code></pre></div>
+<h2 id="matching-policies">Matching policies<a class="headerlink" href="#matching-policies" title="Permanent link">&para;</a></h2>
+<p><code>Matcher&lt;Book&gt;</code> implements the allocation rule:</p>
+<ul>
+<li><strong>Price-time (FIFO)</strong>, the default. Best price first; within a price, oldest
+  order first.</li>
+<li><strong>Pro-rata.</strong> Allocation at a level is proportional to resting size, with the
+  usual leftover pass. Last-look orders are refused at admission on pro-rata
+  instruments (<code>LastLookUnsupported</code>): a held slice cannot be carved out of a
+  proportional round, and silently filling the maker as firm -- the old
+  behaviour -- misrepresented the quote. <strong>Defensive second line</strong>: a resting
+  <code>lastLook</code> maker met by a pro-rata allocation (reachable only if a caller
+  bypassed <code>validate()</code>) is <strong>skipped, never filled as firm</strong> -- it is
+  excluded from the level total and from the allocation, the remaining firm
+  participants split the aggressor exactly as they otherwise would, and
+  <code>Matcher::skippedLastLookProRata()</code> (surfaced as
+  <code>MatchingEngine::skippedLastLookProRata()</code>) counts the event. A level whose
+  firm size is zero stops the sweep, so the aggressor residual follows its
+  TIF instead of a fabricated fill.</li>
+</ul>
+<p>The rule is <strong>instrument configuration</strong>: <code>SymbolConfig::matchPolicy</code> carries
+it, and <code>SequencedShard</code>, <code>SymbolRouter</code> and the offline <code>replayWindow</code> all
+build their engine with it. That is what makes a pro-rata instrument
+deployable rather than test-only -- the config is the only way into a journal,
+a checkpoint, a gateway or a window query. <code>MatchingEngine</code>'s constructor
+argument still wins for a caller that names it, so the hand-built engines in
+the test tree are unchanged.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">SymbolConfig</span><span class="w"> </span><span class="n">cfg</span><span class="p">;</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">cfg</span><span class="p">.</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">cfg</span><span class="p">.</span><span class="n">matchPolicy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MatchPolicy</span><span class="o">::</span><span class="n">ProRata</span><span class="p">;</span><span class="w">   </span><span class="c1">// the shard, the router and replay all read this</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">SequencedShard</span><span class="o">&lt;&gt;</span><span class="w"> </span><span class="n">shard</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span><span class="w"> </span><span class="s">"/var/lib/lrvx/sym1.journal"</span><span class="p">);</span>
+</span></code></pre></div>
+<p><code>configHash()</code> folds the policy, so the two rules do not share snapshots: a
+generation written by a pro-rata engine is refused by a price-time one instead
+of re-queueing every resting order under an allocation it was never priced
+for.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">Matcher</span><span class="o">&lt;</span><span class="n">MatchingBook</span><span class="o">&gt;</span><span class="w"> </span><span class="n">m</span><span class="p">(</span><span class="n">MatchPolicy</span><span class="o">::</span><span class="n">ProRata</span><span class="p">);</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">m</span><span class="p">.</span><span class="n">setStpGroup</span><span class="p">(</span><span class="cm">/*account*/</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="cm">/*firm*/</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w">   </span><span class="c1">// firm-scope self-trade prevention</span>
+</span></code></pre></div>
+<p>Firm-group STP membership is engine state, not startup wiring: runtime
+changes arrive as the sequenced <code>SetStpGroup</code> command (control-plane
+<code>setStpGroup</code> verb), so they journal, ride checkpoints and replay with the
+rest of matching. <code>group = 0</code> removes a membership.</p>
+<h3 id="self-trade-prevention">Self-trade prevention<a class="headerlink" href="#self-trade-prevention" title="Permanent link">&para;</a></h3>
+<p>Four modes, applied when the aggressor and the maker share an STP scope (the
+account, or the firm group registered via <code>setStpGroup</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CancelNewest</code></td>
+<td>the incoming order is killed</td>
+</tr>
+<tr>
+<td><code>CancelOldest</code></td>
+<td>the resting order is pulled, matching continues</td>
+</tr>
+<tr>
+<td><code>CancelBoth</code></td>
+<td>both go</td>
+</tr>
+<tr>
+<td><code>Decrement</code></td>
+<td>the smaller leg is removed, the larger is reduced by that size; no trade</td>
+</tr>
+</tbody>
+</table>
+<p><code>Decrement</code> measures each leg by what it holds, not by what it shows. On an
+iceberg that is the displayed peak plus the hidden reserve, and the cut comes
+out of the reserve first, so a decrement leaves the peak intact while there is
+reserve behind it. Measuring the peak alone would call a large iceberg the
+smaller leg and cancel the whole thing against an aggressor a fraction of its
+size.</p>
+<p>STP interacts with <code>FOK</code>: an all-or-none order cannot count liquidity it would
+never be allowed to trade with, so the precheck excludes same-scope resting
+size.</p>
+<p>A mass quote carries the mode too, and both of its legs inherit it -- so a
+maker that quotes rather than sending individual orders is not left without the
+control.</p>
+<p>In the auction the verdict comes off both resting orders rather than an
+aggressor, and the uncross loop depends on it naming an action: the loop
+re-peeks the same best bid and best ask every pass, so a verdict that
+decrements nothing and cancels neither leg would leave the book untouched and
+come round to the identical pair forever. A verdict that engages without
+naming an action is therefore carried out as <code>CancelBoth</code> -- the pair must not
+print, both legs are crossing, and nothing in such a verdict says which side to
+keep. It is unreachable through the decoders, which refuse a mode outside
+<code>STPMode</code> at the wire (<a href="../perimeter/#hostile-input">perimeter</a>); the uncross
+does not rely on that being the only way in.</p>
+<h3 id="last-look-and-the-option-inside-it">Last look, and the option inside it<a class="headerlink" href="#last-look-and-the-option-inside-it" title="Permanent link">&para;</a></h3>
+<p>A held fill is an option the maker holds for the length of the window, and an
+option nobody can see the exercise of is one that gets exercised in one
+direction. Over enough holds, a maker free to answer as it likes fills the ones
+that moved its way and refuses the ones that did not; the taker sees only a
+reject rate and cannot tell that from an honest wide tolerance.</p>
+<p>Two controls address that, and they work together.</p>
+<p><code>lastLookToleranceRaw</code> is a <strong>symmetric price tolerance applied by the venue</strong>,
+on magnitude alone. Outside the band the fill is rejected whoever it would have
+favoured — including when the move was in the maker's favour, which is the half
+a cherry-picking maker would otherwise keep. Inside the band the maker's answer
+still stands: the tolerance caps the option rather than abolishing last look.
+<code>0</code> disables the check.</p>
+<p><code>MatchingEngine::lastLookStats()</code> returns a snapshot by value -- it is one of
+the three accessors a /metrics thread may call while the consumer is matching
+(see the thread rule in <code>docs/venue/perimeter.md</code>). It reports per maker how many holds it saw, how
+many it refused, and — the number that matters — the split by which way the
+price had moved. A maker applying a symmetric rule refuses about as often when
+the move favoured it as when it did not. One taking the free option refuses
+almost only when it was losing. That split makes the conduct visible without
+anyone seeing the maker's code, which is what a reject rate on its own can
+never do.</p>
+<p><code>lastLookAcceptOnTimeout</code> decides what silence means, and it is the same
+argument: with <code>false</code>, a maker that stalls and says nothing pays nothing, so
+stalling is free; with <code>true</code>, it costs the maker the trade.</p>
+<p>STP also interacts with <strong>last look</strong>: the maker it pulls may have a hold open,
+so the hold is resolved (rejected, liquidity restored) before the order is
+removed -- the same order every engine-side cancel path follows. Removing first
+would release the collateral the hold still had to settle from.</p>
+<h3 id="live-risk-limits">Live risk limits<a class="headerlink" href="#live-risk-limits" title="Permanent link">&para;</a></h3>
+<p>The band, the fat-finger caps, the per-account order cap, the position cap and
+the margin requirement are changed with the sequenced <code>SetRiskLimits</code> command
+(control-plane verb <code>setRiskLimits</code>). A field mask says which limits the record
+carries, so raising one cannot zero another by omission.</p>
+<p>One account's own caps are set with the sequenced <code>SetAccountRiskLimits</code>
+command (control-plane verb <code>setAccountRiskLimits</code>): the fat-finger size and
+notional, the open-order cap and the position cap, under a field mask like
+<code>SetRiskLimits</code>'. Where both the symbol's and the
+account's limit are set, the tighter one binds. The record is journaled before
+it is applied and written into the snapshot's config section, so a replay and
+a recovered engine refuse exactly the orders the live one refused -- a limit
+that lived outside the journal was a limit the replay never saw.</p>
+<p>Every configuration record carries a <code>symbol</code>, and a shard is one instrument:
+a record addressed to another symbol is ignored, silently, and reports
+nothing. That holds for <code>SetRiskLimits</code>, <code>SetAdmissionProfile</code> and
+<code>SetAccountRiskLimits</code> exactly as it does for <code>SetBands</code>, <code>SetTriggerRef</code>,
+<code>SetStpGroup</code> and <code>SetFundingSchedule</code> -- a broadcast or a misroute must not
+retune the risk of whatever instrument it happens to land on.</p>
+<p>The direct setters on the engine remain for pre-start wiring, and they are not
+symbol-checked: the caller holds the engine, so the address is the call. On a
+running engine they apply immediately and ride nothing: a restart reverts them
+and a replica replaying the journal never sees the change. Use the command.</p>
+<h3 id="client-order-ids-and-how-long-they-are-reserved">Client order ids and how long they are reserved<a class="headerlink" href="#client-order-ids-and-how-long-they-are-reserved" title="Permanent link">&para;</a></h3>
+<p>A repeated <code>clientOrderId</code> from the same account is refused
+(<code>DuplicateClientOrderId</code>). That is what the check exists for: a client that
+retries after an ambiguous disconnect must not get two executions.</p>
+<p>The ids were remembered forever, and that is fine for the case above -- a
+repeat of the SAME id costs nothing. It is not fine for a client whose id
+generator is broken and pours in DISTINCT ids: every one of them stayed for
+the life of the process, growing memory, snapshot size, checkpoint pause and
+recovery time with no bound. A million ids on one account is about 35 MiB.</p>
+<p><code>SymbolConfig::clOrdIdWindowNs</code> bounds it. The default is 0, meaning forever,
+so nothing changes until an operator sets it.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>within the window</td>
+<td>the id is reserved; a repeat is refused</td>
+</tr>
+<tr>
+<td>past it</td>
+<td>the id is free again</td>
+</tr>
+</tbody>
+</table>
+<p>The window is kept as two rotating halves rather than a timestamp per id, so
+an id survives <strong>between one and two windows</strong> -- never less than the window,
+sometimes more. Memory is bounded by two windows of distinct ids.</p>
+<p>Exchanges scope client order id uniqueness to the trading day, so a day is the
+honest setting. Say it out loud to clients rather than letting them discover
+it: past the window, an old id is accepted again.</p>
+<h3 id="correcting-a-position-by-hand">Correcting a position by hand<a class="headerlink" href="#correcting-a-position-by-hand" title="Permanent link">&para;</a></h3>
+<p>The venue's books and an external record of the same positions drift for
+ordinary reasons: a counterparty reports a fill the venue never saw, settlement
+lands differently, history is brought in from elsewhere. <code>AdjustPosition</code>
+books the difference.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">AdjustPosition</span><span class="w"> </span><span class="n">a</span><span class="p">{};</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">a</span><span class="p">.</span><span class="n">accountId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">a</span><span class="p">.</span><span class="n">symbol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">SYM</span><span class="p">;</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">a</span><span class="p">.</span><span class="n">qtyDeltaRaw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">qty</span><span class="p">(</span><span class="mi">-2</span><span class="p">).</span><span class="n">raw</span><span class="p">();</span><span class="w">   </span><span class="c1">// signed; added to the existing position</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">a</span><span class="p">.</span><span class="n">entryRaw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">px</span><span class="p">(</span><span class="mf">98.25</span><span class="p">).</span><span class="n">raw</span><span class="p">();</span><span class="w">    </span><span class="c1">// 0 = keep the current average entry</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">a</span><span class="p">.</span><span class="n">reason</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AdjustReason</span><span class="o">::</span><span class="n">CounterpartyReport</span><span class="p">;</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">std</span><span class="o">::</span><span class="n">strncpy</span><span class="p">(</span><span class="n">a</span><span class="p">.</span><span class="n">note</span><span class="p">,</span><span class="w"> </span><span class="s">"LP fill 88213"</span><span class="p">,</span><span class="w"> </span><span class="n">kAdjustNoteLen</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">venue</span><span class="p">.</span><span class="n">submit</span><span class="p">(</span><span class="n">InboundCommand</span><span class="p">{</span><span class="n">a</span><span class="p">},</span><span class="w"> </span><span class="n">tsNs</span><span class="p">);</span>
+</span></code></pre></div>
+<p>It is a command, not a setter, for the same reason as everything else here: a
+correction applied directly to the engine reverts on restart and a replica
+replaying the journal never sees it. The operator sends it through the
+control-plane verb <code>adjustPosition</code>, which forwards exactly this record:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span><span class="nt">"method"</span><span class="p">:</span><span class="s2">"adjustPosition"</span><span class="p">,</span><span class="nt">"symbol"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"account"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"qtyDelta"</span><span class="p">:</span><span class="mf">-2.0</span><span class="p">,</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w"> </span><span class="nt">"entry"</span><span class="p">:</span><span class="mf">98.25</span><span class="p">,</span><span class="nt">"reason"</span><span class="p">:</span><span class="s2">"counterpartyReport"</span><span class="p">,</span><span class="nt">"note"</span><span class="p">:</span><span class="s2">"LP fill 88213"</span><span class="p">}</span>
+</span></code></pre></div>
+<p><code>reason</code> is required -- the record is the only explanation a correction has --
+and <code>entry</code> omitted keeps the average entry rather than zeroing it.</p>
+<p><strong>It is deliberately not a trade.</strong> No PnL is realized, no fee is charged, the
+ledger is not touched and posted margin is left alone. The discrepancy being
+corrected is by definition not backed by a fill, so inventing the cash flow a
+fill would have produced would make the books agree by adding a second error.
+Margin that no longer fits the corrected size is the operator's next decision;
+the <code>PositionAdjusted</code> event says what the position became so that decision can
+be made.</p>
+<p>Two corrections are refused rather than booked:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AdjustmentEmpty</code></td>
+<td>neither a size delta nor an entry was given: it would journal and broadcast a no-op</td>
+</tr>
+<tr>
+<td><code>AdjustmentNeedsEntry</code></td>
+<td>no position to adjust and no entry to open one at; a zero entry would make every later PnL wrong in a way nothing downstream can detect</td>
+</tr>
+</tbody>
+</table>
+<p>A correction to zero clears the entry price with it: an entry left on a flat
+position is a number that means nothing and reads like it means something.</p>
+<p><code>PositionAdjusted</code> goes out to SBE clients (template 23) and to JSON readers.
+It has no FIX mapping: FIX 4.4 carries a position change in a Position Report
+(AP), a different message category with its own request flow, and putting a
+correction into an execution report would tell the client a fill happened when
+none did.</p>
+<h3 id="delisting">Delisting<a class="headerlink" href="#delisting" title="Permanent link">&para;</a></h3>
+<p><code>AdminAction::Delist</code> withdraws an instrument from trading and pulls the
+resting book with it. A halt promises the instrument comes back and a closed
+session promises the next one; delisting promises neither, so leaving orders
+resting would leave them waiting for an open that is not coming. New orders are
+rejected with <code>InstrumentDelisted</code>, which says that rather than promising a
+return.</p>
+<p>It outranks halt, session and auction state: reopening the session does not
+make a delisted instrument tradeable. <code>Relist</code> reverses it -- an irreversible
+operator action is one mistake away from needing a restart to undo.</p>
+<h3 id="the-session-automaton">The session automaton<a class="headerlink" href="#the-session-automaton" title="Permanent link">&para;</a></h3>
+<p>Every trading-state change the venue has is one row of one table,
+<code>kSessionTransitions</code> in <code>lrvx-venue/engine/session.h</code>. Nine of the rows have
+an operator behind them (<code>AdminAction</code>); the other two the engine raises
+itself, when the price leaves the limit-up/limit-down band and when the timed
+pause that followed runs out.</p>
+<p>Read a row as: when the event arrives and its condition holds, the five flags
+move as the cells say, the new state is published with that reason, and the
+engine performs the last column. A row whose condition does not hold is not a
+transition at all -- nothing is published and nothing is touched.</p>
+<p><code>--</code> is "left alone", and it is load-bearing rather than lazy: an operator halt
+on top of a live volatility pause leaves the pause deadline where it is, and a
+closed session leaves the halt underneath it untouched, so reopening returns to
+exactly the state the close interrupted.</p>
+<p>The table below is GENERATED from the code. <code>test_venue_engine_session</code>
+regenerates it and fails if what is committed here differs, so the written
+automaton cannot drift from the running one; <code>LRVX_UPDATE_SESSION_TABLE=1</code>
+rewrites it in place.</p>
+<!-- generated: session transitions -->
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Fires</th>
+<th>Halt</th>
+<th>Pause deadline</th>
+<th>Auction</th>
+<th>Session closed</th>
+<th>Delisted</th>
+<th>Published as</th>
+<th>The engine also</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Halt</code></td>
+<td>always</td>
+<td>set</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td><code>Administrative</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td><code>Resume</code></td>
+<td>always</td>
+<td>clear</td>
+<td>clear</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td><code>Administrative</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td><code>HaltAndCancelAll</code></td>
+<td>always</td>
+<td>set</td>
+<td>clear</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td><code>Administrative</code></td>
+<td>pulls the book, after the status</td>
+</tr>
+<tr>
+<td><code>BeginPreOpen</code></td>
+<td>always</td>
+<td>--</td>
+<td>--</td>
+<td>set</td>
+<td>--</td>
+<td>--</td>
+<td><code>Auction</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td><code>OpenContinuous</code></td>
+<td>always</td>
+<td>--</td>
+<td>--</td>
+<td>clear</td>
+<td>--</td>
+<td>--</td>
+<td><code>Auction</code></td>
+<td>uncrosses, before the flags move</td>
+</tr>
+<tr>
+<td><code>ResumeAuction</code></td>
+<td>always</td>
+<td>clear</td>
+<td>clear</td>
+<td>set</td>
+<td>--</td>
+<td>--</td>
+<td><code>Auction</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td><code>CloseSession</code></td>
+<td>always</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td>set</td>
+<td>--</td>
+<td><code>Session</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td><code>OpenSession</code></td>
+<td>always</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td>clear</td>
+<td>--</td>
+<td><code>Session</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td><code>Delist</code></td>
+<td>not already delisted</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td>set</td>
+<td><code>Administrative</code></td>
+<td>pulls the book, after the status</td>
+</tr>
+<tr>
+<td><code>Relist</code></td>
+<td>always</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td>clear</td>
+<td><code>Administrative</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td><code>LuldBreach</code></td>
+<td>always</td>
+<td>set</td>
+<td>set</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td><code>LuldBreach</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td><code>LuldPauseElapsed</code></td>
+<td>halted, with a deadline that has passed</td>
+<td>clear</td>
+<td>clear</td>
+<td>--</td>
+<td>--</td>
+<td>--</td>
+<td><code>LuldPauseElapsed</code></td>
+<td>--</td>
+</tr>
+</tbody>
+</table>
+<!-- end generated: session transitions -->
+
+<p>The published state itself is not a sixth flag: it is ranked from the five, in
+the order this table's columns are read backwards -- delisting outranks the
+closed session, which outranks the auction phase, which outranks the halt, and
+a halt with a deadline is the timed pause rather than an operator halt. A
+transition reaches the feed only when the state it produces differs from the
+last one published, so a subscriber sees transitions and only transitions.</p>
+<p>The snapshot clone (<code>cloneForSnapshot</code>) copies the auction phase, the pause
+deadline, the session boundary and the delisting flag, so a checkpoint taken
+while an instrument is delisted restores it delisted.</p>
+<h3 id="admission-profiles">Admission profiles<a class="headerlink" href="#admission-profiles" title="Permanent link">&para;</a></h3>
+<p>Counterparties have different rights. One routes flow it manages itself and
+should never leave an order resting here; another posts and pulls quotes, where
+cancel/replace is the main operation. The rights are set per account and
+checked on entry.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>allowedTypes</code></td>
+<td>bitmask over <code>OrderType</code>; 0 = no restriction</td>
+</tr>
+<tr>
+<td><code>allowedTif</code></td>
+<td>bitmask over <code>TimeInForce</code>; 0 = no restriction</td>
+</tr>
+<tr>
+<td><code>deny</code></td>
+<td><code>DenyResting</code>, <code>DenyAmend</code>, <code>DenyCancel</code>, <code>DenyQuote</code>, <code>DenyNewOrder</code></td>
+</tr>
+</tbody>
+</table>
+<p>Both bitmaps are 32 bits wide and indexed by the enum value, so a profile that
+lists what it permits cannot have listed a value the enum does not name: such
+an order is <code>OrderTypeNotPermitted</code> / <code>TimeInForceNotPermitted</code> without the
+shift ever being taken. An order type outside <code>OrderType</code> is refused by
+<code>validate()</code> regardless of any profile, with its own reason
+(<code>UnknownOrderType</code>) -- the price, tick and band checks there are written for
+a <code>LIMIT</code>, so a type the venue cannot name would otherwise reach the book at
+a price nothing had looked at.</p>
+<p>An absent profile permits everything, so an engine never given one behaves as
+before. <code>DenyResting</code> rejects GTC, GTD and post-only on admission rather than
+killing the residual afterwards: an order resting here that the sender does not
+track will not be reconciled, and nothing looks wrong until it fills. The
+rejection happens before the <code>clientOrderId</code> is consumed, so a corrected
+message can be resent under the same id.</p>
+<p>It also refuses <strong>every</strong> order from that counterparty while the instrument is
+in a call auction, whatever its time in force. An auction rests everything it
+admits -- there is no matching to be immediate about, so an IOC accumulates in
+the book like any other order and sits there until the uncross. A counterparty
+that does not track resting orders therefore cannot take part in one: its order
+would sit in the book for the length of the auction while it believes the order
+filled or died on arrival, and at the uncross it could trade against its own
+other side.</p>
+<p>The profile arrives as the sequenced <code>SetAdmissionProfile</code> command
+(control-plane verb of the same name), so it journals, survives checkpoints,
+enters the state hash and replays. Like every other configuration record it
+is addressed by <code>symbol</code> and ignored by an engine that is not the one named. <code>MatchingEngine::admissionRejects()</code> counts
+the rejections; a non-zero value means a counterparty is sending something its
+profile does not allow.</p>
+<h2 id="order-types-and-time-in-force">Order types and time in force<a class="headerlink" href="#order-types-and-time-in-force" title="Permanent link">&para;</a></h2>
+<p><code>NewOrder</code> carries the full venue vocabulary:</p>
+<ul>
+<li><strong>Types</strong>: <code>LIMIT</code>, <code>MARKET</code>, <code>STOP_MARKET</code>, <code>STOP_LIMIT</code>, <code>TAKE_PROFIT*</code>,
+  <code>TRAILING_STOP</code>.</li>
+<li><strong>TIF</strong>: <code>GTC</code>, <code>IOC</code>, <code>FOK</code>, <code>GTD</code> (with <code>expiryNs</code>), <code>POST_ONLY</code>.</li>
+<li><strong>Iceberg.</strong> <code>visibleQuantity</code> shows a peak and hides the rest; the hidden
+  reserve is real liquidity for matching and stays out of the public feed.</li>
+<li><strong>Peg.</strong> <code>PegRef::{Bid,Ask,Mid}</code> plus a signed offset; repriced at each
+  submit boundary, tick-aligned, clamped so it never crosses. The clamp steps
+  back by one tick, so an instrument that declares <strong>no tick</strong>
+  (<code>tickSize == 0</code>) cannot carry a peg at all: it is refused at admission with
+  <code>PegRequiresTick</code>. Taking it instead would put the order ON the opposite
+  touch -- the clamp's distance being zero -- and a reprice re-rests through
+  <code>addResting</code>, which runs no matching pass, so the instrument would quote
+  bid == ask and nobody could trade out of it. The reason is its own rather
+  than <code>TickSizeViolation</code>: no price the client could send would help, because
+  what is missing belongs to the instrument.</li>
+<li><strong>OCO.</strong> <code>ocoGroup</code>; a fill on one leg cancels its siblings. A leg that
+  leaves the venue by any other door -- refused at admission, refused by the
+  matcher, canceled as an unfilled residual, expired, pulled -- leaves the
+  group with it, so a later reuse of its order id is never cancelled in its
+  name.</li>
+<li><strong>Reduce-only.</strong> Perp orders that may only reduce a position, re-capped on
+  submit, trigger, modify -- and re-measured at fill time against the position
+  as it is then (see <a href="../risk/">Risk</a>). The cap counts what the account already
+  has resting reduce-only on that side, so several of them cannot queue up
+  against a position only one of them can close.</li>
+</ul>
+<h3 id="what-a-modify-preserves">What a modify preserves<a class="headerlink" href="#what-a-modify-preserves" title="Permanent link">&para;</a></h3>
+<p><code>ModifyOrder</code> at the same price, shrinking, reduces in place and keeps time
+priority. Any other amend re-enters the order at the tail of its level, and it
+re-enters carrying everything the original was admitted with: self-trade
+prevention, reduce-only, post-only, last look and the iceberg peak. Two of those cost
+real money when they go missing. A post-only order that re-enters as a plain
+aggressor lifts the book it was guaranteed never to touch. An iceberg that
+re-enters without its peak publishes the whole reserve it was hiding.</p>
+<p><code>newQty</code> is the new leaves target. On an iceberg that means the TOTAL
+remaining, displayed peak plus hidden reserve -- the same number an execution
+report gives as that order's <code>leavesQty</code>. The peak itself is preserved; there
+is no way to change it without a fresh order.</p>
+<p>An amend is decided before anything is touched. Ownership, the new quantity,
+the lot, the tick and the band are all checked while the order is still exactly
+as it was, and only an amend that will be applied resolves the order's open
+last-look holds. A refused amend leaves the order resting, its holds open and
+its reservation intact -- the holds are the part that used to go: they were
+rejected before the price was ever looked at, so an off-tick amend killed them
+and then refused itself.</p>
+<p>A re-entering order goes back through matching, so the amend can end any way a
+new order can: rest, fill, be refused (<code>OrderRejected</code> -- post-only crossing is
+the usual one), or be killed outright (<code>OrderCanceled</code>, from self-trade
+prevention or a fill-time risk block). The engine reports all four. The order
+left the book the moment the amend was accepted, so reporting only the resting
+case would ack a working order that is not on the book, hold its collateral
+reserved, and keep its slot in <code>maxOpenOrders</code> while cancel answers
+<code>UnknownOrder</code>.</p>
+<h3 id="fill-or-kill-and-the-depth-that-cannot-fill-it">Fill-or-kill and the depth that cannot fill it<a class="headerlink" href="#fill-or-kill-and-the-depth-that-cannot-fill-it" title="Permanent link">&para;</a></h3>
+<p>A <code>FOK</code> either fills in full or never exists. Some of the depth visible in the
+book cannot fill one, and the plan below subtracts it before answering:</p>
+<ul>
+<li>same-STP-scope makers, which the sweep cancels or decrements instead of
+  trading;</li>
+<li>last-look makers, which are non-firm (see the last-look section below);</li>
+<li>depth a fill-time risk limit will not let trade. This one is measured maker
+  by maker in sweep order, because each prospective print moves the position
+  the next maker is measured against: two reduce-only sells of 10 against a
+  long of 10 look like depth 20 to the book and are worth 10 at the fill.</li>
+</ul>
+<h4 id="the-decision-is-made-once">The decision is made once<a class="headerlink" href="#the-decision-is-made-once" title="Permanent link">&para;</a></h4>
+<p>A <code>FOK</code> walks its crossing range before it prints anything and writes down the
+size of every bite the sweep will take. If those bites do not add up to the
+whole order, it is refused and nothing prints. If they do, the sweep spends
+that plan and does not ask the risk limits again.</p>
+<p>Asking again mid-sweep looks safer and is not. The second answer describes a
+position the earlier prints have already moved, and if it disagrees there is
+nothing to do about it: a venue does not un-print a trade that is already on
+the public feed, journaled and settled. The order would print its first half
+and kill the second, which is the outcome all-or-none exists to rule out.
+Deciding once, before anything is printed, removes that gap instead of
+narrowing it. The same goes for a position moved by something outside the
+sweep -- a liquidation, a funding settlement, a close on another instrument.</p>
+<p>The plan walks only as far as the order's own quantity. Depth past that point
+is depth the sweep never reaches, and counting simulated position moves that
+will not happen is how an order that fills perfectly well gets refused.</p>
+<p>The other way to close the gap was to refuse any <code>FOK</code> whose crossing range
+holds a risk-limited maker at all. On a randomised perp workload (200,000
+commands, three seeds) that rule would have refused 21.8% to 22.6% of the
+all-or-none orders that fill in full today -- better than one in five honest
+orders, to remove an outcome the plan removes for nothing.</p>
+<p>Both matching policies run that plan and both carry the same safety net behind
+it: whatever it concluded, a <code>FOK</code> residual is killed with
+<code>FillOrKillResidual</code> rather than left resting as a GTC.</p>
+<h2 id="the-engine">The engine<a class="headerlink" href="#the-engine" title="Permanent link">&para;</a></h2>
+<p><code>MatchingEngine&lt;Book&gt;</code> owns the lifecycle around the matcher: validation, risk
+gates, stops, expiry, pegs, auctions, clearing, and event emission.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">SymbolConfig</span><span class="w"> </span><span class="n">cfg</span><span class="p">;</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">cfg</span><span class="p">.</span><span class="n">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">cfg</span><span class="p">.</span><span class="n">tickSize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Price</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mf">0.01</span><span class="p">);</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">cfg</span><span class="p">.</span><span class="n">minPrice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Price</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span><span class="w">      </span><span class="c1">// 0 = unchecked</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">cfg</span><span class="p">.</span><span class="n">maxPrice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Price</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mi">1000</span><span class="p">);</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">cfg</span><span class="p">.</span><span class="n">baseAsset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">cfg</span><span class="p">.</span><span class="n">quoteAsset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">MatchingEngine</span><span class="o">&lt;</span><span class="n">MatchingBook</span><span class="o">&gt;</span><span class="w"> </span><span class="n">venue</span><span class="p">(</span><span class="n">cfg</span><span class="p">,</span><span class="w"> </span><span class="p">[](</span><span class="k">const</span><span class="w"> </span><span class="n">OutboundEvent</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">publish</span><span class="p">(</span><span class="n">e</span><span class="p">);</span><span class="w"> </span><span class="p">});</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">venue</span><span class="p">.</span><span class="n">submit</span><span class="p">(</span><span class="n">InboundCommand</span><span class="p">{</span><span class="n">order</span><span class="p">},</span><span class="w"> </span><span class="n">tsNs</span><span class="p">);</span>
+</span></code></pre></div>
+<p>Every state-mutating input is an <code>InboundCommand</code>: <code>NewOrder</code>, <code>CancelOrder</code>,
+<code>ModifyOrder</code>, <code>MassCancel</code>, <code>Quote</code>, <code>QuoteLadder</code>, <code>LastLookDecision</code>,
+<code>SetMark</code>, <code>ApplyFunding</code>, <code>AdminCmd</code>, <code>TimeTick</code> (idle time sweep). That is
+what makes deterministic replay possible; see
+<a href="../runtime/">Runtime and recovery</a>.</p>
+<h3 id="where-the-code-lives">Where the code lives<a class="headerlink" href="#where-the-code-lives" title="Permanent link">&para;</a></h3>
+<p><code>MatchingEngine&lt;Book&gt;</code> is a template for exactly one reason: one of its
+members is the resting book, and there is more than one book. Everything else
+about it -- what an order is allowed to be, what a hold costs, who may send
+what, what a print settles into, what a snapshot says -- is the same code
+whichever book is underneath, and none of it has any business being
+re-instantiated per book type.</p>
+<p>So the engine is three things and a list. The three: a <strong>dispatcher</strong>
+(<code>submit</code> reads a command and calls the handler for it), the <strong>book</strong>, and the
+<strong>matcher</strong> that crosses against it. The list is its components. What is left
+in the template is the code that touches the book or the matcher -- <code>onNew</code>,
+<code>onCancel</code>, <code>onModify</code>, <code>onQuote</code>, <code>onQuoteLadder</code>, <code>onStop</code>, <code>validate</code>, the cross path,
+<code>runAuction</code>, <code>repeg</code>, the expiry and mass-cancel loops -- plus the instrument
+config it owns and a thin delegate for every published method.</p>
+<p>Two kinds of file sit in <code>lrvx-venue/engine/</code>:</p>
+<ul>
+<li><strong><code>*.inl</code> -- fragments of the template.</strong> <code>matching_engine.h</code> is the class:
+  the nested types, the data members, and a declaration for every method, in
+  one list. The <strong>definitions</strong> sit in the fragments, one file per section,
+  included at the bottom of the header. Nothing is conditional and nothing is
+  optional -- the header is not usable without them, and they are not usable
+  without it (each one refuses a direct <code>#include</code>). The split buys one thing:
+  a change to clearing is a diff in <code>clearing.inl</code> rather than a diff
+  somewhere inside five thousand lines shared with everything else.</li>
+<li><strong><code>*.h</code> -- components.</strong> An ordinary class, not a template. The engine owns
+  one as a member, binds it to <code>cfg_</code> and the event sink where it needs them,
+  and calls it from the places its methods used to be called from. Each
+  compiles on its own and is tested on its own, without an engine, a book or a
+  matcher -- and each exists ONCE in the binary however many book types the
+  engine is instantiated with.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Fragment</th>
+<th>What is defined there</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>engine/dispatch.inl</code></td>
+<td>construction, <code>submit</code>, <code>tick</code>, the engine's own accessors and config setters</td>
+</tr>
+<tr>
+<td><code>engine/validate.inl</code></td>
+<td><code>validate</code>, <code>validateConditional</code>, admission, the perp risk gate, fill limits, <code>onNew</code></td>
+</tr>
+<tr>
+<td><code>engine/session.inl</code></td>
+<td>the session transition reaching the feed and the book: <code>applySession</code>, <code>publishStatus</code>, <code>cancelEntireBook</code>, <code>runAuction</code></td>
+</tr>
+<tr>
+<td><code>engine/orders.inl</code></td>
+<td>stops and triggers, <code>onModify</code>, <code>onCancel</code>, order ownership</td>
+</tr>
+<tr>
+<td><code>engine/publications.inl</code></td>
+<td>the engine's side of the publications: <code>publishDerivatives</code>, the mass-cancel loop, the per-account index forwarding</td>
+</tr>
+<tr>
+<td><code>engine/quote_mmp.inl</code></td>
+<td><code>onQuote</code>, <code>onQuoteLadder</code>, the MMP enforcement pass</td>
+</tr>
+<tr>
+<td><code>engine/ledger_fees.inl</code></td>
+<td>reservations, deposits/withdrawals, <code>settleTrade</code></td>
+</tr>
+<tr>
+<td><code>engine/clearing.inl</code></td>
+<td>the engine's side of clearing: the published methods, <code>settlePerp</code>, the order-IM moves</td>
+</tr>
+<tr>
+<td><code>engine/checkpoint.inl</code></td>
+<td><code>stateHash</code>, <code>configHash</code>, <code>writeSnapshot</code>, <code>cloneForSnapshot</code>, and the helpers for the state no component owns</td>
+</tr>
+<tr>
+<td><code>engine/checkpoint_restore.inl</code></td>
+<td><code>applySnapshotRecord</code>, <code>applySnapshotBegin</code>, <code>applyComponentRestore</code> and the <code>applyRestore*</code> handlers</td>
+</tr>
+<tr>
+<td><code>engine/expiry_pegs.inl</code></td>
+<td>the GTD expiry sweep, the peg reprice pass, the OCO sibling cancels</td>
+</tr>
+<tr>
+<td><code>engine/last_look.inl</code></td>
+<td>the engine's side of the last-look seam (see below)</td>
+</tr>
+</tbody>
+</table>
+<h4 id="the-components">The components<a class="headerlink" href="#the-components" title="Permanent link">&para;</a></h4>
+<p>Each row is a class that used to be loose members and loose methods of
+<code>MatchingEngine&lt;Book&gt;</code>. The third column is the division that decides every
+one of them: the component holds the state and reaches the verdict, the engine
+keeps the loop, because the loop is what needs the book, the ledger and the
+sink.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Header</th>
+<th>What it owns</th>
+<th>What stayed in the template</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>engine::Credit</code></td>
+<td><code>engine/credit.h</code></td>
+<td>the admission table and the entitlement gate, the external credit hook, buying-power reservations, the per-fill perp risk allowance</td>
+<td><code>validate</code> and <code>onNew</code> (hot path, direct calls); <code>restingReduceOnlyRaw</code> and <code>perpRiskGate</code>, which read the book and the positions; the public setters as delegates</td>
+</tr>
+<tr>
+<td><code>engine::Clearing</code></td>
+<td><code>engine/clearing.h</code></td>
+<td>perp positions, the funding calendar, liquidations, ADL, force-close, the money that moves on all of it</td>
+<td><code>consumeOrderIM</code> / <code>releaseOrderIM</code> (they read the order reservations); <code>settlePerp</code>; the point at which <code>DerivativesUpdated</code> goes out; the published surface as delegates</td>
+</tr>
+<tr>
+<td><code>engine::LastLook</code></td>
+<td><code>engine/last_look.h</code></td>
+<td>the holds, the decision on each, the outcomes and the conduct statistics</td>
+<td><code>LastLookHost</code> -- the three book operations and the facts only the engine can answer -- plus one-line delegates</td>
+</tr>
+<tr>
+<td><code>engine::Session</code></td>
+<td><code>engine/session.h</code></td>
+<td>the trading state, the transition table that moves it, the memo of what was last published</td>
+<td><code>applySession</code>, <code>publishStatus</code> / <code>emitStatus</code>, <code>cancelEntireBook</code>, <code>runAuction</code></td>
+</tr>
+<tr>
+<td><code>engine::Publications</code></td>
+<td><code>engine/publications.h</code></td>
+<td>the derivatives and cancel-report formatting, and the <code>account -&gt; resting ids</code> index</td>
+<td>the mass-cancel loop: cancelling is reservations, positions and holds as well as an id</td>
+</tr>
+<tr>
+<td><code>engine::Fees</code></td>
+<td><code>engine/fees.h</code></td>
+<td>the fee schedule, what a print costs each side, and the ledger move behind the report</td>
+<td>the three settlement sites that ask it (ledgerless, spot, perp); <code>setFeeSchedule</code> as a delegate</td>
+</tr>
+<tr>
+<td><code>engine::OcoBook</code></td>
+<td><code>engine/oco.h</code></td>
+<td>group membership in both directions, the groups a fill decided, and which members lost</td>
+<td><code>processOco</code> and <code>cancelOcoSibling</code>: the book, the reservation and the report</td>
+</tr>
+<tr>
+<td><code>engine::QuoteLegs</code></td>
+<td><code>engine/quote.h</code></td>
+<td>the child orders a quote names, and every field each of them carries</td>
+<td><code>onQuote</code>: ownership, dedup, cancelling the two prior legs, submitting the new ones</td>
+</tr>
+<tr>
+<td><code>engine::QuoteLadderLegs</code></td>
+<td><code>engine/quote.h</code></td>
+<td>rung <code>i</code> of a ladder as the <code>Quote</code> it is: the ids from the ladder's id block, the rung's prices and sizes, and every flag the ladder carries</td>
+<td><code>onQuoteLadder</code>: the dedup slot the ladder consumes once, and the loop that walks the quote path per rung</td>
+</tr>
+<tr>
+<td><code>engine::Integrity</code></td>
+<td><code>engine/integrity.h</code></td>
+<td>the two refusals that must never happen -- a snapshot record in live traffic, a trade that could not settle -- counted and reported</td>
+<td>the two published counters as delegates</td>
+</tr>
+<tr>
+<td><code>ClOrdIdWindow</code></td>
+<td><code>engine/clordid_window.h</code></td>
+<td>the per-account clientOrderId dedup index in two rotating generations, and the verdict on a resend</td>
+<td><code>clOrdIdDuplicate</code>, one line; the reject the verdict causes</td>
+</tr>
+<tr>
+<td><code>StpState</code></td>
+<td><code>engine/stp.h</code></td>
+<td>self-trade-prevention modes of resting orders, the scope two accounts are compared in, the verdict on a self-matching auction pair</td>
+<td><code>runAuction</code> executing that verdict: decrement or cancel</td>
+</tr>
+<tr>
+<td><code>ExpiryBook</code></td>
+<td><code>engine/expiry.h</code></td>
+<td>GTD deadlines, and which orders are due at a given sequencer time</td>
+<td><code>expireOrders</code>: the book, the stop book, the holds, the events</td>
+</tr>
+<tr>
+<td><code>PegBook</code></td>
+<td><code>engine/pegs.h</code></td>
+<td>peg specs, the order a reprice pass walks them in, the target price for a given market</td>
+<td><code>repeg</code>: cancel, re-price, re-reserve, re-add, report</td>
+</tr>
+<tr>
+<td><code>MmpState</code></td>
+<td><code>engine/mmp.h</code></td>
+<td>per-account fill windows, the breach list, the re-arm after a pull</td>
+<td><code>mmpEnforce</code>: <code>cancelAllForAccount</code> and <code>MmpTriggered</code></td>
+</tr>
+<tr>
+<td><code>sortedKeysOf</code></td>
+<td><code>engine/sorted_keys.h</code></td>
+<td>the canonical key traversal every hash and snapshot section uses</td>
+<td>--</td>
+</tr>
+</tbody>
+</table>
+<p>Nothing in that table is virtual and nothing in it is a template (the one
+exception is described next). Where a component has to call back into engine
+state that is not its own, the callback arrives as <code>Hooks</code> -- a context
+pointer plus plain function pointers, built from captureless lambdas, so the
+seam costs an indirect call and no vtable. <code>SymbolConfig</code> lives in
+<code>lrvx-venue/symbol_config.h</code> rather than at the top of <code>matching_engine.h</code> so
+that a component can hold it by reference without including the engine that
+includes the component.</p>
+<h4 id="the-seam-to-the-book">The seam to the book<a class="headerlink" href="#the-seam-to-the-book" title="Permanent link">&para;</a></h4>
+<p>One component does reach the book, and the shape of that reach is the reason
+the rest of them do not. <code>engine::LastLook</code> touches the resting book exactly
+three times -- lift an order off its level, put one back at the TAIL of its
+level, read a maker as it rests now -- and all three are on the decision path,
+which runs at maker latency rather than at matching latency.</p>
+<p>That seam is a <strong>concept</strong>, <code>engine::LastLookHost</code>, not an abstract base
+class. Both were written and both were measured over 100k hold/resolve cycles
+through a real engine: the virtual version cost 3-5% on the accept path,
+because thirteen host operations per cycle each went through a vtable; the
+concept version inlines and costs under 2%, inside the machine's own noise.
+So <code>engine::LastLook</code> is an ordinary class with ordinary state, and only its
+methods that take the host are templates. Its host,
+<code>MatchingEngine&lt;Book&gt;::LastLookHost</code>, lives in <code>engine/last_look.inl</code> and is
+thirteen operations wide: three on the book, two on the event sink (the raw
+one and the tracking wrapper), and eight facts nobody but the engine can
+answer -- the reference price, the live last-look config, whether the hold is
+still allowed, the next trade sequence number, the reservation release on a
+refused leg, the cleanup of a finished order, the STP mode to remember, and
+the adoption of a resting taker.</p>
+<p>Every other component takes the opposite deal: it answers a narrower question
+and never sees the book at all. Where the book does come into an answer, the
+engine measures it and passes the number in -- the reduce-only quantity an
+account already has resting, the position a fill limit is judged against, the
+market a peg target is computed from.</p>
+<h4 id="the-checkpoint-is-composition">The checkpoint is composition<a class="headerlink" href="#the-checkpoint-is-composition" title="Permanent link">&para;</a></h4>
+<p>Each component carries its own snapshot records: <code>hash*</code>, <code>write*</code> and
+<code>restore*</code> methods the engine calls at the point in its traversal where those
+records have always been written. The tags, the record order and the bytes are
+unchanged -- <code>kSnapshotFormatVersion</code> did not move -- and the golden replay
+(<code>venue/tests/golden/replay_hashes.txt</code>) is what proves it.</p>
+<p>So the four checkpoint functions are calls and little else. <code>stateHash</code> and
+<code>writeSnapshot</code> are a list in file order -- <code>clearing_.hashFunding</code>,
+<code>credit_.hashAdmission</code>, <code>stp_.hashInto</code>, <code>pegs_.hashInto</code>,
+<code>lastLook_.hashInto</code>, <code>mmp_.hashInto</code>, <code>clOrdIds_.hashInto</code>, and their
+<code>write*</code> twins. <code>applySnapshotRecord</code> is a branch per record that hands it to
+whoever keeps that state (<code>applyComponentRestore</code> holds the ones that need
+nothing from the engine but a single check). <code>cloneForSnapshot</code> is one copy
+per component. Two facts a component cannot answer arrive as arguments rather
+than as a dependency: the maker-tracking flag a hold carries comes in as a
+callable (<code>lastLook_.hashInto(h, tracked)</code>), and the matcher's firm-group
+table is read through by <code>engine::StpState</code>, which is already the component
+that reads it for a matching decision.</p>
+<p>What is left in the engine is the state that belongs to no component: the
+book, the stop book, the instrument's own config records and the bound
+ledger. It sits behind a pair of helpers per direction --
+<code>hashBookAndStops</code> / <code>writeBookAndStops</code>, <code>hashBalances</code> / <code>writeBalances</code>,
+and <code>writeConfigSection</code> -- rather than one, because the remainder is not
+contiguous in the file: the config records lead it, the book sits in the
+middle, the balances close it, and that order IS the format. One traversal,
+<code>sortedBalances</code>, serves both the hash and the snapshot so the two cannot
+drift apart.</p>
+<p>The record ORDER is pinned by a test of its own. The state hash says the
+state is what it was and the golden replay says the behaviour is; neither
+sees the layout, because restore is driven by each record's own tag rather
+than by its position. So <code>venue/tests/test_venue_checkpoint_layout.cpp</code>
+writes a snapshot of an engine with every section non-empty and compares the
+sequence of record names against a reference recorded before the functions
+were composed. Swap two sections and it is the one thing that goes red.</p>
+<h4 id="what-holds-the-split-honest">What holds the split honest<a class="headerlink" href="#what-holds-the-split-honest" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>What it would catch</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>venue/tests/golden/replay_hashes.txt</code></td>
+<td>any change at all to the event stream or the state hash over the corpus</td>
+</tr>
+<tr>
+<td><code>venue/tests/support/engine_surface.h</code></td>
+<td>a published method that changed shape or went missing, at compile time</td>
+</tr>
+<tr>
+<td><code>venue/tests/test_venue_checkpoint_layout.cpp</code></td>
+<td>two snapshot sections swapped -- invisible to everything else</td>
+</tr>
+<tr>
+<td><code>venue/tests/test_venue_engine_*.cpp</code></td>
+<td>each component, asked directly, without an engine</td>
+</tr>
+<tr>
+<td><code>scripts/check_gate_reachability.py</code></td>
+<td>an order path that stopped consulting the entitlement gate</td>
+</tr>
+<tr>
+<td><code>scripts/check_iteration_order.py</code></td>
+<td>a container walked without a verdict on whether its order is observable</td>
+</tr>
+</tbody>
+</table>
+<p>The per-component tests are <code>test_venue_engine_credit.cpp</code>,
+<code>test_venue_engine_clearing.cpp</code>, <code>test_venue_engine_last_look.cpp</code>,
+<code>test_venue_engine_session.cpp</code>, <code>test_venue_engine_publications.cpp</code>,
+<code>test_venue_engine_conduct.cpp</code> (the conduct components) and
+<code>test_venue_engine_composition.cpp</code> (fees, OCO, quote legs, the integrity
+counters, and the engine's composition of them).</p>
+<h3 id="pre-trade-risk">Pre-trade risk<a class="headerlink" href="#pre-trade-risk" title="Permanent link">&para;</a></h3>
+<p>Configured on <code>SymbolConfig</code> and adjustable live, so an operator can tighten
+limits during volatility without a restart:</p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Config</th>
+<th>Live setter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tick / lot / min quantity</td>
+<td><code>tickSize</code>, <code>lotSize</code>, <code>minQty</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td>Price band (collar)</td>
+<td><code>minPrice</code>, <code>maxPrice</code></td>
+<td>--</td>
+</tr>
+<tr>
+<td>Fat finger</td>
+<td><code>maxOrderQty</code>, <code>maxOrderNotional</code></td>
+<td><code>setFatFinger</code></td>
+</tr>
+<tr>
+<td>LULD volatility band</td>
+<td><code>luldBps</code>, <code>luldHaltNs</code></td>
+<td><code>setLuldBps</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>maxOrderNotional</code> is measured at the symbol's own <code>priceScale</code>/<code>qtyScale</code>,
+the same arithmetic reservations, margin and fees use, so the gate means the
+same thing on every instrument. Reading the two raws under the compile-time
+scale instead would put the comparison out by a factor of
+<code>(1e8 / priceScale) * (1e8 / qtyScale)</code> -- a coarser scale switches the
+fat-finger check off, a finer one refuses everything. See
+<a href="../../explanation/per-symbol-scale/">per-symbol scale</a>.</p>
+<p>LULD (limit-up/limit-down) gates both sides of a trade. A limit order priced
+outside the band around the last price is rejected pre-trade (<code>LuldBreach</code>) and
+trips a timed pause. A market order has no limit to gate it, so it can sweep the
+book and print outside the band; that breaching print stands, but it trips the
+same pause so subsequent trading halts (the exchange-style volatility
+interruption) -- a stop cascade that prints out of band trips it the same way.
+Before the first trade there is no reference price, so no band exists yet.</p>
+<p>| Max resting orders per account | <code>maxOpenOrders</code> | <code>setMaxOpenOrders</code> |
+| Max position (perp) | <code>maxPositionQty</code> | <code>setPositionLimit</code> |
+| Margin requirement | <code>initialMarginBps</code>, <code>maintenanceMarginBps</code> | <code>setMarginBps</code> |
+| Halt | <code>halted</code> | <code>setHalted</code> |</p>
+<h3 id="market-maker-features">Market-maker features<a class="headerlink" href="#market-maker-features" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Last look.</strong> <code>lastLookWindowNs</code>: the maker holds a fill and answers with
+  <code>LastLookDecision</code>. See the full lifecycle below.</li>
+<li><strong>MMP.</strong> <code>setMmp(account, qtyLimit, windowNs)</code>: if an account is filled
+  faster than its limit inside the window, its book is pulled and
+  <code>MmpTriggered</code> fires.</li>
+<li>
+<p><strong>Mass quote.</strong> <code>Quote</code> replaces both sides of a two-sided quote atomically,
+  by id: the engine cancels <code>bidId</code> and <code>askId</code> and re-posts them at the new
+  prices, so a maker keeps one pair of ids and reuses it. Atomically also
+  against the instrument's state: the quote asks whether the instrument admits
+  order entry at all BEFORE it pulls anything, so a quote sent into a halted or
+  closed instrument is refused whole and leaves the maker's existing quote
+  resting. Reading that gate only per leg, on the way in, pulled the old quote
+  and then refused both replacements. Both legs inherit the
+  quote's <code>stp</code>, <code>lastLook</code>, <code>postOnly</code>, <code>reduceOnly</code>, <code>tif</code>,
+  <code>visibleQuantity</code> and <code>expiryNs</code>, so a quote has every control a single
+  order has. <code>postOnly</code> is the one a quote needs most: a maker repricing into a
+  market that has already moved crosses the book with its near leg and pays to
+  take the liquidity it meant to provide. Without these fields a maker had to
+  choose between the primitive built for two-sided quoting and the controls
+  that make two-sided quoting safe.</p>
+</li>
+<li>
+<p><strong>Ladder.</strong> <code>QuoteLadder</code> replaces a maker's WHOLE set of levels on one
+  symbol in one command: up to 8 rungs a side, one journal record, one
+  sequencer slot. It is defined as the <code>Quote</code>s it stands for -- rung <code>i</code> is a
+  quote under <code>bidIdBase + i</code> / <code>askIdBase + i</code>, carrying every flag the
+  ladder carries -- and the engine runs the quote path once per rung, in
+  order, so the legs, the ids, the events and their sequence are what the 8
+  separate quotes would have produced. <code>engine::QuoteLadderLegs</code> is that
+  reading; there is no second matching path.</p>
+</li>
+</ul>
+<p>The rungs past <code>levels</code> are quotes with no size on either side, which is how
+  a ladder that got SHORTER takes down the levels it stopped naming. That is
+  the one thing a set of independent quotes could not do: the ladder owns a
+  block of ids, so the engine can name a level the submitter no longer names.
+  A <code>levels</code> past the end of the block is clamped rather than refused, and
+  clamped by the same helper the journal writer and the SBE decoder ask, so a
+  live run and its replay cannot disagree about how long the record was.</p>
+<p><code>clientOrderId</code> is the name the submitter gave the LADDER: every leg carries
+  it and it consumes one dedup slot, the rule a <code>Quote</code> already applies to its
+  two legs.</p>
+<p>The record is as long as the rungs it names, not as long as the block --
+  <code>quoteLadderBodySize</code>, the one journaled body whose length is a property of
+  the record rather than of its type. That is what makes the command cheaper
+  rather than merely tidier:</p>
+<table>
+<thead>
+<tr>
+<th>rungs</th>
+<th>ladder</th>
+<th>1 <code>Quote</code> per rung</th>
+<th>saved</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>114 B</td>
+<td>114 B</td>
+<td>1.00x</td>
+</tr>
+<tr>
+<td>3</td>
+<td>178 B</td>
+<td>342 B</td>
+<td>1.92x</td>
+</tr>
+<tr>
+<td>5</td>
+<td>242 B</td>
+<td>570 B</td>
+<td>2.36x</td>
+</tr>
+<tr>
+<td>8</td>
+<td>338 B</td>
+<td>912 B</td>
+<td>2.70x</td>
+</tr>
+</tbody>
+</table>
+<p>(bytes on disk per update, framing and crc included, <code>bench_venue_quote_ladder</code>.)</p>
+<p>An earlier measurement rejected a bulk command on the grounds
+  that "by bytes a bulk command is a wash": one 20-level fixed-width ladder of
+  ~320 bytes against 180-300 for the 3-5 single commands that actually
+  changed. That held for a FIXED-width command, which pays for slots nobody
+  fills. It does not hold for this one, which pays for the rungs it sends.</p>
+<h3 id="last-look-lifecycle">Last-look lifecycle<a class="headerlink" href="#last-look-lifecycle" title="Permanent link">&para;</a></h3>
+<p><code>lastLookWindowNs &gt; 0</code> enables last look venue-wide; <code>0</code> disables it entirely
+(the matcher hook is never installed, so a <code>lastLook</code>-flagged order fills like
+any other maker). When an aggressor hits a resting <code>lastLook</code> maker, the hit
+size is reserved OUT of the book, <code>FillHeld</code> is emitted (with <code>heldId</code>, the
+maker's <code>makerDisplayAfter</code> for the public feed, <code>takerSide</code> -- the
+aggressor's side, the maker's being the opposite one -- the taker's own
+<code>clientOrderId</code>, 0 if it gave none, and <code>cumQty</code>: the taker's
+CONFIRMED fill total as of the moment this hold opened, from any real,
+non-held fill earlier in the same crossing sweep -- never the held quantity
+itself, which is still pending), and the maker has the window to answer
+with <code>LastLookDecision{heldId, accept}</code>.</p>
+<ul>
+<li><strong>Ownership.</strong> Only the maker account that owns the held quote may decide;
+  any other account gets <code>OrderRejected{NotOrderOwner}</code> and the hold stands.</li>
+<li><strong>Accept</strong> prints the trade at the held price/size and settles normally.
+  The decision is all-or-nothing on purpose, and the reason is what a hold
+  <em>is</em>: the quantity was reserved out of the maker's own resting order before
+  the maker was asked. Its inventory for this fill is that order, and the
+  venue is holding all of it — there is no sense in which the maker filled
+  part of it somewhere else. A maker that wants to show less should quote
+  less; one whose appetite changes mid-window says no, and its liquidity
+  returns intact.</li>
+</ul>
+<p>Partial acceptance (<code>acceptQty</code>) is a coherent feature and a deliberate
+  omission rather than an oversight. It would mean "I will honour three of
+  the five you are offering", which is a real liquidity-provider behaviour —
+  and it costs a change to the size of a journaled command (record version
+  and layout fingerprint), an SBE schema version, decode on two more wires,
+  and a second restore path through code where a hold must resolve exactly
+  once. That is a lot of format churn, paid for by everyone with an existing
+  journal, for a behaviour nothing has asked for.
+- <strong>Reject / timeout</strong> (<code>lastLookAcceptOnTimeout=false</code>) destroys no
+  liquidity:
+  - The maker's held quantity returns to its price level <strong>at the tail</strong>
+    (as-if the maker re-entered; time priority is lost). If the maker order was
+    canceled between hold and reject there is nothing to restore -- but the
+    cancel paths below resolve holds <em>first</em>, so that case cannot arise: a
+    missing maker here means it was fully held out of the book, and it is
+    rebuilt.
+  - The taker's held quantity returns and follows the order's TIF: GTC/GTD
+    rest at the taker's limit (tail; combined with any already-resting
+    remainder via <code>OrderModified</code>), IOC/FOK/MARKET residuals are canceled with
+    the matching residual reason. The restored taker rests <strong>passively</strong> -- it
+    does not re-aggress, so the book may be transiently crossed against the
+    rejecting maker until new flow arrives.
+  - <code>FillRejected{heldId, takerId, makerId, price, qty, clientOrderId,
+    cumQty}</code> reports what did not happen; <code>clientOrderId</code> is the taker's own,
+    same rule as <code>FillHeld</code>, and <code>cumQty</code> is the same value <code>FillHeld</code>
+    reported when this hold opened -- a reject settles no trade, so it does
+    not move.
+- <strong>Timeout on a quiet symbol.</strong> Hold expiry runs on every submit AND on
+  <code>tick(nowNs)</code> (idempotent sweep). Under <code>SequencedShard</code>, pass
+  <code>idleSweepIntervalNs &gt; 0</code> to arm the idle sweeper: while holds are open it
+  injects a <code>TimeTick</code> command through the sequenced stream (journaled, so
+  replay reproduces the timeout at the same point).
+- <strong>Cancel-while-held.</strong> Every path that removes or reshapes an order --
+  <code>CancelOrder</code>, <code>ModifyOrder</code>, <code>Quote</code> replace, GTD expiry, OCO, peg reprice,
+  <code>MassCancel</code>/MMP/liquidation (account scope), <code>HaltAndCancelAll</code> (all) --
+  deterministically resolves (rejects) the affected holds FIRST. An accept
+  after the cancel is impossible (<code>UnknownOrder</code>), and reservations release
+  exactly once: the held slice stays reserved until its hold resolves, then
+  either settles (accept) or is released/re-rests (reject).
+- <strong>FOK vs last look.</strong> Last-look liquidity is non-firm: it never counts
+  toward the FOK all-or-none precheck, and a FOK whose crossing range contains
+  ANY last-look maker is rejected <code>FillOrKillUnfulfillable</code> outright -- the
+  sweep is strict price-time, so a last-look maker inside the range could be
+  hit before the FOK completes, and a partial execution followed by a hold
+  would violate all-or-none. A last-look maker priced outside the crossing
+  range does not affect the FOK.
+- <strong>Public feed.</strong> <code>MarketDataPublisher</code> shrinks the maker's level on
+  <code>FillHeld</code> (by <code>makerDisplayAfter</code>) and follows the restore events
+  (<code>OrderModified</code>/<code>OrderAccepted</code>) on reject -- after any sequence of
+  hold/accept/reject the published depth equals the matching book.
+- <strong>Wire.</strong> SBE templates 17 (<code>FillHeld</code>) / 18 (<code>FillRejected</code>) in
+  <code>order-entry-sbe.xml</code>; REST/JSON <code>{"type":"fillHeld"|"fillRejected", ...}</code>.
+  <code>FillHeld</code>'s <code>takerSide</code> is appended after <code>seq</code> at schema version 6, both
+  templates gained a trailing <code>clOrdId</code> at version 7 (after <code>takerSide</code> on
+  <code>FillHeld</code>, after <code>seq</code> on <code>FillRejected</code>), and both gained a further
+  trailing <code>cumQty</code> at version 10 (after <code>clOrdId</code> on both) -- so a
+  version-6 reader skips the later fields via <code>blockLength</code> and a reader
+  looking for <code>seq</code> goes by the frame's own version rather than by a fixed
+  byte offset.
+  FIX has no honest ExecType for a pending held fill, so <code>FillHeld</code> uses the
+  documented custom value <code>150=U</code> and <code>FillRejected</code> uses <code>150=H</code> (Trade
+  Cancel), both with custom tags <code>20001=heldId</code>, <code>20002=makerId</code>, tag <code>11</code>
+  (<code>ClOrdID</code>) carrying the taker's name whenever it gave one -- same rule as
+  every other execution report (see "Client order id dedup" below) -- and tag
+  <code>14</code> (<code>CumQty</code>) carrying the taker's confirmed total as of hold
+  creation.
+- Pro-rata instruments do not honour last look (documented matcher scope
+  limitation), and admission refuses the combination. If one appears anyway
+  (admission bypassed), the pro-rata allocation SKIPS that maker rather than
+  filling it as firm, bumping <code>skippedLastLookProRata()</code> -- see the pro-rata
+  policy above.</p>
+<h3 id="client-order-id-dedup">Client order id dedup<a class="headerlink" href="#client-order-id-dedup" title="Permanent link">&para;</a></h3>
+<p><code>clientOrderId</code> (FIX tag 11, SBE/REST <code>clientOrderId</code>) is deduplicated <strong>per
+account</strong> at the engine: a <code>NewOrder</code> whose <code>clientOrderId</code> was already seen by
+that account rejects with <code>DuplicateClientOrderId</code> and leaves the book
+untouched -- whether the original is still resting, filled, or canceled. That
+is what makes a client resend after an ambiguous disconnect safe.
+<code>clientOrderId == 0</code> means "not set" and is never deduplicated. Every report
+about an order carries it back, including the cancels the venue decides on its
+own -- self-trade prevention in any of its modes, and a resting order pulled
+at fill time by a perp risk limit -- because those are usually the only word
+the owner gets about an order it never cancelled. The dedup
+window is the engine session (uptime): the index is rebuilt by the same
+submits during journal replay, so post-restart behaviour is identical to live;
+rotating/compacting the index is a future checkpoint concern.</p>
+<p>Internal <code>OrderId</code>s (<code>NewOrder.id</code>) are a separate namespace: the engine
+requires them to be <strong>globally unique across accounts</strong> (duplicates reject only
+while the earlier order is alive). Generating unique ids is the
+gateway's/client's responsibility -- that is the honest boundary.</p>
+<h3 id="who-may-act-on-an-order">Who may act on an order<a class="headerlink" href="#who-may-act-on-an-order" title="Permanent link">&para;</a></h3>
+<p><code>CancelOrder</code>, <code>ModifyOrder</code> and <code>Quote</code> address orders by id, and ids are one
+global namespace the client picks numbers in. An id therefore proves nothing
+about who sent the command carrying it. The claim that does carry authorization
+is <code>accountId</code>: <code>GatewaySession</code> overwrites it with the session's authenticated
+account on every account-bearing command, which is what stops a client writing
+someone else's number into the payload. The engine checks that claim against
+the order the command names.</p>
+<ul>
+<li>A command whose <code>accountId</code> does not match the order's owner is refused:
+  <code>CancelRejected{NotOrderOwner}</code> for cancel and modify,
+  <code>OrderRejected{NotOrderOwner}</code> for a quote. A quote is refused whole rather
+  than per leg -- a maker that gets one side replaced and the other refused is
+  quoting a book it did not ask for.</li>
+<li>The refusal happens before any side effect, including resolving the order's
+  open last-look holds. A stranger cannot reach the order at all.</li>
+<li>An id nobody owns stays <code>UnknownOrder</code>. Answering "not yours" for an id that
+  does not exist would turn every rejection into an existence oracle.</li>
+<li><code>accountId == 0</code> is the "unbound / trusted transport" sentinel
+  <code>GatewaySession</code> already documents. An in-process embedder, a replay driver
+  and the single-tenant configuration all act as <code>0</code> and keep full control of
+  every order.</li>
+</ul>
+<p><code>MassCancel</code> needs no such check: it selects by account rather than by id, so
+it can only ever reach the caller's own orders.</p>
+<h3 id="auctions-and-halts">Auctions and halts<a class="headerlink" href="#auctions-and-halts" title="Permanent link">&para;</a></h3>
+<p>Sequenced through <code>AdminCmd</code>, so they survive replay:</p>
+<ul>
+<li><code>BeginPreOpen</code>: accumulate without matching (a crossed book is allowed).</li>
+<li><code>OpenContinuous</code>: uncross at the single volume-maximising price, then resume.</li>
+<li><code>ResumeAuction</code>: clear a halt into a re-opening auction.</li>
+<li><code>HaltAndCancelAll</code>: emergency halt that also pulls the resting book.</li>
+<li><code>Halt</code> / <code>Resume</code>.</li>
+</ul>
+<p>An order admitted into an auction keeps everything it would carry into
+continuous trading: the iceberg peak, the GTD expiry, the peg registration, the
+last-look flag and post-only. The uncross prices on displayed-plus-hidden
+depth, so an iceberg's peak was never load-bearing for price discovery.
+Limiting what the public feed sees is the only thing the peak does, and an
+auction is when a maker wants it most. A GTD order the auction never registers
+for expiry does not expire later either: it outlives the auction, the
+reopening and the rest of the session, and only an explicit cancel removes
+it.</p>
+<h2 id="order-paths-and-the-gates-on-them">Order paths and the gates on them<a class="headerlink" href="#order-paths-and-the-gates-on-them" title="Permanent link">&para;</a></h2>
+<p>Eight paths admit or re-admit an order into matching, and each applies the
+pre-trade checks itself. A stop that fires is not covered by the validation its
+submission passed: the instrument may have halted in between.</p>
+<pre class="mermaid"><code>flowchart TD
+    NEW[NewOrder] --&gt; DEDUP{clOrdId&lt;br/&gt;already used?}
+    DEDUP --&gt;|yes| REJ[Reject]
+    DEDUP --&gt;|no| COND{conditional?}
+
+    COND --&gt;|yes| VC[validateConditional&lt;br/&gt;tick / band / lot on the trigger]
+    VC --&gt;|fails| REJ
+    VC --&gt;|ok| PARK[park in the stop book]
+
+    COND --&gt;|no| CAP{maxOpenOrders}
+    CAP --&gt;|exceeded| REJ
+    CAP --&gt;|ok| PERP[perpRiskGate&lt;br/&gt;reduce-only, position cap]
+    PERP --&gt;|fails| REJ
+    PERP --&gt;|ok| VAL[validate&lt;br/&gt;state, tick, lot, band, LULD]
+    VAL --&gt;|fails| REJ
+    VAL --&gt;|ok| FUND[reserveFunds]
+
+    FUND --&gt; CRED{credit hook&lt;br/&gt;external risk owner}
+    CRED --&gt;|refuses| REJ
+    CRED --&gt;|allows| RES[reserve collateral&lt;br/&gt;if a ledger is bound]
+    RES --&gt;|insufficient| REJ
+    RES --&gt;|ok| MATCH[matcher.cross]
+
+    MARK[mark / last price moves] --&gt; TRIG{instrument&lt;br/&gt;trading?}
+    TRIG --&gt;|halted, closed,&lt;br/&gt;paused, auction| STOPPED[no trigger]
+    TRIG --&gt;|yes| POP[pop triggered stops]
+    POP --&gt; PERP2[perpRiskGate] --&gt; FUND2[reserveFunds] --&gt; MATCH
+
+    MOD[ModifyOrder] --&gt; VM[tick / band / lot] --&gt; HOLDS[resolve open holds]
+    HOLDS --&gt; PERP3[perpRiskGate] --&gt; FUND3[reserveFunds] --&gt; MATCH
+
+    QUOTE[Quote] --&gt; QST{instrument&lt;br/&gt;trading?}
+    QST --&gt;|halted, closed,&lt;br/&gt;delisted| REJ
+    QST --&gt;|yes| HOLDS2[resolve open holds] --&gt; LEGS[each leg through NewOrder]
+    LEGS --&gt; DEDUP
+
+    PEG[reference moves] --&gt; HOLDS3[resolve open holds] --&gt; FUND4[reserveFunds&lt;br/&gt;at the new price] --&gt; BOOK[re-enter book]
+
+    MATCH --&gt; FR{fill-time risk&lt;br/&gt;perp only}
+    FR --&gt;|blocked| PULL[pull the blocked leg]
+    FR --&gt;|ok| TRADE[Trade]
+
+    AUCT[auction uncross] --&gt; FR
+    ACCEPT[hold accepted] --&gt; FR</code></pre>
+<p>The table below is the same thing checked against the source, including gates
+inherited through delegation -- a quote runs every new-order gate because each
+leg goes through that path.</p>
+<table>
+<thead>
+<tr>
+<th>path</th>
+<th>state</th>
+<th>dedup</th>
+<th>tick/lot/band</th>
+<th>perp risk</th>
+<th>credit hook</th>
+<th>collateral</th>
+<th>self-trade</th>
+<th>fill-time risk</th>
+<th>holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>new order</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>conditional (parked)</td>
+<td>yes</td>
+<td>-</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>stop trigger</td>
+<td>yes</td>
+<td>-</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>modify</td>
+<td>yes</td>
+<td>-</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>quote (per leg)</td>
+<td>yes, and once for the whole quote before the replace</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>peg reprice</td>
+<td>-</td>
+<td>-</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>-</td>
+<td>yes</td>
+</tr>
+<tr>
+<td>auction uncross</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>yes</td>
+<td>-</td>
+<td>-</td>
+<td>yes</td>
+<td>yes</td>
+<td>-</td>
+</tr>
+<tr>
+<td>hold accept</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<p>Self-trade prevention applies under both matching policies and in the auction,
+and where it reads the mode from differs. In continuous trading it comes off
+the aggressor: pro-rata resolves every same-scope maker at the level before
+computing the split, price-time resolves each one as the sweep reaches it, and
+both call <code>applySelfTradePrevention</code>. A modify carries the mode of the order it
+replaces. An auction has no aggressor, so the mode comes off each resting order
+(the book stores it for that) and applies from its owner's side.</p>
+<p>Cancel, modify and quote also check that the caller owns the order they name,
+before anything else happens on those paths -- see
+<a href="#who-may-act-on-an-order">Who may act on an order</a>.</p>
+<p>Two blanks in the table are intentional. A peg reprice does not re-check
+instrument state: it only runs on a submit, and that submit is rejected first
+when trading is stopped. The auction uncross does not re-validate prices or
+take collateral, because every order in the book passed both on admission and
+the uncross only picks the clearing price. Both cases are covered by tests.</p>
+<p><code>test_venue_gate_coverage.cpp</code> asserts these as properties rather than as a
+list: each admission path must ask the credit hook for the order it admits,
+nothing may print while the instrument is not trading (under both trigger
+references), and a conditional order must obey tick, band and lot. Removing any
+one guard makes it fail -- verified by mutation, one guard at a time.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

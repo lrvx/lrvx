@@ -1,0 +1,2385 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/venue/perimeter/">
+      
+      
+        <link rel="prev" href="../market-data/">
+      
+      
+        <link rel="next" href="../fix-initiator/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Perimeter - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#perimeter-gateways-protocols-control-plane" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Perimeter
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Venue
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building with/without the venue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build profiles (venue-lite)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Matching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clearing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clearing and the ledger
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../risk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Derivatives risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perimeter
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perimeter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#gateways" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gateways
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sessions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exec-report-delivery-sessionregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exec-report delivery (SessionRegistry)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequencing-and-session-layer-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequencing and session-layer recovery
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#liveness-and-cancel-on-disconnect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liveness and cancel-on-disconnect
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wire-protocols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wire protocols
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hostile-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hostile input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#control-plane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control plane
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Control plane">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verbs-the-deployment-adds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verbs the deployment adds
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Observability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#last-look" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Last look
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#who-may-read-the-engine-while-it-is-matching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who may read the engine while it is matching
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fix-initiator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting over FIX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fix-quoting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quoting over FIX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-agent simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#gateways" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gateways
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sessions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exec-report-delivery-sessionregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exec-report delivery (SessionRegistry)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequencing-and-session-layer-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequencing and session-layer recovery
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#liveness-and-cancel-on-disconnect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liveness and cancel-on-disconnect
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wire-protocols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wire protocols
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hostile-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hostile input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#control-plane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Control plane
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Control plane">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#verbs-the-deployment-adds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verbs the deployment adds
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#observability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Observability">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#last-look" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Last look
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#who-may-read-the-engine-while-it-is-matching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Who may read the engine while it is matching
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="perimeter-gateways-protocols-control-plane">Perimeter: gateways, protocols, control plane<a class="headerlink" href="#perimeter-gateways-protocols-control-plane" title="Permanent link">&para;</a></h1>
+<p>The perimeter is where untrusted bytes become <code>InboundCommand</code>s.</p>
+<h2 id="gateways">Gateways<a class="headerlink" href="#gateways" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Gateway</th>
+<th>Transport</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TcpGateway</code></td>
+<td>length-prefixed frames over TCP</td>
+</tr>
+<tr>
+<td><code>WsGateway</code></td>
+<td>RFC 6455 WebSocket (handshake + frames)</td>
+</tr>
+<tr>
+<td><code>TlsGateway</code></td>
+<td>TLS termination via OpenSSL (optional dependency)</td>
+</tr>
+<tr>
+<td><code>UdpMdPublisher</code> / <code>UdpMdSubscriber</code></td>
+<td>outbound market data over IP multicast</td>
+</tr>
+</tbody>
+</table>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">TcpGateway</span><span class="w"> </span><span class="nf">gw</span><span class="p">([](</span><span class="k">const</span><span class="w"> </span><span class="kt">uint8_t</span><span class="o">*</span><span class="w"> </span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">n</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">SbeOrderEntryCodec</span><span class="o">::</span><span class="n">decode</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">);</span><span class="w"> </span><span class="p">});</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">gw</span><span class="p">.</span><span class="n">start</span><span class="p">(</span><span class="n">port</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="o">&amp;</span><span class="p">](</span><span class="k">const</span><span class="w"> </span><span class="n">InboundCommand</span><span class="o">&amp;</span><span class="w"> </span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">Responder</span><span class="o">&amp;</span><span class="w"> </span><span class="n">respond</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="n">venue</span><span class="p">.</span><span class="n">submit</span><span class="p">(</span><span class="n">cmd</span><span class="p">);</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">});</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">gw</span><span class="p">.</span><span class="n">stop</span><span class="p">();</span>
+</span></code></pre></div>
+<p><code>SocketAcceptor</code> carries the shared accept machinery. Each connection runs its
+loop inside a <code>try/catch</code>: a decode or allocation failure drops that one
+connection and the process keeps running.</p>
+<h2 id="sessions">Sessions<a class="headerlink" href="#sessions" title="Permanent link">&para;</a></h2>
+<p><code>GatewaySession</code> sits between the socket and the engine:</p>
+<ul>
+<li><strong>Authentication.</strong> API-key HMAC logon (<code>apiKey:timestamp</code> signed with the
+  shared secret), constant-time comparison, timestamp-skew window.</li>
+<li>
+<p><strong>Account binding.</strong> A session is bound to a SET of accounts
+  (<code>GatewaySession</code>'s vector constructor, <code>bindAccounts</code>, or <code>setAccounts</code> on
+  a gateway), identity first. The three rules:</p>
+<table>
+<thead>
+<tr>
+<th>the command names</th>
+<th>what happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>no account (<code>0</code>)</td>
+<td>stamped with the session's identity</td>
+</tr>
+<tr>
+<td>one of the session's accounts</td>
+<td>kept</td>
+</tr>
+<tr>
+<td>anything else</td>
+<td>refused, <code>Unauthenticated</code></td>
+</tr>
+</tbody>
+</table>
+<p>Account <code>0</code> as the session's identity is the explicit "unbound / trusted
+transport" sentinel and passes everything through.</p>
+<p>The set exists because the ordinary shape of a client bridge is one
+connection carrying many customers, each with an account of its own.
+Binding a connection to exactly one meant the bridge got reports for that
+one and nothing for the rest; a product on top had to re-derive the
+accounts of every event and fan them out itself.</p>
+<p>The refusal replaces a silent overwrite. Forcing the session's own account
+onto a foreign id was only ever possible because there was exactly one
+account to force, and it was never honest even then: an order aimed at the
+wrong account was quietly placed on a different one and the client was
+told nothing.</p>
+<p>The check reads the account field by the same walk over the command
+variant that stamps it, so a command added later is covered from the day
+it exists. The hand-written list this replaced covered the six order-flow
+commands and missed the ones that move money, close positions and set
+another account's entitlements.
+- <strong>Rate limiting</strong>, per session, via <code>lrvx::RateLimitPolicy</code> -- and the
+  policy is a SETTING (<code>SessionRateLimit</code>, applied with
+  <code>setRateLimit(...)</code> on <code>TcpGateway</code>, <code>TlsGateway</code> and <code>WsGateway</code>), not a
+  fixed profile. <code>SessionRateLimit::off()</code> is one of its values.</p>
+<p>Every session used to be handed <code>RateLimitPolicy::binance_um_futures()</code>:
+50 order actions per 10 seconds, then a three-minute ban after three
+refusals. That is one exchange's retail tier wired in as the only answer
+available. A client bridge that fans a single price move out into a burst
+of amendments is not abusing anything, and against that profile its
+ordinary traffic is a disconnect followed by three minutes of silence.
+The numbers stay the default, so an existing deployment is unchanged.</p>
+<p><strong>The refusal says how long to wait.</strong> A rate-limit reject carries
+<code>RateLimited: retry in &lt;n&gt; ms</code> in the text (FIX <code>58</code>), and once a ban is
+armed, <code>RateLimitBanned: retry in &lt;n&gt; ms</code>. The bare reason left the client
+choosing between retrying in a millisecond and retrying in three minutes,
+and the usual choice -- retry at once -- is the one that walks into the
+ban; a silent ban reads exactly like one refused order, so the client
+keeps sending into a session that will refuse everything. The text travels
+beside the event through <code>SessionRegistry::RejectEncoder</code> (registered with
+<code>setRejectEncoder</code>): <code>OrderRejected</code> is the engine's message about an
+order, and why a SESSION refused a frame is not a property of any order.
+Without a reject encoder the refusal still arrives, just without the wait.</p>
+<p>A ban is also announced on the venue's own side, once per ban, through
+<code>GatewaySession::setBanObserver</code> (default: a <code>WARN</code> naming the session).
+Refusing a named client for minutes is an operational event, not a private
+matter between the limiter and one connection.
+- <strong>Cancel-on-disconnect</strong> optionally pulls the session's resting orders when
+  the connection drops.</p>
+</li>
+</ul>
+<h2 id="exec-report-delivery-sessionregistry">Exec-report delivery (SessionRegistry)<a class="headerlink" href="#exec-report-delivery-sessionregistry" title="Permanent link">&para;</a></h2>
+<p>The per-frame <code>Responder</code> answers only the connection whose frame is being
+handled; an asynchronous event -- a maker fill from a foreign aggressor, a
+stop trigger, a GTD expiry, a liquidation cancel, a <code>FillHeld</code> -- has no
+request context. <code>SessionRegistry</code> (<code>session_registry.h</code>) is the account -&gt;
+session router that closes that hole:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>engine sink -&gt; registry.route(event) -&gt; AccountStream (per account)
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  -&gt; seq stamp + event log + encode -&gt; SessionWriter (per connection)
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    -&gt; bounded queue -&gt; writer thread -&gt; socket
+</span></code></pre></div>
+<ul>
+<li>Every outbound event carries its owner account (appended fields on the
+  event structs, folded into the determinism hash). <code>Trade</code>, <code>FillHeld</code> and
+  <code>FillRejected</code> route to both parties; account <code>0</code> is unrouteable. The
+  mapping is public as <code>SessionRegistry::accountsOf(event, out[2], n)</code> -- a
+  deployment that fans events out itself would otherwise re-derive it and
+  then drift from it as events gain accounts.</li>
+<li><strong>A session that speaks for several accounts has ONE stream.</strong> The extra
+  accounts are aliases onto the first account's <code>AccountStream</code>: one sequence
+  space, one resend log, one socket. Not one stream per account sharing a
+  writer -- N streams would interleave N sequence spaces on one connection,
+  and an event naming two of the session's accounts (a trade between two of a
+  bridge's own customers) would be encoded, sequenced and delivered twice.
+  The aliases are dropped on detach, so a borrowed account is free to open a
+  session of its own afterwards.</li>
+<li>The <strong>matching thread never blocks on a client socket</strong>: <code>route()</code> encodes
+  and enqueues under the account-stream mutex; the write happens on the
+  session's writer thread. A full queue is a slow consumer -- the connection
+  is shut down, <code>GatewayCounters::slowConsumerDisconnects</code> is bumped, and the
+  client recovers the gap via <code>ResendRequest</code> after reconnecting.</li>
+<li>Gateways enter this mode via <code>setDelivery(&amp;registry, encoder)</code>; the
+  connection loop attaches the bound account on connect and detaches on
+  disconnect. Without a registry a gateway stays in the embedded per-frame
+  responder mode.</li>
+<li>
+<p><strong>Rejects are not silent, and they name the frame they refused</strong>: a frame
+  that fails decode or admission answers with a sequenced <code>OrderRejected</code>
+  (reason <code>MalformedMessage</code> / <code>RateLimited</code> / <code>Unauthenticated</code>) on the
+  session's own stream, carrying the id, symbol and ClOrdID of the command it
+  refused. When the frame did not decode there is no command to take them
+  from, so the ClOrdID is read out of the raw bytes instead
+  (<code>clientOrderIdFromRaw</code>: tag 11 at a field boundary, numeric only -- a
+  wrong identifier points the client at an order it never sent, which is
+  worse than none).</p>
+<p>The zeros this replaced cost the client twice. It could not match the
+refusal to anything it had sent, so it waited out its timeout and
+resent -- and the resend was refused again, as a duplicate ClOrdID. One
+refusal became two, and the second one explained nothing.
+- <code>TlsGateway</code> supports delivery mode too. OpenSSL forbids CONCURRENT
+  <code>SSL_read</code>/<code>SSL_write</code> on one <code>SSL*</code>, not serialized use: each connection
+  carries a mutex over its <code>SSL*</code>, the read loop takes it only for the
+  duration of a single <code>SSL_read</code> poll (a short <code>SO_RCVTIMEO</code> makes the call
+  return periodically), and the writer thread takes it per frame written --
+  the two interleave, never overlap. On teardown the writer is detached and
+  joined before <code>SSL_free</code>.</p>
+</li>
+</ul>
+<h2 id="sequencing-and-session-layer-recovery">Sequencing and session-layer recovery<a class="headerlink" href="#sequencing-and-session-layer-recovery" title="Permanent link">&para;</a></h2>
+<p>Every exec report delivered through the registry carries a per-session
+monotonic <code>seq</code>:</p>
+<ul>
+<li><strong>SBE</strong> -- schema version 1 appends a trailing <code>seq</code> (u64, <code>sinceVersion=1</code>)
+  to every outbound template's root block. A version-0 reader skips it via the
+  header's <code>blockLength</code>; no wrapper template, no re-layout
+  (<code>venue/schema/order-entry-sbe.xml</code>, <code>SbeOrderEntryCodec::seqOf</code>).</li>
+<li><strong>The resend log stores events, not frames.</strong> The <code>AccountStream</code> retains
+  <code>(seq, OutboundEvent, first-send timestamp)</code>; frames are (re)encoded per
+  the session's protocol at send and at resend time. SBE encoding is
+  deterministic, so an SBE resend is byte-identical to the original
+  transmission; FIX <em>requires</em> re-encoding on resend (PossDupFlag <code>43=Y</code> and
+  OrigSendingTime <code>122</code> change BodyLength and CheckSum, so a byte replay was
+  never viable there).</li>
+<li><strong>Recovery verbs (SBE, session layer -- never matched or journaled):</strong>
+  <code>ResendRequest{fromSeq}</code> replays the retained events with their original
+  seqs from the account's resend log (which survives disconnects: an event
+  that fires while the account is offline is still sequenced and logged). A
+  <code>fromSeq</code> older than the retained log answers <code>SnapshotRequired{lastSeq}</code>
+  -- an explicit signal, never a silent hole. <code>AccountSnapshotRequest</code>
+  replies with the account's open orders (a series of <code>Accepted</code> frames,
+  <code>restingOnBook=0</code> for pending stops) terminated by
+  <code>SnapshotEnd{position, lastSeq}</code>, built from
+  <code>MatchingEngine::snapshotAccount</code>. Snapshot frames are unsequenced (seq 0)
+  and deliberately NOT in the resend log -- a resend replays what was
+  originally sequenced; a point-in-time snapshot replayed there would be
+  stale. <code>SnapshotEnd.lastSeq</code> (schema v2, trailing field) carries the
+  stream's last assigned outbound seq, so the client resumes gap detection
+  from the exact point. Wired via
+  <code>setSessionVerbs(makeSbeSessionVerbs(engine))</code>.</li>
+<li><strong>Session config on the wire (SBE <code>SetSessionConfig{codEnabled}</code>)</strong>:
+  per-session cancel-on-disconnect negotiation, handled at the gateway via
+  <code>setSessionConfigVerb(makeSbeSessionConfigVerb())</code>. Fire-and-forget by
+  design: the update takes effect immediately and has no reply frame -- its
+  effect is observable (a later disconnect sweeps or keeps the session's
+  orders). The FIX equivalent is Logon tag 20003 (below).</li>
+<li><strong>FIX</strong> -- a full session layer (<code>fix_session.h</code>: <code>FixSessionHost</code> +
+  <code>FixConnection</code>, wired via <code>setFixSession</code> on <code>TcpGateway</code>, <code>TlsGateway</code>
+  and <code>WsGateway</code>; requires delivery mode). The <code>FixConnection</code> is
+  transport-independent; the wire shape per transport:</li>
+<li><strong>TCP / TLS</strong>: one FIX message per length-prefixed frame (TLS inside the
+    encrypted stream, using the existing per-connection <code>sslMu</code> writer path
+    and poll-before-lock read loop; the FIX timers run on the read loop's
+    poll tick).</li>
+<li><strong>WebSocket</strong>: one FIX message per WebSocket data frame. The venue sends
+    Text frames (FIX tag=value is ASCII; Text keeps the messages readable in
+    WS tooling) and accepts inbound FIX in Text or Binary frames alike.
+    FIX liveness (Heartbeat/TestRequest death) replaces the WS Ping probe on
+    these connections.</li>
+<li><strong>Logon (35=A)</strong>: HeartBtInt (108) adoption; ResetSeqNumFlag (141=Y)
+    resets both sequence directions to 1 and clears the outbound stream.
+    Without 141, the client's <code>34</code> is checked against the expected inbound
+    seq: above -&gt; the venue's own <code>ResendRequest (35=2)</code> after the Logon
+    reply; below -&gt; Logout (35=5) with the reason in <code>58</code>, disconnect.</li>
+<li><strong>Custom tag 20003 (CancelOnDisconnect=Y/N) on the Logon</strong>: wire
+    negotiation of the session's cancel-on-disconnect, overriding the
+    gateway default in either direction (sits next to the custom last-look
+    tags 20001 heldId / 20002 makerId). Applied on any accepted Logon,
+    before order flow exists.</li>
+<li><strong>Restart</strong>: the sequence counters (per-account inbound <code>expectedIn</code> +
+    outbound <code>lastSeq</code>) can be persisted across a venue restart via the FIX
+    session sidecar (<code>FixSessionSidecar</code>, file <code>&lt;journal base&gt;.fixsessions</code>):
+    the gateway harness hooks <code>SequencedShard::onCheckpoint</code> and writes the
+    sidecar at every checkpoint boundary with the journal's durability
+    discipline (tmp -&gt; fsync -&gt; atomic rename, trailing CRC32; a torn or
+    corrupt sidecar loads as absent). With a restored sidecar, a Logon
+    without 141=Y that continues the pre-restart sequence space WORKS. The
+    EVENT LOG is deliberately not persisted: a ResendRequest that reaches
+    into the pre-restart range is answered with <code>SequenceReset-GapFill</code> --
+    the honest signal for history the venue no longer holds; full state
+    reconciliation is the snapshot path. Without a sidecar the old rule
+    stands: the first Logon after a restart MUST carry 141=Y or it is
+    answered with <code>Logout "session state lost (venue restart): Logon must
+    set ResetSeqNumFlag (141=Y)"</code>.</li>
+<li><strong>Liveness</strong>: outbound Heartbeat every HeartBtInt on the gateway's
+    <code>SO_RCVTIMEO</code> tick; no inbound traffic for 1.2 intervals -&gt; TestRequest
+    (35=1); no answer for another 1.2 intervals -&gt; disconnect, and COD sweeps
+    normally. An inbound TestRequest is answered with a Heartbeat echoing
+    <code>112</code>.</li>
+<li><strong>Their ResendRequest (35=2, <code>7</code>..<code>16</code>, 16=0 = infinity)</strong>: application
+    messages replay from the event log re-encoded with <code>43=Y</code> +
+    <code>122=OrigSendingTime</code> (the logged first-send time) and their ORIGINAL
+    <code>34</code>; admin seq ranges (Heartbeats, Logon replies -- sequenced but not
+    logged) collapse into <code>SequenceReset-GapFill (35=4, 123=Y)</code>. A range
+    older than the retained log is gap-filled up to the first available seq
+    -- the client sees the trimmed part as an explicit gap-filled hole; full
+    state reconciliation is the SBE <code>AccountSnapshotRequest</code> path. A served
+    FIX resend bumps <code>GatewayCounters::resendServed</code>, same as the SBE path.</li>
+<li><strong>Our inbound gap</strong>: no reorder buffer -- the venue sends <code>35=2</code> and
+    DROPS every message above the hole (repeating the request at most once
+    per HeartBtInt) until the counterparty's PossDup replay closes it. This
+    is deliberate: buffering out-of-order application traffic would run
+    orders outside admission order, and the peer must resend anyway. A
+    PossDup whose <code>34</code> was already seen is silently dropped; an inbound
+    <code>SequenceReset-GapFill</code> advances the expectation; a Reset-mode
+    <code>SequenceReset</code> (no 123=Y) is accepted with a WARN log.</li>
+<li><strong>Unknown MsgType</strong>: an in-sequence message whose <code>35</code> is outside the
+    known set (admin 0/1/2/4/5/A, application D/F/G) is answered with a
+    session <code>Reject (35=3)</code> carrying <code>45=RefSeqNum</code>, <code>372=RefMsgType</code> and a
+    <code>58</code> text -- never silently consumed, never a session kill. Application
+    messages keep their own path: a decode failure there answers with an
+    exec-report reject, not 35=3.</li>
+<li><strong>BalanceUpdate has no FIX mapping</strong> (documented as unsupported): an
+    ExecutionReport is semantically an order-event report and carrying a
+    pure balance change in one would be dishonest; FIX sessions reconcile
+    balances out-of-band (the SBE/REST feeds carry <code>BalanceUpdate</code>). The
+    event is simply not encoded on FIX sessions (no seq is consumed).</li>
+<li>The sequencing/framing building block (<code>FixSession</code> in <code>fix_codec.h</code>)
+    stays for embedded/test use.</li>
+<li><strong>The other end of this session is <code>lrvx::fix::FixInitiator</code></strong>
+    (<code>lrvx/connector/fix/</code>, in the core rather than the venue module -- see
+    <a href="../fix-initiator/">Connecting to another venue over FIX</a> for why). It
+    opens the Logon, keeps the same liveness timers, serves a <code>ResendRequest</code>
+    with the same PossDup/GapFill split, and closes its own gaps under the
+    same no-reorder-buffer rule. Both ends frame through one shared
+    implementation in <code>lrvx/connector/fix/fix_wire.h</code> (field parsing, the
+    checksum, the header field order, SendingTime) and print decimals through
+    one shared <code>lrvx/util/decimal_wire.h</code>, so the bytes cannot drift apart.
+    <code>venue/tests/test_venue_fix_initiator.cpp</code> runs the pair against each
+    other in one process.</li>
+</ul>
+<p>The old <code>ResendBuffer</code> (an event-level log reachable from no wire path) was
+removed; the client-side <code>GapDetector</code> stays in <code>resend_buffer.h</code> for the
+market-data path.</p>
+<h2 id="liveness-and-cancel-on-disconnect">Liveness and cancel-on-disconnect<a class="headerlink" href="#liveness-and-cancel-on-disconnect" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Idle timeout</strong> (<code>setIdleTimeout</code>, default 30s): <code>SO_RCVTIMEO</code> on every
+  connection fd; a peer with no inbound bytes for the whole window is
+  disconnected (<code>GatewayCounters::idleDisconnects</code>), and COD then sweeps its
+  orders normally -- a half-open peer can no longer hold orders and a thread
+  forever. The WebSocket gateway pings at half the window first; any inbound
+  (Pong or data) before the deadline keeps the session alive.</li>
+<li><strong>Shutdown</strong>: <code>SocketAcceptor</code> tracks connection fds and owns their
+  lifecycle; <code>stop()</code> shuts every one of them down before joining, so a
+  silent client cannot hang <code>stop()</code>. Gateway handlers must not close the fd.</li>
+<li><strong><code>DisconnectCanceller</code> is bounded</strong>: the per-session delivery observer
+  prunes an order on its terminal report (complete fill / cancel / reject),
+  so the disconnect flush cancels only what is actually still live.</li>
+<li><strong>COD is per-session</strong>: <code>GatewaySession::setCancelOnDisconnect</code> carries the
+  flag; the gateway-wide atomic is only the default seeded into new sessions.
+  Wire-level negotiation overrides the default in either direction: FIX Logon
+  tag 20003 (CancelOnDisconnect=Y/N) or the SBE <code>SetSessionConfig{codEnabled}</code>
+  verb (fire-and-forget, no reply frame).</li>
+</ul>
+<h2 id="wire-protocols">Wire protocols<a class="headerlink" href="#wire-protocols" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Codec</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SbeOrderEntryCodec</code></td>
+<td>SBE binary order entry + exec reports, full fidelity: every field round-trips, including <code>reduceOnly</code>, <code>peg</code>, <code>expiryNs</code>, <code>ocoGroup</code>, <code>lastLook</code>; schema version 8 adds inbound <code>QuoteLadder</code> (template 7), a maker's whole set of levels in one frame (schema <code>venue/schema/order-entry-sbe.xml</code>)</td>
+</tr>
+<tr>
+<td><code>FixCodec</code></td>
+<td>FIX 4.4: <code>D</code>/<code>F</code>/<code>G</code> in, <code>ExecutionReport</code> out, with <code>BodyLength</code> and validated <code>CheckSum</code>; <code>MassQuote</code> (<code>i</code>) / <code>QuoteCancel</code> (<code>Z</code>) in, <code>QuoteStatusReport</code> (<code>AI</code>) out -- a maker's whole ladder on one symbol, see <a href="../fix-quoting/">fix-quoting.md</a></td>
+</tr>
+<tr>
+<td><code>lrvx::fix::ClientCodec</code></td>
+<td>the mirror, for talking TO a venue: <code>D</code>/<code>F</code>/<code>G</code> out, <code>35=8</code>/<code>9</code>/<code>3</code>/<code>j</code> in (<a href="../fix-initiator/">FIX initiator</a>)</td>
+</tr>
+<tr>
+<td><code>RestJson</code></td>
+<td>REST/JSON adoption path (simdjson)</td>
+</tr>
+<tr>
+<td><code>SbeMdCodec</code></td>
+<td>outbound market data (SBE, schema <code>venue/schema/md-sbe.xml</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Round-trip tests pin every field, because a dropped field here changes
+behaviour: a <code>reduceOnly</code> flag lost on the wire turns a risk-reducing order
+into one that can open a position.</p>
+<h2 id="hostile-input">Hostile input<a class="headerlink" href="#hostile-input" title="Permanent link">&para;</a></h2>
+<p>The perimeter is fuzzed, and the rules are explicit:</p>
+<ul>
+<li><strong>Length prefixes are capped before allocation</strong>: <code>lrvx::net::kMaxFrame</code>
+  (<code>lrvx/util/transport.h</code>) and <code>lrvx::ws::kMaxFramePayload</code>
+  (<code>lrvx/util/websocket.h</code>), 16 MiB, both in core alongside the framing they
+  guard. A 4-byte header cannot reserve gigabytes.</li>
+<li><strong>WebSocket extended length is overflow-safe.</strong> The naive completeness check
+  <code>n &lt; off + len</code> wraps for a 64-bit length; the comparison is done as
+  <code>len &gt; n - off</code>, and an absurd length is a protocol error that closes the
+  connection before any <code>resize</code>.</li>
+<li><strong>A parse error closes one connection</strong>, and only that connection. That holds
+  for an exception too: a connection handler runs as a thread body, so the
+  acceptor contains anything escaping it rather than letting one malformed
+  request reach <code>std::terminate</code> and take every engine in the process with it.</li>
+<li><strong>A frame split across packets is still one frame.</strong> Every gateway sets a
+  receive timeout so session timers and shutdown can run, and that timeout
+  fires mid-message whenever a peer's write lands in two packets. Read state
+  survives it: the bytes already taken are kept and the frame resumes on the
+  next call (<code>lrvx::net::FrameReader</code> for the plain framed transport, the
+  equivalent state in the TLS and WebSocket gateways). Dropping them would
+  offset the stream by exactly that many bytes, and every length prefix after
+  it would be read from the middle of a message.</li>
+<li><strong>An enum-typed field carries only values the schema defines.</strong> <code>Side</code>,
+  <code>OrderType</code>, <code>TimeInForce</code>, <code>STPMode</code> and <code>PegRef</code> each cross the wire as
+  one byte, and a byte holds 256 values where these name at most eight.
+  <code>SbeOrderEntryCodec::decode</code> range-checks every one of them (<code>inRange</code>,
+  <code>lrvx-venue/messages.h</code>) before it builds a command, on <code>EnterOrder</code> and on
+  <code>QuoteLadder</code> alike, and a value outside the set is a decode failure like
+  any other -- <code>RejectReason::MalformedMessage</code> to the client, and
+  <code>decode(p, n, err)</code> naming the field for the operator's log. Carrying such
+  a byte inward makes the engine answer for a value it never defined: an
+  order type wider than the 32-bit admission bitmap that indexes it, or a
+  self-trade mode the auction uncross has no action for.</li>
+</ul>
+<p><code>test_venue_parser_fuzz</code> drives all decoders with random and adversarial
+input; the sanitizer gate runs it under ASAN/UBSAN. The order-entry fuzz does
+not stop at "it did not crash": every frame it decodes has its enum fields
+checked against the same <code>inRange</code> the decoder uses, and is then submitted to
+a live engine under the golden replay driver's per-command event budget
+(<code>venue/tests/test_venue_golden_replay.cpp</code>).</p>
+<h2 id="control-plane">Control plane<a class="headerlink" href="#control-plane" title="Permanent link">&para;</a></h2>
+<p><code>InstrumentRegistry</code> is the venue admin surface (list instruments, halt and
+resume, adjust tick, lot, bands, trigger reference). <code>ControlApi</code> exposes it
+as JSON-RPC and <code>ControlServer</code> serves it over TCP.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">api</span><span class="p">.</span><span class="n">handle</span><span class="p">(</span><span class="sa">R</span><span class="s">"</span><span class="dl">(</span><span class="s">{"method":"halt","symbol":1,"halted":true}</span><span class="dl">)</span><span class="s">"</span><span class="p">);</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">api</span><span class="p">.</span><span class="n">handle</span><span class="p">(</span><span class="sa">R</span><span class="s">"</span><span class="dl">(</span><span class="s">{"method":"setBand","symbol":1,"minPrice":90,"maxPrice":110}</span><span class="dl">)</span><span class="s">"</span><span class="p">);</span>
+</span></code></pre></div>
+<p>Actions that change matchable state (auction transitions, emergency
+cancel-all, halts) go through the sequenced <code>AdminCmd</code> path, so they are
+journalled and survive replay. Configuration mutations are sequenced the same
+way: <code>ControlApi</code> applies a successful mutation to the registry and forwards
+the equivalent command (<code>ListInstrument</code>, <code>SetBands</code>, <code>SetTriggerRef</code>,
+<code>AdminCmd</code> halt/resume)
+to its command sink, which the deployment wires into the journaled stream --
+on restart, <code>InstrumentRegistry::apply</code> replays those records, driven by
+<code>SequencedShard::setRegistry(&amp;reg)</code> (set before <code>start()</code>). There is no
+separate configuration store. The shard writes the registry on its consumer
+thread, so serve this api from that thread. See
+<a href="../runtime/">Runtime and recovery</a>.</p>
+<p>Three of the verbs act on an ACCOUNT rather than on the instrument, and each
+forwards a record that was already journaled, snapshotted and replayed and had
+no way in from outside the process:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">api</span><span class="p">.</span><span class="n">handle</span><span class="p">(</span><span class="sa">R</span><span class="s">"</span><span class="dl">(</span><span class="s">{"method":"setAccountRiskLimits","symbol":1,"account":7,</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="s">                "maxOrderQty":1.0,"maxOrderNotional":0}</span><span class="dl">)</span><span class="s">"</span><span class="p">);</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">api</span><span class="p">.</span><span class="n">handle</span><span class="p">(</span><span class="sa">R</span><span class="s">"</span><span class="dl">(</span><span class="s">{"method":"adjustPosition","symbol":1,"account":7,"qtyDelta":-2.0,</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="s">                "reason":"counterpartyReport","note":"LP fill 88213"}</span><span class="dl">)</span><span class="s">"</span><span class="p">);</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">api</span><span class="p">.</span><span class="n">handle</span><span class="p">(</span><span class="sa">R</span><span class="s">"</span><span class="dl">(</span><span class="s">{"method":"forceClosePosition","symbol":1,"account":7}</span><span class="dl">)</span><span class="s">"</span><span class="p">);</span>
+</span></code></pre></div>
+<p><code>setAccountRiskLimits</code> masks and pairs its fields the way <code>setRiskLimits</code> does
+(<code>maxOrderQty</code>/<code>maxOrderNotional</code> are named together; <code>maxOpenOrders</code> and
+<code>maxPositionQty</code> are each optional), and a request naming no limit answers
+<code>no_limits_named</code>. <code>adjustPosition</code> requires the <code>reason</code>
+(<code>reconciliation</code>, <code>counterpartyReport</code>, <code>settlementCorrection</code>, <code>migration</code>,
+<code>manual</code>) -- an adjustment has no fill behind it, so the record is the whole
+explanation, and an unknown word answers <code>bad_reason</code> rather than being mapped
+to <code>manual</code>. Its <code>entry</code> is optional (absent keeps the average entry, and is
+NOT a zero entry), its <code>note</code> is truncated to <code>kAdjustNoteLen - 1</code>, and a
+request that moves neither size nor entry answers <code>no_adjustment_named</code>.
+<code>forceClosePosition</code> takes an optional <code>qty</code>; absent closes the whole position.</p>
+<p>Requests are read literally. A field nobody named is not a zero, so <code>setBand</code>
+needs both of its bounds and a paired risk limit needs both of its halves; a
+flag has to be spelled out rather than inferred. Half a band used to answer
+<code>ok</code> and write a zero over the other half, which removes the collar an operator
+believed was in place, and two handlers next to each other guessed opposite
+defaults for a missing flag. A value that does not parse, is not finite, or
+does not fit the fixed-point range answers <code>bad_field</code>; an inverted band
+answers <code>bad_band</code>. Neither reaches the registry. The REST codec states the
+same rule for order entry.</p>
+<p>One connection is bounded too. A request line caps at 1 MiB
+(<code>TcpControlServer::kMaxRequestLine</code>), and a client past that gets
+<code>request_too_long</code> and a closed socket. The framed transport bounds a length
+prefix for the same reason; on a line-delimited surface the unbounded thing is
+the newline that never arrives.</p>
+<p><code>TcpControlServer</code> binds to loopback and has no port option to change that.
+Deploy the control plane on an internal interface: it has no authentication of
+its own, so anything able to reach it can move every risk limit on the venue.</p>
+<h3 id="verbs-the-deployment-adds">Verbs the deployment adds<a class="headerlink" href="#verbs-the-deployment-adds" title="Permanent link">&para;</a></h3>
+<p>The built-in verbs are not the whole vocabulary. <code>ControlApi::registerMethod</code>
+puts a handler of your own on the same surface, and nothing in <code>ControlServer</code>
+or <code>TcpControlServer</code> changes: the registered verb is reached through the
+existing accept loop and line framing.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">api</span><span class="p">.</span><span class="n">registerMethod</span><span class="p">(</span><span class="s">"parkInstrument"</span><span class="p">,</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">                   </span><span class="p">[](</span><span class="k">const</span><span class="w"> </span><span class="n">ControlRequest</span><span class="o">&amp;</span><span class="w"> </span><span class="n">req</span><span class="p">)</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">                   </span><span class="p">{</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">                     </span><span class="n">SymbolId</span><span class="w"> </span><span class="n">sym</span><span class="p">{};</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">                     </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">req</span><span class="p">.</span><span class="n">symbolField</span><span class="p">(</span><span class="s">"symbol"</span><span class="p">,</span><span class="w"> </span><span class="n">sym</span><span class="p">))</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">                     </span><span class="p">{</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">                       </span><span class="k">return</span><span class="w"> </span><span class="n">ControlApi</span><span class="o">::</span><span class="n">err</span><span class="p">(</span><span class="s">"bad_field"</span><span class="p">);</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">                     </span><span class="p">}</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">                     </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">req</span><span class="p">.</span><span class="n">registry</span><span class="p">().</span><span class="n">get</span><span class="p">(</span><span class="n">sym</span><span class="p">))</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">                     </span><span class="p">{</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">                       </span><span class="k">return</span><span class="w"> </span><span class="n">ControlApi</span><span class="o">::</span><span class="n">err</span><span class="p">(</span><span class="s">"unknown_symbol"</span><span class="p">);</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">                     </span><span class="p">}</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">                     </span><span class="n">req</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">InboundCommand</span><span class="p">{</span><span class="n">AdminCmd</span><span class="p">{</span><span class="n">sym</span><span class="p">,</span><span class="w"> </span><span class="n">AdminAction</span><span class="o">::</span><span class="n">Halt</span><span class="p">}});</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">                     </span><span class="k">return</span><span class="w"> </span><span class="n">ControlApi</span><span class="o">::</span><span class="n">ok</span><span class="p">();</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">                   </span><span class="p">});</span>
+</span></code></pre></div>
+<p>The handler reads its arguments through <code>ControlRequest</code>, which carries the
+same accessors the built-in verbs use -- so a field nobody named stays absent
+there too -- plus the two things a verb needs from the venue: <code>registry()</code> to
+validate against, and <code>forward()</code> for the journaling rule. A handler that
+changes engine state forwards the record that reproduces the change on replay;
+a handler that only reads forwards nothing, exactly as <code>snapshotNow</code> and <code>get</code>
+forward nothing.</p>
+<p>Registration happens at wiring time, before a server accepts on that api:
+<code>handle()</code> reads the table without a lock. It refuses an empty name, an empty
+handler, a name a built-in verb already answers
+(<code>ControlApi::kBuiltinMethods</code>), and a second registration of a name already
+taken -- a verb that silently replaced another, or that a built-in silently
+shadowed, sends operator traffic to a handler other than the one whose name
+was typed.</p>
+<p>A name nobody answers comes back named:
+<code>{"ok":false,"error":"unknown_method","method":"parkInstrument"}</code>. A bare
+<code>unknown_method</code> reads the same for a typo, a registration that never ran, and
+a request that reached the wrong process. The echoed name is caller input, so
+it is cut at 64 characters and escaped before it travels in the response.</p>
+<h2 id="observability">Observability<a class="headerlink" href="#observability" title="Permanent link">&para;</a></h2>
+<p><code>Metrics</code> counts orders, trades, rejects by reason, and fills. <code>Gauges</code>
+samples venue state (open interest, position count, best bid/ask, mark age,
+feed-breaker state). <code>prometheus.h</code> renders the exposition format and
+<code>MetricsServer</code> serves it over HTTP for scraping.</p>
+<p>Every number on the page and in a control reply is rendered from its raw by
+<code>fixedPointToStr</code> (<code>lrvx-venue/fixed_point_text.h</code>): sign, integral part, and
+exactly as many fractional digits as the scale carries, written as digits with
+no float in between. <code>Gauges::fundingRateRaw</code> is a raw at <code>kFundingRateScale</code>
+for that reason, so the page says <code>fme_funding_rate 0.00030000</code> and a
+one-raw tick in an instrument reply says <code>0.00000001</code>. <code>std::to_string(double)</code>
+is printf("%f"): six decimals, and the C locale's separator -- which under a
+comma locale emits <code>0,00030000</code>, invalid JSON for the operator's tooling and
+an unparseable sample line for every scraper. Neither surface builds a float.</p>
+<h3 id="last-look">Last look<a class="headerlink" href="#last-look" title="Permanent link">&para;</a></h3>
+<p>Six series, from <code>LastLookSample</code>. Four are labeled by maker:</p>
+<table>
+<thead>
+<tr>
+<th>Series</th>
+<th>What it counts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fme_last_look_holds_total{maker}</code></td>
+<td>fills held for that maker's decision</td>
+</tr>
+<tr>
+<td><code>fme_last_look_rejects_total{maker}</code></td>
+<td>held fills it refused</td>
+</tr>
+<tr>
+<td><code>fme_last_look_rejects_adverse_total{maker}</code></td>
+<td>... of which the price had moved AGAINST it</td>
+</tr>
+<tr>
+<td><code>fme_last_look_rejects_favourable_total{maker}</code></td>
+<td>... of which the price had moved its WAY</td>
+</tr>
+</tbody>
+</table>
+<p>and two are venue-wide, because no maker can be blamed for them:
+<code>fme_last_look_tolerance_rejects_total</code> (the venue refused the hold on its own
+tolerance, whatever the maker answered) and
+<code>fme_last_look_prorata_skips_total</code> (pro-rata participants skipped for holding
+rather than standing firm).</p>
+<p>The split by direction is the reason these exist. A maker refusing only the
+fills that moved its way is taking a free option: it keeps the good ones and
+hands back the bad, and every taker pays for it. A maker refusing at a similar
+rate in both directions is answering a latency problem instead. <strong>The totals
+are identical in both cases</strong> -- an alert on <code>fme_last_look_rejects_total</code>
+alone cannot tell them apart, which is what <code>..._favourable_total</code> over
+<code>..._rejects_total</code> is for.</p>
+<p>A maker that refused nothing still gets its series, at zero. A series that
+vanishes when it is healthy cannot be alerted on, and its absence would read
+as "no data" rather than "held ten, refused none".</p>
+<p>Like <code>Gauges</code>, these are sampled rather than pushed: the library runs no
+monitoring thread, so a deployment reads <code>lastLookStats()</code>,
+<code>toleranceRejectedHolds()</code> and <code>skippedLastLookProRata()</code> off the engine and
+hands them to <code>prom::render</code>. Left unsampled they render zeros, and zeros look
+exactly like a venue where nobody has ever held a fill.</p>
+<h3 id="who-may-read-the-engine-while-it-is-matching">Who may read the engine while it is matching<a class="headerlink" href="#who-may-read-the-engine-while-it-is-matching" title="Permanent link">&para;</a></h3>
+<p>Almost everything in the engine belongs to the matching consumer thread and is
+read by nobody else. Three accessors are the exception, because they exist to
+be scraped: <strong><code>lastLookStats()</code>, <code>admissionProfiles()</code> and
+<code>restingOrderCount()</code> may be called from any thread while the consumer is
+matching</strong> — <code>MetricsServer</code> runs its sampler on the connection thread that
+answered the scrape, which is exactly what the section above instructs. No
+other accessor carries that permission; <code>hasHold()</code> / <code>forEachHold()</code> state
+their own consumer-thread rule and mean it.</p>
+<p>The first two hand back a <strong>snapshot by value</strong>, taken under
+<code>engine::SnapshotLock</code> (<code>venue/include/lrvx-venue/engine/snapshot_lock.h</code>) --
+a spinlock the consumer takes when it writes one of those containers and the
+sampler takes for the length of one copy. A reference into live storage would
+be neither safe nor useful: unsafe because an insert can rehash the map under
+the reader's iterator, and useless because a page built from a container that
+keeps moving carries two series from two different moments. The lock is a
+spinlock and not a mutex because of who pays: uncontended it is one atomic
+exchange on the consumer, and a scrape happens once every few seconds.</p>
+<p><code>restingOrderCount()</code> is published through a relaxed atomic instead, because
+it is the one of the three written on the per-ORDER path -- every order that
+rests or leaves. A lock there, for a gauge, is a cost the matching path does
+not take; a count is a single number with nothing else it has to agree with,
+so nothing is lost by publishing it that way.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2782 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/contributors/parity-gate/">
+      
+      
+        <link rel="prev" href="../extension-hook-pattern/">
+      
+      
+        <link rel="next" href="../dts-class-members/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Cross-binding parity gate - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#cross-binding-parity-gate" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Cross-binding parity gate
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../explanation/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/bar-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/clock-domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clock Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/disruptor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disruptor Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/memory-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/strategy-state-ownership/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol strategy state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/integration-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/mcp-control-plane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/connectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/venue-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/per-symbol-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/order-book-tick-window/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order book tick window
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/onchain-order-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    On-chain order lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/liquidity-provision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Liquidity-provision signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/position-valuation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Position valuation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/amm-pricing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM pricing in backtests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/market-making-quoter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market-making quoter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/amm-dex-connector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM DEX connector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/replay-equivalence-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replay-equivalence gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/bar-close-ordering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar-close ordering on tied timestamps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/node-threaded-runner-lifetime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threaded Runner lifetime in Node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/javascript-value-boundary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The JavaScript value boundary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../explanation/venue-stack-reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue-stack reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build/feature-flags/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build feature flags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_27" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_27" id="__nav_6_27_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_27_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_27">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Binding architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adding-a-c-api-export/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a C ABI export
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extension-hook-pattern/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extension hook pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-binding parity gate
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-binding parity gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-it-solves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem it solves
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-quickjs-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The QuickJS map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-per-function-allowlist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The per-function allowlist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The per-function allowlist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-each-binding-does-not-reach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each binding does not reach
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-struct-layout-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The struct-layout tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status values
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Status values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        required
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not_applicable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        not_applicable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#allowlist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        allowlist
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-idl-group" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new IDL group
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#removing-a-group" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removing a group
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-is-just-a-manifest-not-auto-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this is just a manifest, not auto-generation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-of-the-gate-what-it-doesnt-catch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope of the gate (what it doesn't catch)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extending-the-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extending the gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sibling-gate-behaviour-not-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sibling gate: behaviour, not names
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dts-class-members/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Keeping node/index.d.ts class bodies in sync
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../test-gating/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test gating
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../doc-gates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation gates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CI pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../binding-architecture-rfc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Binding architecture RFC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-it-solves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem it solves
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-quickjs-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The QuickJS map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-per-function-allowlist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The per-function allowlist
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The per-function allowlist">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-each-binding-does-not-reach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What each binding does not reach
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-struct-layout-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The struct-layout tables
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#status-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status values
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Status values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#required" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        required
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not_applicable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        not_applicable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#allowlist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        allowlist
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-idl-group" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new IDL group
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#removing-a-group" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removing a group
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-this-is-just-a-manifest-not-auto-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this is just a manifest, not auto-generation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-of-the-gate-what-it-doesnt-catch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope of the gate (what it doesn't catch)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extending-the-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extending the gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sibling-gate-behaviour-not-names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sibling gate: behaviour, not names
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="cross-binding-parity-gate">Cross-Binding Parity Gate<a class="headerlink" href="#cross-binding-parity-gate" title="Permanent link">&para;</a></h1>
+<p>How <code>scripts/check_binding_parity.py</code> makes "I added a function to the C ABI but forgot the pybind11/NAPI wrapper" a CI failure instead of a silent gap that surfaces months later when a user complains.</p>
+<h2 id="the-problem-it-solves">The problem it solves<a class="headerlink" href="#the-problem-it-solves" title="Permanent link">&para;</a></h2>
+<p>The C ABI surface (<code>lrvx_capi.h</code>) grows whenever someone adds a <code>LRVX_EXPORT</code> to the IDL. Each binding (pybind11, NAPI, Codon, QuickJS) is supposed to expose that addition, and all four are hand-written, so all four drift.</p>
+<p>The gate used to promise this and not deliver it. It matched <strong>class names</strong> in <code>.pyi</code> / <code>.d.ts</code>, so a single name satisfied a whole group however many functions the group gained; it checked Codon against <code>tools/codegen/golden/lrvx_capi.codon</code>, a file generated from the same IDL the gate had just parsed, which cannot disagree with it; and it skipped QuickJS for any group that carried no <code>quickjs</code> entry, which was 59 of the 73 groups. All three holes are closed: parity is now checked <strong>per C function</strong>.</p>
+<h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<p>The script:</p>
+<ol>
+<li><strong>Parses the IDL</strong> (<a href="../../include/lrvx/capi/lrvx_capi_spec.hpp"><code>include/lrvx/capi/lrvx_capi_spec.hpp</code></a>). Every <code>LRVX_EXPORT(group = "X")</code> declaration belongs to a named group.</li>
+<li><strong>Reads the manifest</strong> (<a href="../../tools/codegen/binding_parity.yaml"><code>tools/codegen/binding_parity.yaml</code></a>). Each group has four entries: <code>pybind11</code>, <code>napi</code>, <code>codon</code>, <code>quickjs</code>.</li>
+<li><strong>Asks, for every function of the group, whether that binding can reach it</strong>:</li>
+<li>pybind11: a call site under <code>python/</code> (C/C++ sources, comments stripped)</li>
+<li>NAPI: a call site under <code>node/src/</code></li>
+<li>Codon: a <code>from C import lrvx_x</code> in a module under <code>codon/lrvx/</code> — the code a strategy links, not the generated golden</li>
+<li>QuickJS: a <code>lrvx_x: __lrvx_x</code> entry in the group's <code>functions:</code> map, whose global is registered with <code>addGlobalFunc</code> in <code>src/quickjs/js_bindings.cpp</code></li>
+<li><strong>Checks the declared names too</strong>: the <code>classes:</code> of a <code>required</code> entry must appear in <code>.pyi</code> / <code>.d.ts</code> / the QuickJS prelude, and a <code>functions:</code> list under <code>pybind11</code> / <code>napi</code> still names top-level functions in those stubs. QuickJS classes are read through <code>lrvx_codegen.manifest.scan_quickjs</code>, the same extractor <code>scripts/sync_mcp_data.py</code> uses for the MCP <code>binding_manifest</code>, so the two never diverge.</li>
+<li><strong>Fails loudly</strong> on a function that is neither reachable nor allowlisted.</li>
+</ol>
+<p>Run locally:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python3<span class="w"> </span>scripts/check_binding_parity.py<span class="w">            </span><span class="c1"># exit 1 on drift</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python3<span class="w"> </span>scripts/check_binding_parity.py<span class="w"> </span>--verbose<span class="w">  </span><span class="c1"># show every group, not just failures</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>python3<span class="w"> </span>scripts/check_binding_parity.py<span class="w"> </span>--root<span class="w"> </span>/path/to/tree
+</span></code></pre></div>
+<p>Wired into CI as the "Verify cross-binding parity" step inside the <code>verify-docs-current</code> job, with <code>--require-quickjs</code> passed explicitly, plus a step running <code>pytest scripts/tests -q</code> — the gate's own tests, which build a miniature repository, delete one wrapper, and require the gate to go red.</p>
+<h2 id="the-quickjs-map">The QuickJS map<a class="headerlink" href="#the-quickjs-map" title="Permanent link">&para;</a></h2>
+<p>A QuickJS <code>required</code> entry maps each C function to the global a strategy calls:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">composite_book</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">quickjs</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">required</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">classes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">CompositeBook</span><span class="p p-Indicator">]</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">functions</span><span class="p">:</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">      </span><span class="nt">lrvx_composite_book_create</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">__lrvx_cb_create</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">      </span><span class="nt">lrvx_composite_book_destroy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">__lrvx_cb_destroy</span>
+</span></code></pre></div>
+<p>The globals are written out rather than derived because they are not derivable: the <code>__</code> + C-name convention has real exceptions (<code>__lrvx_vprofile_create</code> wraps <code>lrvx_volume_profile_create</code>, <code>__lrvx_cb_*</code> abbreviates <code>lrvx_composite_book_*</code>). <code>--require-quickjs</code> is the default, so every group carries an entry; <code>--no-require-quickjs</code> exists for a tree where the QuickJS layer is not built.</p>
+<h2 id="the-per-function-allowlist">The per-function allowlist<a class="headerlink" href="#the-per-function-allowlist" title="Permanent link">&para;</a></h2>
+<p>A binding that has no wrapper for a function carries it in the top-level <code>allowlist_functions:</code> section, under that binding, with a one-line reason:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">allowlist_functions</span><span class="p">:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">napi</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">lrvx_walk_forward_run_csv</span><span class="p">:</span><span class="w"> </span><span class="nv">*no_napi_wrapper</span>
+</span></code></pre></div>
+<p>The reason is mandatory — an entry with an empty reason fails the gate. Shared reasons are YAML anchors defined once in <code>allowlist_reasons:</code> above the list; a one-off gap can carry its own text. Remove the entry when the wrapper is written.</p>
+<p>The group's status stays <code>required</code>: demoting a group to <code>allowlist</code> would hide every function in it, including the ones added tomorrow. This way a new <code>LRVX_EXPORT</code> still fails the gate in all four bindings until someone either writes the wrapper or writes down why there isn't one.</p>
+<h3 id="what-each-binding-does-not-reach">What each binding does not reach<a class="headerlink" href="#what-each-binding-does-not-reach" title="Permanent link">&para;</a></h3>
+<p>Counts as of the change that introduced the function-level rule, out of 736 C functions:</p>
+<table>
+<thead>
+<tr>
+<th>binding</th>
+<th>reachable</th>
+<th>allowlisted</th>
+<th>what the gap is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pybind11</td>
+<td>55</td>
+<td>681</td>
+<td>the Python binding wraps the C++ API directly rather than calling the C ABI, so most entry points have no call site under <code>python/</code> at all</td>
+</tr>
+<tr>
+<td>napi</td>
+<td>585</td>
+<td>151</td>
+<td>individual wrappers never written</td>
+</tr>
+<tr>
+<td>codon</td>
+<td>566</td>
+<td>170</td>
+<td>functions no module under <code>codon/lrvx/</code> imports</td>
+</tr>
+<tr>
+<td>quickjs</td>
+<td>524</td>
+<td>212</td>
+<td>208 with no <code>addGlobalFunc</code> registration; 4 called only inside other wrappers, with no global of their own</td>
+</tr>
+</tbody>
+</table>
+<p><code>allowlist_functions:</code> is the source of truth for these numbers — this table is a summary and will age. The pybind11 figure is not a claim that Python cannot do those things: it says the Python binding is a parallel implementation over the C++ headers, so fixes made at the C boundary (NULL-safety, the exception guard, the error accessors) do not reach it.</p>
+<h2 id="the-struct-layout-tables">The struct-layout tables<a class="headerlink" href="#the-struct-layout-tables" title="Permanent link">&para;</a></h2>
+<p>The Codon binding reads event payloads out of the C structs by byte offset, because the codegen models every aggregate as an opaque <code>cobj</code>. Those offsets used to be typed in by hand in <code>codon/lrvx/dispatch.codon</code> and <code>codon/lrvx/strategy.codon</code>, with nothing connecting them to the header.</p>
+<p>They are generated now, by <code>tools/codegen/lrvx_codegen/emit_layout.py</code>, from the same IDL spec the C header comes from:</p>
+<ul>
+<li><a href="../../include/lrvx/capi/lrvx_capi_layout.h"><code>include/lrvx/capi/lrvx_capi_layout.h</code></a> — <code>kLrvxEventLayout</code> (struct, field, offset, width) and <code>kLrvxEventStructLayout</code> (struct, size, alignment)</li>
+<li><a href="../../codon/lrvx/layout.codon"><code>codon/lrvx/layout.codon</code></a> — the <code>_TRADE_*</code> / <code>_BAR_*</code> / <code>_EV_*</code> / <code>_CTX_*</code> / <code>_LRVXBAR_*</code> constants the Codon modules import</li>
+</ul>
+<p>Both are regenerated by <code>tools/codegen/scripts/regenerate.sh</code> and diffed in place by <code>tools/codegen/scripts/check.sh</code> and the <code>codegen</code> workflow, so editing either by hand is drift and fails CI. <code>tests/test_capi_event_layout.cpp</code> closes the loop at the other end: every entry is compared against <code>offsetof</code> / <code>sizeof</code> / <code>alignof</code> on the real struct, so an offset the compiler disagrees with fails the build rather than delivering a wrong number to a strategy.</p>
+<h2 id="status-values">Status values<a class="headerlink" href="#status-values" title="Permanent link">&para;</a></h2>
+<p>Each per-binding entry has one of three statuses:</p>
+<h3 id="required"><code>required</code><a class="headerlink" href="#required" title="Permanent link">&para;</a></h3>
+<p>The binding <strong>must</strong> expose the listed symbols. List them under <code>classes</code> or <code>functions</code>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">metrics</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">pybind11</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> status</span><span class="p">:</span><span class="w"> </span><span class="nv">required</span><span class="p p-Indicator">,</span><span class="nt"> classes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">PnLTracker</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">napi</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> status</span><span class="p">:</span><span class="w"> </span><span class="nv">required</span><span class="p p-Indicator">,</span><span class="nt"> classes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">PnLTracker</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">codon</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> status</span><span class="p">:</span><span class="w"> </span><span class="nv">required</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span></code></pre></div>
+<p>This is the default for every user-facing surface. If the listed class or function disappears, CI fails — and so does a C function of the group that the binding cannot reach and that carries no <code>allowlist_functions:</code> entry.</p>
+<h3 id="not_applicable"><code>not_applicable</code><a class="headerlink" href="#not_applicable" title="Permanent link">&para;</a></h3>
+<p>This group is internal helpers and <strong>never</strong> intended for this binding. No symbol list:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">fixed_point</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">pybind11</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> status</span><span class="p">:</span><span class="w"> </span><span class="nv">not_applicable</span><span class="w"> </span><span class="p p-Indicator">}</span><span class="w">   </span><span class="c1"># exposed via Price.toDouble() on classes</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">napi</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> status</span><span class="p">:</span><span class="w"> </span><span class="nv">not_applicable</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="nt">codon</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> status</span><span class="p">:</span><span class="w"> </span><span class="nv">required</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span></code></pre></div>
+<p>Used for things like <code>pointer_out</code> (output-pointer helpers) or <code>validation</code> (input validation primitives) that wouldn't make sense as a Python class.</p>
+<h3 id="allowlist"><code>allowlist</code><a class="headerlink" href="#allowlist" title="Permanent link">&para;</a></h3>
+<p>The <strong>whole group</strong> is a known gap, with a mandatory <code>reason</code>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">your_group</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">napi</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">allowlist</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">reason</span><span class="p">:</span><span class="w"> </span><span class="s">"stats</span><span class="nv"> </span><span class="s">functions</span><span class="nv"> </span><span class="s">exposed</span><span class="nv"> </span><span class="s">via</span><span class="nv"> </span><span class="s">Stats</span><span class="nv"> </span><span class="s">class</span><span class="nv"> </span><span class="s">methods;</span><span class="nv"> </span><span class="s">function-style</span><span class="nv"> </span><span class="s">not</span><span class="nv"> </span><span class="s">declared."</span>
+</span></code></pre></div>
+<p>Use this only when the binding exposes nothing of the group at all. For a group the binding does expose, with individual functions missing, keep <code>required</code> and list those functions under <code>allowlist_functions:</code> — a group-level allowlist also swallows every function added to the group later.</p>
+<h2 id="adding-a-new-idl-group">Adding a new IDL group<a class="headerlink" href="#adding-a-new-idl-group" title="Permanent link">&para;</a></h2>
+<p>If you add <code>LRVX_EXPORT(group = "new_thing")</code> and don't update the YAML, CI says:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>FAIL  new_thing  config  missing_yaml: add an entry to binding_parity.yaml
+</span></code></pre></div>
+<p>Add a stanza for the new group:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">new_thing</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">pybind11</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> status</span><span class="p">:</span><span class="w"> </span><span class="nv">required</span><span class="p p-Indicator">,</span><span class="nt"> classes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">NewThing</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">napi</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> status</span><span class="p">:</span><span class="w"> </span><span class="nv">required</span><span class="p p-Indicator">,</span><span class="nt"> classes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">NewThing</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">codon</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> status</span><span class="p">:</span><span class="w"> </span><span class="nv">required</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="nt">quickjs</span><span class="p">:</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="nt">status</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">required</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span><span class="nt">functions</span><span class="p">:</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">      </span><span class="nt">lrvx_new_thing_create</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">__lrvx_new_thing_create</span>
+</span></code></pre></div>
+<p>Then make sure the listed classes exist on each side, and that every function of the group is either reachable from each binding or listed under <code>allowlist_functions:</code> with a reason.</p>
+<h2 id="removing-a-group">Removing a group<a class="headerlink" href="#removing-a-group" title="Permanent link">&para;</a></h2>
+<p>If you delete the last <code>LRVX_EXPORT(group = "old_thing")</code> declaration, the gate notices the YAML still mentions it:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>FAIL  old_thing  config  missing_in_binding: group `old_thing` not found in IDL spec; remove from yaml
+</span></code></pre></div>
+<p>Remove the YAML stanza in the same PR.</p>
+<h2 id="why-this-is-just-a-manifest-not-auto-generation">Why this is just a manifest, not auto-generation<a class="headerlink" href="#why-this-is-just-a-manifest-not-auto-generation" title="Permanent link">&para;</a></h2>
+<p>Reasonable question: "if you know which classes belong to which group, why not generate the bindings from that?"</p>
+<p>Two reasons:</p>
+<ol>
+<li><strong>The manifest knows the <em>names</em>, not the <em>shape</em>.</strong> It can say "<code>Executor</code> should exist", but it can't generate the <code>submit / cancel / replace / submit_oco / capabilities</code> method signatures — those are codegen's job (and codegen is unsafe to run for pybind11/NAPI for <a href="../architecture-overview/#why-this-layout-not-c-abi-all-the-way">perf reasons</a>).</li>
+<li><strong>Coverage ≠ correctness.</strong> Even if <code>Executor</code> is named in <code>.pyi</code>, that doesn't mean the binding actually wires <code>lrvx_executor_*</code> correctly. Tests check correctness; the gate checks "did you remember to write the wrapper at all".</li>
+</ol>
+<p>So the gate is a coarse mechanical check: "does the symbol exist?". Tests cover the semantics. Together they catch most of what auto-generation would catch, without giving up idiomatic bindings.</p>
+<h2 id="scope-of-the-gate-what-it-doesnt-catch">Scope of the gate (what it doesn't catch)<a class="headerlink" href="#scope-of-the-gate-what-it-doesnt-catch" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Argument signature drift (pybind11 method takes <code>int</code> but C ABI takes <code>int64_t</code>). That's pybind11's responsibility at runtime.</li>
+<li>Submodule-style exposure (<code>lrvx.targets.linear_slope</code> rather than top-level <code>lrvx.LinearSlope</code>). The gate only inspects top-level declarations for <code>classes:</code> / <code>functions:</code>. The <code>targets</code> group is <code>allowlist</code>'ed for this reason.</li>
+<li>Whether a call site is <em>correct</em>. The gate sees that <code>python/</code> mentions <code>lrvx_x</code>; it does not see whether the arguments are right. Tests cover that.</li>
+<li>Behavioral parity (Python and Node returning different values for the same input). Cross-binding parity <em>tests</em> (<code>scripts/cross_binding_parity.py</code>) cover that.</li>
+</ul>
+<h2 id="extending-the-gate">Extending the gate<a class="headerlink" href="#extending-the-gate" title="Permanent link">&para;</a></h2>
+<p>The script is small (<a href="../../scripts/check_binding_parity.py">scripts/check_binding_parity.py</a>). If you need a new check, add it there. Examples:</p>
+<ul>
+<li><strong>QuickJS registration, not just parity.</strong> <a href="../../scripts/check_quickjs_registration.py"><code>check_quickjs_registration.py</code></a> is a sibling gate: it asserts that every <code>__lrvx_*</code> global the JS layer <em>calls</em> has an <code>addGlobalFunc</code> registration, which is what <code>setQueueFifoTopN</code> violated. That is a different question from this gate's "does the IDL group's promised symbol exist" — this gate would pass on a registered-but-never-called global, and <code>check_quickjs_registration.py</code> doesn't know about IDL groups at all.</li>
+<li><strong>Method-level checks.</strong> Currently we check class presence; we could check that a class has specific methods (e.g. <code>Executor</code> must have <code>submit</code>, <code>cancel</code>, <code>replace</code>).</li>
+</ul>
+<p>Both would tighten the gate. Keep changes minimal — every false-positive case wastes contributor time.</p>
+<h2 id="sibling-gate-behaviour-not-names">Sibling gate: behaviour, not names<a class="headerlink" href="#sibling-gate-behaviour-not-names" title="Permanent link">&para;</a></h2>
+<p>This gate asserts a symbol <em>exists</em>. Every defect the binding-surface audit
+found had an existing symbol — <code>VenueStack.clock()</code> raised "Unregistered type",
+the five Node <code>VenueStack</code> factories threw <code>SyntaxError</code>.
+<a href="../../scripts/check_binding_smoke.py"><code>check_binding_smoke.py</code></a> closes that by
+walking both bindings by reflection and <em>calling</em> what it finds (~760 zero-arg
+calls), failing only on binding-level errors and ignoring rejected inputs.</p>
+<p><strong>A binding that cannot be imported fails that gate.</strong> It used to print
+<code>python: SKIP (cannot import lrvx: ...)</code> and exit 0, so a wheel that did not
+load and an addon that was never built both read as "OK: no binding-level
+failures" — the gate was loudest exactly when it had exercised nothing. An
+import failure, a Node entry point that throws, and a missing <code>node/index.js</code>
+are all reported with the binding named and a non-zero exit. <code>--root</code> points it
+at another tree, the way the parity gate's <code>--root</code> does.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,1931 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/venue/risk/">
+      
+      
+        <link rel="prev" href="../clearing/">
+      
+      
+        <link rel="next" href="../runtime/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Derivatives risk - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#derivatives-risk" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Derivatives risk
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Venue
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building with/without the venue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build profiles (venue-lite)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Matching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clearing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clearing and the ledger
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Derivatives risk
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Derivatives risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#isolated-margin-in-the-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Isolated margin (in the engine)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#liquidation-waterfall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liquidation waterfall
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#portfolio-cross-margin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portfolio (cross) margin
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Portfolio (cross) margin">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-symbol-with-no-profile-is-not-tradable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A symbol with no profile is not tradable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-symbol-with-no-mark-is-priced-at-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A symbol with no mark is priced at entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#handing-risk-to-an-owner-outside-the-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handing risk to an owner outside the engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-asset-collateral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-asset collateral
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mark-and-index-price" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mark and index price
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feed-circuit-breaker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feed circuit breaker
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#funding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Funding
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../perimeter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perimeter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fix-initiator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting over FIX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fix-quoting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quoting over FIX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-agent simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#isolated-margin-in-the-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Isolated margin (in the engine)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#liquidation-waterfall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Liquidation waterfall
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#portfolio-cross-margin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Portfolio (cross) margin
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Portfolio (cross) margin">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-symbol-with-no-profile-is-not-tradable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A symbol with no profile is not tradable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-symbol-with-no-mark-is-priced-at-entry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A symbol with no mark is priced at entry
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#handing-risk-to-an-owner-outside-the-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handing risk to an owner outside the engine
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-asset-collateral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-asset collateral
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mark-and-index-price" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mark and index price
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#feed-circuit-breaker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feed circuit breaker
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#funding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Funding
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="derivatives-risk">Derivatives risk<a class="headerlink" href="#derivatives-risk" title="Permanent link">&para;</a></h1>
+<p>A spot venue only moves assets that exist. A derivatives venue extends credit,
+so it needs margin, a defensible mark, a liquidation path, and a backstop for
+when liquidation is not enough.</p>
+<h2 id="isolated-margin-in-the-engine">Isolated margin (in the engine)<a class="headerlink" href="#isolated-margin-in-the-engine" title="Permanent link">&para;</a></h2>
+<p>Set <code>SymbolConfig::linearPerp</code> and the engine clears a linear perpetual:</p>
+<ul>
+<li><strong>Initial margin on entry.</strong> <code>notional * initialMarginBps</code> is reserved in
+  quote collateral; insufficient margin rejects the order. An order with no
+  price of its own (market, triggered stop) is margined at the top of the price
+  band on <strong>both</strong> sides -- a perp delivers nothing, so its notional grows with
+  price whether the account ends long or short.</li>
+<li><strong>Netting positions</strong> with an average entry price.</li>
+<li><strong>Mark-to-market PnL</strong> realised into collateral through the venue clearing
+  pool: a long's profit is funded by a short's loss, so value is conserved.</li>
+<li><strong>Reduce-only</strong> orders are capped to the opposing position on submit, on stop
+  trigger and on modify -- and re-measured <strong>at fill time</strong>, against the position
+  as it is then. A resting order is sized against the position it saw when it
+  was admitted; by the time it trades that position may be smaller or gone, so
+  only the part that still reduces executes and the rest is canceled
+  (<code>ReduceOnlyNotReducing</code>). That is what makes "never opens or flips" true of
+  the fill and not just of the submit -- and it matters because a reduce-only
+  order reserves no margin, so any part of it that opened a position would open
+  one with none.</li>
+<li><strong><code>maxPositionQty</code></strong> is enforced against the <strong>resulting</strong> position at fill
+  time, not only against the incoming order: orders that each pass the cap
+  individually cannot settle into a position past it together. The bite that
+  would breach it is cut, and a maker with no room left is pulled
+  (<code>PositionLimitExceeded</code>).</li>
+<li><strong>Maintenance sweep.</strong> <code>setMarkPrice</code> walks every position; anything whose
+  equity (posted margin + unrealised PnL, plus a negative wallet if the account
+  is overdrawn) falls under the maintenance requirement is force-closed.</li>
+</ul>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">cfg</span><span class="p">.</span><span class="n">linearPerp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">cfg</span><span class="p">.</span><span class="n">initialMarginBps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1000</span><span class="p">;</span><span class="w">      </span><span class="c1">// 10x</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">cfg</span><span class="p">.</span><span class="n">maintenanceMarginBps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">500</span><span class="p">;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">cfg</span><span class="p">.</span><span class="n">autoDeleverage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">venue</span><span class="p">.</span><span class="n">submit</span><span class="p">(</span><span class="n">InboundCommand</span><span class="p">{</span><span class="n">SetMark</span><span class="p">{</span><span class="n">SYM</span><span class="p">,</span><span class="w"> </span><span class="n">Price</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mi">49'500</span><span class="p">)}},</span><span class="w"> </span><span class="n">tsNs</span><span class="p">);</span>
+</span></code></pre></div>
+<p><code>SetMark</code> and <code>ApplyFunding</code> are commands in the sequenced stream, so a replay
+reproduces every mark-driven liquidation and funding payment exactly.</p>
+<h2 id="liquidation-waterfall">Liquidation waterfall<a class="headerlink" href="#liquidation-waterfall" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Cancel the account's resting orders.</strong> Their initial margin is the
+   account's own collateral; freeing it first means a total-equity-solvent
+   account covers its own shortfall before the insurance fund pays anything.</li>
+<li><strong>Force-close at the mark</strong> through the clearing pool.</li>
+<li><strong>Insurance fund</strong> (the venue account) absorbs a negative-equity deficit.</li>
+<li><strong>ADL</strong> claws the remainder from the most profitable opposite-side
+   positions: each winner is closed at the bankruptcy price, giving up exactly
+   the gain that absorbs the deficit and keeping the excess. Victim selection
+   uses a total order (<code>uPnl desc, then account, then symbol</code>), so it does not
+   depend on hash iteration or an unstable sort and a replica picks the same
+   victim.</li>
+</ol>
+<h2 id="portfolio-cross-margin">Portfolio (cross) margin<a class="headerlink" href="#portfolio-cross-margin" title="Permanent link">&para;</a></h2>
+<p><code>CrossMarginManager</code> runs margin across an account's whole book, so a profit
+on one symbol offsets a loss on another.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">CrossMarginManager</span><span class="w"> </span><span class="nf">cm</span><span class="p">(</span><span class="n">ledger</span><span class="p">,</span><span class="w"> </span><span class="cm">/*collateral asset*/</span><span class="w"> </span><span class="n">USD</span><span class="p">,</span><span class="w"> </span><span class="n">VENUE</span><span class="p">,</span><span class="w"> </span><span class="n">onLiquidation</span><span class="p">,</span><span class="w"> </span><span class="cm">/*adl*/</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">cm</span><span class="p">.</span><span class="n">configureSymbol</span><span class="p">(</span><span class="n">BTC</span><span class="p">,</span><span class="w"> </span><span class="cm">/*imBps*/</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w"> </span><span class="cm">/*mmBps*/</span><span class="w"> </span><span class="mi">500</span><span class="p">);</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">cm</span><span class="p">.</span><span class="n">setMark</span><span class="p">(</span><span class="n">BTC</span><span class="p">,</span><span class="w"> </span><span class="n">Price</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mi">50'000</span><span class="p">));</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">cm</span><span class="p">.</span><span class="n">canOpen</span><span class="p">(</span><span class="n">acct</span><span class="p">,</span><span class="w"> </span><span class="n">BTC</span><span class="p">,</span><span class="w"> </span><span class="n">Side</span><span class="o">::</span><span class="n">BUY</span><span class="p">,</span><span class="w"> </span><span class="n">qtyRaw</span><span class="p">,</span><span class="w"> </span><span class="n">priceRaw</span><span class="p">);</span><span class="w">  </span><span class="c1">// pre-trade gate</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">cm</span><span class="p">.</span><span class="n">applyFill</span><span class="p">(</span><span class="n">acct</span><span class="p">,</span><span class="w"> </span><span class="n">BTC</span><span class="p">,</span><span class="w"> </span><span class="n">Side</span><span class="o">::</span><span class="n">BUY</span><span class="p">,</span><span class="w"> </span><span class="n">qtyRaw</span><span class="p">,</span><span class="w"> </span><span class="n">priceRaw</span><span class="p">);</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">cm</span><span class="p">.</span><span class="n">equity</span><span class="p">(</span><span class="n">acct</span><span class="p">);</span><span class="w">            </span><span class="c1">// collateral basket + unrealised PnL</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">cm</span><span class="p">.</span><span class="n">withdrawable</span><span class="p">(</span><span class="n">acct</span><span class="p">);</span><span class="w">      </span><span class="c1">// never lets collateral behind open positions leave</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">cm</span><span class="p">.</span><span class="n">openInterestRaw</span><span class="p">();</span><span class="w">       </span><span class="c1">// venue-wide risk gauge</span>
+</span></code></pre></div>
+<p><code>setLiquidationsPaused(true)</code> is the operator switch for an untrustworthy
+price feed; see the circuit breaker below.</p>
+<h3 id="a-symbol-with-no-profile-is-not-tradable">A symbol with no profile is not tradable<a class="headerlink" href="#a-symbol-with-no-profile-is-not-tradable" title="Permanent link">&para;</a></h3>
+<p><code>canOpen</code> refuses to increase exposure on a symbol that never went through
+<code>configureSymbol</code>. There is no initial-margin rate for it, and an absent rate
+is not a rate of zero -- read that way, one listing that reached a matching
+engine ahead of the risk configuration would have backed any notional at all
+with any collateral at all.</p>
+<p>A leg that exists anyway, because a fill was reported before the symbol was
+configured, is charged its full notional as margin, so the account is closed
+out while the position is still covered instead of after the collateral is
+gone. <code>setUnconfiguredSymbolMargin(imBps, mmBps)</code> moves that rate for an
+integrator whose house rule differs; it stays a rate someone chose.</p>
+<h3 id="a-symbol-with-no-mark-is-priced-at-entry">A symbol with no mark is priced at entry<a class="headerlink" href="#a-symbol-with-no-mark-is-priced-at-entry" title="Permanent link">&para;</a></h3>
+<p>Nothing here invents a price. Where a position has to be valued and the symbol
+has no published mark -- unrealised PnL, the margin requirement, the
+liquidation close, ADL ranking and the price on the emitted <code>Liquidation</code> --
+the leg's own entry price stands in, which values it at no gain and no loss.
+A zero would not be a missing price but a price, and it turns a short into the
+winner of its whole notional: the fund pays out the invention, and the public
+tape prints a trade at zero on an instrument trading near its mark.</p>
+<p>An instrument nobody has marked yet is a normal state, not a broken one.
+<a href="../market-data/">Market data</a> publishes nothing rather than publish a zero for
+it; clearing follows the same rule.</p>
+<h2 id="handing-risk-to-an-owner-outside-the-engine">Handing risk to an owner outside the engine<a class="headerlink" href="#handing-risk-to-an-owner-outside-the-engine" title="Permanent link">&para;</a></h2>
+<p>Isolated margin is the engine's own business: it sees one instrument and the
+collateral behind it, so it can decide alone. Portfolio margin cannot work that
+way -- a hedge only nets across instruments, and the engines are per symbol. So
+the decision moves out and the engine executes it, over three seams.</p>
+<p><strong>Permission on entry.</strong> <code>setCreditCheck</code> is asked before an order is funded,
+whether or not this engine posts collateral of its own. The request names the
+instrument (the owner serves many), the order type and whether it reduces
+exposure; the answer carries a reject reason, so a client refused by portfolio
+margin is told that, not a flat funds error.</p>
+<p><strong>Fills.</strong> Every outbound event carries its owner account, so the risk layer
+rebuilds each account's basket by subscribing to the same stream everyone else
+reads. Nothing extra is needed.</p>
+<p><strong>Closing.</strong> <code>ForceClosePosition</code> closes a position on the owner's decision,
+settling through exactly the path the engine's own sweep uses, so the events
+and the replay are identical either way. The control-plane verb
+<code>forceClosePosition</code> sends it from outside the process
+(<code>{"method":"forceClosePosition","symbol":1,"account":7,"qty":2.0}</code>; an
+unnamed <code>qty</code> closes the whole position). Pair it with
+<code>SymbolConfig::externalLiquidation</code>, which stops the engine liquidating on its
+own: two systems closing the same position from different numbers is worse than
+either doing it alone.</p>
+<p>What stays outside: how the requirement is computed, which positions net, what
+haircuts collateral takes, when to close and in what order. Those differ per
+venue and are the owner's to define.</p>
+<h2 id="multi-asset-collateral">Multi-asset collateral<a class="headerlink" href="#multi-asset-collateral" title="Permanent link">&para;</a></h2>
+<p><code>CollateralSchedule</code> values a basket with per-asset haircuts. An unconfigured
+asset is valued at zero, so a forgotten entry under-counts collateral instead
+of extending credit against it. During liquidation the venue buys the
+non-quote collateral and the insurance fund only covers the remainder; every
+conversion is balanced per asset.</p>
+<p>The haircut applies to a positive balance only. A wallet can go negative --
+funding alone drives one there -- and that balance is a debt. Discounting a
+debt writes the liability down: a coin owed under a 20% haircut would count as
+four fifths of itself, and the missing fifth reads as equity, which the account
+can then withdraw or trade against. A debt is worth its full size.</p>
+<h2 id="mark-and-index-price">Mark and index price<a class="headerlink" href="#mark-and-index-price" title="Permanent link">&para;</a></h2>
+<p>A mark you can push is a mark someone will push. <code>index_feed.h</code> builds one
+that resists that:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">IndexAggregator</span><span class="w"> </span><span class="n">idx</span><span class="p">(</span><span class="cm">/*stalenessNs*/</span><span class="w"> </span><span class="mi">5'000'000'000</span><span class="p">,</span><span class="w"> </span><span class="cm">/*maxDeviationBps*/</span><span class="w"> </span><span class="mi">500</span><span class="p">,</span><span class="w"> </span><span class="cm">/*minSources*/</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">idx</span><span class="p">.</span><span class="n">update</span><span class="p">(</span><span class="n">sourceId</span><span class="p">,</span><span class="w"> </span><span class="n">price</span><span class="p">,</span><span class="w"> </span><span class="n">tsNs</span><span class="p">);</span><span class="w">   </span><span class="c1">// several external spot venues</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">idx</span><span class="p">.</span><span class="n">hasIndex</span><span class="p">(</span><span class="n">nowNs</span><span class="p">);</span><span class="w">                 </span><span class="c1">// enough fresh sources?</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">idx</span><span class="p">.</span><span class="n">index</span><span class="p">(</span><span class="n">nowNs</span><span class="p">);</span><span class="w">                    </span><span class="c1">// median, stale sources and outliers dropped</span>
+</span></code></pre></div>
+<p>The mark is the median of <code>{index, last trade, impact-mid}</code>, clamped into a
+band around the index. Impact-mid is a VWAP walked into the live book to a
+notional depth, so dust or a spoofed top level cannot move the mark.</p>
+<h2 id="feed-circuit-breaker">Feed circuit breaker<a class="headerlink" href="#feed-circuit-breaker" title="Permanent link">&para;</a></h2>
+<p><code>MarkFeedDriver</code> watches the feed and pauses liquidations when it goes stale:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">MarkFeedDriver</span><span class="w"> </span><span class="nf">driver</span><span class="p">(...);</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">const</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">publish</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">driver</span><span class="p">.</span><span class="n">onTick</span><span class="p">(</span><span class="n">nowNs</span><span class="p">,</span><span class="w"> </span><span class="n">lastTradeRaw</span><span class="p">,</span><span class="w"> </span><span class="n">impactMidRaw</span><span class="p">);</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">driver</span><span class="p">.</span><span class="n">paused</span><span class="p">();</span><span class="w">          </span><span class="c1">// liquidations halted while the index is not fresh</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">driver</span><span class="p">.</span><span class="n">markAgeNs</span><span class="p">(</span><span class="n">nowNs</span><span class="p">);</span><span class="w">  </span><span class="c1">// export as a health gauge</span>
+</span></code></pre></div>
+<p>Liquidating traders on a frozen price is how venues turn an outage into an
+incident. The breaker makes that failure mode explicit and observable.</p>
+<h2 id="funding">Funding<a class="headerlink" href="#funding" title="Permanent link">&para;</a></h2>
+<p>Two sources behind one settlement path:</p>
+<ul>
+<li><strong><code>FundingSchedule</code></strong> (<code>lrvx/backtest/</code>) replays a recorded rate tape.</li>
+<li><strong><code>FundingCalculator</code></strong> (<code>lrvx-venue/funding_rate.h</code>) computes the rate live:
+  premium (mark vs index) plus a clamped interest component, capped.</li>
+</ul>
+<p>The live path is TWAP by default: sample the premium across the interval and
+settle on the average, so a momentary dislocation cannot swing the payment.</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">FundingCalculator</span><span class="w"> </span><span class="n">f</span><span class="p">;</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">f</span><span class="p">.</span><span class="n">sample</span><span class="p">(</span><span class="n">mark</span><span class="p">,</span><span class="w"> </span><span class="n">index</span><span class="p">);</span><span class="w">          </span><span class="c1">// repeatedly across the interval</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">const</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="n">rate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">f</span><span class="p">.</span><span class="n">intervalRate</span><span class="p">();</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">f</span><span class="p">.</span><span class="n">resetSamples</span><span class="p">();</span>
+</span></code></pre></div>
+<p><code>FundingScheduler</code> closes the loop (sample, settle at the boundary, reset).
+Settlement is zero-sum: longs pay shorts or the reverse, and the charges
+across a balanced book sum to zero.</p>
+<p>The rate is a <code>double</code> as far as the journaled <code>ApplyFunding</code> body -- that is
+what a calculator produces and what an operator types, and it replays bit for
+bit -- and becomes an integer exactly once, at the boundary of the settlement
+path: <code>fundingRateRawOf</code> rounds it to nearest at <code>kFundingRateScale</code>, so 0.0003
+means 30000 rather than the 29999 truncation used to publish. Every payment
+after that is <code>mulDivI64(notionalRaw, rateRaw, kFundingRateScale)</code>, truncated
+toward zero and mirrored between the two legs. The clearing path and the
+portfolio-margin path (<code>CrossMarginManager::applyFunding</code>) take the same
+conversion and the same multiply, so the two books cannot settle one interval
+differently.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

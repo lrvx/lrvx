@@ -1,0 +1,2088 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/venue/fix-quoting/">
+      
+      
+        <link rel="prev" href="../fix-initiator/">
+      
+      
+        <link rel="next" href="../multi-agent/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Quoting over FIX - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#quoting-over-fix-massquote-quotecancel-quotestatusreport" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Quoting over FIX
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Venue
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building with/without the venue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build profiles (venue-lite)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Matching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clearing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clearing and the ledger
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../risk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Derivatives risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime and recovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../perimeter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perimeter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../fix-initiator/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting over FIX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quoting over FIX
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quoting over FIX
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-inbound-codec-accepts-and-refuses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the inbound codec accepts and refuses
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What the inbound codec accepts and refuses">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-id-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The id fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeinforce-59-and-gtd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TimeInForce (59) and GTD
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#massquote-35i-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MassQuote (35=i) in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MassQuote (35=i) in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-order-id-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The order-id block
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quotecancel-35z-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QuoteCancel (35=Z) in
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quotestatusreport-35ai-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QuoteStatusReport (35=AI) out
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quotes-only-admission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quotes-only admission
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-does-not-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What does not change
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-agent simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Verification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-inbound-codec-accepts-and-refuses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the inbound codec accepts and refuses
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What the inbound codec accepts and refuses">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-id-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The id fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#timeinforce-59-and-gtd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TimeInForce (59) and GTD
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#massquote-35i-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MassQuote (35=i) in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MassQuote (35=i) in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-order-id-block" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The order-id block
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quotecancel-35z-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QuoteCancel (35=Z) in
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quotestatusreport-35ai-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QuoteStatusReport (35=AI) out
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quotes-only-admission" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quotes-only admission
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-does-not-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What does not change
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="quoting-over-fix-massquote-quotecancel-quotestatusreport">Quoting over FIX: MassQuote / QuoteCancel / QuoteStatusReport<a class="headerlink" href="#quoting-over-fix-massquote-quotecancel-quotestatusreport" title="Permanent link">&para;</a></h1>
+<p><code>FixCodec</code> (<code>venue/include/lrvx-venue/fix_codec.h</code>) and <code>FixConnection</code>
+(<code>venue/include/lrvx-venue/fix_session.h</code>) decode a maker's whole ladder on
+one symbol from a single FIX message, the same <code>QuoteLadder</code> command a
+non-FIX caller builds directly (<code>venue/include/lrvx-venue/messages.h</code>,
+<code>venue/include/lrvx-venue/engine/quote_mmp.inl</code>). Before MassQuote/QuoteCancel support was added, the FIX
+perimeter accepted <code>D</code>/<code>F</code>/<code>G</code> (order entry) only -- a market maker speaking
+FIX could not quote at all.</p>
+<h2 id="what-the-inbound-codec-accepts-and-refuses">What the inbound codec accepts and refuses<a class="headerlink" href="#what-the-inbound-codec-accepts-and-refuses" title="Permanent link">&para;</a></h2>
+<p><code>FixCodec::decode</code> is the same function for <code>D</code>/<code>F</code>/<code>G</code> and for
+<code>i</code>/<code>Z</code>, so the strictness below is the same on all of them. Every refusal
+fills in the reason of the two-argument
+<code>decode(const std::string&amp;, std::string*)</code>, formatted as
+<code>&lt;FixFieldName&gt;(&lt;tag&gt;): &lt;what was wrong&gt;</code> -- <code>ClOrdID(11)</code>, <code>Account(1)</code>,
+<code>Symbol(55)</code>. <code>FixConnection</code> puts that string in the <code>Text</code> (58) of the
+<code>QuoteStatusReport</code> it answers a refused MassQuote/QuoteCancel with, which is
+the only place the sender ever sees it. The one-argument <code>decode</code> remains the
+decoder hook the gateways install.</p>
+<h3 id="the-id-fields">The id fields<a class="headerlink" href="#the-id-fields" title="Permanent link">&para;</a></h3>
+<p>FIX types <code>ClOrdID</code> (11), <code>OrigClOrdID</code> (41), <code>Account</code> (1) and <code>Symbol</code> (55)
+as String; this venue carries them as integers. A value it cannot carry is
+<strong>refused naming the field</strong>, never coerced -- see
+<code>venue/include/lrvx-venue/fix_field_parse.h</code>. Accepted: decimal digits only,
+and nothing else.</p>
+<table>
+<thead>
+<tr>
+<th>Wire value</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>42</code>, <code>0</code>, <code>18446744073709551615</code></td>
+<td>accepted (the last is the largest id this venue can carry)</td>
+</tr>
+<tr>
+<td><code>ORD-A1</code>, <code>BTC-USD</code>, <code>123ABC</code>, <code>4.2</code>, <code>0x10</code>, <code>4e2</code></td>
+<td>refused -- <code>strtoull</code> stopped at the first junk character and handed the engine what it had read so far, so two clients with alphanumeric names both became order id 0</td>
+</tr>
+<tr>
+<td>`` (empty)</td>
+<td>refused</td>
+</tr>
+<tr>
+<td><code>42</code>, <code>42</code></td>
+<td>refused -- a leading space is not part of a decimal integer</td>
+</tr>
+<tr>
+<td><code>+42</code>, <code>-1</code></td>
+<td>refused -- no sign; <code>-1</code> used to wrap to <code>UINT64_MAX</code>, the id a client that legitimately named <code>UINT64_MAX</code> gets</td>
+</tr>
+<tr>
+<td><code>0042</code></td>
+<td>refused -- <code>0042</code> and <code>42</code> are two different ClOrdIDs, and accepting both would hand them one order id</td>
+</tr>
+<tr>
+<td><code>99999999999999999999</code></td>
+<td>refused -- above <code>UINT64_MAX</code>; <code>strtoull</code> saturated it onto <code>UINT64_MAX</code> and set <code>ERANGE</code>, which nobody read</td>
+</tr>
+<tr>
+<td><code>4294967296</code> in 55</td>
+<td>refused -- above <code>UINT32_MAX</code>; the cast to <code>SymbolId</code> truncated it to 0, another instrument's book</td>
+</tr>
+</tbody>
+</table>
+<p><code>ClOrdID</code> (11) is required on <code>D</code> and <code>OrigClOrdID</code> (41) on <code>F</code>/<code>G</code>, as FIX
+4.4 requires them. <code>Account</code> (1) and <code>Symbol</code> (55) stay optional on <code>D</code>/<code>F</code>/<code>G</code>
+-- the session stamps the account and a shard already knows its symbol -- but a
+value that <em>is</em> present has to parse. On <code>i</code> and <code>Z</code> both are required, for
+the reason the id block section below gives.</p>
+<h3 id="timeinforce-59-and-gtd">TimeInForce (59) and GTD<a class="headerlink" href="#timeinforce-59-and-gtd" title="Permanent link">&para;</a></h3>
+<p><code>TimeInForce</code> used to map 3 and 4 and send everything else to GTC, including
+values that name a deadline this venue cannot keep. It now accepts exactly the
+four the engine runs, and refuses the rest naming <code>TimeInForce(59)</code>.</p>
+<table>
+<thead>
+<tr>
+<th>59</th>
+<th>FIX 4.4</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>absent</em></td>
+<td>--</td>
+<td>GTC, the default</td>
+</tr>
+<tr>
+<td>1</td>
+<td>GoodTillCancel</td>
+<td><code>TimeInForce::GTC</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>ImmediateOrCancel</td>
+<td><code>TimeInForce::IOC</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>FillOrKill</td>
+<td><code>TimeInForce::FOK</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>GoodTillDate</td>
+<td><code>TimeInForce::GTD</code>, with <code>ExpireTime</code> (126) below</td>
+</tr>
+<tr>
+<td>0, 2, 5, 7, 8</td>
+<td>Day, AtTheOpening, GoodTillCrossing, AtTheClose, AtCrossing</td>
+<td>refused -- each ends at a session boundary or an auction this venue does not run, and resting one as GTC turns an order the sender gave a deadline into one that never expires</td>
+</tr>
+<tr>
+<td>anything else</td>
+<td>--</td>
+<td>refused</td>
+</tr>
+</tbody>
+</table>
+<p>There is no <code>TimeInForce</code> for post-only: that arrives as <code>ExecInst</code> (18) <code>6</code>
+ParticipateDoNotInitiate, which is how FIX spells it, and <code>TimeInForce::POST_ONLY</code>
+is reachable only through the non-FIX transports.</p>
+<p><code>ExpireTime</code> (126) is <strong>required</strong> by <code>59=6</code> and refused unless it is a FIX
+<code>UTCTimestamp</code> -- <code>YYYYMMDD-HH:MM:SS</code> with optional <code>.sss</code> milliseconds,
+<code>20260925-12:00:00.250</code>. It is read as UTC by civil-date arithmetic
+(<code>fix_field_parse.h</code>), never through <code>mktime</code>/<code>strptime</code>: those read the host's
+<code>TZ</code> and locale, and an expiry that moves with the venue host's
+<code>/etc/localtime</code> is not an expiry. The milliseconds are kept
+(<code>.250</code> -&gt; <code>...250000000</code> in <code>NewOrder::expiryNs</code>), and the parse is the exact
+inverse of the <code>SendingTime</code> (52) printer both ends of a session already share.
+A month outside 1-12, a day the month does not have, an hour above 23, a year
+before 1970, after 2261 (nanoseconds since the epoch no longer fit an int64) or any other shape is refused naming <code>ExpireTime(126)</code>. On a
+<code>TimeInForce</code> other than GTD, tag 126 carries no FIX meaning and is ignored.</p>
+<h2 id="massquote-35i-in">MassQuote (35=i) in<a class="headerlink" href="#massquote-35i-in" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Field</th>
+<th>Maps to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Account</td>
+<td><code>QuoteLadder::accountId</code> -- <strong>required</strong>, see below</td>
+</tr>
+<tr>
+<td>117</td>
+<td>QuoteID</td>
+<td><code>QuoteLadder::clientOrderId</code> -- the ladder's own name; deduplicated once for the whole ladder, the same rule a <code>Quote</code> already applies to its two legs</td>
+</tr>
+<tr>
+<td>299</td>
+<td>QuoteEntryID</td>
+<td>starts one level; levels are read in the order the entries arrive, up to <code>kQuoteLadderLevels</code></td>
+</tr>
+<tr>
+<td>55</td>
+<td>Symbol</td>
+<td><code>QuoteLadder::symbol</code>, once per entry; every entry of one MassQuote must name the same symbol</td>
+</tr>
+<tr>
+<td>132</td>
+<td>BidPx</td>
+<td><code>QuoteLadderLevel::bidPrice</code></td>
+</tr>
+<tr>
+<td>133</td>
+<td>OfferPx</td>
+<td><code>QuoteLadderLevel::askPrice</code></td>
+</tr>
+<tr>
+<td>134</td>
+<td>BidSize</td>
+<td><code>QuoteLadderLevel::bidQty</code></td>
+</tr>
+<tr>
+<td>135</td>
+<td>OfferSize</td>
+<td><code>QuoteLadderLevel::askQty</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>NoQuoteSets</code> (296), <code>QuoteSetID</code> (302) and <code>NoQuoteEntries</code> (295) are the FIX
+4.4 group counts; the decoder does not need them -- entries are read as they
+arrive, delimited by <code>QuoteEntryID</code>, the way <code>FixMdCodec</code> reads repeating
+market-data entries.</p>
+<p>The decode is refused (no command is built, no engine call happens) when:</p>
+<ul>
+<li><strong>Account (1) or QuoteID (117) is missing.</strong></li>
+<li><strong>More than <code>kQuoteLadderLevels</code> entries are named.</strong> <code>QuoteLadder::levels</code>
+  above that is <em>clamped</em> by the engine (a live ladder never shrinks the
+  wire format), so this is the codec's own check -- a client that named nine
+  levels asked for something the ladder cannot represent and is told so,
+  rather than having its ninth level silently dropped.</li>
+<li><strong>The levels are not ordered as received: bid strictly descending, ask
+  strictly ascending.</strong> The shape a ladder walking away from the mid always
+  has. A MassQuote that does not honour it is refused rather than silently
+  sorted -- sorting would submit a ladder the sender never asked for under
+  its own QuoteID.</li>
+<li><strong>A level is missing one of BidPx/OfferPx/BidSize/OfferSize</strong>, or a price
+  or size does not parse as a clean fixed-point decimal (the same strict
+  <code>decwire</code> parse every other FIX numeric field gets: no doubles, no
+  exponents, no silent coercion).</li>
+<li><strong>An entry names a different symbol than the first one.</strong> One MassQuote is
+  one <code>QuoteLadder</code>, and a <code>QuoteLadder</code> is one symbol.</li>
+</ul>
+<h3 id="the-order-id-block">The order-id block<a class="headerlink" href="#the-order-id-block" title="Permanent link">&para;</a></h3>
+<p>FIX <code>MassQuote</code> carries no per-leg order id -- 117 QuoteID is the <em>ladder's</em>
+own name, not an id base for its <code>kQuoteLadderLevels</code> legs a side. The venue
+therefore derives <code>bidIdBase</code>/<code>askIdBase</code> deterministically from
+<code>(accountId, symbol)</code> (<code>FixCodec::quoteLadderIdBase</code>): every MassQuote or
+QuoteCancel from one account on one symbol addresses the same
+<code>2*kQuoteLadderLevels</code>-id block, bid block then ask block. That is what lets
+a QuoteCancel -- which names no ids of its own -- take down exactly the legs
+the last MassQuote on that account/symbol put up, and what lets a later
+MassQuote <em>replace</em> them rather than add a second set beside them, which is
+the "replaced atomically, same ids" contract <code>QuoteLadder</code> already
+documents.</p>
+<p>This is also why Account (1) is required rather than left to the session to
+stamp after decode, unlike <code>NewOrderSingle</code>: the id block is derived from
+<code>accountId</code> <em>inside</em> <code>decode()</code>, before any session-level stamping could run,
+so a decode that tolerated a missing Account would leave the ladder's own
+<code>accountId</code> field disagreeing with the id block it was built from.</p>
+<p>"Exactly the legs the last MassQuote on <em>that</em> account/symbol put up" is a
+claim in two directions: one pair always reaches its own block, and no other
+pair ever reaches it. The original fold, <code>account * 4099 + symbol</code>, only
+delivered the first -- <code>(1, 4099)</code> and <code>(2, 0)</code> both fold to 8198 and were
+handed the same sixteen ids, so either maker's QuoteCancel took the other's
+ladder down. A bigger multiplier moves which pairs collide; it does not
+remove the collision.</p>
+<p><strong>The range.</strong> The fold is positional, so each field has a width:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Width</th>
+<th>Range</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Symbol</code> (55)</td>
+<td>32 bits</td>
+<td><code>0 .. 4294967295</code> -- the whole <code>SymbolId</code> type</td>
+</tr>
+<tr>
+<td><code>Account</code> (1)</td>
+<td>24 bits</td>
+<td><code>0 .. 16777215</code> (<code>FixCodec::kQuoteAccountLimit - 1</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><code>bidIdBase = kMarker + ((account &lt;&lt; 32) | symbol) * 2 * kQuoteLadderLevels</code>,
+<code>askIdBase = bidIdBase + kQuoteLadderLevels</code>. Injective over that whole range
+by construction, and the blocks tile it: adjacent pairs are exactly one block
+width apart, so no leg of one pair can land in another pair's block.</p>
+<p>An <code>Account</code> above the range is <strong>refused</strong> naming <code>Account(1)</code>, on MassQuote
+and QuoteCancel alike (<code>FixCodec::quoteIdBlockInRange</code>). A venue cannot fold
+2^64 accounts x 2^32 symbols into 2^64 ids sixteen at a time -- the pigeonhole
+is not negotiable -- so the choice is between refusing the pairs that do not
+fit and wrapping two makers onto one ladder. A maker told "your account id is
+outside the quoting range" can be given an account id inside it; a maker whose
+quotes are cancelled by a stranger cannot tell that is what happened.</p>
+<h2 id="quotecancel-35z-in">QuoteCancel (35=Z) in<a class="headerlink" href="#quotecancel-35z-in" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Field</th>
+<th>Maps to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Account</td>
+<td><code>QuoteLadder::accountId</code> -- required</td>
+</tr>
+<tr>
+<td>55</td>
+<td>Symbol</td>
+<td><code>QuoteLadder::symbol</code> -- required</td>
+</tr>
+<tr>
+<td>298</td>
+<td>QuoteCancelType</td>
+<td>not read: every engine shard already handles exactly one symbol, so "cancel every symbol" (4) and "cancel this symbol" are the same operation from here</td>
+</tr>
+</tbody>
+</table>
+<p>Decodes to a <code>QuoteLadder</code> with <code>levels = 0</code> targeting the same id block a
+MassQuote from this account on this symbol would -- the engine's existing
+"a shorter ladder takes its surplus levels down" rule does the rest; a
+zero-level ladder takes ALL of them down.</p>
+<h2 id="quotestatusreport-35ai-out">QuoteStatusReport (35=AI) out<a class="headerlink" href="#quotestatusreport-35ai-out" title="Permanent link">&para;</a></h2>
+<p>Two different things answer with this message, both intentionally:</p>
+<ol>
+<li><strong>The immediate acknowledgment of the MassQuote/QuoteCancel frame itself</strong>,
+   sent by <code>FixConnection::onFrame</code> before the frame falls through to the
+   ordinary decode/admission/submit pipeline -- the same session layer that
+   answers Logon, Heartbeat and an unknown MsgType directly, not an engine
+   event. <code>297</code> QuoteStatus is <code>0</code> (Accepted) for anything this venue could
+   turn into a <code>QuoteLadder</code>, <code>5</code> (Rejected) with <code>58</code> Text for anything it
+   could not (see the refusal list above). <code>117</code> echoes the request's
+   QuoteID when it had one.</li>
+<li><strong>An engine-side refusal of a ladder that passed that check</strong> --
+   <code>RejectReason::QuoteNotPermitted</code> (the admission profile denies quoting,
+   <code>AdmissionDeny::DenyQuote</code>) -- answers through the <em>same</em> report shape,
+   from <code>FixCodec::encode</code>'s own <code>QuoteNotPermitted</code> case, over the ordinary
+   <code>OutboundEvent</code> -&gt; exec-report path. FIX has no honest <code>ExecType</code> for "your
+   ladder never reached the book", and switching to an <code>ExecutionReport</code>
+   partway through one MassQuote's story would be a second message format
+   for the same conversation.</li>
+</ol>
+<p>Every other engine-side event a ladder's legs produce (<code>OrderAccepted</code>,
+<code>OrderCanceled</code>, <code>OrderExecuted</code>, ...) is unaffected and still travels as an
+ordinary <code>ExecutionReport</code> per leg, exactly as it does for a <code>QuoteLadder</code>
+submitted through any other transport -- <code>QuoteStatusReport</code> answers the
+MassQuote/QuoteCancel <em>request</em>, not the legs it produces.</p>
+<p>The immediate acknowledgment is sent the same way Logon/Heartbeat/session
+Reject are (sequenced, not logged for resend): a <code>ResendRequest</code> whose range
+covers it answers with <code>SequenceReset-GapFill</code> over that seq, same as every
+other session-layer reply.</p>
+<h2 id="quotes-only-admission">Quotes-only admission<a class="headerlink" href="#quotes-only-admission" title="Permanent link">&para;</a></h2>
+<p>A market maker that only ever sends <code>MassQuote</code>/<code>QuoteCancel</code> should not be
+able to place or cancel a plain order through the same session --
+<code>AdmissionProfile::deny</code> carries <code>DenyNewOrder</code> (refuses <code>NewOrder</code>,
+<code>RejectReason::NewOrderNotPermitted</code>) alongside the existing <code>DenyCancel</code>
+(refuses <code>CancelOrder</code>) for exactly this profile, with <code>DenyQuote</code> left
+unset. See <code>docs/venue/matching.md</code> for the full <code>AdmissionDeny</code> table.</p>
+<h2 id="what-does-not-change">What does not change<a class="headerlink" href="#what-does-not-change" title="Permanent link">&para;</a></h2>
+<p>The engine (<code>MatchingEngine::onQuoteLadder</code>, <code>engine::QuoteLadderLegs</code>) is
+untouched: a <code>QuoteLadder</code> decoded from a MassQuote runs through the exact
+same path, id for id and event for event, as one submitted through any other
+transport. SBE's own inbound <code>QuoteLadder</code> (schema version 8, template 7,
+see <code>docs/venue/perimeter.md</code>) is unaffected. The golden replay corpus does
+not change -- the perimeter gained a decoder, the engine gained nothing new
+to replay.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

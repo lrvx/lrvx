@@ -1,0 +1,2118 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/spec/lrvxrun/">
+      
+      
+        <link rel="prev" href="../lrvx/">
+      
+      
+        <link rel="next" href="../../reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>lrvxrun strategy-trace format v1.0 - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#lrvxrun-strategy-trace-format-specification" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              lrvxrun strategy-trace format v1.0
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Specifications
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lrvx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lrvx tape format v1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lrvxrun strategy-trace format v1.0
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    lrvxrun strategy-trace format v1.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-a-separate-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a separate format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout-on-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout on disk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#magic-numbers-and-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Magic numbers and constants
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-segment-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run-segment file
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Run-segment file">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#runsegmentheader-64-bytes-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RunSegmentHeader (64 bytes, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runsegmentflags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RunSegmentFlags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frame-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frame stream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signalrecord-48-bytes-fixed-variable-payload-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SignalRecord (48 bytes fixed + variable payload, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ordereventrecord-64-bytes-fixed-optional-payload-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderEventRecord (64 bytes fixed + optional payload, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fillrecord-64-bytes-8-byte-aligned-no-payload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FillRecord (64 bytes, 8-byte aligned, no payload)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sparse-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sparse index
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reader-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reader contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bundle-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bundle integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        At a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-a-separate-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a separate format
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout-on-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout on disk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#magic-numbers-and-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Magic numbers and constants
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-segment-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run-segment file
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Run-segment file">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#runsegmentheader-64-bytes-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RunSegmentHeader (64 bytes, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runsegmentflags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RunSegmentFlags
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frame-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frame stream
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signalrecord-48-bytes-fixed-variable-payload-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SignalRecord (48 bytes fixed + variable payload, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ordereventrecord-64-bytes-fixed-optional-payload-8-byte-aligned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OrderEventRecord (64 bytes fixed + optional payload, 8-byte aligned)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fillrecord-64-bytes-8-byte-aligned-no-payload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FillRecord (64 bytes, 8-byte aligned, no payload)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sparse-index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sparse index
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reader-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reader contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bundle-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bundle integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="lrvxrun-strategy-trace-format-specification"><code>.lrvxrun</code> strategy-trace format specification<a class="headerlink" href="#lrvxrun-strategy-trace-format-specification" title="Permanent link">&para;</a></h1>
+<p><strong>Version 1.0, frozen 2026-05-08.</strong> This is the on-disk format lrvx uses to record what a strategy did during a run: the signals it produced, the orders it submitted, and the fills it received. Tape (<code>.lrvx</code>) records what came in from the exchange; this format records what the strategy emitted in response. The two live side by side.</p>
+<p>The spec is published so third-party tooling can read and write trace artifacts without depending on lrvx itself.</p>
+<h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">&para;</a></h2>
+<p>A <code>.lrvxrun</code> is a directory of segment files plus a manifest. Each segment holds one record type (signals, order events, or fills) as length-prefixed CRC-checked frames. Frames carry both a wall-clock timestamp (when the strategy emitted the event) and a feed timestamp (the source tape event that triggered the decision), so a reader can line trace events up against any of the consumed tapes without guessing.</p>
+<p>Everything is little-endian. All structures are 8-byte aligned. CRC32 uses the standard reflected polynomial <code>0xEDB88320</code> (ISO 3309). The on-disk layout, segment-header shape, frame-header shape, and CRC are intentionally identical to <code>.lrvx</code> so existing reader infrastructure ports over with minimal change.</p>
+<h2 id="why-a-separate-format">Why a separate format<a class="headerlink" href="#why-a-separate-format" title="Permanent link">&para;</a></h2>
+<p>Tape is per-feed: one symbol from one exchange, one stream of trades and book updates as they arrived from the wire. A strategy run is per-run: it consumes N tapes, emits decisions that may span several symbols, and produces orders and fills that don't belong to any one feed.</p>
+<p>Putting trace inside <code>.lrvx</code> was rejected for three reasons:</p>
+<ul>
+<li>A multi-symbol decision (for example, "BTC/ETH ratio crossed threshold, short BTC and long ETH") doesn't belong to either input tape. Writing it into one would lie about its scope; writing it into both would duplicate it.</li>
+<li>Tape is exchange-portable. A Bitget BTC tape should replay against any strategy. Mixing one strategy's signals into the tape couples them.</li>
+<li>Tape is a deterministic input format. Replay tooling should not have to filter a "trace" subtype out before feeding the strategy.</li>
+</ul>
+<p>The trace lives alongside the tape, and the run's manifest references the tapes it was produced from.</p>
+<h2 id="layout-on-disk">Layout on disk<a class="headerlink" href="#layout-on-disk" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>my-run.lrvxrun/
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── manifest.json
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── signals-000000.bin
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── orders-000000.bin
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>└── fills-000000.bin
+</span></code></pre></div>
+<p><code>manifest.json</code> is the index. It carries strategy identity, the list of consumed tapes with content hashes, the run's wall-clock window, and per-segment metadata. Segments are independently parseable; the manifest is an index, not a requirement.</p>
+<p>Per-type segment files mean a tool that only cares about, say, fills can read just the fills segment without paying for signal decoding.</p>
+<p>A directory named <code>*.floxrun</code>, the name traces recorded under FLOX carry, holds the same format. <code>TraceReader</code> opens a trace by directory path whatever its suffix, <code>lrvx tape view</code> accepts <code>.floxrun</code> alongside <code>.lrvxrun</code>, and bundle validation reads <code>expected.floxrun/</code> when a bundle has no <code>expected.lrvxrun/</code>.</p>
+<h2 id="magic-numbers-and-constants">Magic numbers and constants<a class="headerlink" href="#magic-numbers-and-constants" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Value</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MAGIC_RUN_SEGMENT</code></td>
+<td><code>0x4E555246</code> (<code>"FRUN"</code>)</td>
+<td>Run-segment header sentinel.</td>
+</tr>
+<tr>
+<td><code>FORMAT_VERSION</code></td>
+<td><code>1</code></td>
+<td>Bump triggers a new <code>.lrvxrun</code> major.</td>
+</tr>
+</tbody>
+</table>
+<p>The frame-header magic, CRC algorithm, and compressed-block header (when used) are reused verbatim from <code>.lrvx</code>.</p>
+<h2 id="run-segment-file">Run-segment file<a class="headerlink" href="#run-segment-file" title="Permanent link">&para;</a></h2>
+<p>A segment is a <code>RunSegmentHeader</code> followed by a stream of frames. Frames carry one record per the segment's record type. Compression is supported via the same <code>CompressedBlock</code> shape as <code>.lrvx</code>.</p>
+<h3 id="runsegmentheader-64-bytes-8-byte-aligned"><code>RunSegmentHeader</code> (64 bytes, 8-byte aligned)<a class="headerlink" href="#runsegmentheader-64-bytes-8-byte-aligned" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">4</td>
+<td><code>magic</code></td>
+<td><code>MAGIC_RUN_SEGMENT</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">2</td>
+<td><code>version</code></td>
+<td><code>1</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">1</td>
+<td><code>flags</code></td>
+<td>Bitfield. See below.</td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">1</td>
+<td><code>record_kind</code></td>
+<td><code>1</code> Signal, <code>2</code> OrderEvent, <code>3</code> Fill.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+<td><code>created_ns</code></td>
+<td>Wall-clock nanoseconds when the segment was opened.</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">8</td>
+<td><code>first_event_ns</code></td>
+<td>Earliest <code>run_ts_ns</code> in segment.</td>
+</tr>
+<tr>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">8</td>
+<td><code>last_event_ns</code></td>
+<td>Latest <code>run_ts_ns</code> in segment.</td>
+</tr>
+<tr>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">4</td>
+<td><code>event_count</code></td>
+<td>Total events written.</td>
+</tr>
+<tr>
+<td style="text-align: right;">36</td>
+<td style="text-align: right;">4</td>
+<td><code>_pad0</code></td>
+<td>Zero.</td>
+</tr>
+<tr>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">8</td>
+<td><code>index_offset</code></td>
+<td>Byte offset of the index trailer; <code>0</code> if absent.</td>
+</tr>
+<tr>
+<td style="text-align: right;">48</td>
+<td style="text-align: right;">1</td>
+<td><code>compression</code></td>
+<td><code>0</code> none, <code>1</code> LZ4.</td>
+</tr>
+<tr>
+<td style="text-align: right;">49</td>
+<td style="text-align: right;">15</td>
+<td><code>reserved[15]</code></td>
+<td>Zero-filled.</td>
+</tr>
+</tbody>
+</table>
+<p>A reader that sees an unknown <code>record_kind</code> must reject the segment.</p>
+<h3 id="runsegmentflags"><code>RunSegmentFlags</code><a class="headerlink" href="#runsegmentflags" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Bit</th>
+<th>Name</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><code>0x01</code></td>
+<td><code>HasIndex</code></td>
+<td>Sparse index trailer present. Same shape as <code>.lrvx</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>0x02</code></td>
+<td><code>Compressed</code></td>
+<td>Frame stream partitioned into <code>CompressedBlock</code>s.</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>0x04</code></td>
+<td><code>Sorted</code></td>
+<td>Writer guarantees <code>run_ts_ns</code> is monotonically non-decreasing.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="frame-stream">Frame stream<a class="headerlink" href="#frame-stream" title="Permanent link">&para;</a></h3>
+<p>A frame is the standard 12-byte <code>FrameHeader</code> (the same struct <code>.lrvx</code> uses) followed by <code>size</code> bytes of payload. Payload meaning depends on <code>type</code>:</p>
+<ul>
+<li><code>type = 10</code> → <code>SignalRecord</code> followed by <code>payload_len</code> bytes</li>
+<li><code>type = 11</code> → <code>OrderEventRecord</code> followed by <code>payload_len</code> bytes</li>
+<li><code>type = 12</code> → <code>FillRecord</code> (fixed-size, no trailing payload)</li>
+</ul>
+<p>A run-segment file holds frames of one <code>record_kind</code> only. Mixing kinds within a segment is not allowed.</p>
+<p>The <code>FrameHeader</code> from <code>.lrvx</code> is reused exactly:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">4</td>
+<td><code>size</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">4</td>
+<td><code>crc32</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">1</td>
+<td><code>type</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">1</td>
+<td><code>rec_version</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">2</td>
+<td><code>flags</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>type</code> for run frames lives in <code>[10, 12]</code> to leave space for tape frame types in <code>[1, 9]</code>.</p>
+<h3 id="signalrecord-48-bytes-fixed-variable-payload-8-byte-aligned"><code>SignalRecord</code> (48 bytes fixed + variable payload, 8-byte aligned)<a class="headerlink" href="#signalrecord-48-bytes-fixed-variable-payload-8-byte-aligned" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">8</td>
+<td><code>run_ts_ns</code></td>
+<td>Wall-clock nanoseconds when the strategy emitted the signal.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+<td><code>feed_ts_ns</code></td>
+<td>Timestamp of the tape event that triggered the decision; <code>0</code> if not applicable.</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">4</td>
+<td><code>signal_id</code></td>
+<td>Numeric id from the strategy's signal registry.</td>
+</tr>
+<tr>
+<td style="text-align: right;">20</td>
+<td style="text-align: right;">2</td>
+<td><code>name_len</code></td>
+<td>Bytes of UTF-8 signal name in the payload.</td>
+</tr>
+<tr>
+<td style="text-align: right;">22</td>
+<td style="text-align: right;">2</td>
+<td><code>symbol_count</code></td>
+<td>Number of <code>symbol_id</code> entries in the payload.</td>
+</tr>
+<tr>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">4</td>
+<td><code>payload_len</code></td>
+<td>Bytes of caller-defined payload after the trailing fields.</td>
+</tr>
+<tr>
+<td style="text-align: right;">28</td>
+<td style="text-align: right;">4</td>
+<td><code>flags</code></td>
+<td>Bit <code>0x01</code> = decision is "enter", <code>0x02</code> = "exit", <code>0x04</code> = "rebalance".</td>
+</tr>
+<tr>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">8</td>
+<td><code>strength_raw</code></td>
+<td>Signal strength, fixed-point with scale <code>1e8</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">8</td>
+<td><code>_reserved</code></td>
+<td>Zero.</td>
+</tr>
+</tbody>
+</table>
+<p>Followed in order by:</p>
+<ol>
+<li><code>name_len</code> bytes of UTF-8 signal name (no terminator).</li>
+<li><code>symbol_count</code> × <code>uint32_t</code> (4 bytes each) symbol ids.</li>
+<li><code>payload_len</code> bytes of caller-defined payload (typically a JSON blob; opaque to the format).</li>
+<li>Padding to align the frame end to 8 bytes.</li>
+</ol>
+<p>A single signal can carry several symbol ids because cross-symbol decisions are first-class. A pair-trade signal lists both symbols; a single-symbol signal lists one.</p>
+<h3 id="ordereventrecord-64-bytes-fixed-optional-payload-8-byte-aligned"><code>OrderEventRecord</code> (64 bytes fixed + optional payload, 8-byte aligned)<a class="headerlink" href="#ordereventrecord-64-bytes-fixed-optional-payload-8-byte-aligned" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">8</td>
+<td><code>run_ts_ns</code></td>
+<td>Wall-clock when the event was emitted.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+<td><code>feed_ts_ns</code></td>
+<td>Triggering tape event timestamp; <code>0</code> if not applicable.</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">8</td>
+<td><code>order_id</code></td>
+<td>Numeric order id from the executor's registry.</td>
+</tr>
+<tr>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">8</td>
+<td><code>parent_signal_id</code></td>
+<td>Signal that produced this event; <code>0</code> if unrooted.</td>
+</tr>
+<tr>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">8</td>
+<td><code>price_raw</code></td>
+<td>Fixed-point price, scale <code>1e8</code>. <code>0</code> if not applicable.</td>
+</tr>
+<tr>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">8</td>
+<td><code>qty_raw</code></td>
+<td>Fixed-point quantity, scale <code>1e8</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">48</td>
+<td style="text-align: right;">4</td>
+<td><code>symbol_id</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">52</td>
+<td style="text-align: right;">1</td>
+<td><code>event_kind</code></td>
+<td><code>1</code> submit, <code>2</code> cancel, <code>3</code> modify, <code>4</code> ack, <code>5</code> reject, <code>6</code> expire.</td>
+</tr>
+<tr>
+<td style="text-align: right;">53</td>
+<td style="text-align: right;">1</td>
+<td><code>side</code></td>
+<td><code>0</code> buy, <code>1</code> sell.</td>
+</tr>
+<tr>
+<td style="text-align: right;">54</td>
+<td style="text-align: right;">1</td>
+<td><code>order_type</code></td>
+<td><code>0</code> market, <code>1</code> limit, <code>2</code> stop, <code>3</code> stop-limit.</td>
+</tr>
+<tr>
+<td style="text-align: right;">55</td>
+<td style="text-align: right;">1</td>
+<td><code>_pad0</code></td>
+<td>Zero.</td>
+</tr>
+<tr>
+<td style="text-align: right;">56</td>
+<td style="text-align: right;">4</td>
+<td><code>reason_len</code></td>
+<td>Bytes of UTF-8 reason text in the payload (e.g. for reject).</td>
+</tr>
+<tr>
+<td style="text-align: right;">60</td>
+<td style="text-align: right;">4</td>
+<td><code>flags</code></td>
+<td>Bit <code>0x01</code> = post-only, <code>0x02</code> = reduce-only, <code>0x04</code> = ioc.</td>
+</tr>
+</tbody>
+</table>
+<p>Followed by <code>reason_len</code> bytes of UTF-8 reason text and padding to 8-byte alignment.</p>
+<h3 id="fillrecord-64-bytes-8-byte-aligned-no-payload"><code>FillRecord</code> (64 bytes, 8-byte aligned, no payload)<a class="headerlink" href="#fillrecord-64-bytes-8-byte-aligned-no-payload" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Offset</th>
+<th style="text-align: right;">Size</th>
+<th>Field</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">8</td>
+<td><code>run_ts_ns</code></td>
+<td>Wall-clock when the fill was processed.</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">8</td>
+<td><code>feed_ts_ns</code></td>
+<td>Triggering trade tape event; <code>0</code> if not applicable.</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">8</td>
+<td><code>order_id</code></td>
+<td>Order this fill belongs to.</td>
+</tr>
+<tr>
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">8</td>
+<td><code>fill_id</code></td>
+<td>Exchange fill id; <code>0</code> if unknown.</td>
+</tr>
+<tr>
+<td style="text-align: right;">32</td>
+<td style="text-align: right;">8</td>
+<td><code>price_raw</code></td>
+<td>Fixed-point price.</td>
+</tr>
+<tr>
+<td style="text-align: right;">40</td>
+<td style="text-align: right;">8</td>
+<td><code>qty_raw</code></td>
+<td>Fixed-point quantity filled.</td>
+</tr>
+<tr>
+<td style="text-align: right;">48</td>
+<td style="text-align: right;">8</td>
+<td><code>fee_raw</code></td>
+<td>Fixed-point fee in fee currency, scale <code>1e8</code>.</td>
+</tr>
+<tr>
+<td style="text-align: right;">56</td>
+<td style="text-align: right;">4</td>
+<td><code>symbol_id</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: right;">60</td>
+<td style="text-align: right;">1</td>
+<td><code>side</code></td>
+<td><code>0</code> buy, <code>1</code> sell.</td>
+</tr>
+<tr>
+<td style="text-align: right;">61</td>
+<td style="text-align: right;">1</td>
+<td><code>liquidity</code></td>
+<td><code>0</code> unknown, <code>1</code> maker, <code>2</code> taker.</td>
+</tr>
+<tr>
+<td style="text-align: right;">62</td>
+<td style="text-align: right;">2</td>
+<td><code>_pad0</code></td>
+<td>Zero.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="sparse-index">Sparse index<a class="headerlink" href="#sparse-index" title="Permanent link">&para;</a></h3>
+<p>When <code>flags.HasIndex</code> is set, the <code>RunSegmentHeader.index_offset</code> points at a trailer whose layout is identical to <code>.lrvx</code>'s <code>SegmentIndexHeader</code> followed by <code>IndexEntry</code> rows keyed by <code>run_ts_ns</code>.</p>
+<h2 id="manifest">Manifest<a class="headerlink" href="#manifest" title="Permanent link">&para;</a></h2>
+<p><code>manifest.json</code> is one JSON object:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"schema_version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">"format_version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">"strategy_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"moving-average-cross"</span><span class="p">,</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">"strategy_hash"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:abc123..."</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">"run_started_ns"</span><span class="p">:</span><span class="w"> </span><span class="mi">1714123456000000000</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">"run_ended_ns"</span><span class="p">:</span><span class="w"> </span><span class="mi">1714123556000000000</span><span class="p">,</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">"tape_refs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="p">{</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"BTCUSDT.lrvx"</span><span class="p">,</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">      </span><span class="nt">"content_hash"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:def456..."</span><span class="p">,</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">      </span><span class="nt">"first_event_ns"</span><span class="p">:</span><span class="w"> </span><span class="mi">1714123456000000000</span><span class="p">,</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="nt">"last_event_ns"</span><span class="p">:</span><span class="w"> </span><span class="mi">1714123556000000000</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">  </span><span class="p">],</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="nt">"segments"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span><span class="p">{</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"signals-000000.bin"</span><span class="p">,</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">      </span><span class="nt">"record_kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"signals"</span><span class="p">,</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">      </span><span class="nt">"size_bytes"</span><span class="p">:</span><span class="w"> </span><span class="mi">12345</span><span class="p">,</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">      </span><span class="nt">"first_event_ns"</span><span class="p">:</span><span class="w"> </span><span class="mi">1714123456000000000</span><span class="p">,</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">      </span><span class="nt">"last_event_ns"</span><span class="p">:</span><span class="w"> </span><span class="mi">1714123556000000000</span><span class="p">,</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">      </span><span class="nt">"event_count"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders-000000.bin"</span><span class="p">,</span><span class="w"> </span><span class="nt">"record_kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"orders"</span><span class="p">,</span><span class="w"> </span><span class="nt">"size_bytes"</span><span class="p">:</span><span class="w"> </span><span class="mi">6789</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">    </span><span class="p">{</span><span class="w"> </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fills-000000.bin"</span><span class="p">,</span><span class="w"> </span><span class="nt">"record_kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"fills"</span><span class="p">,</span><span class="w"> </span><span class="nt">"size_bytes"</span><span class="p">:</span><span class="w"> </span><span class="mi">4321</span><span class="p">,</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">  </span><span class="p">]</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><code>tape_refs[].path</code> is relative to the <code>.lrvxrun</code> directory. A tooling layer that wants to verify that the run was produced against a specific tape compares <code>content_hash</code> against a hash of the referenced <code>.lrvx</code> directory.</p>
+<p><code>strategy_hash</code> is the hash of the strategy source plus its build inputs. A reader can use it to detect that two runs claiming the same <code>strategy_id</code> actually used different code.</p>
+<h2 id="reader-contract">Reader contract<a class="headerlink" href="#reader-contract" title="Permanent link">&para;</a></h2>
+<p>A reader walks each segment file in isolation. The order of records inside a segment is defined by <code>run_ts_ns</code>. Across segments, a tool that wants a unified timeline merges by <code>run_ts_ns</code>. A tool that wants to align trace events with tape events merges trace records with tape records by <code>feed_ts_ns</code>.</p>
+<p>A frame whose <code>type</code> is outside <code>[10, 12]</code> must be skipped. A frame whose <code>rec_version</code> is unknown must be rejected. A segment whose <code>record_kind</code> doesn't match the frame <code>type</code> it carries must be rejected.</p>
+<h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">&para;</a></h2>
+<p><code>format_version = 1</code> is frozen. Adding a new record kind, a new flag, or a new field requires a minor bump and an explicit description of the backward-compatibility rule. Removing a field or changing a layout requires a major bump.</p>
+<p>The trace format and the tape format version independently. A <code>.lrvxrun 1.0</code> can reference a <code>.lrvx 1.0</code> or a future <code>.lrvx 1.1</code>; the reader checks the version of each artifact separately.</p>
+<h2 id="bundle-integration">Bundle integration<a class="headerlink" href="#bundle-integration" title="Permanent link">&para;</a></h2>
+<p><code>lrvx bundle pack</code> produces a tarball containing the strategy source, the consumed tape, the run parameters, and a <code>.lrvxrun</code> directory. <code>lrvx bundle replay</code> extracts the tarball, replays the strategy against the included tape, and compares the new <code>.lrvxrun</code> against the bundled one as the actual-vs-expected diff.</p>
+<p>The bundle's outer layout is:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>my-bundle.tar[.zst]
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── manifest.json           versions + integrity hashes + config
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>├── strategy/
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│   └── &lt;name&gt;.py           the strategy module
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>├── config/
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>│   └── params.json         runtime params (slippage, queue model,
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>│                           initial capital, ...)
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>├── tape/                   the .lrvx tape this run drove against
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>├── expected_output.json    PnL, fill sequence, final positions
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>└── expected.lrvxrun/
+</span></code></pre></div>
+<p>Phase 1 covers single-strategy, single-tape bundles — hence <code>tape/</code>, singular. Bundles produced before the <code>.lrvxrun</code> ride-along landed have no <code>expected.lrvxrun/</code> entry; <code>replay</code> falls back to a JSON-only diff for those.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

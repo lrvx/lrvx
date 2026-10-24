@@ -1,0 +1,2751 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/explanation/bar-types/">
+      
+      
+        <link rel="prev" href="../architecture/">
+      
+      
+        <link rel="next" href="../clock-domains/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Bar Types - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#understanding-bar-types" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Bar Types
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Explanation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar Types
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-with-time-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem with Time Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bar-types-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bar Types Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tick-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tick Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volume-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volume Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#renko-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renko Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#range-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Range Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bpsrange-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BpsRange Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#heikin-ashi-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heikin-Ashi Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-the-right-bar-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the Right Bar Type
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choosing the Right Bar Type">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#decision-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision Framework
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#by-strategy-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        By Strategy Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#by-market-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        By Market Condition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-timeframe-with-mixed-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Timeframe with Mixed Types
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clock-domains/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clock Domains
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disruptor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disruptor Pattern
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../memory-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-state-ownership/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol strategy state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-control-plane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../per-symbol-scale/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-symbol scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../order-book-tick-window/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order book tick window
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../onchain-order-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    On-chain order lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../liquidity-provision/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Liquidity-provision signals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../position-valuation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Position valuation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amm-pricing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM pricing in backtests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../market-making-quoter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Market-making quoter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../amm-dex-connector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AMM DEX connector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../replay-equivalence-gate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replay-equivalence gate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-close-ordering/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar-close ordering on tied timestamps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node-threaded-runner-lifetime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threaded Runner lifetime in Node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../javascript-value-boundary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The JavaScript value boundary
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-stack-reproducibility/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue-stack reproducibility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build/feature-flags/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build feature flags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../contributors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-with-time-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Problem with Time Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bar-types-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bar Types Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tick-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tick Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#volume-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Volume Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#renko-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renko Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#range-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Range Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bpsrange-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BpsRange Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#heikin-ashi-bars" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Heikin-Ashi Bars
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-the-right-bar-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the Right Bar Type
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choosing the Right Bar Type">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#decision-framework" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision Framework
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#by-strategy-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        By Strategy Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#by-market-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        By Market Condition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#multi-timeframe-with-mixed-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multi-Timeframe with Mixed Types
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-comparison" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance Comparison
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See Also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="understanding-bar-types">Understanding Bar Types<a class="headerlink" href="#understanding-bar-types" title="Permanent link">&para;</a></h1>
+<p>This document explains the different bar types available in lrvx and when to use each one. Examples are shown in C++ because that's where the aggregator templates live, but every binding can produce and consume each bar type — see <a href="../../how-to/bar-aggregation/">Bar aggregation</a> for the binding-level API.</p>
+<h2 id="the-problem-with-time-bars">The Problem with Time Bars<a class="headerlink" href="#the-problem-with-time-bars" title="Permanent link">&para;</a></h2>
+<p>Traditional time-based bars (1-minute, hourly, daily) have one problem: <strong>information content varies with market activity</strong>.</p>
+<ul>
+<li>During high activity: bars pack lots of information</li>
+<li>During low activity: bars contain little information (noise)</li>
+</ul>
+<p>This inconsistency creates problems:</p>
+<ul>
+<li>Indicators behave differently at different times</li>
+<li>Backtests may not reflect live performance</li>
+<li>Overnight gaps distort analysis</li>
+</ul>
+<p>Alternative bar types address this by normalizing <strong>what</strong> closes a bar rather than <strong>when</strong>.</p>
+<h2 id="bar-types-overview">Bar Types Overview<a class="headerlink" href="#bar-types-overview" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Closes When</th>
+<th>Best For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Time</strong></td>
+<td>Fixed time interval</td>
+<td>Traditional analysis, backtesting</td>
+</tr>
+<tr>
+<td><strong>Tick</strong></td>
+<td>N trades occur</td>
+<td>HFT, eliminating time bias</td>
+</tr>
+<tr>
+<td><strong>Volume</strong></td>
+<td>Notional volume threshold</td>
+<td>Volume-weighted analysis</td>
+</tr>
+<tr>
+<td><strong>Renko</strong></td>
+<td>Price moves by brick size</td>
+<td>Trend following, noise elimination</td>
+</tr>
+<tr>
+<td><strong>Range</strong></td>
+<td>High-low exceeds an absolute price threshold</td>
+<td>Volatility-based analysis</td>
+</tr>
+<tr>
+<td><strong>BpsRange</strong></td>
+<td>High-low exceeds a threshold in basis points of the open</td>
+<td>Volatility-based analysis across instruments and price levels</td>
+</tr>
+<tr>
+<td><strong>Heikin-Ashi</strong></td>
+<td>Fixed time interval (smoothed)</td>
+<td>Trend clarity, noise reduction</td>
+</tr>
+</tbody>
+</table>
+<h2 id="time-bars">Time Bars<a class="headerlink" href="#time-bars" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">TimeBarAggregator</span><span class="w"> </span><span class="nf">aggregator</span><span class="p">(</span><span class="n">TimeBarPolicy</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">chrono</span><span class="o">::</span><span class="n">seconds</span><span class="p">(</span><span class="mi">60</span><span class="p">)),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bus</span><span class="p">);</span>
+</span></code></pre></div>
+<p><strong>How it works</strong>: Close after a fixed time interval (e.g., 1 minute).</p>
+<p><strong>Pros</strong>:</p>
+<ul>
+<li>Familiar, widely used</li>
+<li>Easy to compare across instruments</li>
+<li>Works with most existing tools</li>
+</ul>
+<p><strong>Cons</strong>:</p>
+<ul>
+<li>Information content varies</li>
+<li>Overnight gaps create distortions</li>
+<li>Low-activity periods add noise</li>
+</ul>
+<p><strong>Use when</strong>:</p>
+<ul>
+<li>Backtesting strategies designed for time bars</li>
+<li>Comparing to external data sources</li>
+<li>Building indicators that expect regular intervals</li>
+</ul>
+<p><strong>Late trades</strong>: a time bar is a clock construct, so a trade can arrive for a bucket that is no longer open — routine when several venue feeds are merged, or when a feed reconnects and replays. A trade whose aligned bucket is <em>earlier</em> than the live bar's <code>startTime</code> is <strong>dropped</strong>, and the drop is counted in <code>BarAggregator::lateTradeCount()</code> (and <code>MultiTimeframeAggregator::lateTradeCount()</code>). It is not folded into the live bar: doing that made the trade's price the live bar's close, and possibly its high or low, so the bar published for an interval reported a price that never traded inside it. Nor does it reopen the bucket it belongs to: that bar has already been published, and reopening it would break the monotonicity of <code>bar.startTime</code> that <code>BarSeries</code> and <code>BarMatrix</code> rely on.</p>
+<p>The rule is about the <em>bucket</em>, not about arrival order. A trade that arrives out of order but still falls inside the live bucket is ordinary data and is folded in like any other; only a trade from an earlier bucket is dropped. If the count keeps climbing, the feed merge upstream is delivering trades later than one bar interval and the interval — or the merge — needs to change.</p>
+<h2 id="tick-bars">Tick Bars<a class="headerlink" href="#tick-bars" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">TickBarAggregator</span><span class="w"> </span><span class="nf">aggregator</span><span class="p">(</span><span class="n">TickBarPolicy</span><span class="p">(</span><span class="mi">100</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bus</span><span class="p">);</span><span class="w">  </span><span class="c1">// 100 trades per bar</span>
+</span></code></pre></div>
+<p><strong>How it works</strong>: Close after N trades occur, regardless of time.</p>
+<p><strong>Pros</strong>:</p>
+<ul>
+<li>Consistent information per bar</li>
+<li>No time-based distortions</li>
+<li>Better for statistical analysis</li>
+</ul>
+<p><strong>Cons</strong>:</p>
+<ul>
+<li>Bar duration varies wildly</li>
+<li>Can't easily compare across instruments</li>
+<li>May produce many bars during high activity</li>
+</ul>
+<p><strong>Use when</strong>:</p>
+<ul>
+<li>High-frequency strategies</li>
+<li>Statistical arbitrage</li>
+<li>Eliminating time-of-day effects</li>
+</ul>
+<p><strong>Example</strong>: A 100-tick bar during high volatility might span 1 second; during quiet periods, 10 minutes. But each bar represents the same amount of "market activity."</p>
+<p><strong>Publication lag</strong>: a tick bar's <em>contents</em> are always exactly N trades, but the aggregator only recognizes a bar as complete when it sees a trade that doesn't belong to it -- so a 100-tick bar is emitted on the 101st trade, not the 100th. This is the same structural lag every closing rule in this aggregator has (a time bar likewise cannot close without a trade from the next interval); it is not data loss or corruption, only a one-event delay before the already-correct bar is handed to a subscriber.</p>
+<h2 id="volume-bars">Volume Bars<a class="headerlink" href="#volume-bars" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">VolumeBarAggregator</span><span class="w"> </span><span class="nf">aggregator</span><span class="p">(</span><span class="n">VolumeBarPolicy</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mf">1000000.0</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bus</span><span class="p">);</span>
+</span></code></pre></div>
+<p><strong>How it works</strong>: Close after notional volume (price × quantity) reaches threshold.</p>
+<p><strong>Pros</strong>:</p>
+<ul>
+<li>Normalizes for trade size variation</li>
+<li>Better represents institutional activity</li>
+<li>Consistent economic significance per bar</li>
+</ul>
+<p><strong>Cons</strong>:</p>
+<ul>
+<li>Threshold needs tuning per instrument</li>
+<li>Price changes affect bar frequency</li>
+</ul>
+<p><strong>Use when</strong>:</p>
+<ul>
+<li>Analyzing institutional flow</li>
+<li>Volume-weighted strategies</li>
+<li>Markets with varying trade sizes</li>
+</ul>
+<p><strong>Example</strong>: $1M volume bars on BTC might close every few seconds during active trading, but take hours overnight.</p>
+<p><code>param()</code> reports the threshold in the same units you passed to <code>fromDouble()</code> (e.g. <code>1000000</code> for the example above), which is also what <code>TimeframeId::volume(threshold)</code> expects -- the two must agree for <code>BarMatrix</code> to find the bars this policy emits.</p>
+<h2 id="renko-bars">Renko Bars<a class="headerlink" href="#renko-bars" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">RenkoBarAggregator</span><span class="w"> </span><span class="nf">aggregator</span><span class="p">(</span><span class="n">RenkoBarPolicy</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mf">10.0</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bus</span><span class="p">);</span>
+</span></code></pre></div>
+<p><strong>How it works</strong>: New bar only when price moves by "brick size" from previous close.</p>
+<p><strong>Pros</strong>:</p>
+<ul>
+<li>Eliminates noise</li>
+<li>Clear trend visualization</li>
+<li>No time or volume dependency</li>
+</ul>
+<p><strong>Cons</strong>:</p>
+<ul>
+<li>Loses timing information</li>
+<li>Can miss reversals within brick</li>
+<li>The synthesized bricks from a gap (see "Gaps" below) carry no volume or trade-count data of their own, since no trade actually happened at those prices</li>
+</ul>
+<p><strong>Use when</strong>:</p>
+<ul>
+<li>Trend following strategies</li>
+<li>Support/resistance identification</li>
+<li>Filtering out market noise</li>
+</ul>
+<p><strong>Unique property</strong>: Renko bars only move one direction until reversal. A series of up-bricks means consistent upward movement without significant pullbacks.</p>
+<p><strong>Where a brick closes</strong>: a brick closes when a trade's price is at least one brick size away from the brick's open. The brick is a price construct, so both ends of the close are fixed by the grid rather than by the trade that happened to cross it:</p>
+<ul>
+<li>The crossing trade is applied <strong>first</strong> and is counted in the brick it completes — its notional lands in that brick's <code>volume</code> and its tick in that brick's <code>tradeCount</code>.</li>
+<li>The brick closes <strong>at the boundary</strong>, exactly one brick size from its open and in the direction of the move.</li>
+<li>The next brick <strong>opens at that same boundary</strong>, not at the crossing trade's price, so bricks chain (<code>bricks[i].open == bricks[i-1].close</code>) and the grid never drifts.</li>
+<li>The brick's extreme on the side of the move is the boundary; the crossing trade's overshoot past it belongs to the brick that opens next, which is where it is reported. The opposite side keeps whatever retracement the trades actually made, so a brick can have a wick against the move but not with it.</li>
+</ul>
+<p>Brick size 10 with trades 100, 95, 111 therefore produces one brick, <code>open 100 → close 110</code>, <code>low 95</code>, <code>tradeCount 3</code>; the brick that opens next runs from 110 and stands at 111. The brick that opens after a close starts empty (<code>tradeCount 0</code>, <code>volume 0</code>) — the trade that opened it was already counted — while its <code>close</code> tracks the current price, so a <code>stop()</code> flush still reports where the price stands.</p>
+<p><strong>Gaps</strong>: if a single trade jumps several brick sizes at once — a real gap, or just a thin book — lrvx fills in the intermediate bricks a continuous price path would have produced. The brick that was forming closes at the first boundary the trade crossed, then one synthetic brick per additional whole brick width walks the price toward the trade in clean steps of exactly one brick size, and the new brick opens at the last boundary reached. A trade that jumps from 100 to 155 with a brick size of 10 spans 5.5 bricks: the real brick (100 → 110) plus 4 synthesized bricks (110 → 120, 120 → 130, 130 → 140, 140 → 150) account for the 5 complete bricks the move spans, leaving a new brick open at 150 — the boundary — with the leftover 5 points showing as its close. The synthesized bricks have no volume or trade count of their own — no trade happened at those prices — so treat them as a price-path marker, not as a record of activity.</p>
+<p><strong>The gap walk is bounded</strong>: at most <code>RenkoBarPolicy::kMaxGapBricks</code> (1024) bars are published for any one trade, including the brick that was forming. Without the bound, the cost of a single print scales with how far the price moved: a brick size of 0.01 and a print from 1.00 to 100000.00 spans ten million bricks, which stalls the bus and exhausts memory inside one <code>onTrade()</code>. When the bound is hit, the last bar published absorbs the whole remainder of the move: it is taller than one brick, it closes on the far boundary so the grid stays aligned with the price, and it carries <code>BarCloseReason::Gap</code> so a consumer can tell a truncated walk from a complete one instead of silently seeing fewer bricks than the move spanned. <code>Gap</code> is the only reason the engine sets besides <code>Threshold</code> and <code>Forced</code>.</p>
+<p><code>param()</code> reports the brick size in the instrument's own price units (e.g. <code>10</code> for <code>RenkoBarPolicy::fromDouble(10.0)</code>), matching <code>TimeframeId::renko(brickSize)</code>.</p>
+<h2 id="range-bars">Range Bars<a class="headerlink" href="#range-bars" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">RangeBarAggregator</span><span class="w"> </span><span class="nf">aggregator</span><span class="p">(</span><span class="n">RangeBarPolicy</span><span class="o">::</span><span class="n">fromDouble</span><span class="p">(</span><span class="mf">5.0</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bus</span><span class="p">);</span>
+</span></code></pre></div>
+<p><strong>How it works</strong>: Close when high-low range exceeds threshold.</p>
+<p><strong>Pros</strong>:</p>
+<ul>
+<li>Consistent volatility per bar</li>
+<li>Adapts to market conditions</li>
+<li>Good for breakout detection</li>
+</ul>
+<p><strong>Cons</strong>:</p>
+<ul>
+<li>Can produce many small bars in trending markets</li>
+<li>Range threshold needs tuning</li>
+</ul>
+<p><strong>Use when</strong>:</p>
+<ul>
+<li>Volatility-based strategies</li>
+<li>Breakout trading</li>
+<li>Options-related strategies</li>
+</ul>
+<p><strong>Example</strong>: $5 range bars will close quickly during volatile periods (many bars) and slowly during consolidation (fewer bars).</p>
+<p>The closed bar's own high-low range always reaches the threshold (the trade that pushes the accumulated range to the threshold is folded into that bar before it closes); as with Tick bars, the <em>close is only detected</em> on the following trade, which then opens the next bar.</p>
+<p><code>param()</code> reports the range size in the instrument's own price units (e.g. <code>5</code> for <code>RangeBarPolicy::fromDouble(5.0)</code>), matching <code>TimeframeId::range(rangeSize)</code>.</p>
+<h2 id="bpsrange-bars">BpsRange Bars<a class="headerlink" href="#bpsrange-bars" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">BpsRangeBarAggregator</span><span class="w"> </span><span class="nf">aggregator</span><span class="p">(</span><span class="n">BpsRangeBarPolicy</span><span class="p">(</span><span class="mf">20.0</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bus</span><span class="p">);</span><span class="w">  </span><span class="c1">// 20 bps</span>
+</span></code></pre></div>
+<p><strong>How it works</strong>: Close when <code>(high − low) / open</code> reaches the threshold expressed in basis points. Same idea as Range bars, but relative instead of absolute.</p>
+<p><strong>Pros</strong>:</p>
+<ul>
+<li>One threshold works across instruments with different price levels</li>
+<li>Stays meaningful as an instrument's price drifts over a long backtest</li>
+<li>No re-tuning after a redenomination or a large price move</li>
+</ul>
+<p><strong>Cons</strong>:</p>
+<ul>
+<li>Needs a valid open price; a bar with <code>open &lt;= 0</code> never closes on this rule</li>
+<li>Slightly less intuitive than an absolute range in the instrument's own units</li>
+</ul>
+<p><strong>Use when</strong>:</p>
+<ul>
+<li>Running the same strategy across a basket at different price levels</li>
+<li>Long backtests where an absolute range threshold would drift out of relevance</li>
+</ul>
+<p><code>param()</code> encodes the threshold as bps × 100, so a 20 bps policy reports <code>2000</code>.</p>
+<h2 id="heikin-ashi-bars">Heikin-Ashi Bars<a class="headerlink" href="#heikin-ashi-bars" title="Permanent link">&para;</a></h2>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">HeikinAshiBarAggregator</span><span class="w"> </span><span class="nf">aggregator</span><span class="p">(</span><span class="n">HeikinAshiBarPolicy</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">chrono</span><span class="o">::</span><span class="n">seconds</span><span class="p">(</span><span class="mi">60</span><span class="p">)),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">bus</span><span class="p">);</span>
+</span></code></pre></div>
+<p><strong>How it works</strong>: Uses smoothed OHLC calculations based on previous bar:</p>
+<ul>
+<li>HA_Close = (Open + High + Low + Close) / 4</li>
+<li>HA_Open = (prev_HA_Open + prev_HA_Close) / 2</li>
+<li>HA_High = max(High, HA_Open, HA_Close)</li>
+<li>HA_Low = min(Low, HA_Open, HA_Close)</li>
+</ul>
+<p><strong>Pros</strong>:</p>
+<ul>
+<li>Smoother trends, easier to identify</li>
+<li>Reduces noise from individual bars</li>
+<li>Bullish bars always have close &gt; open</li>
+</ul>
+<p><strong>Cons</strong>:</p>
+<ul>
+<li>Loses exact price information</li>
+<li>Not suitable for precise entries</li>
+<li>Lags behind actual price</li>
+<li>Requires previous bar for calculation</li>
+</ul>
+<p><strong>Use when</strong>:</p>
+<ul>
+<li>Trend following strategies</li>
+<li>Visual trend confirmation</li>
+<li>Reducing false signals in choppy markets</li>
+<li>Swing trading with trend filters</li>
+</ul>
+<p><strong>Unique property</strong>: In a strong uptrend, Heikin-Ashi bars will show no lower wicks (or very small ones). Strong downtrends show no upper wicks.</p>
+<p><strong>Multi-symbol support</strong>: The Heikin-Ashi aggregator maintains independent state per symbol, so a single aggregator instance can correctly handle multiple symbols simultaneously.</p>
+<h2 id="choosing-the-right-bar-type">Choosing the Right Bar Type<a class="headerlink" href="#choosing-the-right-bar-type" title="Permanent link">&para;</a></h2>
+<h3 id="decision-framework">Decision Framework<a class="headerlink" href="#decision-framework" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>What matters most for your strategy?
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>├── Time consistency?
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>│   └── Use TIME bars
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>│
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>├── Trade activity?
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>│   └── Use TICK bars
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>│
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>├── Dollar volume?
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>│   └── Use VOLUME bars
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>│
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>├── Price movement?
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>│   ├── Trend direction → Use RENKO bars
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>│   ├── Volatility, absolute units → Use RANGE bars
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>│   └── Volatility, relative → Use BPSRANGE bars
+</span></code></pre></div>
+<h3 id="by-strategy-type">By Strategy Type<a class="headerlink" href="#by-strategy-type" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>Recommended Bar Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mean reversion</td>
+<td>Time or Volume</td>
+</tr>
+<tr>
+<td>Momentum</td>
+<td>Time, Renko, or Heikin-Ashi</td>
+</tr>
+<tr>
+<td>Scalping/HFT</td>
+<td>Tick</td>
+</tr>
+<tr>
+<td>Trend following</td>
+<td>Renko, Heikin-Ashi, or Time</td>
+</tr>
+<tr>
+<td>Volatility trading</td>
+<td>Range or BpsRange</td>
+</tr>
+<tr>
+<td>Statistical arb</td>
+<td>Tick or Volume</td>
+</tr>
+<tr>
+<td>Swing trading</td>
+<td>Time (H1, D1) or Heikin-Ashi</td>
+</tr>
+</tbody>
+</table>
+<h3 id="by-market-condition">By Market Condition<a class="headerlink" href="#by-market-condition" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Better Choice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>High volatility</td>
+<td>Range, BpsRange, or Renko</td>
+</tr>
+<tr>
+<td>Low liquidity</td>
+<td>Volume</td>
+</tr>
+<tr>
+<td>24/7 markets</td>
+<td>Tick or Volume</td>
+</tr>
+<tr>
+<td>Session-based</td>
+<td>Time</td>
+</tr>
+<tr>
+<td>Trending</td>
+<td>Renko or Heikin-Ashi</td>
+</tr>
+<tr>
+<td>Ranging</td>
+<td>Time or Range</td>
+</tr>
+<tr>
+<td>Noisy markets</td>
+<td>Heikin-Ashi</td>
+</tr>
+</tbody>
+</table>
+<h2 id="multi-timeframe-with-mixed-types">Multi-Timeframe with Mixed Types<a class="headerlink" href="#multi-timeframe-with-mixed-types" title="Permanent link">&para;</a></h2>
+<p>One aggregator can carry several bar types at once:</p>
+<div class="language-cpp highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">MultiTimeframeAggregator</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">aggregator</span><span class="p">(</span><span class="o">&amp;</span><span class="n">bus</span><span class="p">);</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">aggregator</span><span class="p">.</span><span class="n">addTimeInterval</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">chrono</span><span class="o">::</span><span class="n">seconds</span><span class="p">(</span><span class="mi">60</span><span class="p">));</span><span class="w">   </span><span class="c1">// M1 for timing</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">aggregator</span><span class="p">.</span><span class="n">addTimeInterval</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">chrono</span><span class="o">::</span><span class="n">seconds</span><span class="p">(</span><span class="mi">3600</span><span class="p">));</span><span class="w"> </span><span class="c1">// H1 for trend</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">aggregator</span><span class="p">.</span><span class="n">addTickInterval</span><span class="p">(</span><span class="mi">100</span><span class="p">);</span><span class="w">                         </span><span class="c1">// Tick for activity</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">aggregator</span><span class="p">.</span><span class="n">addVolumeInterval</span><span class="p">(</span><span class="mf">1000000.0</span><span class="p">);</span><span class="w">                 </span><span class="c1">// Volume for flow</span>
+</span></code></pre></div>
+<p><strong>Strategy example</strong>:</p>
+<ul>
+<li>H1 time bars for trend direction</li>
+<li>Volume bars for institutional activity</li>
+<li>Tick bars for precise entry timing</li>
+</ul>
+<h2 id="performance-comparison">Performance Comparison<a class="headerlink" href="#performance-comparison" title="Permanent link">&para;</a></h2>
+<p>All bar types have similar computational cost:</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Time</th>
+<th>Tick</th>
+<th>Volume</th>
+<th>Renko</th>
+<th>Range</th>
+<th>BpsRange</th>
+<th>Heikin-Ashi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>shouldClose()</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+</tr>
+<tr>
+<td>update()</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+<td>O(1)</td>
+</tr>
+</tbody>
+</table>
+<p>The main difference is <strong>bar frequency</strong>, not computational overhead.</p>
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
+<p>Time bars are the familiar default, at the cost of inconsistent information per bar. Tick bars hold activity constant, which is what HFT work usually wants; volume bars hold economic significance constant instead. Renko strips noise out of the trend picture. Range bars normalize volatility in absolute price units and BpsRange in basis points of the open. Heikin-Ashi smooths the trend but gives up exact prices.</p>
+<p>Choose based on what your strategy needs to hold constant: <strong>time</strong>, <strong>activity</strong>, <strong>volume</strong>, <strong>price movement</strong>, <strong>volatility</strong>, or <strong>trend clarity</strong>.</p>
+<h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../../reference/api/aggregator/bar_aggregator/">Bar Aggregator Reference</a></li>
+<li><a href="../../how-to/custom-bar-policy/">How to Create Custom Bar Policy</a></li>
+<li><a href="../../tutorials/multi-timeframe-strategy/">Multi-Timeframe Strategy Tutorial</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

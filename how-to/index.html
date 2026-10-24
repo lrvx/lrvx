@@ -1,0 +1,2105 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/how-to/">
+      
+      
+        <link rel="prev" href="../bindings/capi/">
+      
+      
+        <link rel="next" href="lrvx-new/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>How-To Guides - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#how-to-guides" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How-To Guides
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="./" class="md-nav__link md-nav__link--active">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link md-nav__link--active" for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How-To Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="lrvx-new/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy & Backtest
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="indicator-graph/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Aggregation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="optimize-performance/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance (system-level)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="add-an-indicator/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the core (C++)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="project-layout/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project ops
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#project-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Project setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backtesting-and-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backtesting and analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#live-trading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live trading
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#indicators-and-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indicators and aggregation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-and-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance and project
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="how-to-guides">How-To Guides<a class="headerlink" href="#how-to-guides" title="Permanent link">&para;</a></h1>
+<p>Solve specific problems. Assumes you know the basics.</p>
+<h2 id="project-setup">Project setup<a class="headerlink" href="#project-setup" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guide</th>
+<th>Problem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="lrvx-new/">Scaffold a project (<code>lrvx new</code>)</a></td>
+<td>Bootstrap research / live / indicator-library projects from a template</td>
+</tr>
+<tr>
+<td><a href="project-layout/">Project layout</a></td>
+<td>What a scaffolded project contains and where each piece belongs</td>
+</tr>
+<tr>
+<td><a href="strategy-classes/">Strategy classes</a></td>
+<td>Structure strategy code idiomatically</td>
+</tr>
+<tr>
+<td><a href="strategy-hot-reload/">Strategy hot-reload</a></td>
+<td>Swap a strategy at runtime without dropping connections</td>
+</tr>
+<tr>
+<td><a href="typescript-strategy-authoring/">TypeScript strategy authoring</a></td>
+<td>Write strategies as TS classes with <code>@strategy</code> / <code>@onTrade</code> decorators</td>
+</tr>
+<tr>
+<td><a href="ccxt-adapter/">CCXT adapter</a></td>
+<td>Connect to an exchange via the CCXT bridge</td>
+</tr>
+</tbody>
+</table>
+<h2 id="backtesting-and-analysis">Backtesting and analysis<a class="headerlink" href="#backtesting-and-analysis" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guide</th>
+<th>Problem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="backtest/">Backtesting</a></td>
+<td>Run strategy backtests on historical data</td>
+</tr>
+<tr>
+<td><a href="realistic-backtest/">Realistic backtest in one call</a></td>
+<td>Venue-typed factory that wires executor, account, fees, funding, liquidation, and rate limits</td>
+</tr>
+<tr>
+<td><a href="backtest-recipes/">Backtest recipes</a></td>
+<td>Runnable end-to-end recipes for the common backtest assembly patterns</td>
+</tr>
+<tr>
+<td><a href="strategy-pump/">Sweep a signal over a tape</a></td>
+<td>Monomorphic replay for indicator studies and parameter sweeps</td>
+</tr>
+<tr>
+<td><a href="backtest-realistic-fills/">Realistic fills</a></td>
+<td>Slippage, queue position, partial fills</td>
+</tr>
+<tr>
+<td><a href="tape-record/">Record and replay tapes</a></td>
+<td>Capture live market data to <code>.lrvx</code>, replay deterministically</td>
+</tr>
+<tr>
+<td><a href="engine-sim/">Run a paper engine (<code>lrvx engine sim</code>)</a></td>
+<td>Replay a tape through a strategy behind a control server an agent can drive</td>
+</tr>
+<tr>
+<td><a href="multi-tape/">Merge multiple tapes on read</a></td>
+<td>Cross-exchange research over N tapes with symbols rekeyed into one global id space</td>
+</tr>
+<tr>
+<td><a href="aggregate-tape-events/">Aggregate tape events in a single pass</a></td>
+<td>Run a panel of streaming aggregators over a tape without materialising it</td>
+</tr>
+<tr>
+<td><a href="import-binance-archive/">Import Binance public archives</a></td>
+<td>Convert <code>data.binance.vision</code> aggTrades zips into a <code>.lrvx</code> tape</td>
+</tr>
+<tr>
+<td><a href="import-binance-book-archive/">Import Binance book archives</a></td>
+<td>Convert <code>bookTicker</code> / <code>bookDepth</code> zips into delta-encoded book events on the same tape</td>
+</tr>
+<tr>
+<td><a href="import-multi-exchange-archives/">Import multi-exchange archives</a></td>
+<td>Binance / Bybit / OKX / Bitget / Deribit public archive importers</td>
+</tr>
+<tr>
+<td><a href="iterate-orderbook/">Iterate the order book from a tape</a></td>
+<td>Reconstruct ladder state per bucket or at a chosen instant for offline book analysis</td>
+</tr>
+<tr>
+<td><a href="rolling-thresholds/">Rolling top-K thresholds</a></td>
+<td>Vectorized sliding K-th-largest for extreme-event filters at any timeframe</td>
+</tr>
+<tr>
+<td><a href="cross-sectional-panel/">Cross-sectional panel builder</a></td>
+<td>Aligned (T × S) close / OHLC / returns panel over N lrvx tapes</td>
+</tr>
+<tr>
+<td><a href="delta-book-compression/">Delta book compression</a></td>
+<td>Shrink L2 tapes 10-30x by emitting only the changed levels</td>
+</tr>
+<tr>
+<td><a href="lrvxrun/">Record a strategy run as <code>.lrvxrun</code></a></td>
+<td>Capture signals, orders, and fills as a per-run trace alongside the tape</td>
+</tr>
+<tr>
+<td><a href="lrvxrun-auto-capture/">Capture a strategy run automatically with <code>.lrvxrun</code></a></td>
+<td><code>TraceSignalHandler</code> + <code>TraceExecutionListener</code> adapters; no per-strategy instrumentation</td>
+</tr>
+<tr>
+<td><a href="replay-viewer/">Inspect a tape and run in the replay viewer</a></td>
+<td>Single-page UI for scrubbing through a captured tape and strategy trace</td>
+</tr>
+<tr>
+<td><a href="backtest-html-report/">HTML report</a></td>
+<td>Render an equity curve + trade table to one HTML file</td>
+</tr>
+<tr>
+<td><a href="interactive-backtest/">Interactive backtest</a></td>
+<td>Inspect state mid-run from a notebook</td>
+</tr>
+<tr>
+<td><a href="grid-search/">Grid search</a></td>
+<td>Sweep parameters over a backtest</td>
+</tr>
+<tr>
+<td><a href="walk-forward/">Walk-forward</a></td>
+<td>Out-of-sample validation with rolling / anchored folds</td>
+</tr>
+<tr>
+<td><a href="heatmap/">Heatmap</a></td>
+<td>SVG heatmap from a 2D parameter sweep</td>
+</tr>
+<tr>
+<td><a href="whites-reality-check/">White's reality check</a></td>
+<td>Multiple-comparison-aware significance test</td>
+</tr>
+<tr>
+<td><a href="mlflow/">Log to MLflow</a></td>
+<td>Send a backtest run + artifacts into an MLflow tracking server</td>
+</tr>
+<tr>
+<td><a href="backtest-an-lp-position/">Backtest an LP position</a></td>
+<td>Run a concentrated-liquidity position through a pool tape</td>
+</tr>
+<tr>
+<td><a href="matching-modes/">Choose a matching model</a></td>
+<td>FIFO, pro-rata, <code>pro_rata_with_fifo</code>, TOP-PRO-LMM, and priority-weighted matching</td>
+</tr>
+<tr>
+<td><a href="queue-position/">Read queue position from a strategy</a></td>
+<td>Queue-ahead / queue-total events off the backtest queue tracker</td>
+</tr>
+<tr>
+<td><a href="live-queue-position/">Estimate queue position from live events</a></td>
+<td><code>LiveQueuePositionEstimator</code> over live trade + book feeds</td>
+</tr>
+<tr>
+<td><a href="calibrate-live-queue/">Calibrate the live queue estimator</a></td>
+<td>Fit half-life and shrink factor against observed fills</td>
+</tr>
+<tr>
+<td><a href="hidden-order-attribution/">Attribute hidden / iceberg flow</a></td>
+<td>Stop counting hidden fills as cancellations in the queue estimate</td>
+</tr>
+<tr>
+<td><a href="level-empty-detection/">Detect an empty price level</a></td>
+<td>Fire when a resting order is alone at its level</td>
+</tr>
+<tr>
+<td><a href="resting-order-market-position/">Track a resting order's market position</a></td>
+<td>Categorical best / behind-best / mid-spread / crossed transitions</td>
+</tr>
+<tr>
+<td><a href="maker-taker-classification/">Read maker / taker on a fill</a></td>
+<td>Fill-role classification and why it drives the fee ladder</td>
+</tr>
+<tr>
+<td><a href="order-state-timestamps/">Per-stage order timestamps</a></td>
+<td>Submitted / accepted / first-fill / cancelled / rejected snapshot per order</td>
+</tr>
+<tr>
+<td><a href="order-journey-forensics/">Record and analyse order journeys</a></td>
+<td><code>OrderJourneyTracer</code> for post-trade latency and cancel-race forensics</td>
+</tr>
+<tr>
+<td><a href="latency-profiles/">Apply a named latency profile</a></td>
+<td>Canned per-venue ack-latency defaults</td>
+</tr>
+<tr>
+<td><a href="latency-distributions/">Ack-latency distributions</a></td>
+<td>Lognormal / empirical draws with burst correlation instead of a scalar</td>
+</tr>
+<tr>
+<td><a href="submit-latency-modeling/">Model submit-side ack latency</a></td>
+<td>Defer <code>ACCEPTED</code> so the submit race is reproducible</td>
+</tr>
+<tr>
+<td><a href="cancel-latency-modeling/">Model cancellation ack latency</a></td>
+<td>Reproduce the lost-to-fill cancel race</td>
+</tr>
+<tr>
+<td><a href="order-replace-flow/">Model order replace acknowledgement</a></td>
+<td>The three-event async replace sequence and the late-replace race</td>
+</tr>
+<tr>
+<td><a href="venue-downtime/">Simulate venue downtime</a></td>
+<td>Maintenance windows, random disconnects, and buffered request flush</td>
+</tr>
+<tr>
+<td><a href="rate-limits/">Model venue rate limits</a></td>
+<td>Per-endpoint budgets and rejection behaviour</td>
+</tr>
+<tr>
+<td><a href="tiered-fees/">Model volume-tiered fees</a></td>
+<td>30-day rolling VIP ladder for maker / taker rates</td>
+</tr>
+<tr>
+<td><a href="perpetual-funding/">Model perpetual funding</a></td>
+<td>Funding schedules, per-symbol tapes, and settlement bookkeeping</td>
+</tr>
+<tr>
+<td><a href="liquidation-and-adl/">Model liquidation and ADL</a></td>
+<td>Cascades, insurance fund, ADL ranking, mark impact</td>
+</tr>
+<tr>
+<td><a href="cross-margin/">Cross-margin accounts</a></td>
+<td>Shared-equity account with per-symbol marks and maintenance margin</td>
+</tr>
+<tr>
+<td><a href="self-match-prevention/">Self-trade prevention</a></td>
+<td>STP modes and account groups in the simulator</td>
+</tr>
+<tr>
+<td><a href="options-pricing/">Price options and back out IV</a></td>
+<td>Black-Scholes, implied vol, SVI surfaces, and the vol cone</td>
+</tr>
+<tr>
+<td><a href="options-greeks/">Compute option greeks</a></td>
+<td>First- and second-order greeks</td>
+</tr>
+</tbody>
+</table>
+<h2 id="live-trading">Live trading<a class="headerlink" href="#live-trading" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guide</th>
+<th>Problem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="advanced-orders/">Advanced orders</a></td>
+<td>Stop-loss, take-profit, brackets</td>
+</tr>
+<tr>
+<td><a href="bracket-orders/">Submit a native bracket order</a></td>
+<td>One entry plus linked TP / stop children with OCO semantics</td>
+</tr>
+<tr>
+<td><a href="iceberg-orders/">Submit a native iceberg order</a></td>
+<td>Visible slice, hidden remainder, refresh latency and size randomisation</td>
+</tr>
+<tr>
+<td><a href="order-tif-flags/">Extended TIF and reduce-only</a></td>
+<td><code>ioc</code> / <code>fok</code> / <code>gtd</code> / <code>post_only</code> and the reduce-only flag</td>
+</tr>
+<tr>
+<td><a href="order-group-replace/">Replace a leg of an active OrderGroup</a></td>
+<td>Re-price one basket leg without tearing down the group</td>
+</tr>
+<tr>
+<td><a href="multi-exchange-trading/">Multi-exchange trading</a></td>
+<td>Aggregate books and route across venues</td>
+</tr>
+<tr>
+<td><a href="price-a-dex-swap/">Price a DEX swap</a></td>
+<td>Constant-product and concentrated-liquidity quote maths</td>
+</tr>
+<tr>
+<td><a href="route-and-arb-dex-pools/">Route, arb, and ingest DEX pools</a></td>
+<td>Multi-hop routing, arb detection, and pool-tape replay</td>
+</tr>
+<tr>
+<td><a href="dex-on-node/">Price and backtest DEX pools on Node</a></td>
+<td>The same AMM surface from the Node binding</td>
+</tr>
+<tr>
+<td><a href="mcp-runtime-inspection/">Inspect a running engine over MCP</a></td>
+<td>Read positions / PnL / kill-switch from a running engine via an AI client</td>
+</tr>
+<tr>
+<td><a href="paper-trading/">Paper trading</a></td>
+<td>Drive a strategy off live data but route orders to a simulator</td>
+</tr>
+<tr>
+<td><a href="reproducibility-bundles/">Reproducibility bundles</a></td>
+<td>Pack strategy + tape + expected output into a single tarball; replay and compare the fills field by field</td>
+</tr>
+<tr>
+<td><a href="mcp-control-plane/">Control a running engine over MCP</a></td>
+<td>Send place / cancel / flatten / kill-switch from an AI client over a token-scoped HTTP control plane</td>
+</tr>
+<tr>
+<td><a href="mcp-live-analytics/">Live engine analytics over MCP</a></td>
+<td>Read-only introspection of a running engine: list strategies, walk causal chains, replay-with-overrides</td>
+</tr>
+<tr>
+<td><a href="lookahead-detector/">Lookahead-bias detector</a></td>
+<td>Static-analysis lint that flags <code>.shift(-N)</code>, forward-index arithmetic, future-named attributes</td>
+</tr>
+<tr>
+<td><a href="portfolio-risk/">Portfolio-level risk aggregator</a></td>
+<td>Combine PnL and exposure across N strategies; portfolio-level kill switch on drawdown / loss / gross / concentration</td>
+</tr>
+<tr>
+<td><a href="backtest-with-latency/">Backtest with latency</a></td>
+<td>Add feed / order / fill latency samples to a backtest for HFT-grade fill realism</td>
+</tr>
+<tr>
+<td><a href="execution-algorithms/">Execution algorithms</a></td>
+<td>TWAP / VWAP / Iceberg / POV slicers that work on top of any executor</td>
+</tr>
+<tr>
+<td><a href="rl-environment/">RL environment</a></td>
+<td>Gymnasium-compatible env over a lrvx tape for training RL agents</td>
+</tr>
+</tbody>
+</table>
+<h2 id="indicators-and-aggregation">Indicators and aggregation<a class="headerlink" href="#indicators-and-aggregation" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guide</th>
+<th>Problem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="add-an-indicator/">Add an indicator</a></td>
+<td>Wire a custom indicator into a strategy</td>
+</tr>
+<tr>
+<td><a href="indicator-graph/">Indicator graph</a></td>
+<td>Compose indicators into a DAG</td>
+</tr>
+<tr>
+<td><a href="multi-symbol-indicators/">Multi-symbol indicators</a></td>
+<td>One indicator across many symbols</td>
+</tr>
+<tr>
+<td><a href="cross-symbol-indicators/">Cross-symbol indicators</a></td>
+<td>Indicators over two synchronised symbol streams — correlation, hedge ratios, benchmark regime filters</td>
+</tr>
+<tr>
+<td><a href="multi-tf-context/">Read multi-timeframe context from a strategy</a></td>
+<td><code>last_closed_bar(symbol, tf)</code> + <code>last_n_closed_bars(...)</code> ring helpers</td>
+</tr>
+<tr>
+<td><a href="composite-conditions/">Compose multi-symbol multi-TF entry conditions declaratively</a></td>
+<td><code>when(self, btc, H4).ema(50) &gt; when(self, btc, H4).ema(200)</code> composable DSL</td>
+</tr>
+<tr>
+<td><a href="multi-leg-order-group/">Submit a multi-leg order group</a></td>
+<td>Bundle pair-trade / basket legs under one <code>parent_signal_id</code> with status + cancel</td>
+</tr>
+<tr>
+<td><a href="multi-feed-clock/">Wait for multiple feeds with a known staleness budget</a></td>
+<td><code>MultiFeedClock</code> with WaitForAll / FireOnAny / LeaderFollower policies</td>
+</tr>
+<tr>
+<td><a href="bar-aggregation/">Bar aggregation</a></td>
+<td>Pre-aggregate bars for fast backtesting</td>
+</tr>
+<tr>
+<td><a href="custom-bar-policy/">Custom bar policy</a></td>
+<td>Hand-roll a new bar aggregation rule</td>
+</tr>
+<tr>
+<td><a href="use-volume-profile/">Volume profile</a></td>
+<td>Build a volume profile from trades</td>
+</tr>
+</tbody>
+</table>
+<h2 id="performance-and-project">Performance and project<a class="headerlink" href="#performance-and-project" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Guide</th>
+<th>Problem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="optimize-performance/">Optimize performance</a></td>
+<td>Tune for minimum latency</td>
+</tr>
+<tr>
+<td><a href="cpu-affinity/">CPU affinity</a></td>
+<td>Pin threads to isolated cores</td>
+</tr>
+<tr>
+<td><a href="configuration/">Configuration</a></td>
+<td>Runtime configuration options</td>
+</tr>
+<tr>
+<td><a href="ci/">CI configuration</a></td>
+<td>Understand the CI pipeline</td>
+</tr>
+<tr>
+<td><a href="custom-connector/">Custom connector</a></td>
+<td>Add a new exchange to the connector tree</td>
+</tr>
+<tr>
+<td><a href="contributing/">Contributing</a></td>
+<td>Contribute to lrvx development</td>
+</tr>
+<tr>
+<td><a href="migrate-from-flox/">Migrate from FLOX</a></td>
+<td>Move a FLOX project, its tapes, environment and build flags to the lrvx names</td>
+</tr>
+</tbody>
+</table>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<p>These guides assume you've worked through the <a href="../tutorials/">tutorials</a> and understand the core lrvx concepts.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

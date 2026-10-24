@@ -1,0 +1,2498 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/how-to/aggregate-tape-events/">
+      
+      
+        <link rel="prev" href="../use-volume-profile/">
+      
+      
+        <link rel="next" href="../optimize-performance/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Aggregate tape events in a single pass - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#aggregate-tape-events-in-a-single-pass" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Aggregate tape events in a single pass
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How-To Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../lrvx-new/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy & Backtest
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Aggregation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Indicators & Aggregation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indicator-graph/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicator Graph
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-symbol-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Symbol Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross-symbol-indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-symbol indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-aggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar Aggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../custom-bar-policy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Bar Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../use-volume-profile/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Volume Profile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregate tape events in a single pass
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Aggregate tape events in a single pass
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nodejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node.js
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#merged-tapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merged tapes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aggregator-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregator semantics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Aggregator semantics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#eventtypestats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EventTypeStats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bincount-and-volumebin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BinCount and VolumeBin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ohlcbin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OHLCBin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#booksnapshotbin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BookSnapshotBin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#peak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Peak
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quantile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quantile
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallel-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parallel execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#out-of-order-tapes-and-the-reorder-buffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out-of-order tapes and the reorder buffer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Out-of-order tapes and the reorder buffer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#events-that-arrive-too-late" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Events that arrive too late
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aggregators-that-cannot-be-partitioned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregators that cannot be partitioned
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#long-running-tapes-progress-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-running tapes: progress callback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../optimize-performance/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance (system-level)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../add-an-indicator/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the core (C++)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../project-layout/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project ops
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nodejs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Node.js
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#merged-tapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merged tapes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aggregator-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregator semantics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Aggregator semantics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#eventtypestats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EventTypeStats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bincount-and-volumebin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BinCount and VolumeBin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ohlcbin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OHLCBin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#booksnapshotbin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BookSnapshotBin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#peak" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Peak
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quantile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quantile
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parallel-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parallel execution
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#out-of-order-tapes-and-the-reorder-buffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Out-of-order tapes and the reorder buffer
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Out-of-order tapes and the reorder buffer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#events-that-arrive-too-late" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Events that arrive too late
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aggregators-that-cannot-be-partitioned" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregators that cannot be partitioned
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#long-running-tapes-progress-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-running tapes: progress callback
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="aggregate-tape-events-in-a-single-pass">Aggregate tape events in a single pass<a class="headerlink" href="#aggregate-tape-events-in-a-single-pass" title="Permanent link">&para;</a></h1>
+<p><code>DataReader.run([...])</code> walks a <code>.lrvx</code> once and forwards every event to a panel of streaming aggregators. The aggregators run entirely in C++; the dispatch loop never crosses into Python or JS during the walk.</p>
+<p>The seven native aggregators:</p>
+<table>
+<thead>
+<tr>
+<th>Aggregator</th>
+<th>Per-cell value</th>
+<th>Typical use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EventTypeStatsAggregator</code></td>
+<td>Counter of trades, book snapshots, book deltas</td>
+<td>Quick overview of a tape's contents</td>
+</tr>
+<tr>
+<td><code>BinCountAggregator</code></td>
+<td>Event count per time bucket</td>
+<td>Trades per minute, per second, etc.</td>
+</tr>
+<tr>
+<td><code>VolumeBinAggregator</code></td>
+<td>Sum of trade <code>qty_raw</code> per time bucket</td>
+<td>Volume profile over time</td>
+</tr>
+<tr>
+<td><code>OHLCBinAggregator</code></td>
+<td>Open / high / low / close of trade <code>price_raw</code> per bucket</td>
+<td>Price-time series for returns and candle reconstruction</td>
+</tr>
+<tr>
+<td><code>BookSnapshotBinAggregator</code></td>
+<td>Order-book ladder (up to N levels/side) at each bucket boundary</td>
+<td>Per-bucket book shape: spread, depth, imbalance</td>
+</tr>
+<tr>
+<td><code>PeakAggregator</code></td>
+<td>Top-N busiest fixed-width windows per scale</td>
+<td>Finding bursts at chosen scales</td>
+</tr>
+<tr>
+<td><code>QuantileAggregator</code></td>
+<td>Window-count distribution to quantiles</td>
+<td>Activity baseline at a given scale</td>
+</tr>
+</tbody>
+</table>
+<p>The filter parameters work the same way on all seven:</p>
+<ul>
+<li><code>event_filter</code>: <code>Trades</code>, <code>BooksOnly</code>, or <code>Both</code>. Aggregators that only make sense for trades (volume, OHLC, peaks, quantiles) default to <code>Trades</code>; <code>BookSnapshotBin</code> defaults to <code>BooksOnly</code>.</li>
+<li><code>symbol_filter</code>: a list of symbol ids. The default (empty) admits every symbol.</li>
+</ul>
+<p><code>BookSnapshotBinAggregator</code> requires <code>n_threads=1</code> — see <a href="#parallel-execution">Parallel execution</a>.</p>
+<p><code>run([])</code> is a no-op. It does not decompress anything; useful as a sanity check that the framework is wired up.</p>
+<h2 id="python">Python<a class="headerlink" href="#python" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">lrvx</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">reader</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">DataReader</span><span class="p">(</span><span class="s2">"./tape"</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">stats</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">EventTypeStatsAggregator</span><span class="p">()</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">counts</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">BinCountAggregator</span><span class="p">(</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">bucket_ns</span><span class="o">=</span><span class="mi">60_000_000_000</span><span class="p">,</span>  <span class="c1"># 1-minute buckets</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">by_side</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">volume</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">VolumeBinAggregator</span><span class="p">(</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">bucket_ns</span><span class="o">=</span><span class="mi">60_000_000_000</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">by_side</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">ohlc</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">OHLCBinAggregator</span><span class="p">(</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">bucket_ns</span><span class="o">=</span><span class="mi">60_000_000_000</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="p">)</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">book</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">BookSnapshotBinAggregator</span><span class="p">(</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">bucket_ns</span><span class="o">=</span><span class="mi">60_000_000_000</span><span class="p">,</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    <span class="n">levels</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>                 <span class="c1"># rows per side per bucket; default 20</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p">)</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="n">peaks</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">PeakAggregator</span><span class="p">(</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    <span class="n">window_ns_list</span><span class="o">=</span><span class="p">[</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="mi">10_000_000</span><span class="p">,</span> <span class="mi">100_000_000</span><span class="p">,</span> <span class="mi">1_000_000_000</span><span class="p">],</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    <span class="n">top_n</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="p">)</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="n">quantiles</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">QuantileAggregator</span><span class="p">(</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    <span class="n">window_ns_list</span><span class="o">=</span><span class="p">[</span><span class="mi">1_000_000</span><span class="p">,</span> <span class="mi">100_000_000</span><span class="p">],</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>    <span class="n">quantiles</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">,</span> <span class="mf">0.99</span><span class="p">],</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="p">)</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="c1"># n_threads=1 is mandatory once the panel contains BookSnapshotBinAggregator.</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="n">reader</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="n">stats</span><span class="p">,</span> <span class="n">counts</span><span class="p">,</span> <span class="n">volume</span><span class="p">,</span> <span class="n">ohlc</span><span class="p">,</span> <span class="n">book</span><span class="p">,</span> <span class="n">peaks</span><span class="p">,</span> <span class="n">quantiles</span><span class="p">],</span> <span class="n">n_threads</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="c1"># .result() is populated once run() returns.</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="nb">print</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">result</span><span class="p">())</span>       <span class="c1"># structured numpy array</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="nb">print</span><span class="p">(</span><span class="n">counts</span><span class="o">.</span><span class="n">result</span><span class="p">())</span>      <span class="c1"># structured numpy array</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="nb">print</span><span class="p">(</span><span class="n">volume</span><span class="o">.</span><span class="n">result</span><span class="p">())</span>      <span class="c1"># structured numpy array</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="nb">print</span><span class="p">(</span><span class="n">ohlc</span><span class="o">.</span><span class="n">result</span><span class="p">())</span>        <span class="c1"># structured numpy array</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="nb">print</span><span class="p">(</span><span class="n">book</span><span class="o">.</span><span class="n">result</span><span class="p">())</span>        <span class="c1"># structured numpy array</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="nb">print</span><span class="p">(</span><span class="n">peaks</span><span class="o">.</span><span class="n">result</span><span class="p">())</span>       <span class="c1"># dict[window_ns, list[(count, start_ns)]]</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="nb">print</span><span class="p">(</span><span class="n">quantiles</span><span class="o">.</span><span class="n">result</span><span class="p">())</span>   <span class="c1"># dict[window_ns, dict[quantile, count]]</span>
+</span></code></pre></div>
+<p>The tabular aggregators (stats, counts, volume, ohlc, book) return structured numpy arrays. Field names match the row struct, so <code>arr["count"]</code>, <code>arr["bucket_ts_ns"]</code>, <code>arr["close_raw"]</code> work directly.</p>
+<p><code>side</code> encoding in <code>BinCount</code> and <code>VolumeBin</code> rows: <code>0</code> means aggregate (no side split), <code>1</code> is BUY, <code>2</code> is SELL. <code>symbol_id = 0</code> means aggregate; set <code>by_symbol=True</code> to get one row per (bucket, symbol_id) cell.</p>
+<h2 id="nodejs">Node.js<a class="headerlink" href="#nodejs" title="Permanent link">&para;</a></h2>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">DataReader</span><span class="p">,</span><span class="w"> </span><span class="nx">EventTypeStatsAggregator</span><span class="p">,</span><span class="w"> </span><span class="nx">BinCountAggregator</span><span class="p">,</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">         </span><span class="nx">VolumeBinAggregator</span><span class="p">,</span><span class="w"> </span><span class="nx">OHLCBinAggregator</span><span class="p">,</span><span class="w"> </span><span class="nx">BookSnapshotBinAggregator</span><span class="p">,</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">         </span><span class="nx">PeakAggregator</span><span class="p">,</span><span class="w"> </span><span class="nx">QuantileAggregator</span><span class="p">,</span><span class="w"> </span><span class="nx">AggregatorEventFilter</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="kr">from</span><span class="w"> </span><span class="s1">'@lrvx/lrvx'</span><span class="p">;</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="kd">const</span><span class="w"> </span><span class="nx">reader</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">DataReader</span><span class="p">(</span><span class="s1">'./tape'</span><span class="p">);</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="kd">const</span><span class="w"> </span><span class="nx">F</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">AggregatorEventFilter</span><span class="p">;</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="kd">const</span><span class="w"> </span><span class="nx">stats</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">EventTypeStatsAggregator</span><span class="p">(</span><span class="nx">F</span><span class="p">.</span><span class="nx">Both</span><span class="p">,</span><span class="w"> </span><span class="p">[]);</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="kd">const</span><span class="w"> </span><span class="nx">counts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">BinCountAggregator</span><span class="p">(</span><span class="mf">60</span><span class="nx">_000_000_000n</span><span class="p">,</span><span class="w"> </span><span class="cm">/*bySide=*/</span><span class="kc">true</span><span class="p">);</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="kd">const</span><span class="w"> </span><span class="nx">volume</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">VolumeBinAggregator</span><span class="p">(</span><span class="mf">60</span><span class="nx">_000_000_000n</span><span class="p">,</span><span class="w"> </span><span class="cm">/*bySide=*/</span><span class="kc">true</span><span class="p">);</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="kd">const</span><span class="w"> </span><span class="nx">ohlc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">OHLCBinAggregator</span><span class="p">(</span><span class="mf">60</span><span class="nx">_000_000_000n</span><span class="p">);</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="kd">const</span><span class="w"> </span><span class="nx">book</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">BookSnapshotBinAggregator</span><span class="p">(</span><span class="mf">60</span><span class="nx">_000_000_000n</span><span class="p">,</span><span class="w"> </span><span class="cm">/*levels=*/</span><span class="mf">20</span><span class="p">);</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="kd">const</span><span class="w"> </span><span class="nx">peaks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">PeakAggregator</span><span class="p">(</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="p">[</span><span class="mf">1</span><span class="nx">_000_000n</span><span class="p">,</span><span class="w"> </span><span class="mf">10</span><span class="nx">_000_000n</span><span class="p">,</span><span class="w"> </span><span class="mf">100</span><span class="nx">_000_000n</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="nx">_000_000_000n</span><span class="p">],</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="cm">/*topN=*/</span><span class="mf">10</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="p">);</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="kd">const</span><span class="w"> </span><span class="nx">quantiles</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">QuantileAggregator</span><span class="p">(</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="p">[</span><span class="mf">1</span><span class="nx">_000_000n</span><span class="p">,</span><span class="w"> </span><span class="mf">100</span><span class="nx">_000_000n</span><span class="p">],</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">0.95</span><span class="p">,</span><span class="w"> </span><span class="mf">0.99</span><span class="p">]</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="p">);</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="nx">reader</span><span class="p">.</span><span class="nx">run</span><span class="p">([</span><span class="nx">stats</span><span class="p">,</span><span class="w"> </span><span class="nx">counts</span><span class="p">,</span><span class="w"> </span><span class="nx">volume</span><span class="p">,</span><span class="w"> </span><span class="nx">ohlc</span><span class="p">,</span><span class="w"> </span><span class="nx">book</span><span class="p">,</span><span class="w"> </span><span class="nx">peaks</span><span class="p">,</span><span class="w"> </span><span class="nx">quantiles</span><span class="p">],</span><span class="w"> </span><span class="mf">1</span><span class="p">);</span><span class="w">  </span><span class="c1">// n_threads=1</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">stats</span><span class="p">.</span><span class="nx">result</span><span class="p">());</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">counts</span><span class="p">.</span><span class="nx">result</span><span class="p">());</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">volume</span><span class="p">.</span><span class="nx">result</span><span class="p">());</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">ohlc</span><span class="p">.</span><span class="nx">result</span><span class="p">());</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">book</span><span class="p">.</span><span class="nx">result</span><span class="p">());</span><span class="w">     </span><span class="c1">// Array&lt;BookSnapshotBinRow&gt;</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">peaks</span><span class="p">.</span><span class="nx">result</span><span class="p">());</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="nx">quantiles</span><span class="p">.</span><span class="nx">result</span><span class="p">());</span>
+</span></code></pre></div>
+<p>Node returns BigInt for ns timestamps and 64-bit counters, so values past <code>2^53</code> keep precision. The <code>Peak</code> result is <code>Array&lt;{windowNs, peaks: Array&lt;{count, startNs}&gt;}&gt;</code> rather than a Map; iterate with <code>for (const entry of result)</code>.</p>
+<h2 id="merged-tapes">Merged tapes<a class="headerlink" href="#merged-tapes" title="Permanent link">&para;</a></h2>
+<p><code>MergedTapeReader.run([...])</code> takes the same aggregator panel and walks the merged stream from N input tapes in a single pass. Aggregators see events with global-rewritten symbol ids; the originating tape index is not surfaced. Use <code>streamEvents()</code> directly when the tape index matters.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">merged</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">MergedTapeReader</span><span class="p">([</span><span class="s2">"./tape-bybit"</span><span class="p">,</span> <span class="s2">"./tape-bitget"</span><span class="p">])</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">peaks</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">PeakAggregator</span><span class="p">(</span><span class="n">window_ns_list</span><span class="o">=</span><span class="p">[</span><span class="mi">1_000_000_000</span><span class="p">],</span> <span class="n">top_n</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">merged</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="n">peaks</span><span class="p">])</span>
+</span></code></pre></div>
+<h2 id="aggregator-semantics">Aggregator semantics<a class="headerlink" href="#aggregator-semantics" title="Permanent link">&para;</a></h2>
+<h3 id="eventtypestats">EventTypeStats<a class="headerlink" href="#eventtypestats" title="Permanent link">&para;</a></h3>
+<p>Result is sorted by <code>symbol_id</code> ascending. Symbols with zero matching events don't appear in the output. Pass an explicit <code>symbol_filter</code> for a stable shape across runs.</p>
+<h3 id="bincount-and-volumebin">BinCount and VolumeBin<a class="headerlink" href="#bincount-and-volumebin" title="Permanent link">&para;</a></h3>
+<p>The bucket for an event at time <code>t</code> is <code>floor(t / bucket_ns) * bucket_ns</code>. Empty buckets produce no rows. <code>by_side=True</code> only splits trades (book events stay in <code>side=0</code>); <code>by_symbol=True</code> produces one row per (bucket, symbol_id) cell.</p>
+<p><code>VolumeBin</code> ignores book events. Pass <code>event_filter=BooksOnly</code> and you get an empty result by design.</p>
+<h3 id="ohlcbin">OHLCBin<a class="headerlink" href="#ohlcbin" title="Permanent link">&para;</a></h3>
+<p>Same bucketing as <code>BinCount</code> / <code>VolumeBin</code>. For every (bucket, optional symbol) cell, four values come out of the trades that fell into it:</p>
+<ul>
+<li><code>open_raw</code>: <code>price_raw</code> of the trade with the smallest <code>exchange_ts_ns</code>.</li>
+<li><code>close_raw</code>: <code>price_raw</code> of the trade with the largest <code>exchange_ts_ns</code>.</li>
+<li><code>high_raw</code> / <code>low_raw</code>: max and min of <code>price_raw</code> across the cell.</li>
+</ul>
+<p>Books are ignored — no scalar price per book event. Empty buckets produce no row; forward-fill on the caller side if a dense series is needed.</p>
+<p>There is no <code>by_side</code> parameter. An "open price for buys" is not a generally useful primitive; pair with <code>VolumeBinAggregator(by_side=True)</code> when per-side flow has to sit next to the price series.</p>
+<p><code>*_raw</code> fields are fixed-point int64. Divide by <code>Price::SCALE</code> (= 1e8) to get floats. Parallel runs preserve open/close ordering by comparing the per-cell first/last timestamps on merge.</p>
+<h3 id="booksnapshotbin">BookSnapshotBin<a class="headerlink" href="#booksnapshotbin" title="Permanent link">&para;</a></h3>
+<p>Maintains the full ladder per symbol from <code>BookSnapshot</code> / <code>BookDelta</code> events and, at each bucket boundary, emits the latest state observed inside the closed bucket as up to <code>levels</code> rows per side. One row pairs the bid and the ask at the same depth (<code>level=0</code> is top of book); the shorter side is zero-padded, so a row can carry a bid and a zero ask. Buckets with no book events for a symbol produce no rows; the state at the end of the walk is emitted as the trailing bucket.</p>
+<p>Row fields: <code>bucket_ts_ns</code>, <code>symbol_id</code>, <code>level</code>, <code>flags</code>, <code>bid_price_raw</code>, <code>bid_qty_raw</code>, <code>ask_price_raw</code>, <code>ask_qty_raw</code>. Rows are sorted by <code>(bucket_ts_ns, symbol_id, level)</code> ascending. <code>flags</code> bit 0 (<code>kFlagCrossed</code>, value 1) marks a bucket where the best bid was <code>&gt;=</code> the best ask. A zero price and qty on one side means no level at that depth.</p>
+<p><code>event_filter</code> is accepted for API parity, but only book events ever contribute — a <code>Trades</code> filter yields an empty result. <code>bucket_ns</code> and <code>levels</code> must both be <code>&gt; 0</code>.</p>
+<p>This is the C++ fast path for per-bucket book shape. The pure-Python equivalent is <a href="../iterate-orderbook/"><code>OrderBookIterator</code></a>, which has the same bucket semantics but is meant for point queries and hours-scale windows; use this aggregator for month-scale multi-symbol feature extraction.</p>
+<h3 id="peak">Peak<a class="headerlink" href="#peak" title="Permanent link">&para;</a></h3>
+<p>For each <code>window_ns</code>, finds the top-N intervals of width <code>window_ns</code> that contain the most events. After the walk, <code>finalize()</code> removes peaks that fall within <code>3 × window_ns</code> of a stronger one already kept; this keeps the top-N from being filled with adjacent samples of one burst.</p>
+<p><code>oversample_factor</code> (default 100) sets the in-flight candidate heap size to <code>top_n × oversample_factor</code>. Raise it when tapes have many distinct bursts clustered within <code>3 × window_ns</code> of an earlier candidate.</p>
+<p><code>start_ns</code> in the result is <code>t - window_ns</code>, where <code>t</code> is the arrival time of the last event in the window. The window starts <code>window_ns</code> earlier and ends at the event.</p>
+<h3 id="quantile">Quantile<a class="headerlink" href="#quantile" title="Permanent link">&para;</a></h3>
+<p>For each <code>window_ns</code>, the aggregator records the sliding-window event count at every event arrival and accumulates those observations into a histogram. <code>finalize()</code> then resolves each requested quantile <code>q</code> to the smallest count value <code>C</code> for which <code>fraction(observed ≤ C) ≥ q</code>.</p>
+<p>Quantiles must be in <code>(0.0, 1.0]</code>. The result row count is <code>len(window_ns_list) × len(quantiles)</code>. When <code>event_filter</code> admits no events, rows still appear with <code>count=0</code> so the shape stays stable.</p>
+<h2 id="parallel-execution">Parallel execution<a class="headerlink" href="#parallel-execution" title="Permanent link">&para;</a></h2>
+<p><code>reader.run(panel)</code> takes an optional <code>n_threads</code> argument:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">reader</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">panel</span><span class="p">,</span> <span class="n">n_threads</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>   <span class="c1"># explicit 4 workers</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">reader</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">panel</span><span class="p">)</span>                <span class="c1"># default n_threads=0 → auto</span>
+</span></code></pre></div>
+<p><code>n_threads</code> policy:</p>
+<ul>
+<li><code>0</code> (default): auto, resolved to <code>min(blocks_per_segment / 2, hardware_concurrency())</code>. Small captures stay single-threaded; multi-block segments use all available cores. The caller does not need to know the tape layout or core count.</li>
+<li><code>1</code>: explicit single-thread. Useful for benchmarking the base path, or for environments where threading is undesirable.</li>
+<li><code>&gt;1</code>: explicit worker count, capped to the effective block count per segment. <code>n_threads=100</code> on a 4-block segment allocates 4 panel clones.</li>
+</ul>
+<p>Partitioning is intra-segment at the compressed-block level. Each worker holds its own panel, cloned from the caller's via <code>IAggregator::cloneEmpty()</code>, and walks its assigned block range; results merge into the caller's originals via <code>IAggregator::merge()</code> before <code>finalize()</code>. Captures with one large active segment (md_collector style) benefit from this layout; segment-level partitioning would leave workers idle when one segment dominates.</p>
+<p>Aggregators with associative state (<code>EventTypeStats</code>, <code>BinCount</code>, <code>VolumeBin</code>, <code>Quantile</code>) produce identical results between single-thread and parallel runs.</p>
+<p><code>BookSnapshotBinAggregator</code> cannot run partitioned at all. Book reconstruction is order-dependent across the whole tape: a worker that starts mid-stream would apply deltas to a ladder whose snapshot it never saw. <code>cloneEmpty()</code> and <code>merge()</code> therefore throw, and a parallel run fails with "book reconstruction is order-dependent across the whole tape". Pass <code>n_threads=1</code>.</p>
+<p>The failure is layout-dependent: the reader only partitions when a segment has enough compressed blocks, so on small or uncompressed tapes <code>n_threads&gt;1</code> silently runs on the master panel and succeeds. Do not rely on that — pass <code>n_threads=1</code> explicitly.</p>
+<p><code>PeakAggregator</code> and <code>QuantileAggregator</code> are sliding-window aggregators. With <code>N</code> workers there are up to <code>N-1</code> partition seams per segment, each at most <code>max(window_ns)</code> wide; windows that span a seam are not seen by any single worker. The trade-off is documented on <code>IAggregator::merge</code>. Results match the single-thread reference when <code>window_ns</code> is much wider than the seam. At sub-millisecond scales on a tape with 16 workers, expect a small fraction of cross-seam windows to be miscounted.</p>
+<p><code>MergedTapeReader.run()</code> is single-threaded (per-tape symbol rekey is instance-local, and parallel workers would not share a global symbol-id space).</p>
+<h2 id="out-of-order-tapes-and-the-reorder-buffer">Out-of-order tapes and the reorder buffer<a class="headerlink" href="#out-of-order-tapes-and-the-reorder-buffer" title="Permanent link">&para;</a></h2>
+<p>For segments without the <code>Sorted</code> flag (tapes produced by external writers such as <code>md_collector</code> or third-party recorders), the reader applies two ordering stages:</p>
+<ol>
+<li>Intra-block sort runs on decompress, removing the ~1–2 ms exchange-WS jitter that accounts for most exchange-feed reordering. Cost: one linear scan of the block buffer per Sorted=false block.</li>
+<li>Cross-block reorder buffer is a bounded min-heap of in-flight events keyed by <code>exchange_ts_ns</code>. As events arrive (each block already intra-sorted), the heap drains anything whose timestamp falls outside <code>watermark - reorder_window_ns</code>. Memory: <code>O(reorder_window_ns × peak_event_rate)</code>.</li>
+</ol>
+<p><code>reorder_window_ns</code> is a constructor argument on <code>DataReader</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">reader</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">DataReader</span><span class="p">(</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="s2">"./tape"</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">reorder_window_ns</span><span class="o">=</span><span class="mi">30_000_000_000</span><span class="p">,</span>  <span class="c1"># 30s</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>The 10s default covers ~99% of cross-block inversions observed on real <code>md_collector</code> captures (1–25s tail, p99 around 5s).</p>
+<h3 id="events-that-arrive-too-late">Events that arrive too late<a class="headerlink" href="#events-that-arrive-too-late" title="Permanent link">&para;</a></h3>
+<p>An event with <code>exchange_ts_ns &lt; watermark - reorder_window_ns</code> has no slot left in sorted order: the reader has already emitted past it. It is dropped, counted in <code>ReaderStats::late_dropped</code> (<code>stats()["late_dropped"]</code> in Python), and reported once per segment in a warning that names the symbol, the event type, the file and the offset.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">reader</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="n">agg</span><span class="p">],</span> <span class="n">n_threads</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">dropped</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">stats</span><span class="p">()[</span><span class="s2">"late_dropped"</span><span class="p">]</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">if</span> <span class="n">dropped</span><span class="p">:</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">dropped</span><span class="si">}</span><span class="s2"> events arrived past the reorder window and were discarded"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The symbol filter runs before that check, so an event belonging to a symbol you did not ask to replay neither moves the watermark nor counts as late. The watermark also carries across segment boundaries within one walk, so an inversion straddling two segments is caught instead of disappearing when the watermark restarts.</p>
+<p>Set <code>strict_ordering=True</code> to raise <code>LrvxError(code="E_DATA_002")</code> on the first late event instead. Byte-for-byte reproducibility gates want that, because there a dropped frame is a silent difference between two runs. Everywhere else dropping is the better trade. On a five-day bybit capture of 12.9 million frames, fifteen events sit deeper than ten seconds; raising on them ended the walk at the halfway mark with aggregators already fed half a dataset.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">reader</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">DataReader</span><span class="p">(</span><span class="s2">"./tape"</span><span class="p">,</span> <span class="n">strict_ordering</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The other two options are unchanged: raise <code>reorder_window_ns</code>, or pre-sort the tape through <code>BinaryLogWriter</code>, which sets the <code>Sorted</code> flag and bypasses the reorder buffer.</p>
+<h3 id="aggregators-that-cannot-be-partitioned">Aggregators that cannot be partitioned<a class="headerlink" href="#aggregators-that-cannot-be-partitioned" title="Permanent link">&para;</a></h3>
+<p><code>BookSnapshotBinAggregator</code> rebuilds the book by applying deltas in order from the start of the tape, so it cannot run on partitioned workers. It reports that through <code>IAggregator::supportsParallel()</code>, and <code>run()</code> checks the panel before it partitions anything: <code>n_threads=0</code> resolves to a single thread, and an explicit <code>n_threads &gt; 1</code> is refused up front with <code>E_DATA_003</code> rather than throwing from inside a worker halfway through the walk.</p>
+<h2 id="performance-notes">Performance notes<a class="headerlink" href="#performance-notes" title="Permanent link">&para;</a></h2>
+<p><code>onEvent</code> runs once per event for each aggregator in the panel. Adding aggregators raises the per-event cost; it does not change how many times the tape is walked.</p>
+<p>Aggregators don't do I/O and don't call into Python. The only hot-path allocation is the bounded sliding deque used by Peak and Quantile.</p>
+<p>For multi-tape captures use <code>MergedTapeReader.run()</code>. The C++ N-way heap merge keeps peak memory at <code>O(N_tapes)</code> regardless of total event count.</p>
+<p>The Quantile histogram is keyed by <code>count_value</code> in an <code>unordered_map</code>. There are at most a few dozen distinct count values (bounded by the peak burst size), so the histogram stays small even when the tape contains billions of observations.</p>
+<h2 id="long-running-tapes-progress-callback">Long-running tapes: progress callback<a class="headerlink" href="#long-running-tapes-progress-callback" title="Permanent link">&para;</a></h2>
+<p><code>DataReader.run()</code> on a multi-day capture can sit silently for minutes. <code>progress_callback</code> lets the caller report status without changing the aggregator surface.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">progress</span><span class="p">(</span><span class="n">pct</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">ts_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">pct</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="si">:</span><span class="s2">5.1f</span><span class="si">}</span><span class="s2">%  ts=</span><span class="si">{</span><span class="n">ts_ns</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">return</span> <span class="kc">True</span>  <span class="c1"># return False to cancel</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">reader</span><span class="o">.</span><span class="n">run</span><span class="p">([</span><span class="n">agg</span><span class="p">],</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>           <span class="n">n_threads</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>           <span class="n">progress_callback</span><span class="o">=</span><span class="n">progress</span><span class="p">,</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>           <span class="n">progress_interval_ms</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The callback fires from inside the run loop at most once per <code>progress_interval_ms</code> (default 1 s) with the bytes-of-events pct in <code>[0.0, 1.0]</code> and the exchange timestamp of the most recent dispatched event. Returning <code>False</code> cancels the run: <code>run()</code> returns <code>False</code>, aggregators are still finalised with the partial state they had accumulated, and the caller can call <code>.result()</code> on them. Returning <code>True</code> (or <code>None</code>) lets the run continue. Raising inside the callback also cancels, and the exception re-raises after <code>run()</code> finalises so the caller sees it instead of a silent partial.</p>
+<p>Progress is reported only on the single-thread path (<code>n_threads=1</code>). Multi-thread runs ignore the callback because per-event GIL reentry would defeat the parallelism gained from cloning aggregators across workers; for those, run a smaller probe slice first to estimate throughput, then let the full run complete without progress.</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1">// Node.js: { onProgress, progressIntervalMs, nThreads }</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nx">reader</span><span class="p">.</span><span class="nx">run</span><span class="p">([</span><span class="nx">agg</span><span class="p">],</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nx">nThreads</span><span class="o">:</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nx">progressIntervalMs</span><span class="o">:</span><span class="w"> </span><span class="mf">1000</span><span class="p">,</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span><span class="nx">onProgress</span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="nx">pct</span><span class="p">,</span><span class="w"> </span><span class="nx">tsNs</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="p">(</span><span class="nx">pct</span><span class="o">*</span><span class="mf">100</span><span class="p">).</span><span class="nx">toFixed</span><span class="p">(</span><span class="mf">1</span><span class="p">)</span><span class="si">}</span><span class="sb">%`</span><span class="p">);</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">});</span>
+</span></code></pre></div>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../tape-record/">Record and replay market data with <code>lrvx tape</code></a> for capturing the <code>.lrvx</code>.</li>
+<li><a href="../multi-tape/">Merged tape consumption</a> for <code>MergedTapeReader</code> reference when streaming <code>run()</code> is not enough.</li>
+<li><a href="../iterate-orderbook/">Iterate the order book</a> for the event-by-event Python reconstruction <code>BookSnapshotBinAggregator</code> replaces on the hot path.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
