@@ -204,9 +204,11 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     sub.add_parser("serve", help="Start the MCP server over stdio.")
 
-    # `lrvx-mcp --help` returns 0 from here (rather than raising SystemExit
-    # from inside argparse) so embedders get a plain return value.
-    if raw == ["--help"]:
+    # Help variants print usage and return 0 (a plain return value for
+    # embedders, instead of SystemExit from inside argparse). Must run
+    # before the bare-invocation fallback, which would otherwise launch
+    # the stdio server for `-h`/`help` too.
+    if raw and raw[0] in ("--help", "-h", "help"):
         p.print_help()
         return 0
 
