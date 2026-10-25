@@ -177,6 +177,20 @@ TEST(CApiBookSnapshot, TopOfBookRefreshesTheTouchWithoutABookCallback)
   EXPECT_EQ(cap.tradeContext.bid_qty_raw, Quantity::fromDouble(4.0).raw());
   EXPECT_EQ(cap.tradeContext.ask_price_raw, Price::fromDouble(100.03).raw());
   EXPECT_EQ(cap.tradeContext.ask_qty_raw, Quantity::fromDouble(3.0).raw());
+
+  // The pull accessors must agree with the snapshot the callbacks carry:
+  // Codon and QuickJS strategies read the top through these.
+  auto* h = static_cast<LrvxStrategyHandle>(bridge.get());
+  int64_t px = 0;
+  ASSERT_EQ(lrvx_best_bid_raw_opt(h, sym, &px), 1);
+  EXPECT_EQ(px, Price::fromDouble(100.02).raw());
+  ASSERT_EQ(lrvx_best_ask_raw_opt(h, sym, &px), 1);
+  EXPECT_EQ(px, Price::fromDouble(100.03).raw());
+  ASSERT_EQ(lrvx_mid_price_raw_opt(h, sym, &px), 1);
+  EXPECT_EQ(px, Price::fromDouble(100.025).raw());
+  EXPECT_EQ(lrvx_best_bid_raw(h, sym), Price::fromDouble(100.02).raw());
+  EXPECT_EQ(lrvx_best_ask_raw(h, sym), Price::fromDouble(100.03).raw());
+  EXPECT_EQ(lrvx_mid_price_raw(h, sym), Price::fromDouble(100.025).raw());
 }
 
 TEST(CApiBookSnapshot, EmptySideReportsZeroPriceAndZeroSize)

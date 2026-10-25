@@ -728,23 +728,23 @@ int64_t lrvx_last_trade_price_raw(LrvxStrategyHandle s, uint32_t symbol)
 int64_t lrvx_best_bid_raw(LrvxStrategyHandle s, uint32_t symbol)
 {
   LRVX_CAPI_ENTER(s);
-  auto bid = toStrategy(s)->ctx(symbol).book.bestBid();
-  return bid ? bid->raw() : 0;
+  const auto& bid = toStrategy(s)->ctx(symbol).touchBid;
+  return bid ? bid->price.raw() : 0;
   LRVX_CAPI_LEAVE;
 }
 
 int64_t lrvx_best_ask_raw(LrvxStrategyHandle s, uint32_t symbol)
 {
   LRVX_CAPI_ENTER(s);
-  auto ask = toStrategy(s)->ctx(symbol).book.bestAsk();
-  return ask ? ask->raw() : 0;
+  const auto& ask = toStrategy(s)->ctx(symbol).touchAsk;
+  return ask ? ask->price.raw() : 0;
   LRVX_CAPI_LEAVE;
 }
 
 int64_t lrvx_mid_price_raw(LrvxStrategyHandle s, uint32_t symbol)
 {
   LRVX_CAPI_ENTER(s);
-  auto mid = toStrategy(s)->ctx(symbol).mid();
+  auto mid = toStrategy(s)->ctx(symbol).touchMid();
   return mid ? mid->raw() : 0;
   LRVX_CAPI_LEAVE;
 }
@@ -755,14 +755,14 @@ int64_t lrvx_mid_price_raw(LrvxStrategyHandle s, uint32_t symbol)
 uint8_t lrvx_best_bid_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* price_out)
 {
   LRVX_CAPI_ENTER(s);
-  auto bid = toStrategy(s)->ctx(symbol).book.bestBid();
+  const auto& bid = toStrategy(s)->ctx(symbol).touchBid;
   if (!bid)
   {
     return 0;
   }
   if (price_out)
   {
-    *price_out = bid->raw();
+    *price_out = bid->price.raw();
   }
   return 1;
   LRVX_CAPI_LEAVE;
@@ -771,14 +771,14 @@ uint8_t lrvx_best_bid_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* pr
 uint8_t lrvx_best_ask_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* price_out)
 {
   LRVX_CAPI_ENTER(s);
-  auto ask = toStrategy(s)->ctx(symbol).book.bestAsk();
+  const auto& ask = toStrategy(s)->ctx(symbol).touchAsk;
   if (!ask)
   {
     return 0;
   }
   if (price_out)
   {
-    *price_out = ask->raw();
+    *price_out = ask->price.raw();
   }
   return 1;
   LRVX_CAPI_LEAVE;
@@ -787,7 +787,7 @@ uint8_t lrvx_best_ask_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* pr
 uint8_t lrvx_mid_price_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* price_out)
 {
   LRVX_CAPI_ENTER(s);
-  auto mid = toStrategy(s)->ctx(symbol).mid();
+  auto mid = toStrategy(s)->ctx(symbol).touchMid();
   if (!mid)
   {
     return 0;

@@ -8,6 +8,9 @@ struct SymbolContext
   static constexpr size_t kDefaultBookLevels = 512;
 
   NLevelOrderBook<kDefaultBookLevels> book;
+  std::optional<BookLevel> touchBid{};
+  std::optional<BookLevel> touchAsk{};
+  int64_t lastTouchNs{0};
   Quantity position{};
   std::optional<Price> avgEntryPrice{};
   Price lastTradePrice{};
@@ -67,6 +70,9 @@ Returns bid-ask spread. Returns `nullopt` if book is one-sided.
 std::optional<double> unrealizedPnl(Price markPrice) const noexcept;
 std::optional<double> unrealizedPnl() const noexcept;  // Uses mid() as mark
 ```
+
+The no-argument form marks at the depth-book `mid()`, not `touchMid()`: marking
+at a one-level touch is a separate decision. Pass a mark price to choose.
 
 Unrealized PnL against the average entry price, which the engine reads from the
 attached `IPositionManager` before every handler call. Empty when there is no

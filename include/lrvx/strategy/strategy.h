@@ -557,7 +557,10 @@ class Strategy : public IStrategy
   }
 
   // Caller holds the symbol lock and has just applied a depth frame: the
-  // touch mirrors the book's new top.
+  // touch mirrors the book's new top. Both writers overwrite the touch
+  // unconditionally — frames arrive in exchange order on one socket, and a
+  // timestamp guard would have to special-case frames that carry no time
+  // (their exchangeTsNs is 0).
   static void refreshTouchFromBook(SymbolContext& c, int64_t exchangeTsNs) noexcept
   {
     auto bid = c.book.bestBid();
