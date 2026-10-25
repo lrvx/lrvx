@@ -703,7 +703,8 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 | `supports_post_only` | `uint8_t` |
 | `supports_reduce_only` | `uint8_t` |
 | `supports_close_position` | `uint8_t` |
-| `_pad` | `uint8_t[2]` |
+| `supports_batch_submit` | `uint8_t` |
+| `_pad` | `uint8_t[1]` |
 
 ### `LrvxExecutorCallbacks`
 

@@ -2832,7 +2832,8 @@ inline void bindStrategy(py::module_& m)
       .def_readwrite("gtd", &lrvx::PyExchangeCapabilities::gtd)
       .def_readwrite("post_only", &lrvx::PyExchangeCapabilities::post_only)
       .def_readwrite("reduce_only", &lrvx::PyExchangeCapabilities::reduce_only)
-      .def_readwrite("close_position", &lrvx::PyExchangeCapabilities::close_position);
+      .def_readwrite("close_position", &lrvx::PyExchangeCapabilities::close_position)
+      .def_readwrite("batch_submit", &lrvx::PyExchangeCapabilities::batch_submit);
 
   py::class_<lrvx::PyExecutor, lrvx::PyExecutorTrampoline,
              std::shared_ptr<lrvx::PyExecutor>>(m, "Executor")

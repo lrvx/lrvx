@@ -644,7 +644,10 @@ extern "C"
     uint8_t supports_post_only;
     uint8_t supports_reduce_only;
     uint8_t supports_close_position;
-    uint8_t _pad[2];
+    // Native batch submit behind IOrderExecutor::submitOrders. Takes a pad
+    // byte, so the struct layout is unchanged.
+    uint8_t supports_batch_submit;
+    uint8_t _pad[1];
   } LrvxExchangeCapabilities;
 
   typedef struct

@@ -554,7 +554,8 @@ extern "C"
     uint8_t supports_post_only;
     uint8_t supports_reduce_only;
     uint8_t supports_close_position;
-    uint8_t _pad[2];
+    uint8_t supports_batch_submit;
+    uint8_t _pad[1];
   } LrvxExchangeCapabilities;
 
   typedef struct

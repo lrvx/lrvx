@@ -613,6 +613,7 @@ Per-symbol counters split by event kind (trade / book_snapshot / book_delta). Ch
 
 **Members**
 
+- *attr* `batch_submit: bool`
 - *attr* `close_position: bool`
 - *attr* `fok: bool`
 - *attr* `gtc: bool`

@@ -28728,6 +28728,11 @@
         },
         {
           "kind": "method",
+          "name": "batchSubmit",
+          "parent": "ExchangeCapabilities"
+        },
+        {
+          "kind": "method",
           "name": "closePosition",
           "parent": "ExchangeCapabilities"
         },

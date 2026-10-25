@@ -92,6 +92,7 @@ void ex_caps(void* ud, LrvxExchangeCapabilities* out)
   out->supports_gtd = 0;
   out->supports_take_profit_market = 1;
   out->supports_take_profit_limit = 1;
+  out->supports_batch_submit = 1;
 }
 void ex_on_start(void* ud) { static_cast<ExecState*>(ud)->on_start++; }
 void ex_on_stop(void* ud) { static_cast<ExecState*>(ud)->on_stop++; }
@@ -125,6 +126,7 @@ TEST(CapiExecutor, CreateDestroyCapabilities)
   EXPECT_EQ(caps.supports_stop_market, 1);
   EXPECT_EQ(caps.supports_oco, 1);
   EXPECT_EQ(caps.supports_iceberg, 0);
+  EXPECT_EQ(caps.supports_batch_submit, 1);
 
   lrvx_executor_destroy(exec);
 }

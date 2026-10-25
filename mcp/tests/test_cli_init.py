@@ -240,9 +240,9 @@ class CliHelpTests(unittest.TestCase):
         for flag in ("--help", "-h", "help"):
             with self.subTest(flag=flag):
                 out = io.StringIO()
-                with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as exit_info:
-                    cli.main([flag])
-                self.assertEqual(exit_info.exception.code, 0)
+                with contextlib.redirect_stdout(out):
+                    rc = cli.main([flag])
+                self.assertEqual(rc, 0)
                 self.assertIn("usage: lrvx-mcp", out.getvalue())
                 self.assertIn("init", out.getvalue())
                 self.assertIn("serve", out.getvalue())

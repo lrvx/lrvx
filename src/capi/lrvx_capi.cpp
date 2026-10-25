@@ -5957,6 +5957,7 @@ class CapiExecutor : public lrvx::IOrderExecutor
     out.supportsPostOnly = (cc.supports_post_only != 0);
     out.supportsReduceOnly = (cc.supports_reduce_only != 0);
     out.supportsClosePosition = (cc.supports_close_position != 0);
+    out.supportsBatchSubmit = (cc.supports_batch_submit != 0);
     return out;
   }
 

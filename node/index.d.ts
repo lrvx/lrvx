@@ -362,6 +362,7 @@ export interface ExchangeCapabilities {
   postOnly?: boolean;
   reduceOnly?: boolean;
   closePosition?: boolean;
+  batchSubmit?: boolean;
 }
 
 /** Post-emission observer of every signal. Fires from a Node background

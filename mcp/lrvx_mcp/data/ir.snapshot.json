@@ -15310,8 +15310,12 @@
           "type": "uint8_t"
         },
         {
+          "name": "supports_batch_submit",
+          "type": "uint8_t"
+        },
+        {
           "name": "_pad",
-          "type": "uint8_t[2]"
+          "type": "uint8_t[1]"
         }
       ],
       "name": "LrvxExchangeCapabilities"
