@@ -27,8 +27,8 @@ struct SymbolContext
 | Field | Type | Description |
 |-------|------|-------------|
 | `book` | `NLevelOrderBook<512>` | Order book with 512 price levels |
-| `touchBid` / `touchAsk` | `std::optional<BookLevel>` | Freshest known top of book: mirrors the depth book's top after every `SNAPSHOT`/`DELTA` and is also refreshed by `TOP_OF_BOOK` frames the depth book ignores. Empty when that side has no quote |
-| `lastTouchNs` | `int64_t` | Exchange timestamp of the frame that last wrote the touch; separate from `lastUpdateNs`, which stamps dispatched events |
+| `touchBid` / `touchAsk` | `std::optional<BookLevel>` | The most recent best bid/ask. Depth frames set it from the applied book; `TOP_OF_BOOK` frames, which the book ignores, update it directly. Empty when that side has no quote |
+| `lastTouchNs` | `int64_t` | Exchange timestamp of the frame that last wrote the touch; `lastUpdateNs` only covers dispatched events |
 | `position` | `Quantity` | Net position (positive=long, negative=short) |
 | `avgEntryPrice` | `std::optional<Price>` | Volume-weighted average entry price, empty when the attached position manager reports none |
 | `lastTradePrice` | `Price` | Most recent trade price |

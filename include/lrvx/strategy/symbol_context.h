@@ -24,13 +24,13 @@ struct SymbolContext
 
   NLevelOrderBook<kDefaultBookLevels> book;
 
-  // Freshest known top of book, whichever frame kind carried it: depth
-  // frames refresh it from the applied book, TOP_OF_BOOK — which the depth
-  // book ignores — refreshes only this. Empty: no quote on that side.
+  // The most recent best bid/ask. Depth frames set it from the applied
+  // book; TOP_OF_BOOK frames, which the book ignores, update it directly.
+  // An empty optional means that side has no quote.
   std::optional<BookLevel> touchBid{};
   std::optional<BookLevel> touchAsk{};
-  // Stamp of the frame that last wrote the touch. Separate from
-  // lastUpdateNs, which stamps events the strategy was dispatched for.
+  // Exchange timestamp of the frame that last wrote the touch. lastUpdateNs
+  // only covers events the strategy was dispatched for.
   int64_t lastTouchNs{0};
 
   Quantity position{};

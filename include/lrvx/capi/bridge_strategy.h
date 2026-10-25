@@ -322,6 +322,7 @@ class BridgeStrategy : public Strategy
       // since a book may be quoted at exactly zero.
       snap.has_bid = 1;
       snap.bid_price_raw = c.touchBid->price.raw();
+      // The size resting at the touch; 0 stays reserved for an empty side.
       snap.bid_qty_raw = c.touchBid->quantity.raw();
     }
     if (c.touchAsk)

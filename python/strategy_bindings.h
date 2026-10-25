@@ -412,15 +412,17 @@ class PyStrategyBase
     result.symbol_id = c.symbolId;
     result.position = c.position.toDouble();
     result.last_trade_price = c.lastTradePrice.toDouble();
-    if (auto bid = c.book.bestBid())
+    // The touch, not book.bestBid()/bestAsk(): it also follows TOP_OF_BOOK
+    // frames the depth book ignores, same as the C API snapshots.
+    if (c.touchBid)
     {
-      result.best_bid = bid->toDouble();
+      result.best_bid = c.touchBid->price.toDouble();
     }
-    if (auto ask = c.book.bestAsk())
+    if (c.touchAsk)
     {
-      result.best_ask = ask->toDouble();
+      result.best_ask = c.touchAsk->price.toDouble();
     }
-    if (auto mid = c.mid())
+    if (auto mid = c.touchMid())
     {
       result.mid_price = mid->toDouble();
     }
@@ -542,8 +544,8 @@ class PyStrategyBase
     {
       return std::nullopt;
     }
-    auto bid = _bridge->ctx(_resolve(symbol)).book.bestBid();
-    return bid ? std::optional<double>(bid->toDouble()) : std::nullopt;
+    const auto& bid = _bridge->ctx(_resolve(symbol)).touchBid;
+    return bid ? std::optional<double>(bid->price.toDouble()) : std::nullopt;
   }
 
   std::optional<double> best_ask(std::optional<std::string> symbol = std::nullopt) const
@@ -552,8 +554,8 @@ class PyStrategyBase
     {
       return std::nullopt;
     }
-    auto ask = _bridge->ctx(_resolve(symbol)).book.bestAsk();
-    return ask ? std::optional<double>(ask->toDouble()) : std::nullopt;
+    const auto& ask = _bridge->ctx(_resolve(symbol)).touchAsk;
+    return ask ? std::optional<double>(ask->price.toDouble()) : std::nullopt;
   }
 
   std::optional<double> mid_price(std::optional<std::string> symbol = std::nullopt) const
@@ -562,7 +564,7 @@ class PyStrategyBase
     {
       return std::nullopt;
     }
-    auto mid = _bridge->ctx(_resolve(symbol)).mid();
+    auto mid = _bridge->ctx(_resolve(symbol)).touchMid();
     return mid ? std::optional<double>(mid->toDouble()) : std::nullopt;
   }
 
