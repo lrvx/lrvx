@@ -352,6 +352,7 @@ class BridgeStrategy : public Strategy
     fctx.avg_entry_price_raw = c.avgEntryPrice ? c.avgEntryPrice->raw() : 0;
     fctx.last_trade_price_raw = c.lastTradePrice.raw();
     fctx.last_update_ns = c.lastUpdateNs;
+    fctx.last_touch_ns = c.lastTouchNs;
     fctx.book = toBookSnapshot(c);
     return fctx;
   }

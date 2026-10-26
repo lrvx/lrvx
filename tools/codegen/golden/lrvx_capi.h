@@ -89,7 +89,7 @@ extern "C"
   // ============================================================
 
   // ABI version
-#define LRVX_CAPI_ABI_VERSION 4
+#define LRVX_CAPI_ABI_VERSION 5
 
   // Feature Flags
 #define LRVX_HAS_OPTIONAL_RAW_BEST_QUOTE 1
@@ -203,6 +203,7 @@ extern "C"
     int64_t last_trade_price_raw;
     int64_t last_update_ns;
     LrvxBookSnapshot book;
+    int64_t last_touch_ns;
   } LrvxSymbolContext;
 
   typedef struct

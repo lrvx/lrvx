@@ -24,8 +24,8 @@
  * rather than a failed load -- compare LRVX_CAPI_ABI_VERSION against
  * lrvx_capi_abi_version() once at startup and refuse the mismatch.
  * 3: LrvxBar grew close_reason. 4: LrvxBookSnapshot grew has_bid and
- * has_ask. */
-#define LRVX_CAPI_ABI_VERSION 4
+ * has_ask. 5: LrvxSymbolContext grew last_touch_ns. */
+#define LRVX_CAPI_ABI_VERSION 5
 
 /* Declared by a header that carries lrvx_best_bid_raw_opt and its two
  * siblings, so a binding can compile against a header with or without them.
@@ -235,9 +235,8 @@ extern "C"
    * on it as NaN rather than as the position's whole notional. The flag sits
    * in padding the struct already had, so the layout does not move. */
   /* book is the touch, which a TOP_OF_BOOK frame can refresh without a
-   * dispatch; last_update_ns stamps dispatched events only, so the top can be
-   * fresher than the stamp. The touch's own stamp (C++ lastTouchNs) is not in
-   * this struct: adding a field is an ABI bump. */
+   * dispatch. last_update_ns stamps dispatched events; last_touch_ns stamps
+   * the touch itself, so the two can differ. */
   typedef struct
   {
     uint32_t symbol_id;
@@ -247,6 +246,7 @@ extern "C"
     int64_t last_trade_price_raw;
     int64_t last_update_ns;
     LrvxBookSnapshot book;
+    int64_t last_touch_ns;
   } LrvxSymbolContext;
 
   /* order_type here is the C++ lrvx::OrderType space (LIMIT=0, MARKET=1,

@@ -810,6 +810,7 @@ void lrvx_get_symbol_context(LrvxStrategyHandle s, uint32_t symbol, LrvxSymbolCo
   out->avg_entry_price_raw = c.avgEntryPrice ? c.avgEntryPrice->raw() : 0;
   out->last_trade_price_raw = c.lastTradePrice.raw();
   out->last_update_ns = c.lastUpdateNs;
+  out->last_touch_ns = c.lastTouchNs;
 
   // The touch, same as BridgeStrategy::toBookSnapshot. The flags say whether
   // a side has a quote; the price fields cannot, since a book may be quoted

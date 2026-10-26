@@ -14576,7 +14576,7 @@
     {
       "group": "abi_version",
       "name": "LRVX_CAPI_ABI_VERSION",
-      "value": "4"
+      "value": "5"
     },
     {
       "group": "feature_flags",
@@ -16482,6 +16482,10 @@
         {
           "name": "book",
           "type": "LrvxBookSnapshot"
+        },
+        {
+          "name": "last_touch_ns",
+          "type": "int64_t"
         }
       ],
       "name": "LrvxSymbolContext"

@@ -7,7 +7,7 @@
 # file is the flat reference, not directly imported by user code.
 
 # ── macro: abi_version ──
-LRVX_CAPI_ABI_VERSION: int = 4
+LRVX_CAPI_ABI_VERSION: int = 5
 
 # ── macro: feature_flags ──
 LRVX_HAS_OPTIONAL_RAW_BEST_QUOTE: int = 1
