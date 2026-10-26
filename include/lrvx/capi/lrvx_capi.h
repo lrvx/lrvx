@@ -234,6 +234,10 @@ extern "C"
    * then 0 and means nothing, and bindings surface the unrealized PnL built
    * on it as NaN rather than as the position's whole notional. The flag sits
    * in padding the struct already had, so the layout does not move. */
+  /* book is the touch, which a TOP_OF_BOOK frame can refresh without a
+   * dispatch; last_update_ns stamps dispatched events only, so the top can be
+   * fresher than the stamp. The touch's own stamp (C++ lastTouchNs) is not in
+   * this struct: adding a field is an ABI bump. */
   typedef struct
   {
     uint32_t symbol_id;
@@ -1281,6 +1285,9 @@ extern "C"
 
   int64_t lrvx_position_raw(LrvxStrategyHandle s, uint32_t symbol);
   int64_t lrvx_last_trade_price_raw(LrvxStrategyHandle s, uint32_t symbol);
+  /* The quote accessors below answer from the touch — the same top the
+   * LrvxBookSnapshot in every callback carries — so they also follow
+   * TOP_OF_BOOK frames the depth book ignores. */
   int64_t lrvx_best_bid_raw(LrvxStrategyHandle s, uint32_t symbol);
   int64_t lrvx_best_ask_raw(LrvxStrategyHandle s, uint32_t symbol);
   int64_t lrvx_mid_price_raw(LrvxStrategyHandle s, uint32_t symbol);

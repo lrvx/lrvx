@@ -145,13 +145,19 @@ class Strategy : public IStrategy
       return;
     }
 
-    // Same rule as the depth book itself (see BookUpdateType): a
-    // TOP_OF_BOOK frame carries the touch, not the book. The context's book
-    // ignores it, so dispatching onSymbolBook here would hand the strategy
-    // the previous snapshot's top at touch rate — with lastUpdateNs
-    // claiming it is fresh.
+    // A TOP_OF_BOOK frame lands in the touch fields and nothing else: the
+    // depth book ignores it (see BookUpdateType), and dispatching it would
+    // hand the strategy the previous depth frame's book at touch rate,
+    // stamped fresh.
     if (ev.update.type == BookUpdateType::TOP_OF_BOOK)
     {
+      std::lock_guard<SymbolLock> owned(lockFor(sym));
+      auto& c = _contexts[sym];
+      c.touchBid = ev.update.bids.empty() ? std::nullopt
+                                          : std::optional<BookLevel>(ev.update.bids.front());
+      c.touchAsk = ev.update.asks.empty() ? std::nullopt
+                                          : std::optional<BookLevel>(ev.update.asks.front());
+      c.lastTouchNs = ev.update.exchangeTsNs.raw();
       return;
     }
 
@@ -159,6 +165,7 @@ class Strategy : public IStrategy
     auto& c = _contexts[sym];
     c.book.applyBookUpdate(ev);
     c.lastUpdateNs = ev.update.exchangeTsNs.raw();
+    refreshTouchFromBook(c, ev.update.exchangeTsNs.raw());
     refreshPosition(c, sym);
 
     onSymbolBook(c, ev);
@@ -547,6 +554,22 @@ class Strategy : public IStrategy
       c.position = snap.position;
       c.avgEntryPrice = snap.avgEntryPrice;
     }
+  }
+
+  // Caller holds the symbol lock and has just applied a depth frame: the
+  // touch mirrors the book's new top. Both writers overwrite the touch
+  // unconditionally — frames arrive in exchange order on one socket, and a
+  // timestamp guard would have to special-case frames that carry no time
+  // (their exchangeTsNs is 0).
+  static void refreshTouchFromBook(SymbolContext& c, int64_t exchangeTsNs) noexcept
+  {
+    auto bid = c.book.bestBid();
+    auto ask = c.book.bestAsk();
+    c.touchBid = bid ? std::optional<BookLevel>(BookLevel(*bid, c.book.bidAtPrice(*bid)))
+                     : std::nullopt;
+    c.touchAsk = ask ? std::optional<BookLevel>(BookLevel(*ask, c.book.askAtPrice(*ask)))
+                     : std::nullopt;
+    c.lastTouchNs = exchangeTsNs;
   }
 
   // One lock per flat slot, padded to its own cache line so that locking

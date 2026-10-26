@@ -728,23 +728,23 @@ int64_t lrvx_last_trade_price_raw(LrvxStrategyHandle s, uint32_t symbol)
 int64_t lrvx_best_bid_raw(LrvxStrategyHandle s, uint32_t symbol)
 {
   LRVX_CAPI_ENTER(s);
-  auto bid = toStrategy(s)->ctx(symbol).book.bestBid();
-  return bid ? bid->raw() : 0;
+  const auto& bid = toStrategy(s)->ctx(symbol).touchBid;
+  return bid ? bid->price.raw() : 0;
   LRVX_CAPI_LEAVE;
 }
 
 int64_t lrvx_best_ask_raw(LrvxStrategyHandle s, uint32_t symbol)
 {
   LRVX_CAPI_ENTER(s);
-  auto ask = toStrategy(s)->ctx(symbol).book.bestAsk();
-  return ask ? ask->raw() : 0;
+  const auto& ask = toStrategy(s)->ctx(symbol).touchAsk;
+  return ask ? ask->price.raw() : 0;
   LRVX_CAPI_LEAVE;
 }
 
 int64_t lrvx_mid_price_raw(LrvxStrategyHandle s, uint32_t symbol)
 {
   LRVX_CAPI_ENTER(s);
-  auto mid = toStrategy(s)->ctx(symbol).mid();
+  auto mid = toStrategy(s)->ctx(symbol).touchMid();
   return mid ? mid->raw() : 0;
   LRVX_CAPI_LEAVE;
 }
@@ -755,14 +755,14 @@ int64_t lrvx_mid_price_raw(LrvxStrategyHandle s, uint32_t symbol)
 uint8_t lrvx_best_bid_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* price_out)
 {
   LRVX_CAPI_ENTER(s);
-  auto bid = toStrategy(s)->ctx(symbol).book.bestBid();
+  const auto& bid = toStrategy(s)->ctx(symbol).touchBid;
   if (!bid)
   {
     return 0;
   }
   if (price_out)
   {
-    *price_out = bid->raw();
+    *price_out = bid->price.raw();
   }
   return 1;
   LRVX_CAPI_LEAVE;
@@ -771,14 +771,14 @@ uint8_t lrvx_best_bid_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* pr
 uint8_t lrvx_best_ask_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* price_out)
 {
   LRVX_CAPI_ENTER(s);
-  auto ask = toStrategy(s)->ctx(symbol).book.bestAsk();
+  const auto& ask = toStrategy(s)->ctx(symbol).touchAsk;
   if (!ask)
   {
     return 0;
   }
   if (price_out)
   {
-    *price_out = ask->raw();
+    *price_out = ask->price.raw();
   }
   return 1;
   LRVX_CAPI_LEAVE;
@@ -787,7 +787,7 @@ uint8_t lrvx_best_ask_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* pr
 uint8_t lrvx_mid_price_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* price_out)
 {
   LRVX_CAPI_ENTER(s);
-  auto mid = toStrategy(s)->ctx(symbol).mid();
+  auto mid = toStrategy(s)->ctx(symbol).touchMid();
   if (!mid)
   {
     return 0;
@@ -811,22 +811,19 @@ void lrvx_get_symbol_context(LrvxStrategyHandle s, uint32_t symbol, LrvxSymbolCo
   out->last_trade_price_raw = c.lastTradePrice.raw();
   out->last_update_ns = c.lastUpdateNs;
 
-  auto bid = c.book.bestBid();
-  auto ask = c.book.bestAsk();
-  // The flags say whether a side has a best level; the price fields cannot,
-  // since a book may be quoted at exactly zero.
-  out->book.has_bid = bid ? 1u : 0u;
-  out->book.has_ask = ask ? 1u : 0u;
-  out->book.bid_price_raw = bid ? bid->raw() : 0;
-  // See BridgeStrategy::toBookSnapshot: the size at the best level comes
-  // from bidAtPrice()/askAtPrice(), and 0 is reserved for an empty side.
-  out->book.bid_qty_raw = bid ? c.book.bidAtPrice(*bid).raw() : 0;
-  out->book.ask_price_raw = ask ? ask->raw() : 0;
-  out->book.ask_qty_raw = ask ? c.book.askAtPrice(*ask).raw() : 0;
-  auto mid = c.mid();
+  // The touch, same as BridgeStrategy::toBookSnapshot. The flags say whether
+  // a side has a quote; the price fields cannot, since a book may be quoted
+  // at exactly zero, and a size of 0 is reserved for an empty side.
+  out->book.has_bid = c.touchBid ? 1u : 0u;
+  out->book.has_ask = c.touchAsk ? 1u : 0u;
+  out->book.bid_price_raw = c.touchBid ? c.touchBid->price.raw() : 0;
+  out->book.bid_qty_raw = c.touchBid ? c.touchBid->quantity.raw() : 0;
+  out->book.ask_price_raw = c.touchAsk ? c.touchAsk->price.raw() : 0;
+  out->book.ask_qty_raw = c.touchAsk ? c.touchAsk->quantity.raw() : 0;
+  auto mid = c.touchMid();
   out->book.mid_raw = mid ? mid->raw() : 0;
-  auto spread = c.bookSpread();
-  out->book.spread_raw = spread ? spread->raw() : 0;
+  out->book.spread_raw =
+      (c.touchBid && c.touchAsk) ? (c.touchAsk->price.raw() - c.touchBid->price.raw()) : 0;
   LRVX_CAPI_LEAVE_VOID;
 }
 

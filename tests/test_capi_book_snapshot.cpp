@@ -50,6 +50,25 @@ void onBookCapture(void* user, const LrvxSymbolContext* ctx, const LrvxBookData*
   c->fromContext = ctx->book;
 }
 
+struct TouchCaptured
+{
+  int bookCalls = 0;
+  int tradeCalls = 0;
+  LrvxBookSnapshot tradeContext{};
+};
+
+void onBookCount(void* user, const LrvxSymbolContext*, const LrvxBookData*)
+{
+  ++static_cast<TouchCaptured*>(user)->bookCalls;
+}
+
+void onTradeTouch(void* user, const LrvxSymbolContext* ctx, const LrvxTradeData*)
+{
+  auto* c = static_cast<TouchCaptured*>(user);
+  ++c->tradeCalls;
+  c->tradeContext = ctx->book;
+}
+
 SymbolId addSymbol(SymbolRegistry& reg)
 {
   SymbolInfo info;
@@ -115,6 +134,63 @@ TEST(CApiBookSnapshot, BestLevelSizesReachTheCConsumer)
   // callback, and it is built by the same helper.
   EXPECT_EQ(captured.fromContext.bid_qty_raw, Quantity::fromDouble(2.5).raw());
   EXPECT_EQ(captured.fromContext.ask_qty_raw, Quantity::fromDouble(1.25).raw());
+}
+
+TEST(CApiBookSnapshot, TopOfBookRefreshesTheTouchWithoutABookCallback)
+{
+  SymbolRegistry registry;
+  SymbolId sym = addSymbol(registry);
+
+  TouchCaptured cap;
+  LrvxStrategyCallbacks cb{};
+  cb.on_book = &onBookCount;
+  cb.on_trade = &onTradeTouch;
+  cb.user_data = &cap;
+
+  auto bridge = std::make_unique<BridgeStrategy>(1, std::vector<SymbolId>{sym}, registry, cb);
+
+  BookUpdatePool pool;
+  auto snap = makeSnapshot(pool, sym, {{Price::fromDouble(100.00), Quantity::fromDouble(2.5)}},
+                           {{Price::fromDouble(100.05), Quantity::fromDouble(1.25)}});
+  bridge->onBookUpdate(*snap);
+  ASSERT_EQ(cap.bookCalls, 1);
+
+  // A TOP_OF_BOOK frame must not fire on_book — the depth book ignored it —
+  // but it must land in the context's touch, which every later callback
+  // serializes.
+  auto top = makeSnapshot(pool, sym, {{Price::fromDouble(100.02), Quantity::fromDouble(4.0)}},
+                          {{Price::fromDouble(100.03), Quantity::fromDouble(3.0)}});
+  top->update.type = BookUpdateType::TOP_OF_BOOK;
+  bridge->onBookUpdate(*top);
+  EXPECT_EQ(cap.bookCalls, 1);
+
+  TradeEvent tr;
+  tr.trade.symbol = sym;
+  tr.trade.price = Price::fromDouble(100.02);
+  tr.trade.quantity = Quantity::fromDouble(0.1);
+  bridge->onTrade(tr);
+
+  ASSERT_EQ(cap.tradeCalls, 1);
+  EXPECT_EQ(cap.tradeContext.has_bid, 1);
+  EXPECT_EQ(cap.tradeContext.bid_price_raw, Price::fromDouble(100.02).raw())
+      << "the touch from the TOP_OF_BOOK frame, not the stale snapshot top";
+  EXPECT_EQ(cap.tradeContext.bid_qty_raw, Quantity::fromDouble(4.0).raw());
+  EXPECT_EQ(cap.tradeContext.ask_price_raw, Price::fromDouble(100.03).raw());
+  EXPECT_EQ(cap.tradeContext.ask_qty_raw, Quantity::fromDouble(3.0).raw());
+
+  // The pull accessors must agree with the snapshot the callbacks carry:
+  // Codon and QuickJS strategies read the top through these.
+  auto* h = static_cast<LrvxStrategyHandle>(bridge.get());
+  int64_t px = 0;
+  ASSERT_EQ(lrvx_best_bid_raw_opt(h, sym, &px), 1);
+  EXPECT_EQ(px, Price::fromDouble(100.02).raw());
+  ASSERT_EQ(lrvx_best_ask_raw_opt(h, sym, &px), 1);
+  EXPECT_EQ(px, Price::fromDouble(100.03).raw());
+  ASSERT_EQ(lrvx_mid_price_raw_opt(h, sym, &px), 1);
+  EXPECT_EQ(px, Price::fromDouble(100.025).raw());
+  EXPECT_EQ(lrvx_best_bid_raw(h, sym), Price::fromDouble(100.02).raw());
+  EXPECT_EQ(lrvx_best_ask_raw(h, sym), Price::fromDouble(100.03).raw());
+  EXPECT_EQ(lrvx_mid_price_raw(h, sym), Price::fromDouble(100.025).raw());
 }
 
 TEST(CApiBookSnapshot, EmptySideReportsZeroPriceAndZeroSize)

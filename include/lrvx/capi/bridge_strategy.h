@@ -313,34 +313,32 @@ class BridgeStrategy : public Strategy
   static LrvxBookSnapshot toBookSnapshot(const SymbolContext& c)
   {
     LrvxBookSnapshot snap{};
-    auto bid = c.book.bestBid();
-    auto ask = c.book.bestAsk();
-    if (bid)
+    // The touch, not book.bestBid()/bestAsk(): it also follows TOP_OF_BOOK
+    // frames the depth book ignores, so a bridge strategy sees the freshest
+    // known top on every callback.
+    if (c.touchBid)
     {
       // The flag is what says a quote exists; the price field alone cannot,
       // since a book may be quoted at exactly zero.
       snap.has_bid = 1;
-      snap.bid_price_raw = bid->raw();
-      // The size at the best level, not 0: bestBid() answers the price and
-      // bidAtPrice() the quantity resting at it. Hardcoding 0 here left a
-      // direct C ABI consumer unable to tell a sized side from an empty one.
-      snap.bid_qty_raw = c.book.bidAtPrice(*bid).raw();
+      snap.bid_price_raw = c.touchBid->price.raw();
+      // The size resting at the touch; 0 stays reserved for an empty side.
+      snap.bid_qty_raw = c.touchBid->quantity.raw();
     }
-    if (ask)
+    if (c.touchAsk)
     {
       snap.has_ask = 1;
-      snap.ask_price_raw = ask->raw();
-      snap.ask_qty_raw = c.book.askAtPrice(*ask).raw();
+      snap.ask_price_raw = c.touchAsk->price.raw();
+      snap.ask_qty_raw = c.touchAsk->quantity.raw();
     }
-    auto mid = c.mid();
+    auto mid = c.touchMid();
     if (mid)
     {
       snap.mid_raw = mid->raw();
     }
-    auto spread = c.bookSpread();
-    if (spread)
+    if (c.touchBid && c.touchAsk)
     {
-      snap.spread_raw = spread->raw();
+      snap.spread_raw = c.touchAsk->price.raw() - c.touchBid->price.raw();
     }
     return snap;
   }

@@ -24662,6 +24662,11 @@
         },
         {
           "kind": "method",
+          "name": "refreshTouchFromBook",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "setBarRingCapacity",
           "parent": "Strategy"
         },
@@ -24953,6 +24958,11 @@
         {
           "kind": "method",
           "name": "reset",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
+          "name": "touchMid",
           "parent": "SymbolContext"
         },
         {
