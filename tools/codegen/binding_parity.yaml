@@ -719,10 +719,10 @@ groups:
   additional_stats:
     pybind11:
       status: required
-      functions: [permutation_test, bootstrap_ci, whites_reality_check]
+      functions: [permutation_test, bootstrap_ci, whites_reality_check, pbo_cscv, deflated_sharpe, grid_neighborhood]
     napi:
       status: required
-      functions: [bootstrapCI, permutationTest, whitesRealityCheck]
+      functions: [bootstrapCI, permutationTest, whitesRealityCheck, pboCscv, deflatedSharpe, gridNeighborhood]
     codon: { status: required }
     quickjs:
       status: required
@@ -1907,6 +1907,9 @@ allowlist_functions:
     lrvx_stat_correlation: *cpp_direct
     lrvx_stat_permutation_test: *cpp_direct
     lrvx_stat_profit_factor: *cpp_direct
+    lrvx_stat_deflated_sharpe: *cpp_direct
+    lrvx_stat_grid_neighborhood: *cpp_direct
+    lrvx_stat_pbo_cscv: *cpp_direct
     lrvx_stat_whites_reality_check: *cpp_direct
     lrvx_stat_win_rate: *cpp_direct
     lrvx_storage_sink_create_p: *cpp_direct
@@ -2294,6 +2297,9 @@ allowlist_functions:
     lrvx_set_log_callback: *no_codon_import
     lrvx_simulated_executor_get_fills: *no_codon_import
     lrvx_simulated_executor_on_book_snapshot: *no_codon_import
+    lrvx_stat_deflated_sharpe: *no_codon_import
+    lrvx_stat_grid_neighborhood: *no_codon_import
+    lrvx_stat_pbo_cscv: *no_codon_import
     lrvx_stat_whites_reality_check: *no_codon_import
     lrvx_storage_sink_create: *no_codon_import
     lrvx_storage_sink_create_p: *no_codon_import
@@ -2499,6 +2505,9 @@ allowlist_functions:
     lrvx_simulated_executor_cancel_order: *no_quickjs_global
     lrvx_simulated_executor_get_fills: *no_quickjs_global
     lrvx_simulated_executor_on_book_snapshot: *no_quickjs_global
+    lrvx_stat_deflated_sharpe: *no_quickjs_global
+    lrvx_stat_grid_neighborhood: *no_quickjs_global
+    lrvx_stat_pbo_cscv: *no_quickjs_global
     lrvx_stat_whites_reality_check: *no_quickjs_global
     lrvx_storage_sink_create: *no_quickjs_global
     lrvx_storage_sink_create_p: *no_quickjs_global

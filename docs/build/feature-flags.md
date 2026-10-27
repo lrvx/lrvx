@@ -54,6 +54,7 @@ The empty string (the default) means "all venues currently in `connectors/src/`"
 | Flag | Default | Effect |
 |---|---|---|
 | `LRVX_NATIVE` | **ON** | Add `-march=native` to Release builds. Fastest on the build host, but the resulting `.so` / `.a` will fault with SIGILL on any CPU lacking an instruction the build host had (e.g. AVX-512 → consumer x86). When OFF on x86_64, falls back to `-march=x86-64-v3` (AVX2/BMI2/FMA baseline, supported since ~2015); on arm64 the compiler default is used. Distribution paths (wheels, prebuilt binaries) must build with `LRVX_NATIVE=OFF`. |
+| `LRVX_LTO` | **ON** | Link-time optimisation in Release builds: `-flto` on GCC and Clang, `/GL` + `/LTCG` on MSVC. Every executable that links the static library redoes the whole-program step at link time, so a build with `LRVX_BUILD_TESTS=ON` pays it once per test binary and ccache cannot help (it caches compiles, not links). Turn it OFF for build-and-test runs; keep it ON for anything you ship or measure. The per-push Linux CI jobs and the flag matrix run with it OFF; macOS, MSVC, the wheels and the nightly benchmarks keep it ON. |
 
 ## Build type, and why it is not a neutral choice
 

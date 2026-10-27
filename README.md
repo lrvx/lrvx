@@ -1,7 +1,7 @@
 [![CI](https://github.com/lrvx/lrvx/actions/workflows/ci.yml/badge.svg)](https://github.com/lrvx/lrvx/actions)
 [![Docs](https://img.shields.io/badge/docs-site-blue)](https://docs.lrvx.dev)
 [![PyPI](https://img.shields.io/pypi/v/lrvx?v=1)](https://pypi.org/project/lrvx/)
-[![npm](https://img.shields.io/npm/v/lrvx)](https://www.npmjs.com/package/@lrvx/lrvx)
+[![npm](https://img.shields.io/npm/v/@lrvx/lrvx)](https://www.npmjs.com/package/@lrvx/lrvx)
 
 ## lrvx
 

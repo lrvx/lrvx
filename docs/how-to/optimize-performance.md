@@ -17,7 +17,7 @@ cmake .. \
 
 Default release flags in lrvx:
 ```cmake
-$<$<CONFIG:Release>:-O3 ${LRVX_ARCH_OPT} -flto -funroll-loops>
+$<$<CONFIG:Release>:-O3 -funroll-loops -flto ${LRVX_ARCH_OPT}>
 ```
 
 `LRVX_ARCH_OPT` resolves at configure time from `LRVX_NATIVE` (default `ON`):
@@ -30,10 +30,16 @@ Set `LRVX_NATIVE=OFF` when shipping artefacts to machines whose CPUs you do not 
 
 ### Link-Time Optimization
 
-Already enabled by default with `-flto`. Ensure your compiler supports it:
+On by default through the `LRVX_LTO` option: `-flto` on GCC and Clang, `/GL` +
+`/LTCG` on MSVC. Ensure your compiler supports it:
 ```bash
 g++ --version  # GCC 13+ recommended
 ```
+
+Every executable that links the static library redoes the whole-program step
+at link time, so a build with the test suite on pays it once per test binary.
+Pass `-DLRVX_LTO=OFF` for build-and-test runs and keep it on for anything you
+ship or measure. See [Build feature flags](../build/feature-flags.md#compiler-options).
 
 ## Event Bus Tuning
 

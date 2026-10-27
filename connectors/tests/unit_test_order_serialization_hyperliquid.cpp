@@ -66,12 +66,12 @@ struct Call
   std::string body;
 };
 
-// The executor's constructor unconditionally fetches the asset-id map from
-// a hardcoded "https://api.hyperliquid.xyz/info" URL (loadAssetIds()),
-// independent of the restUrl passed in; every subsequent order call goes
-// to whatever URL the test passes as restUrl. The fake distinguishes the
-// two so the meta round-trip (needed to make assetIdFor() resolve "BTC")
-// doesn't get counted or asserted on as an order call.
+// The executor's constructor fetches the asset-id map (loadAssetIds()) from
+// the /info URL derived from the restUrl: the /info next to an /exchange
+// URL, or the mainnet /info for any other URL, such as the ones these tests
+// pass. Every order call goes to the restUrl itself. The fake tells the two
+// apart by the /info suffix so the meta round-trip (needed to make
+// assetIdFor() resolve "BTC") is not counted or asserted on as an order call.
 class FakeTransport final : public ITransport
 {
  public:

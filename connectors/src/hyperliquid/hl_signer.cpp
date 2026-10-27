@@ -136,7 +136,13 @@ static bool is_private_signer_socket(const char* path)
   return true;
 }
 
-static socket_t connect_unix(const char* path, int timeout_ms = 50)
+// hl_signerd answers one request at a time, so a sign can queue behind
+// another client's request or behind the daemon's own slow first sign. The
+// timeout is sized for that queue; the bound is for a daemon that is wedged,
+// not for one that is busy.
+constexpr int kSignerTimeoutMs = 2000;
+
+static socket_t connect_unix(const char* path, int timeout_ms = kSignerTimeoutMs)
 {
   socket_t fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
   if (fd < 0)
@@ -261,7 +267,7 @@ std::optional<HlSig> hl_sign_with_sdk(const HlSignParams& p)
   // have the key in a buffer we might never be allowed to send.
   const std::string req = build_request_json(p);
 
-  socket_t fd = connect_unix(path.c_str(), /*timeout_ms=*/50);
+  socket_t fd = connect_unix(path.c_str(), kSignerTimeoutMs);
   if (fd == INVALID_SOCK)
   {
     LRVX_LOG_ERROR("[HL] connect hl_signerd failed on " << path);
