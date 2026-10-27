@@ -1396,8 +1396,11 @@ jobs:
   connectors-build:
     needs: [format-check]
     runs-on: ubuntu-24.04
-    # Observed: ~11 min.
-    timeout-minutes: 25
+    # Observed: ~11 min on a warm ccache. LRVX_BUILD_TESTS=ON below pulls
+    # every core and venue test into this build too, so a cold cache on a
+    # slow runner needs about 25 min for the compile and LTO links alone;
+    # 40 leaves that case room.
+    timeout-minutes: 40
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       # ccache defaults to comparing the compiler binary's mtime, and
