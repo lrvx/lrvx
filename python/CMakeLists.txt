@@ -1,5 +1,13 @@
 find_package(pybind11 REQUIRED)
 
+# pybind11_add_module links pybind11::lto (-flto=auto on GCC) into the
+# module unless CMAKE_INTERPROCEDURAL_OPTIMIZATION is defined, whatever
+# the build type. Follow LRVX_LTO: with it off, define the variable so
+# the module is built the way the library it links was.
+if(NOT LRVX_LTO)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
+endif()
+
 # Compiled module name is `_lrvx`; the user-facing import path
 # `lrvx` is provided by the pure-Python wrapper in lrvx/__init__.py
 # that re-exports everything. This split lets us ship .pyi stubs and a
@@ -17,7 +25,10 @@ if(NOT MSVC)
   # honours the LRVX_NATIVE option. Wheel builds set LRVX_NATIVE=OFF via
   # python/pyproject.toml so the shipped .so does not require AVX-512
   # (or whatever ISA the build host happened to expose).
-  set(_LRVX_PY_OPTS -O3 -flto)
+  set(_LRVX_PY_OPTS -O3)
+  if(LRVX_LTO)
+    list(APPEND _LRVX_PY_OPTS -flto)
+  endif()
   if(LRVX_ARCH_OPT)
     list(APPEND _LRVX_PY_OPTS ${LRVX_ARCH_OPT})
   endif()

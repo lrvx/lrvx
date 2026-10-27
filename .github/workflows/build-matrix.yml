@@ -28,7 +28,9 @@ jobs:
   # gating the flag matrix on it bought nothing.
   matrix:
     runs-on: ubuntu-24.04
-    # Observed: 1-3 min for most entries, ~7.5 min for tests-only.
+    # Observed: 1-3 min for most entries, ~7.5 min for tests-only with
+    # LRVX_LTO=OFF below (with LTO on and no ccache here, tests-only ran
+    # past 20 min relinking every test binary and was cancelled).
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -98,16 +100,31 @@ jobs:
       run: |
         echo "pybind11_DIR=$(python3 -c 'import pybind11; print(pybind11.get_cmake_dir())')" >> $GITHUB_ENV
 
+    # LRVX_LTO=OFF: this matrix checks that each flag combination
+    # configures and builds; the whole-program link step adds nothing to
+    # that and dominated the tests-only row.
     - name: Configure
       run: |
         cmake -B build -G Ninja \
               -DCMAKE_CXX_COMPILER=g++-14 \
               -DCMAKE_BUILD_TYPE=Release \
+              -DLRVX_LTO=OFF \
               -DCMAKE_PREFIX_PATH="$HOME/gtest-install" \
               ${{ matrix.flags }}
 
     - name: Build
       run: cmake --build build -j$(nproc)
+
+    # Build the wheel from the root pyproject.toml, install it into a
+    # throwaway venv, and assert every documented pure-Python module is
+    # importable. Catches the regression where scikit-build-core only
+    # collects the install component contents and silently drops new
+    # `.py` files added under `python/lrvx/`. It lives here rather than in
+    # ci.yml's linux-gcc because it rebuilds the extension from scratch,
+    # two minutes that sat on the critical path of the slowest job.
+    - name: Verify wheel ships every pure-Python module
+      if: matrix.name == 'python-only'
+      run: bash scripts/check_lrvx_wheel.sh
 
     - name: Venue-stack composition smoke
       if: matrix.name == 'python-only' || matrix.name == 'production-typical'
