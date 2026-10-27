@@ -139,6 +139,8 @@ Names differ slightly by language (snake_case vs camelCase) but the surface is t
 
 In Python / Node.js / Codon `symbol` defaults to the first registered symbol when omitted.
 
+Two exits that look alike are not. `market_sell(qty)` is a plain sell of `qty`: it reduces a long by that much and goes short past it. `close_position()` sells exactly the open position as a reduce-only order, and submits nothing when flat.
+
 The Node `emit` object carries only `marketBuy`, `marketSell`,
 `limitBuy`, `limitSell`, `cancel`, `closePosition`,
 `provideLiquidity`, and `withdrawLiquidity`. `cancelAll(symbol)` is a

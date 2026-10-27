@@ -158,6 +158,7 @@ nav:
           - Cross-sectional panel builder: how-to/cross-sectional-panel.md
           - Interactive Backtest: how-to/interactive-backtest.md
           - Grid Search: how-to/grid-search.md
+          - Sweep parameters over bars: how-to/sweep-over-bars.md
           - Walk-forward: how-to/walk-forward.md
           - White's reality check: how-to/whites-reality-check.md
           - Log to MLflow: how-to/mlflow.md
@@ -249,6 +250,7 @@ nav:
       - Market-making quoter: explanation/market-making-quoter.md
       - AMM DEX connector: explanation/amm-dex-connector.md
       - Replay-equivalence gate: explanation/replay-equivalence-gate.md
+      - The reference backtest: explanation/reference-backtest.md
       - Bar-close ordering on tied timestamps: explanation/bar-close-ordering.md
       - Threaded Runner lifetime in Node: explanation/node-threaded-runner-lifetime.md
       - The JavaScript value boundary: explanation/javascript-value-boundary.md

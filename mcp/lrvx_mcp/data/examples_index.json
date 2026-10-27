@@ -254,6 +254,13 @@
     },
     {
       "language": "python",
+      "path": "docs/examples/python_reference_backtest.py",
+      "sha256": "976cd885ad74343779629a9789cb4e7e1f38dd721f500f37592041f83b634499",
+      "size_bytes": 4278,
+      "topic": "backtest"
+    },
+    {
+      "language": "python",
       "path": "docs/examples/python_rolling_top_k.py",
       "sha256": "e5e23b5cbf15fd97408f16ffe5421770533fc99b8d524aa6b8995600a8294d5d",
       "size_bytes": 1833,
@@ -271,6 +278,13 @@
       "path": "docs/examples/python_submit_latency_watcher.py",
       "sha256": "4fe459a7353b5b2cbf46e707eccb311a950de1239521fcbb0ea957e316c26e50",
       "size_bytes": 396,
+      "topic": "strategy"
+    },
+    {
+      "language": "python",
+      "path": "docs/examples/python_sweep_over_bars.py",
+      "sha256": "843e84a850f49a87840b85a21e6b675c09c9ef40b04cb18f71b853fdfa948820",
+      "size_bytes": 3271,
       "topic": "strategy"
     },
     {

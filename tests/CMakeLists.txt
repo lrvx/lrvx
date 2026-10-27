@@ -188,6 +188,11 @@ if(NOT WIN32)
 endif()
 
 if(LRVX_ENABLE_BACKTEST)
+  add_lrvx_test(test_reference_backtest)
+  # Reads docs/examples/data/btcusdt_1m.csv, the data file the reference page
+  # fixes, so it needs the source tree rather than the test binary's directory.
+  target_compile_definitions(test_reference_backtest PRIVATE
+    LRVX_DOCS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../docs")
   add_lrvx_test(test_backtest)
   add_lrvx_test(test_fixed_point_muldiv)
   add_lrvx_test(test_strategy_pump)

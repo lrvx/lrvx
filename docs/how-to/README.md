@@ -39,6 +39,7 @@ Solve specific problems. Assumes you know the basics.
 | [HTML report](backtest-html-report.md) | Render an equity curve + trade table to one HTML file |
 | [Interactive backtest](interactive-backtest.md) | Inspect state mid-run from a notebook |
 | [Grid search](grid-search.md) | Sweep parameters over a backtest |
+| [Sweep parameters over bars](sweep-over-bars.md) | Load bars once, run one bar strategy per combination, in processes or on threads |
 | [Walk-forward](walk-forward.md) | Out-of-sample validation with rolling / anchored folds |
 | [Heatmap](heatmap.md) | SVG heatmap from a 2D parameter sweep |
 | [White's reality check](whites-reality-check.md) | Multiple-comparison-aware significance test |
