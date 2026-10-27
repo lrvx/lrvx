@@ -21,6 +21,7 @@ Understand concepts and design decisions behind lrvx. These pages are language-a
 | [Market-making quoter](market-making-quoter.md) | Two-sided quote ladder with inventory skew and requote tolerance |
 | [AMM DEX connector](amm-dex-connector.md) | Presenting a constant-product pool through the connector interface |
 | [Replay-equivalence gate](replay-equivalence-gate.md) | The CI check that defends deterministic backtest replay |
+| [The reference backtest](reference-backtest.md) | One strategy, one file, pinned numbers, and the execution rules they follow |
 | [Bar-close ordering](bar-close-ordering.md) | Which aggregator fires first when several bars close on the same instant |
 | [Connectors](connectors.md) | The native exchange connectors module and the interfaces it implements |
 | [MCP control plane](mcp-control-plane.md) | Why the AI-agent control surface is shaped the way it is |

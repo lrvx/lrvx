@@ -3335,6 +3335,21 @@
         {
           "group": "additional_stats",
           "kind": "function",
+          "name": "lrvx_stat_deflated_sharpe"
+        },
+        {
+          "group": "additional_stats",
+          "kind": "function",
+          "name": "lrvx_stat_grid_neighborhood"
+        },
+        {
+          "group": "additional_stats",
+          "kind": "function",
+          "name": "lrvx_stat_pbo_cscv"
+        },
+        {
+          "group": "additional_stats",
+          "kind": "function",
           "name": "lrvx_stat_permutation_test"
         },
         {
@@ -10945,6 +10960,18 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_stat_deflated_sharpe"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_stat_grid_neighborhood"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_stat_pbo_cscv"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_stat_permutation_test"
         },
         {
@@ -11336,6 +11363,11 @@
           "name": "AtomicLoggerOptions"
         },
         {
+          "header": "include/lrvx/strategy/exits.h",
+          "kind": "type",
+          "name": "AtrStop"
+        },
+        {
           "header": "include/lrvx/indicator/autocorrelation.h",
           "kind": "type",
           "name": "AutoCorrelation"
@@ -11501,6 +11533,11 @@
           "name": "Breach"
         },
         {
+          "header": "include/lrvx/strategy/exits.h",
+          "kind": "type",
+          "name": "BreakEvenTrail"
+        },
+        {
           "header": "include/lrvx/backtest/backtest_runner.h",
           "kind": "type",
           "name": "Breakpoint"
@@ -11559,6 +11596,11 @@
           "header": "include/lrvx/connector/fix/fix_client_codec.h",
           "kind": "type",
           "name": "CancelRequest"
+        },
+        {
+          "header": "include/lrvx/strategy/exits.h",
+          "kind": "type",
+          "name": "ChandelierExit"
         },
         {
           "header": "include/lrvx/execution/algos.h",
@@ -11709,6 +11751,11 @@
           "header": "include/lrvx/util/base/decimal.h",
           "kind": "type",
           "name": "Decimal"
+        },
+        {
+          "header": "include/lrvx/stats/deflated_sharpe.h",
+          "kind": "type",
+          "name": "DeflatedSharpeResult"
         },
         {
           "header": "include/lrvx/replay/delta_book.h",
@@ -12729,6 +12776,11 @@
           "header": "include/lrvx/replay/ops/partitioner.h",
           "kind": "type",
           "name": "Partitioner"
+        },
+        {
+          "header": "include/lrvx/stats/pbo_cscv.h",
+          "kind": "type",
+          "name": "PboResult"
         },
         {
           "header": "include/lrvx/replay/aggregators/peak.h",
@@ -13967,6 +14019,36 @@
         },
         {
           "kind": "method",
+          "name": "arm",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "atrMultiple",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
           "name": "compute",
           "parent": "AutoCorrelation"
         },
@@ -13998,6 +14080,11 @@
         {
           "kind": "method",
           "name": "rankResults",
+          "parent": "BacktestOptimizer"
+        },
+        {
+          "kind": "method",
+          "name": "resolveThreads",
           "parent": "BacktestOptimizer"
         },
         {
@@ -15157,6 +15244,36 @@
         },
         {
           "kind": "method",
+          "name": "arm",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "atBreakEven",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
           "name": "afterEvents",
           "parent": "Breakpoint"
         },
@@ -15429,6 +15546,41 @@
           "kind": "method",
           "name": "position",
           "parent": "CachedPositionState"
+        },
+        {
+          "kind": "method",
+          "name": "arm",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "atrMultiple",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "lookback",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "ChandelierExit"
         },
         {
           "kind": "method",
@@ -21882,6 +22034,31 @@
         },
         {
           "kind": "method",
+          "name": "blockCount",
+          "parent": "PboResult"
+        },
+        {
+          "kind": "method",
+          "name": "blockSum",
+          "parent": "PboResult"
+        },
+        {
+          "kind": "method",
+          "name": "blockSumSq",
+          "parent": "PboResult"
+        },
+        {
+          "kind": "method",
+          "name": "isScore",
+          "parent": "PboResult"
+        },
+        {
+          "kind": "method",
+          "name": "oosScore",
+          "parent": "PboResult"
+        },
+        {
+          "kind": "method",
           "name": "cloneEmpty",
           "parent": "PeakAggregator"
         },
@@ -27099,6 +27276,10 @@
         },
         {
           "kind": "function",
+          "name": "deflatedSharpe"
+        },
+        {
+          "kind": "function",
           "name": "dema"
         },
         {
@@ -27116,6 +27297,10 @@
         {
           "kind": "function",
           "name": "extractTimeRange"
+        },
+        {
+          "kind": "function",
+          "name": "gridNeighborhood"
         },
         {
           "kind": "function",
@@ -27156,6 +27341,10 @@
         {
           "kind": "function",
           "name": "parkinson_vol"
+        },
+        {
+          "kind": "function",
+          "name": "pboCscv"
         },
         {
           "kind": "function",
@@ -33762,6 +33951,10 @@
         },
         {
           "kind": "function",
+          "name": "deflated_sharpe"
+        },
+        {
+          "kind": "function",
           "name": "dema"
         },
         {
@@ -33787,6 +33980,10 @@
         {
           "kind": "function",
           "name": "greeks"
+        },
+        {
+          "kind": "function",
+          "name": "grid_neighborhood"
         },
         {
           "kind": "function",
@@ -33847,6 +34044,10 @@
         {
           "kind": "function",
           "name": "parkinson_vol"
+        },
+        {
+          "kind": "function",
+          "name": "pbo_cscv"
         },
         {
           "kind": "function",
@@ -40875,6 +41076,9 @@
     "additional_stats": {
       "capi_functions": [
         "lrvx_stat_bootstrap_ci",
+        "lrvx_stat_deflated_sharpe",
+        "lrvx_stat_grid_neighborhood",
+        "lrvx_stat_pbo_cscv",
         "lrvx_stat_permutation_test",
         "lrvx_stat_whites_reality_check"
       ],
@@ -40887,7 +41091,10 @@
         "functions": [
           "bootstrapCI",
           "permutationTest",
-          "whitesRealityCheck"
+          "whitesRealityCheck",
+          "pboCscv",
+          "deflatedSharpe",
+          "gridNeighborhood"
         ],
         "status": "required"
       },
@@ -40896,7 +41103,10 @@
         "functions": [
           "permutation_test",
           "bootstrap_ci",
-          "whites_reality_check"
+          "whites_reality_check",
+          "pbo_cscv",
+          "deflated_sharpe",
+          "grid_neighborhood"
         ],
         "status": "required"
       },

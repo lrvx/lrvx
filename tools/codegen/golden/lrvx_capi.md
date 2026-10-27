@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 743 functions, 58 handles, 59 structs, 43 callback typedefs, 3 enums, 16 macro constants, 73 groups.
+**Surface:** 746 functions, 58 handles, 59 structs, 43 callback typedefs, 3 enums, 16 macro constants, 73 groups.
 
 ## Opaque handles
 
@@ -937,6 +937,9 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `double lrvx_stat_permutation_test(const double * group1, size_t len1, const double * group2, size_t len2, uint32_t num_permutations)`
 - `void lrvx_stat_bootstrap_ci(const double * data, size_t len, double confidence, uint32_t num_samples, double * lower_out, double * median_out, double * upper_out)`
 - `void lrvx_stat_whites_reality_check(const double * returns, size_t num_strategies, size_t num_periods, uint32_t num_bootstrap, double avg_block_size, double * p_value_out, double * best_stat_out, int32_t * best_index_out)`
+- `void lrvx_stat_pbo_cscv(const double * returns, size_t num_trials, size_t num_periods, uint32_t num_blocks, double * pbo_out, uint64_t * splits_out, double * mean_oos_rank_out, double * mean_logit_out)`
+- `void lrvx_stat_deflated_sharpe(const double * returns, size_t num_periods, const double * trial_sharpes, size_t num_trials, double * sharpe_out, double * skewness_out, double * kurtosis_out, double * expected_max_sharpe_out, double * dsr_out)`
+- `void lrvx_stat_grid_neighborhood(const double * values, const size_t * shape, size_t ndim, size_t radius, double * neighbor_mean_out, uint32_t * neighbor_count_out)`
 
 ### amm_curve
 

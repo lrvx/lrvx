@@ -1429,6 +1429,36 @@ extern "C"
                                       size_t num_periods, uint32_t num_bootstrap,
                                       double avg_block_size, double* p_value_out,
                                       double* best_stat_out, int32_t* best_index_out);
+  /* Probability of backtest overfitting by CSCV (Bailey, Borwein, Lopez de
+   * Prado, Zhu). returns is trials x periods, row-major; num_blocks is the
+   * even number of period blocks the splits are drawn from. pbo_out is NaN
+   * when the inputs cannot be split (fewer than 2 trials, an odd or
+   * out-of-range block count, fewer periods than blocks), and splits_out is
+   * then 0. Deterministic. */
+  LRVX_EXPORT(group = "additional_stats")
+  void lrvx_stat_pbo_cscv(const double* returns, size_t num_trials, size_t num_periods,
+                          uint32_t num_blocks, double* pbo_out, uint64_t* splits_out,
+                          double* mean_oos_rank_out, double* mean_logit_out);
+  /* Deflated Sharpe ratio (Bailey, Lopez de Prado). returns is the selected
+   * strategy's per-period return series; trial_sharpes holds the per-period
+   * Sharpe ratio of every trial the selection ran over (NULL or fewer than 2
+   * of them means no selection, SR0 = 0). Every output is NaN with fewer than
+   * 2 periods or a zero return variance; dsr_out alone is NaN when the
+   * non-normality correction has no real root. */
+  LRVX_EXPORT(group = "additional_stats")
+  void lrvx_stat_deflated_sharpe(const double* returns, size_t num_periods,
+                                 const double* trial_sharpes, size_t num_trials,
+                                 double* sharpe_out, double* skewness_out, double* kurtosis_out,
+                                 double* expected_max_sharpe_out, double* dsr_out);
+  /* Per-cell neighbourhood of a parameter grid: the mean of the neighbouring
+   * cells' values (every cell whose index differs by at most radius on every
+   * axis, the cell itself excluded, NaN values skipped) and their count.
+   * values is row-major over shape[ndim]; both outputs have as many cells as
+   * values. A cell with no neighbour gets a NaN mean and a count of 0. */
+  LRVX_EXPORT(group = "additional_stats")
+  void lrvx_stat_grid_neighborhood(const double* values, const size_t* shape, size_t ndim,
+                                   size_t radius, double* neighbor_mean_out,
+                                   uint32_t* neighbor_count_out);
 
   // ============================================================
   // Segment operations

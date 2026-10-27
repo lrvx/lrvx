@@ -46,6 +46,9 @@
 #include "lrvx/risk/portfolio_risk.h"
 #include "lrvx/run/trace_reader.h"
 #include "lrvx/run/trace_recorder.h"
+#include "lrvx/stats/deflated_sharpe.h"
+#include "lrvx/stats/grid_neighborhood.h"
+#include "lrvx/stats/pbo_cscv.h"
 #include "lrvx/stats/whites_reality_check.h"
 
 #include "lrvx/indicator/adf.h"
@@ -3724,6 +3727,72 @@ void lrvx_stat_whites_reality_check(const double* returns, size_t num_strategies
   {
     *best_index_out = result.bestIndex;
   }
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_stat_pbo_cscv(const double* returns, size_t num_trials, size_t num_periods,
+                        uint32_t num_blocks, double* pbo_out, uint64_t* splits_out,
+                        double* mean_oos_rank_out, double* mean_logit_out)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  const auto r = lrvx::stats::pboCscv(returns, num_trials, num_periods, num_blocks);
+  if (pbo_out)
+  {
+    *pbo_out = r.pbo;
+  }
+  if (splits_out)
+  {
+    *splits_out = r.splits;
+  }
+  if (mean_oos_rank_out)
+  {
+    *mean_oos_rank_out = r.meanOosRank;
+  }
+  if (mean_logit_out)
+  {
+    *mean_logit_out = r.meanLogit;
+  }
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_stat_deflated_sharpe(const double* returns, size_t num_periods,
+                               const double* trial_sharpes, size_t num_trials, double* sharpe_out,
+                               double* skewness_out, double* kurtosis_out,
+                               double* expected_max_sharpe_out, double* dsr_out)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  const auto r =
+      lrvx::stats::deflatedSharpeRatio(returns, num_periods, trial_sharpes, num_trials);
+  if (sharpe_out)
+  {
+    *sharpe_out = r.sharpe;
+  }
+  if (skewness_out)
+  {
+    *skewness_out = r.skewness;
+  }
+  if (kurtosis_out)
+  {
+    *kurtosis_out = r.kurtosis;
+  }
+  if (expected_max_sharpe_out)
+  {
+    *expected_max_sharpe_out = r.expectedMaxSharpe;
+  }
+  if (dsr_out)
+  {
+    *dsr_out = r.dsr;
+  }
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_stat_grid_neighborhood(const double* values, const size_t* shape, size_t ndim,
+                                 size_t radius, double* neighbor_mean_out,
+                                 uint32_t* neighbor_count_out)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  lrvx::stats::gridNeighborhood(values, shape, ndim, radius, neighbor_mean_out,
+                                neighbor_count_out);
   LRVX_CAPI_LEAVE_VOID;
 }
 

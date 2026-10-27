@@ -199,6 +199,29 @@ for (size_t i = 0; i < mid; ++i) {
 double pValue = Stats::permutationTest(topHalf, bottomHalf);
 ```
 
+## Robustness statistics (`lrvx/stats/`)
+
+Header-only, outside `OptimizationStatistics`; each takes raw arrays so a binding can call it on its own buffers.
+
+```cpp
+#include "lrvx/stats/pbo_cscv.h"
+#include "lrvx/stats/deflated_sharpe.h"
+#include "lrvx/stats/grid_neighborhood.h"
+
+// returns: trials x periods, row-major. pbo is NaN and splits 0 when the
+// inputs cannot be split (fewer than 2 trials, S odd or above 32, T < S).
+stats::PboResult pbo = stats::pboCscv(returns.data(), trials, periods, /*numBlocks=*/16);
+
+// The selected strategy's returns and every trial's per-period Sharpe ratio.
+stats::DeflatedSharpeResult d =
+    stats::deflatedSharpeRatio(best.data(), best.size(), sharpes.data(), sharpes.size());
+
+// values row-major over shape; one mean and one count per cell.
+stats::gridNeighborhood(values.data(), shape, ndim, /*radius=*/1, means.data(), counts.data());
+```
+
+`PboResult` carries `pbo`, `splits`, `meanOosRank` and `meanLogit`; `DeflatedSharpeResult` carries `sharpe`, `skewness`, `kurtosis`, `expectedMaxSharpe` and `dsr`. The definitions, with references, are on [Overfitting checks for a parameter sweep](../../../how-to/robustness-statistics.md); `lrvx/stats/normal.h` holds the normal CDF and quantile they use.
+
 ## See Also
 
 - [BacktestOptimizer](./backtest_optimizer.md)
