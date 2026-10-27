@@ -46,6 +46,8 @@ struct NoRateLimitPolicy
   {
     action();
   }
+
+  void stop() {}
 };
 
 /// Active rate limiting with configurable behavior.
@@ -78,7 +80,35 @@ class ActiveRateLimitPolicy
   ActiveRateLimitPolicy(const ActiveRateLimitPolicy&) = delete;
   ActiveRateLimitPolicy& operator=(const ActiveRateLimitPolicy&) = delete;
 
-  ~ActiveRateLimitPolicy() { shutdown(); }
+  ~ActiveRateLimitPolicy() { stop(); }
+
+  // Joins the sender thread and refuses every request still queued, through
+  // its onRejected. No deferred action runs once this returns, so an owner
+  // calls it before tearing down anything a deferred action touches. Safe to
+  // call more than once.
+  void stop()
+  {
+    {
+      std::lock_guard<std::mutex> lock(_mutex);
+      _stopping = true;
+    }
+    _cv.notify_all();
+    if (_sender.joinable())
+    {
+      _sender.join();
+    }
+
+    std::deque<Deferred> leftovers;
+    {
+      std::lock_guard<std::mutex> lock(_mutex);
+      leftovers.swap(_deferred);
+    }
+    for (auto& item : leftovers)
+    {
+      LRVX_LOG_WARN("[RateLimit] Dropping deferred orderId=" << item.orderId << " on shutdown");
+      item.onRejected();
+    }
+  }
 
   void init(RateLimitConfig config)
   {
@@ -255,30 +285,6 @@ class ActiveRateLimitPolicy
       {
         return false;
       }
-    }
-  }
-
-  void shutdown()
-  {
-    {
-      std::lock_guard<std::mutex> lock(_mutex);
-      _stopping = true;
-    }
-    _cv.notify_all();
-    if (_sender.joinable())
-    {
-      _sender.join();
-    }
-
-    std::deque<Deferred> leftovers;
-    {
-      std::lock_guard<std::mutex> lock(_mutex);
-      leftovers.swap(_deferred);
-    }
-    for (auto& item : leftovers)
-    {
-      LRVX_LOG_WARN("[RateLimit] Dropping deferred orderId=" << item.orderId << " on shutdown");
-      item.onRejected();
     }
   }
 

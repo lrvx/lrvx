@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -33,5 +34,13 @@ struct HlSignParams
 };
 
 std::optional<HlSig> hl_sign_with_sdk(const HlSignParams& p);
+
+// Nonce for an L1 action: the wall clock in milliseconds, bumped past the
+// last value this process handed out. The venue rejects a nonce it has
+// already seen for the signer, so two actions signed in the same millisecond
+// (from two threads, or from two signers in one process) need distinct
+// values. Process-wide and lock-free; never returns the same value twice and
+// never goes backwards.
+uint64_t nextNonceMs();
 
 }  // namespace lrvx::hl
