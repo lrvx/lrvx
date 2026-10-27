@@ -40,6 +40,7 @@ Solve specific problems. Assumes you know the basics.
 | [Interactive backtest](interactive-backtest.md) | Inspect state mid-run from a notebook |
 | [Grid search](grid-search.md) | Sweep parameters over a backtest |
 | [Sweep parameters over bars](sweep-over-bars.md) | Load bars once, run one bar strategy per combination, in processes or on threads |
+| [Exits for bar strategies](bar-exits.md) | ATR stop, Chandelier exit and break-even trail as rules a bar strategy arms and updates |
 | [Walk-forward](walk-forward.md) | Out-of-sample validation with rolling / anchored folds |
 | [Heatmap](heatmap.md) | SVG heatmap from a 2D parameter sweep |
 | [White's reality check](whites-reality-check.md) | Multiple-comparison-aware significance test |
