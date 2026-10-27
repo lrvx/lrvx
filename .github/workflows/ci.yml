@@ -647,8 +647,15 @@ jobs:
       if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'bench')
       run: ./scripts/run-benchmarks.sh build/benchmarks
 
+    # Saved on pushes to main only. Every save is a new cache entry (the key
+    # carries run_id) and the repository's 10 GB cache budget evicts by last
+    # access, so two PR runs of this workflow (about 3.6 GB each across its
+    # jobs) were enough to evict main's whole set and every push to main
+    # started cold, 25 minutes instead of 15. A PR restores from main's
+    # caches through restore-keys (a PR may read its base branch's cache),
+    # so it stays warm without saving anything.
     - name: Save ccache
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: ${{ env.CCACHE_DIR }}
@@ -767,8 +774,9 @@ jobs:
       if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'bench')
       run: ./scripts/run-benchmarks.sh build/benchmarks
 
+    # Main only; see linux-gcc's Save ccache.
     - name: Save ccache
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: ${{ env.CCACHE_DIR }}
@@ -883,8 +891,9 @@ jobs:
         TSAN_OPTIONS: halt_on_error=0:exitcode=66:second_deadlock_stack=1
       run: scripts/run-with-sanitizer-scan.sh ./build/demo/lrvx_demo
 
+    # Main only; see linux-gcc's Save ccache.
     - name: Save ccache
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: ${{ env.CCACHE_DIR }}
@@ -997,8 +1006,9 @@ jobs:
         UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
       run: scripts/run-with-sanitizer-scan.sh ./build/demo/lrvx_demo
 
+    # Main only; see linux-gcc's Save ccache.
     - name: Save ccache
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: ${{ env.CCACHE_DIR }}
@@ -1160,8 +1170,9 @@ jobs:
     - name: Run demo
       run: .\build\demo\lrvx_demo.exe
 
+    # Main only; see linux-gcc's Save ccache.
     - name: Save sccache
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: ${{ env.SCCACHE_DIR }}
@@ -1325,8 +1336,9 @@ jobs:
     - name: Run demo
       run: .\build\demo\lrvx_demo.exe
 
+    # Main only; see linux-gcc's Save ccache.
     - name: Save sccache
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: ${{ env.SCCACHE_DIR }}
@@ -1482,8 +1494,9 @@ jobs:
     - name: Run connector unit tests
       run: scripts/run-with-sanitizer-scan.sh ctest --output-on-failure --test-dir build
 
+    # Main only; see linux-gcc's Save ccache.
     - name: Save ccache
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: ${{ env.CCACHE_DIR }}
@@ -1663,8 +1676,9 @@ jobs:
             || { echo "::error::perimeter test test_venue_$t was built without the perimeter"; exit 1; }
         done
 
+    # Main only; see linux-gcc's Save ccache.
     - name: Save ccache
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: ${{ env.CCACHE_DIR }}
@@ -1813,8 +1827,9 @@ jobs:
           -o -path '*/lrvx-connectors/*' | grep -q . \
           || { echo "::error::a forbidden directory reached the install surface"; exit 1; }
 
+    # Main only; see linux-gcc's Save ccache.
     - name: Save ccache
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: ${{ env.CCACHE_DIR }}
@@ -1909,8 +1924,9 @@ jobs:
       if: always()
       run: ccache -s
 
+    # Main only; see linux-gcc's Save ccache.
     - name: Save ccache
-      if: always()
+      if: always() && github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: ${{ env.CCACHE_DIR }}
