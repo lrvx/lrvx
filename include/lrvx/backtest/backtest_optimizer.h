@@ -12,6 +12,7 @@
 #include "lrvx/backtest/backtest_runner.h"
 #include "lrvx/log/log.h"
 #include "lrvx/util/base/move_only_function.h"
+#include "lrvx/util/concurrency/thread_body.h"
 
 #include <algorithm>
 #include <atomic>
@@ -159,7 +160,7 @@ class BacktestOptimizer
     pool.reserve(threads - 1);
     for (size_t t = 1; t < threads; ++t)
     {
-      pool.emplace_back(worker);
+      pool.push_back(makeThread("lrvx.backtest.optimizer", worker));
     }
     worker();
     for (auto& th : pool)

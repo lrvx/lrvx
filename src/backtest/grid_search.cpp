@@ -10,6 +10,7 @@
 #include "lrvx/backtest/grid_search.h"
 
 #include "lrvx/log/log.h"
+#include "lrvx/util/concurrency/thread_body.h"
 
 #include <algorithm>
 #include <atomic>
@@ -139,7 +140,7 @@ std::vector<GridSearchResult> GridSearch::run(std::size_t numThreads)
   pool.reserve(threads - 1);
   for (std::size_t t = 1; t < threads; ++t)
   {
-    pool.emplace_back(worker);
+    pool.push_back(makeThread("lrvx.backtest.grid_search", worker));
   }
   worker();
   for (auto& th : pool)
