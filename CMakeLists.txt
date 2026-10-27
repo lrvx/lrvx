@@ -577,6 +577,12 @@ endif()
 
 option(LRVX_BUILD_PYTHON "Build Python bindings" OFF)
 if (LRVX_BUILD_PYTHON)
+  # The extension module is a shared object that links the static library,
+  # so the library has to be PIC, the same requirement LRVX_BUILD_CAPI
+  # states below. LTO used to hide a missing -fPIC here: with -flto the
+  # objects carry bytecode and the code is generated at link time under
+  # the module's own -fPIC, so the link only fails once LRVX_LTO is off.
+  set_target_properties(${LRVX} PROPERTIES POSITION_INDEPENDENT_CODE ON)
   add_subdirectory(python)
 endif()
 
