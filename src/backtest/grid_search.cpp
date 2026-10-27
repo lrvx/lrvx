@@ -11,8 +11,30 @@
 
 #include "lrvx/log/log.h"
 
+#include <algorithm>
+#include <atomic>
+#include <exception>
+#include <mutex>
+#include <thread>
+
 namespace lrvx
 {
+
+namespace
+{
+
+std::size_t resolveThreads(std::size_t requested, std::size_t total)
+{
+  std::size_t n =
+      requested == 0 ? static_cast<std::size_t>(std::thread::hardware_concurrency()) : requested;
+  if (n == 0)
+  {
+    n = 1;
+  }
+  return std::min(n, total);
+}
+
+}  // namespace
 
 void GridSearch::addAxis(std::vector<double> values)
 {
@@ -61,7 +83,7 @@ std::vector<double> GridSearch::paramsForIndex(std::size_t index) const
   return out;
 }
 
-std::vector<GridSearchResult> GridSearch::run(std::size_t /*numThreads*/)
+std::vector<GridSearchResult> GridSearch::run(std::size_t numThreads)
 {
   std::vector<GridSearchResult> results;
   if (!_factory)
@@ -75,15 +97,59 @@ std::vector<GridSearchResult> GridSearch::run(std::size_t /*numThreads*/)
     LRVX_LOG_ERROR("GridSearch: no parameter combinations");
     return results;
   }
-  results.reserve(total);
-  for (std::size_t i = 0; i < total; ++i)
+  results.resize(total);
+
+  const std::size_t threads = resolveThreads(numThreads, total);
+  std::atomic<std::size_t> next{0};
+  std::mutex failureMutex;
+  std::exception_ptr failure;
+
+  auto worker = [&]
   {
-    GridSearchResult r;
-    r.paramIndex = i;
-    r.params = paramsForIndex(i);
-    BacktestResult bt = _factory(r.params);
-    r.stats = bt.computeStats();
-    results.push_back(std::move(r));
+    for (;;)
+    {
+      const std::size_t i = next.fetch_add(1, std::memory_order_relaxed);
+      if (i >= total)
+      {
+        return;
+      }
+      try
+      {
+        GridSearchResult r;
+        r.paramIndex = i;
+        r.params = paramsForIndex(i);
+        BacktestResult bt = _factory(r.params);
+        r.stats = bt.computeStats();
+        results[i] = std::move(r);
+      }
+      catch (...)
+      {
+        std::lock_guard<std::mutex> lock(failureMutex);
+        if (!failure)
+        {
+          failure = std::current_exception();
+        }
+        next.store(total, std::memory_order_relaxed);
+        return;
+      }
+    }
+  };
+
+  std::vector<std::thread> pool;
+  pool.reserve(threads - 1);
+  for (std::size_t t = 1; t < threads; ++t)
+  {
+    pool.emplace_back(worker);
+  }
+  worker();
+  for (auto& th : pool)
+  {
+    th.join();
+  }
+
+  if (failure)
+  {
+    std::rethrow_exception(failure);
   }
   return results;
 }

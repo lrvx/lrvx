@@ -16,8 +16,11 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <exception>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
+#include <thread>
 #include <vector>
 
 namespace lrvx
@@ -73,45 +76,100 @@ class BacktestOptimizer
 
   size_t totalCombinations() const { return _grid.totalCombinations(); }
 
-  // Runs the grid sequentially on the calling thread. numThreads is reserved
-  // for a future parallel path and is currently ignored (the previous code
-  // logged "Using N threads" while running single-threaded, which lied).
+  // Runs every combination and returns one result per combination, in grid
+  // order. numThreads is the number of worker threads, 0 meaning one per
+  // hardware thread; the calling thread is one of them. Combinations are
+  // handed out through an atomic index, so with more than one thread the
+  // factory is called from several threads at once: it has to build
+  // everything a backtest touches per call and share only read-only inputs
+  // (a bar vector loaded once is the usual one). The progress callback is
+  // serialised and sees every tenth completion and the last, in completion
+  // order rather than grid order. An exception from the factory on any
+  // thread stops the hand-out, and is rethrown here once the workers have
+  // joined.
   std::vector<OptimizationResult<ParamsT>> runLocal(size_t numThreads = 0)
   {
-    (void)numThreads;
     if (!_factory)
     {
       LRVX_LOG_ERROR("BacktestOptimizer: No factory set");
       return {};
     }
 
-    size_t total = _grid.totalCombinations();
+    const size_t total = _grid.totalCombinations();
     if (total == 0)
     {
       LRVX_LOG_ERROR("BacktestOptimizer: No parameter combinations");
       return {};
     }
 
-    LRVX_LOG_INFO("Running optimization: " << total << " parameter combinations (sequential)");
+    const size_t threads = resolveThreads(numThreads, total);
+    LRVX_LOG_INFO("Running optimization: " << total << " parameter combinations on " << threads
+                                           << " thread(s)");
 
     std::vector<OptimizationResult<ParamsT>> results(total);
     _completedTasks = 0;
 
-    for (size_t i = 0; i < total; ++i)
+    std::atomic<size_t> next{0};
+    std::mutex progressMutex;
+    std::mutex failureMutex;
+    std::exception_ptr failure;
+
+    auto worker = [&]
     {
-      ParamsT params = _grid[i];
-      BacktestResult bt = _factory(params);
-      auto stats = bt.computeStats();
-
-      OptimizationResult<ParamsT>& res = results[i];
-      res.parameters = params;
-      res.setFromStats(stats);
-
-      size_t completed = ++_completedTasks;
-      if (_progressCallback && (completed % 10 == 0 || completed == total))
+      for (;;)
       {
-        _progressCallback(completed, total, res);
+        const size_t i = next.fetch_add(1, std::memory_order_relaxed);
+        if (i >= total)
+        {
+          return;
+        }
+        try
+        {
+          ParamsT params = _grid[i];
+          BacktestResult bt = _factory(params);
+          auto stats = bt.computeStats();
+
+          OptimizationResult<ParamsT>& res = results[i];
+          res.parameters = params;
+          res.setFromStats(stats);
+
+          const size_t completed = ++_completedTasks;
+          if (_progressCallback && (completed % 10 == 0 || completed == total))
+          {
+            std::lock_guard<std::mutex> lock(progressMutex);
+            _progressCallback(completed, total, res);
+          }
+        }
+        catch (...)
+        {
+          std::lock_guard<std::mutex> lock(failureMutex);
+          if (!failure)
+          {
+            failure = std::current_exception();
+          }
+          // Nothing else starts; the combinations in flight finish on
+          // their own threads.
+          next.store(total, std::memory_order_relaxed);
+          return;
+        }
       }
+    };
+
+    std::vector<std::thread> pool;
+    pool.reserve(threads - 1);
+    for (size_t t = 1; t < threads; ++t)
+    {
+      pool.emplace_back(worker);
+    }
+    worker();
+    for (auto& th : pool)
+    {
+      th.join();
+    }
+
+    if (failure)
+    {
+      std::rethrow_exception(failure);
     }
 
     LRVX_LOG_INFO("Optimization complete: " << total << " backtests finished");
@@ -213,6 +271,16 @@ class BacktestOptimizer
   }
 
  private:
+  static size_t resolveThreads(size_t requested, size_t total)
+  {
+    size_t n = requested == 0 ? static_cast<size_t>(std::thread::hardware_concurrency()) : requested;
+    if (n == 0)
+    {
+      n = 1;
+    }
+    return std::min(n, total);
+  }
+
   GridT _grid;
   BacktestFactory _factory;
   ProgressCallback _progressCallback;

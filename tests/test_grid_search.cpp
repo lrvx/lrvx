@@ -9,9 +9,16 @@
 
 #include "lrvx/backtest/backtest_optimizer.h"
 #include "lrvx/backtest/bar_replay_source.h"
+#include "lrvx/backtest/grid_search.h"
 
 #include <gtest/gtest.h>
+#include <atomic>
+#include <chrono>
 #include <filesystem>
+#include <mutex>
+#include <set>
+#include <stdexcept>
+#include <thread>
 
 using namespace lrvx;
 
@@ -462,4 +469,208 @@ TEST_F(GridSearchTest, RankByAllMetrics)
 
   auto r7 = BacktestOptimizer<TestParams, TestGrid>::rankResults(results, RankMetric::ProfitFactor);
   EXPECT_DOUBLE_EQ(r7[0].profitFactor(), 2.0);
+}
+
+// ---------------------------------------------------------------- threads
+
+namespace
+{
+
+// A result that depends on nothing but its parameters, so a run on any
+// thread count must come back identical.
+BacktestResult pnlFor(int p1, int p2)
+{
+  BacktestConfig config;
+  BacktestResult result(config);
+
+  Fill buy;
+  buy.orderId = 1;
+  buy.symbol = 1;
+  buy.side = Side::BUY;
+  buy.price = Price::fromDouble(100.0);
+  buy.quantity = Quantity::fromDouble(1.0);
+  buy.timestampNs = UnixNanos::fromRaw(1000);
+  result.recordFill(buy);
+
+  Fill sell = buy;
+  sell.orderId = 2;
+  sell.side = Side::SELL;
+  sell.price = Price::fromDouble(100.0 + p1 + p2 * 0.1);
+  sell.timestampNs = UnixNanos::fromRaw(2000);
+  result.recordFill(sell);
+  return result;
+}
+
+TestGrid sevenByThree()
+{
+  TestGrid grid;
+  grid.param1Values = {1, 2, 3, 4, 5, 6, 7};
+  grid.param2Values = {10, 20, 30};
+  return grid;
+}
+
+}  // namespace
+
+TEST_F(GridSearchTest, OptimizerThreadsAgreeWithTheSequentialRun)
+{
+  auto run = [](size_t threads, std::atomic<int>& calls)
+  {
+    BacktestOptimizer<TestParams, TestGrid> optimizer;
+    optimizer.setParameterGrid(sevenByThree());
+    optimizer.setBacktestFactory(
+        [&calls](const TestParams& p)
+        {
+          ++calls;
+          return pnlFor(p.param1, p.param2);
+        });
+    return optimizer.runLocal(threads);
+  };
+
+  std::atomic<int> seqCalls{0};
+  std::atomic<int> parCalls{0};
+  auto seq = run(1, seqCalls);
+  auto par = run(4, parCalls);
+
+  ASSERT_EQ(seq.size(), 21u);
+  ASSERT_EQ(par.size(), 21u);
+  EXPECT_EQ(seqCalls.load(), 21);
+  EXPECT_EQ(parCalls.load(), 21);
+  for (size_t i = 0; i < seq.size(); ++i)
+  {
+    EXPECT_EQ(par[i].parameters.param1, seq[i].parameters.param1) << "combination " << i;
+    EXPECT_EQ(par[i].parameters.param2, seq[i].parameters.param2) << "combination " << i;
+    EXPECT_DOUBLE_EQ(par[i].totalReturn(), seq[i].totalReturn()) << "combination " << i;
+    EXPECT_EQ(par[i].totalTrades(), seq[i].totalTrades()) << "combination " << i;
+  }
+}
+
+TEST_F(GridSearchTest, OptimizerRunsTheFactoryOnMoreThanOneThread)
+{
+  BacktestOptimizer<TestParams, TestGrid> optimizer;
+  TestGrid grid;
+  grid.param1Values = {1, 2, 3, 4};
+  grid.param2Values = {10, 20, 30, 40};
+  optimizer.setParameterGrid(grid);
+
+  std::mutex mutex;
+  std::set<std::thread::id> threads;
+  optimizer.setBacktestFactory(
+      [&](const TestParams& p)
+      {
+        {
+          std::lock_guard<std::mutex> lock(mutex);
+          threads.insert(std::this_thread::get_id());
+        }
+        // Long enough that the other workers pick up combinations of
+        // their own while this one is busy.
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        return pnlFor(p.param1, p.param2);
+      });
+
+  auto results = optimizer.runLocal(4);
+  EXPECT_EQ(results.size(), 16u);
+  EXPECT_GE(threads.size(), 2u) << "every combination ran on the calling thread";
+}
+
+TEST_F(GridSearchTest, OptimizerProgressCallbackIsSerialisedAcrossThreads)
+{
+  BacktestOptimizer<TestParams, TestGrid> optimizer;
+  TestGrid grid;
+  grid.param1Values = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  grid.param2Values = {10, 20, 30, 40};
+  optimizer.setParameterGrid(grid);
+  optimizer.setBacktestFactory(
+      [](const TestParams& p)
+      {
+        return pnlFor(p.param1, p.param2);
+      });
+
+  std::atomic<int> inside{0};
+  std::atomic<int> overlaps{0};
+  std::mutex mutex;
+  std::set<size_t> completions;
+  optimizer.setProgressCallback(
+      [&](size_t completed, size_t total, const OptimizationResult<TestParams>&)
+      {
+        if (++inside != 1)
+        {
+          ++overlaps;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        EXPECT_EQ(total, 40u);
+        {
+          std::lock_guard<std::mutex> lock(mutex);
+          completions.insert(completed);
+        }
+        --inside;
+      });
+
+  auto results = optimizer.runLocal(4);
+  EXPECT_EQ(results.size(), 40u);
+  EXPECT_EQ(overlaps.load(), 0);
+  EXPECT_EQ(completions, (std::set<size_t>{10, 20, 30, 40}));
+}
+
+TEST_F(GridSearchTest, OptimizerFactoryExceptionIsRethrownFromEveryThreadCount)
+{
+  for (size_t threads : {size_t{1}, size_t{4}})
+  {
+    BacktestOptimizer<TestParams, TestGrid> optimizer;
+    optimizer.setParameterGrid(sevenByThree());
+    optimizer.setBacktestFactory(
+        [](const TestParams& p)
+        {
+          if (p.param1 == 5)
+          {
+            throw std::runtime_error("combination refused");
+          }
+          return pnlFor(p.param1, p.param2);
+        });
+    EXPECT_THROW(optimizer.runLocal(threads), std::runtime_error) << "threads=" << threads;
+  }
+}
+
+TEST(GridSearchTypeErased, ThreadsAgreeWithTheSequentialRun)
+{
+  auto run = [](std::size_t threads)
+  {
+    GridSearch gs;
+    gs.addAxis({1.0, 2.0, 3.0, 4.0, 5.0});
+    gs.addAxis({10.0, 20.0, 30.0});
+    gs.setFactory(
+        [](const std::vector<double>& params)
+        {
+          return pnlFor(static_cast<int>(params[0]), static_cast<int>(params[1]));
+        });
+    return gs.run(threads);
+  };
+
+  auto seq = run(1);
+  auto par = run(4);
+  ASSERT_EQ(seq.size(), 15u);
+  ASSERT_EQ(par.size(), 15u);
+  for (std::size_t i = 0; i < seq.size(); ++i)
+  {
+    EXPECT_EQ(par[i].paramIndex, i);
+    EXPECT_EQ(par[i].params, seq[i].params) << "combination " << i;
+    EXPECT_DOUBLE_EQ(par[i].stats.totalPnl, seq[i].stats.totalPnl) << "combination " << i;
+    EXPECT_EQ(par[i].stats.totalTrades, seq[i].stats.totalTrades) << "combination " << i;
+  }
+}
+
+TEST(GridSearchTypeErased, FactoryExceptionIsRethrown)
+{
+  GridSearch gs;
+  gs.addAxis({1.0, 2.0, 3.0});
+  gs.addAxis({10.0, 20.0});
+  gs.setFactory(
+      [](const std::vector<double>& params)
+      {
+        if (params[0] == 2.0)
+        {
+          throw std::runtime_error("combination refused");
+        }
+        return pnlFor(static_cast<int>(params[0]), static_cast<int>(params[1]));
+      });
+  EXPECT_THROW(gs.run(4), std::runtime_error);
 }

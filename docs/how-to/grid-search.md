@@ -88,7 +88,7 @@ Find good strategy parameters by sweeping a grid and ranking results. The patter
     std::cout << "Best: " << ranked[0].parameters.toString() << "\n";
     ```
 
-The C++ optimizer parallelises across threads automatically (`runLocal(numThreads)`).
+`runLocal(numThreads)` runs the combinations on that many threads, one per hardware thread when it is 0, and returns the results in grid order. The factory is called from several threads at once, so it builds everything a backtest touches per call and shares only read-only inputs, such as a bar vector loaded once. The type-erased `GridSearch::run(numThreads)` works the same way from C++.
 
 ## Ranking metrics
 
@@ -234,7 +234,7 @@ Compose with [walk-forward](walk-forward.md): run a `GridSearch` on each fold's 
 
 ### Limitations
 
-The current backend runs combinations sequentially. Multi-process and Ray Tune backends are tracked follow-ups. Result list is unsorted — sort or filter on the caller side.
+`GridSearch.run()` in Python, Node and Codon runs the combinations one after another: the Python factory holds the GIL while it builds and runs the strategy, and a Node factory is a JavaScript function on the one JavaScript thread. A parallel sweep from Python uses the process pool shown in the quick start; from C++, `GridSearch::run(numThreads)` and `BacktestOptimizer::runLocal(numThreads)` run on threads. The result list is unsorted — sort or filter on the caller side.
 
 ## See also
 

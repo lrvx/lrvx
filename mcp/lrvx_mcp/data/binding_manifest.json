@@ -14002,6 +14002,11 @@
         },
         {
           "kind": "method",
+          "name": "resolveThreads",
+          "parent": "BacktestOptimizer"
+        },
+        {
+          "kind": "method",
           "name": "runLocal",
           "parent": "BacktestOptimizer"
         },
