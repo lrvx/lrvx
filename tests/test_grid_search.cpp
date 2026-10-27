@@ -112,7 +112,9 @@ TEST_F(GridSearchTest, OptimizerBasicRun)
 
   EXPECT_EQ(optimizer.totalCombinations(), 6);
 
-  int callCount = 0;
+  // runLocal() calls the factory from several threads at once, so the
+  // counter it shares with them is atomic.
+  std::atomic<int> callCount{0};
   optimizer.setBacktestFactory(
       [&callCount](const TestParams& params)
       {
@@ -144,7 +146,7 @@ TEST_F(GridSearchTest, OptimizerBasicRun)
 
   auto results = optimizer.runLocal();
 
-  EXPECT_EQ(callCount, 6);
+  EXPECT_EQ(callCount.load(), 6);
   EXPECT_EQ(results.size(), 6);
 
   // Check that parameters are correctly assigned
