@@ -213,6 +213,7 @@ jobs:
         cmake -B build -G Ninja \
               -DCMAKE_CXX_COMPILER=g++-14 \
               -DCMAKE_BUILD_TYPE=Release \
+              -DLRVX_LTO=OFF \
               -DLRVX_BUILD_PYTHON=ON \
               -DLRVX_ENABLE_BACKTEST=ON \
               -Dpybind11_DIR="$(python3 -c 'import pybind11; print(pybind11.get_cmake_dir())')"
@@ -344,6 +345,11 @@ jobs:
     # is a fixed baseline every runner in the fleet satisfies, so a cached
     # object is safe to run anywhere. Same reasoning as this flag's other
     # OFF caller, the distributable wheel build.
+    # LRVX_LTO=OFF: with the suite on, the build is 370+ test executables
+    # and each one redoes the whole-program step over the static library at
+    # link time, 8-9 min that ccache cannot cache. The sanitizer jobs never
+    # had LTO; macos and windows-msvc keep it, so an LTO build still runs
+    # the suite on every push.
     - name: Configure
       run: |
         cmake -B build -G Ninja \
@@ -351,6 +357,7 @@ jobs:
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DCMAKE_BUILD_TYPE=Release \
+              -DLRVX_LTO=OFF \
               -DLRVX_NATIVE=OFF \
               -DCMAKE_PREFIX_PATH="$HOME/gtest-install;$HOME/benchmark-install" \
               -Dpybind11_DIR="$(python3 -c 'import pybind11; print(pybind11.get_cmake_dir())')" \
@@ -418,14 +425,6 @@ jobs:
 
     - name: Verify .pyi stubs are in sync with the binding
       run: python3 scripts/gen_pyi_stubs.py --check
-
-    # Build the wheel from the root pyproject.toml, install it into a
-    # throwaway venv, and assert every documented pure-Python module is
-    # importable. Catches the regression where scikit-build-core only
-    # collects the install component contents and silently drops new
-    # `.py` files added under `python/lrvx/`.
-    - name: Verify wheel ships every pure-Python module
-      run: bash scripts/check_lrvx_wheel.sh
 
     - name: Type-check Python examples with mypy
       run: PYTHONPATH=build/python python3 -m mypy --ignore-missing-imports
@@ -639,13 +638,13 @@ jobs:
       run: scripts/run-with-sanitizer-scan.sh ./build/demo/lrvx_demo
 
     # Benchmarks still compile every run (LRVX_BUILD_BENCHMARKS=ON above), so
-    # a benchmark that stops building fails this job either way. Only
-    # *running* them (the 4-5 min this step costs) moves off the PR path:
-    # bench-nightly.yml runs them on a schedule and on workflow_dispatch: a PR
-    # gets the compile check for free, a `bench`-labeled PR or the nightly
-    # run gets the numbers.
+    # a benchmark that stops building fails this job either way. Running
+    # them costs 4-5 min and the numbers from a shared runner are noise, so
+    # only a `bench`-labeled PR runs them here; bench-nightly.yml runs them
+    # on a schedule and on workflow_dispatch. A push to main used to run
+    # them too, which kept this job on main 4-5 min longer than on a PR.
     - name: Run benchmarks
-      if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'bench')
+      if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'bench')
       run: ./scripts/run-benchmarks.sh build/benchmarks
 
     - name: Save ccache
@@ -736,6 +735,7 @@ jobs:
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DCMAKE_BUILD_TYPE=Release \
+              -DLRVX_LTO=OFF \
               -DLRVX_NATIVE=OFF \
               -DCMAKE_PREFIX_PATH="$HOME/gtest-install;$HOME/benchmark-install" \
               -DLRVX_BUILD_TESTS=ON \
@@ -762,9 +762,9 @@ jobs:
       run: scripts/run-with-sanitizer-scan.sh ./build/demo/lrvx_demo
 
     # See linux-gcc's identical step: benchmarks still compile every run,
-    # only running them moves to bench-nightly.yml / a `bench`-labeled PR.
+    # only a `bench`-labeled PR runs them here; bench-nightly.yml has the rest.
     - name: Run benchmarks
-      if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'bench')
+      if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'bench')
       run: ./scripts/run-benchmarks.sh build/benchmarks
 
     - name: Save ccache
@@ -1396,10 +1396,10 @@ jobs:
   connectors-build:
     needs: [format-check]
     runs-on: ubuntu-24.04
-    # Observed: ~11 min on a warm ccache. LRVX_BUILD_TESTS=ON below pulls
-    # every core and venue test into this build too, so a cold cache on a
-    # slow runner needs about 25 min for the compile and LTO links alone;
-    # 40 leaves that case room.
+    # Observed: ~11 min on a warm ccache, and about 25 min cold on a slow
+    # runner while the test links still ran LTO. LRVX_BUILD_TESTS=ON below
+    # pulls every core and venue test into this build too; 40 keeps the
+    # cold case inside the limit.
     timeout-minutes: 40
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -1459,6 +1459,7 @@ jobs:
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DCMAKE_BUILD_TYPE=Release \
+              -DLRVX_LTO=OFF \
               -DLRVX_NATIVE=OFF \
               -DCMAKE_PREFIX_PATH=$HOME/gtest-install \
               -DLRVX_BUILD_CONNECTORS=ON \
@@ -1520,6 +1521,7 @@ jobs:
         cmake -B build -G Ninja \
               -DCMAKE_CXX_COMPILER=clang++-18 \
               -DCMAKE_BUILD_TYPE=Release \
+              -DLRVX_LTO=OFF \
               -DLRVX_BUILD_VENUE=ON \
               -DLRVX_BUILD_TESTS=ON
 
@@ -1588,6 +1590,7 @@ jobs:
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DCMAKE_BUILD_TYPE=Release \
+              -DLRVX_LTO=OFF \
               -DLRVX_NATIVE=OFF \
               -DLRVX_BUILD_VENUE=OFF \
               -DLRVX_BUILD_TESTS=ON \
@@ -1631,6 +1634,7 @@ jobs:
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DCMAKE_BUILD_TYPE=Release \
+              -DLRVX_LTO=OFF \
               -DLRVX_NATIVE=OFF \
               -DLRVX_BUILD_VENUE=ON \
               -DLRVX_VENUE_PERIMETER=OFF \

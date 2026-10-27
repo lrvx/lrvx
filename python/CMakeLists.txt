@@ -17,7 +17,10 @@ if(NOT MSVC)
   # honours the LRVX_NATIVE option. Wheel builds set LRVX_NATIVE=OFF via
   # python/pyproject.toml so the shipped .so does not require AVX-512
   # (or whatever ISA the build host happened to expose).
-  set(_LRVX_PY_OPTS -O3 -flto)
+  set(_LRVX_PY_OPTS -O3)
+  if(LRVX_LTO)
+    list(APPEND _LRVX_PY_OPTS -flto)
+  endif()
   if(LRVX_ARCH_OPT)
     list(APPEND _LRVX_PY_OPTS ${LRVX_ARCH_OPT})
   endif()

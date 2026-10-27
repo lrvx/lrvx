@@ -301,6 +301,17 @@ option(LRVX_NATIVE
   "Compile Release with -march=native. Disable for distributable artifacts."
   ON)
 
+# Link-time optimisation for Release builds: -flto on GCC and Clang, /GL +
+# /LTCG on cl.exe. Every executable that links the static library redoes
+# the whole-program step at link time, so a build with the test suite on
+# pays it once per test binary (several hundred of them), and ccache
+# cannot help because it caches compiles, not links. The per-push CI jobs
+# turn this off; the artefacts people run (wheels, the C API library, the
+# nightly benchmarks, the macOS and MSVC jobs) keep it on.
+option(LRVX_LTO
+  "Link-time optimisation in Release builds (-flto, or /GL + /LTCG on MSVC)."
+  ON)
+
 if(NOT MSVC)
   if(LRVX_NATIVE)
     set(LRVX_ARCH_OPT -march=native)
@@ -319,11 +330,16 @@ endif()
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   # Genuine cl.exe: whole-program optimization via /GL + /LTCG.
   target_compile_options(${LRVX} PUBLIC
-    $<$<CONFIG:Release>:/O2 /GL>
+    $<$<CONFIG:Release>:/O2>
   )
-  target_link_options(${LRVX} PUBLIC
-    $<$<CONFIG:Release>:/LTCG>
-  )
+  if(LRVX_LTO)
+    target_compile_options(${LRVX} PUBLIC
+      $<$<CONFIG:Release>:/GL>
+    )
+    target_link_options(${LRVX} PUBLIC
+      $<$<CONFIG:Release>:/LTCG>
+    )
+  endif()
 elseif(MSVC)
   # clang-cl has the MSVC frontend but does not accept /GL at compile time
   # (it emits "argument unused"). Keep /O2; LTO would need -flto, not /GL.
@@ -331,17 +347,23 @@ elseif(MSVC)
     $<$<CONFIG:Release>:/O2>
   )
 else()
-  set(LRVX_RELEASE_OPTS -O3 -flto -funroll-loops)
+  set(LRVX_RELEASE_OPTS -O3 -funroll-loops)
+  if(LRVX_LTO)
+    list(APPEND LRVX_RELEASE_OPTS -flto)
+  endif()
   if(LRVX_ARCH_OPT)
     list(APPEND LRVX_RELEASE_OPTS ${LRVX_ARCH_OPT})
   endif()
   target_compile_options(${LRVX} PUBLIC
     $<$<CONFIG:Release>:${LRVX_RELEASE_OPTS}>
   )
-  # LTO requires -flto flag at link time as well
-  target_link_options(${LRVX} PUBLIC
-    $<$<CONFIG:Release>:-flto>
-  )
+  # LTO requires -flto at link time as well; PUBLIC, so every consumer of
+  # the static library links the same way.
+  if(LRVX_LTO)
+    target_link_options(${LRVX} PUBLIC
+      $<$<CONFIG:Release>:-flto>
+    )
+  endif()
 endif()
 
 # WARNING: CPU affinity can decrease performance on busy/shared systems.
