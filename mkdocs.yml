@@ -161,6 +161,7 @@ nav:
           - Sweep parameters over bars: how-to/sweep-over-bars.md
           - Walk-forward: how-to/walk-forward.md
           - White's reality check: how-to/whites-reality-check.md
+          - Overfitting checks for a parameter sweep: how-to/robustness-statistics.md
           - Log to MLflow: how-to/mlflow.md
           - Advanced Orders: how-to/advanced-orders.md
           - Submit a native bracket order: how-to/bracket-orders.md

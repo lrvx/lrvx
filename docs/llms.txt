@@ -50,6 +50,8 @@ Documentation is grouped below by Diátaxis category — pick the section matchi
 - [Interactive backtest](https://docs.lrvx.dev/how-to/interactive-backtest/): Step through a backtest
 - [Grid search](https://docs.lrvx.dev/how-to/grid-search/): Parameter sweep with the optimizer
 - [Sweep parameters over bars](https://docs.lrvx.dev/how-to/sweep-over-bars/): Load bars once, one bar strategy per combination, processes or threads
+- [Overfitting checks for a parameter sweep](https://docs.lrvx.dev/how-to/robustness-statistics/): PBO by CSCV, deflated Sharpe ratio, neighbourhood of a grid point
+- [Exits for bar strategies](https://docs.lrvx.dev/how-to/bar-exits/): ATR stop, Chandelier exit, break-even trail
 - [Advanced orders](https://docs.lrvx.dev/how-to/advanced-orders/): Bracket, OCO, and conditional orders
 - [Multi-exchange trading](https://docs.lrvx.dev/how-to/multi-exchange-trading/): Route across venues
 

@@ -51,6 +51,13 @@
     },
     {
       "language": "python",
+      "path": "docs/examples/python_bar_exits.py",
+      "sha256": "f6f4d4e5ff29e193d2a4a62c2d56e4e96313ec3ed7570728f45c3d082e703f4e",
+      "size_bytes": 3348,
+      "topic": "strategy"
+    },
+    {
+      "language": "python",
       "path": "docs/examples/python_binance_archive.py",
       "sha256": "27fcff010ee0270b5b5b06b08b0b96d81fe6d01f54093e92eab76fc6b3faced8",
       "size_bytes": 2499,
@@ -258,6 +265,13 @@
       "sha256": "976cd885ad74343779629a9789cb4e7e1f38dd721f500f37592041f83b634499",
       "size_bytes": 4278,
       "topic": "backtest"
+    },
+    {
+      "language": "python",
+      "path": "docs/examples/python_robustness_statistics.py",
+      "sha256": "74a6e2bfaa9cdc20e4cebebdfe9f6f4679e290dd0e2a895e357395e32ec26a66",
+      "size_bytes": 2294,
+      "topic": "strategy"
     },
     {
       "language": "python",

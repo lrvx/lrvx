@@ -43,6 +43,7 @@ Solve specific problems. Assumes you know the basics.
 | [Walk-forward](walk-forward.md) | Out-of-sample validation with rolling / anchored folds |
 | [Heatmap](heatmap.md) | SVG heatmap from a 2D parameter sweep |
 | [White's reality check](whites-reality-check.md) | Multiple-comparison-aware significance test |
+| [Overfitting checks for a parameter sweep](robustness-statistics.md) | Probability of backtest overfitting, deflated Sharpe ratio, neighbourhood of a grid point |
 | [Log to MLflow](mlflow.md) | Send a backtest run + artifacts into an MLflow tracking server |
 | [Backtest an LP position](backtest-an-lp-position.md) | Run a concentrated-liquidity position through a pool tape |
 | [Choose a matching model](matching-modes.md) | FIFO, pro-rata, `pro_rata_with_fifo`, TOP-PRO-LMM, and priority-weighted matching |

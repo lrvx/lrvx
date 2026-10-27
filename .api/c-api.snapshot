@@ -667,6 +667,9 @@ lrvx_simulated_executor_submit_order|void|LrvxSimulatedExecutorHandle|uint64_t|u
 lrvx_simulated_executor_submit_order_ex|void|LrvxSimulatedExecutorHandle|uint64_t|uint8_t|double|double|uint8_t|uint32_t|uint8_t|uint8_t|int64_t
 lrvx_stat_bootstrap_ci|void|const double *|size_t|double|uint32_t|double *|double *|double *
 lrvx_stat_correlation|double|const double *|const double *|size_t
+lrvx_stat_deflated_sharpe|void|const double *|size_t|const double *|size_t|double *|double *|double *|double *|double *
+lrvx_stat_grid_neighborhood|void|const double *|const size_t *|size_t|size_t|double *|uint32_t *
+lrvx_stat_pbo_cscv|void|const double *|size_t|size_t|uint32_t|double *|uint64_t *|double *|double *
 lrvx_stat_permutation_test|double|const double *|size_t|const double *|size_t|uint32_t
 lrvx_stat_profit_factor|double|const double *|size_t
 lrvx_stat_whites_reality_check|void|const double *|size_t|size_t|uint32_t|double|double *|double *|int32_t *

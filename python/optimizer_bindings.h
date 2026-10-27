@@ -6,11 +6,15 @@
 #include <pybind11/pybind11.h>
 
 #include "lrvx/error/lrvx_error.h"
+#include "lrvx/stats/deflated_sharpe.h"
+#include "lrvx/stats/grid_neighborhood.h"
+#include "lrvx/stats/pbo_cscv.h"
 #include "lrvx/stats/whites_reality_check.h"
 
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <vector>
 
@@ -239,4 +243,132 @@ inline void bindOptimizer(py::module_& m)
       "{p_value, best_stat, best_index}.",
       py::arg("returns"), py::arg("num_bootstrap") = 10000u,
       py::arg("avg_block_size") = 0.0, py::arg("seed") = 42u);
+
+  m.def(
+      "pbo_cscv",
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> returns,
+         uint32_t numBlocks)
+      {
+        if (returns.ndim() != 2)
+        {
+          throw lrvx::LrvxError("E_LEN_003",
+                                "returns must be a 2D array (trials x periods).");
+        }
+        const auto N = static_cast<size_t>(returns.shape(0));
+        const auto T = static_cast<size_t>(returns.shape(1));
+        if (N == 0 || T == 0)
+        {
+          throw lrvx::LrvxError("E_LEN_002", "returns matrix must not be empty.");
+        }
+        lrvx::stats::PboResult res{};
+        {
+          py::gil_scoped_release release;
+          res = lrvx::stats::pboCscv(returns.data(), N, T, numBlocks);
+        }
+        py::dict out;
+        out["pbo"] = res.pbo;
+        out["splits"] = res.splits;
+        out["mean_oos_rank"] = res.meanOosRank;
+        out["mean_logit"] = res.meanLogit;
+        return out;
+      },
+      "Probability of backtest overfitting by combinatorially symmetric "
+      "cross-validation. `returns` is a (trials, periods) array of per-period "
+      "returns, one row per parameter combination; `num_blocks` is the even "
+      "number of period blocks the C(S, S/2) splits are drawn from. Returns "
+      "pbo (the fraction of splits whose in-sample best ranks below the "
+      "out-of-sample median; NaN when the inputs cannot be split), splits, "
+      "mean_oos_rank and mean_logit. Deterministic.",
+      py::arg("returns"), py::arg("num_blocks") = 16);
+
+  m.def(
+      "deflated_sharpe",
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> returns,
+         std::optional<py::array_t<double, py::array::c_style | py::array::forcecast>>
+             trialSharpes)
+      {
+        if (returns.ndim() != 1)
+        {
+          throw lrvx::LrvxError("E_LEN_003",
+                                "returns must be a 1D array of per-period returns.");
+        }
+        const auto T = static_cast<size_t>(returns.shape(0));
+        if (T == 0)
+        {
+          throw lrvx::LrvxError("E_LEN_002", "returns must not be empty.");
+        }
+        const double* trials = nullptr;
+        size_t numTrials = 0;
+        if (trialSharpes)
+        {
+          if (trialSharpes->ndim() != 1)
+          {
+            throw lrvx::LrvxError("E_LEN_003",
+                                  "trial_sharpes must be a 1D array, one Sharpe ratio per trial.");
+          }
+          trials = trialSharpes->data();
+          numTrials = static_cast<size_t>(trialSharpes->shape(0));
+        }
+        lrvx::stats::DeflatedSharpeResult res{};
+        {
+          py::gil_scoped_release release;
+          res = lrvx::stats::deflatedSharpeRatio(returns.data(), T, trials, numTrials);
+        }
+        py::dict out;
+        out["sharpe"] = res.sharpe;
+        out["skewness"] = res.skewness;
+        out["kurtosis"] = res.kurtosis;
+        out["expected_max_sharpe"] = res.expectedMaxSharpe;
+        out["dsr"] = res.dsr;
+        return out;
+      },
+      "Deflated Sharpe ratio. `returns` is the selected strategy's per-period "
+      "return series; `trial_sharpes` holds the per-period Sharpe ratio of "
+      "every trial the selection ran over (None or fewer than two means no "
+      "selection, so the expected maximum is 0 and dsr is the probabilistic "
+      "Sharpe ratio against zero). Returns sharpe, skewness, kurtosis (3 for "
+      "normal returns), expected_max_sharpe and dsr, the probability that the "
+      "true Sharpe ratio exceeds the expected maximum of that many unskilled "
+      "trials. NaN with fewer than two periods or a zero return variance.",
+      py::arg("returns"), py::arg("trial_sharpes") = py::none());
+
+  m.def(
+      "grid_neighborhood",
+      [](py::array_t<double, py::array::c_style | py::array::forcecast> values, size_t radius)
+      {
+        const auto ndim = static_cast<size_t>(values.ndim());
+        if (ndim == 0)
+        {
+          throw lrvx::LrvxError("E_LEN_003",
+                                "values must be an array with at least one axis.");
+        }
+        std::vector<size_t> shape(ndim);
+        std::vector<ssize_t> pyShape(ndim);
+        size_t total = 1;
+        for (size_t i = 0; i < ndim; ++i)
+        {
+          shape[i] = static_cast<size_t>(values.shape(static_cast<ssize_t>(i)));
+          pyShape[i] = values.shape(static_cast<ssize_t>(i));
+          total *= shape[i];
+        }
+        py::array_t<double> mean(pyShape);
+        py::array_t<uint32_t> count(pyShape);
+        if (total > 0)
+        {
+          py::gil_scoped_release release;
+          lrvx::stats::gridNeighborhood(values.data(), shape.data(), ndim, radius,
+                                        mean.mutable_data(), count.mutable_data());
+        }
+        py::dict out;
+        out["neighbor_mean"] = mean;
+        out["neighbor_count"] = count;
+        return out;
+      },
+      "The neighbourhood of every point of a parameter grid. `values` is an "
+      "n-dimensional array of one metric per grid point; a cell's neighbours "
+      "are the cells whose index differs by at most `radius` on every axis, "
+      "the cell itself excluded, NaN values skipped. Returns neighbor_mean "
+      "(the mean of the neighbours' values, NaN when there are none) and "
+      "neighbor_count, both shaped like `values`.",
+      py::arg("values"), py::arg("radius") = 1);
 }

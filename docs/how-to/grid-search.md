@@ -165,9 +165,9 @@ The C++ `BacktestOptimizer` ships ranking, filtering, bootstrap CIs, and permuta
 
 1. **Avoid overfitting** — every extra parameter increases overfit risk
 2. **Walk-forward** — optimise on train, validate on a held-out test slice
-3. **Parameter stability** — the best point should have good neighbours, not be an isolated peak
+3. **Parameter stability** — the best point should have good neighbours, not be an isolated peak; `grid_neighborhood` measures that
 4. **Realistic costs** — include slippage and exchange fees
-5. **Statistical significance** — bootstrap CI / permutation tests separate luck from edge
+5. **Statistical significance** — bootstrap CI / permutation tests separate luck from edge; `pbo_cscv` and `deflated_sharpe` ask whether the selection itself overfit (see [Overfitting checks](robustness-statistics.md))
 
 ## Type-erased `GridSearch` class (Python / Node / Codon)
 

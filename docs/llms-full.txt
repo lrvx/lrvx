@@ -3756,9 +3756,11 @@ Solve specific problems. Assumes you know the basics.
 | [Interactive backtest](interactive-backtest.md) | Inspect state mid-run from a notebook |
 | [Grid search](grid-search.md) | Sweep parameters over a backtest |
 | [Sweep parameters over bars](sweep-over-bars.md) | Load bars once, run one bar strategy per combination, in processes or on threads |
+| [Exits for bar strategies](bar-exits.md) | ATR stop, Chandelier exit and break-even trail as rules a bar strategy arms and updates |
 | [Walk-forward](walk-forward.md) | Out-of-sample validation with rolling / anchored folds |
 | [Heatmap](heatmap.md) | SVG heatmap from a 2D parameter sweep |
 | [White's reality check](whites-reality-check.md) | Multiple-comparison-aware significance test |
+| [Overfitting checks for a parameter sweep](robustness-statistics.md) | Probability of backtest overfitting, deflated Sharpe ratio, neighbourhood of a grid point |
 | [Log to MLflow](mlflow.md) | Send a backtest run + artifacts into an MLflow tracking server |
 | [Backtest an LP position](backtest-an-lp-position.md) | Run a concentrated-liquidity position through a pool tape |
 | [Choose a matching model](matching-modes.md) | FIFO, pro-rata, `pro_rata_with_fifo`, TOP-PRO-LMM, and priority-weighted matching |
@@ -5041,9 +5043,9 @@ The C++ `BacktestOptimizer` ships ranking, filtering, bootstrap CIs, and permuta
 
 1. **Avoid overfitting** — every extra parameter increases overfit risk
 2. **Walk-forward** — optimise on train, validate on a held-out test slice
-3. **Parameter stability** — the best point should have good neighbours, not be an isolated peak
+3. **Parameter stability** — the best point should have good neighbours, not be an isolated peak; `grid_neighborhood` measures that
 4. **Realistic costs** — include slippage and exchange fees
-5. **Statistical significance** — bootstrap CI / permutation tests separate luck from edge
+5. **Statistical significance** — bootstrap CI / permutation tests separate luck from edge; `pbo_cscv` and `deflated_sharpe` ask whether the selection itself overfit (see [Overfitting checks](robustness-statistics.md))
 
 ## Type-erased `GridSearch` class (Python / Node / Codon)
 
@@ -5172,6 +5174,165 @@ The result list is unsorted. Rank it on the caller side, then:
 - [The reference backtest](../explanation/reference-backtest.md)
 - [Bar aggregation](bar-aggregation.md)
 - [Backtesting](backtest.md)
+
+------------------------------------------------------------------------------
+# Source: docs/how-to/robustness-statistics.md
+# URL: https://docs.lrvx.dev/how-to/robustness-statistics/
+------------------------------------------------------------------------------
+
+# Overfitting checks for a parameter sweep
+
+A sweep over N parameter combinations always has a winner. These three statistics say what that winner is worth: whether the selection itself overfits, whether the winning Sharpe ratio clears the bar that N unskilled trials set, and whether the winning point sits on a plateau or on a spike. They work on the sweep's own outputs, the per-period returns and the metric per combination, and need nothing from the engine.
+
+## Probability of backtest overfitting
+
+`pbo_cscv(returns, num_blocks=16)` takes the per-period returns of every combination as a `(trials, periods)` array and runs combinatorially symmetric cross-validation: the periods are cut into `num_blocks` blocks, every way of choosing half of the blocks is an in-sample set with the other half out of sample, and on each split the in-sample best combination is ranked among all combinations out of sample. The relative rank is `r / (N + 1)`, its logit `log(w / (1 - w))`, and `pbo` is the fraction of splits whose logit is below zero: the in-sample winner did worse than the out-of-sample median. A sweep whose winner is a fit to the sample answers around 0.5 or more; a real edge answers near 0.
+
+The result also carries `splits` (there are 12 870 with 16 blocks), `mean_oos_rank` and `mean_logit`. Nothing is sampled, so the same inputs give the same answer. The inputs cannot be split with fewer than two trials, an odd block count, or fewer periods than blocks, and `pbo` is then NaN.
+
+Reference: Bailey, Borwein, López de Prado, Zhu (2017), "The Probability of Backtest Overfitting", Journal of Computational Finance 20(4).
+
+## Deflated Sharpe ratio
+
+`deflated_sharpe(returns, trial_sharpes=None)` takes the selected combination's per-period returns and the per-period Sharpe ratio of every trial the selection ran over. The expected maximum Sharpe ratio of that many unskilled trials, `expected_max_sharpe`, follows from the number of trials and the variance of their Sharpe ratios; `dsr` is the probability that the selected strategy's true Sharpe ratio is above it, with the sample length, the skewness and the kurtosis of the returns taken into account. Without `trial_sharpes` there is no selection, the expected maximum is 0, and `dsr` is the probabilistic Sharpe ratio against zero.
+
+The function returns `sharpe` (per period, mean over sample standard deviation), `skewness`, `kurtosis` (3 for normal returns), `expected_max_sharpe` and `dsr`. Annualise nothing before calling it: every quantity is per period. Fewer than two periods, or a zero return variance, answer NaN throughout.
+
+References: Bailey, López de Prado (2014), "The Deflated Sharpe Ratio", Journal of Portfolio Management 40(5); Bailey, López de Prado (2012), "The Sharpe Ratio Efficient Frontier", Journal of Risk 15(2).
+
+## Neighbourhood of a grid point
+
+`grid_neighborhood(values, radius=1)` takes the metric of every combination as an n-dimensional array over the parameter grid and returns, for every cell, `neighbor_mean` (the metric averaged over the cells whose index differs by at most `radius` on every axis, the cell itself excluded, NaN cells skipped) and `neighbor_count`. Both have the shape of `values`. A corner of a two-dimensional grid has three neighbours at radius 1, an interior point eight; a cell with none gets NaN.
+
+The decision is the caller's. A winner whose neighbourhood mean is close to its own value sits on a plateau, and a small move in either parameter keeps most of the edge; a winner far above its neighbours is a spike, which is what a fit to noise looks like on a grid.
+
+## The three together
+
+```python
+--8<-- "examples/python_robustness_statistics.py"
+```
+
+In C++ the same functions are `lrvx::stats::pboCscv`, `lrvx::stats::deflatedSharpeRatio` and `lrvx::stats::gridNeighborhood` in `lrvx/stats/`; in Node they are `pboCscv`, `deflatedSharpe` and `gridNeighborhood`.
+
+## See also
+
+- [Grid search](grid-search.md)
+- [Sweep parameters over bars](sweep-over-bars.md)
+- [Walk-forward](walk-forward.md)
+- [White's reality check](whites-reality-check.md)
+
+------------------------------------------------------------------------------
+# Source: docs/how-to/bar-exits.md
+# URL: https://docs.lrvx.dev/how-to/bar-exits/
+------------------------------------------------------------------------------
+
+# Exits for bar strategies
+
+Three exit rules for a position opened by a bar strategy: a stop a fixed distance from the entry, a Chandelier exit that follows the best price, and a break-even trail. They live in `lrvx.exits` in Python and in `lrvx/strategy/exits.h` in C++, with the same arithmetic on both sides, and they carry no dependency on the engine: a rule takes the entry and the bars, and answers where the stop is and whether a bar reached it. The strategy keeps the entry logic, the ATR and the exit order.
+
+## One shape
+
+Every rule has the same four moves.
+
+- `arm(side, entry_price, atr)` when the position opens, with the fill price and the ATR of that bar. `side` is `"long"` or `"short"` in Python and `Side::BUY` or `Side::SELL` in C++.
+- `update(high, low, atr)` once per closed bar from the fill bar on. It returns `True` when the bar's range reached the stop: `low <= stop` for a long, `high >= stop` for a short.
+- `stop` is the current level, `armed` whether a position is being watched.
+- `disarm()` forgets the position. A hit does not disarm; the strategy exits and disarms, and the same hit is reported again until it does.
+
+`update` tests the bar against the stop that was resting before the bar, the level the previous update left, and only then moves the stop with the bar. A bar cannot be stopped out by a level its own high raised, and a stop order resting at `stop` would have filled on the bar the test reports.
+
+## The rules
+
+| Rule | Stop | Moves |
+|---|---|---|
+| `AtrStop(atr_multiple)` | `atr_multiple` ATRs from the entry | Never |
+| `ChandelierExit(lookback, atr_multiple)` | `atr_multiple` ATRs below the highest high since the entry (above the lowest low for a short), over the last `lookback` bars, 0 for all of them; starts the same distance from the entry | Only in the position's favour |
+| `BreakEvenTrail(hard_stop_atr, break_even_atr, trail_atr)` | `hard_stop_atr` ATRs from the entry until the position has moved `break_even_atr` ATRs (the ATR at arm time) in its favour; then the entry price, or the best price seen minus `trail_atr` ATRs (the current ATR) when that is better | Only in the position's favour |
+
+The ATR is the strategy's: feed `lrvx.ATR` (`indicator::ATR`) the same bars and pass its value in. Nothing in a rule is annualised or scaled; a rule works in the price units it is given.
+
+## Where the entry price comes from
+
+Under [the execution model](../explanation/reference-backtest.md) an order from the bar callback fills at the next bar's open. A strategy that buys from `on_bar` sees the position open on the following bar, and that bar's `open` is the entry: arm the rule there, then update it with the same bar's range, since the stop has been resting from the open.
+
+## Example
+
+The reference backtest's entry with and without a Chandelier exit, on the one-minute file that ships with the docs. The guarded run closes a position on the bar whose range reaches the stop and lets the cross close the rest.
+
+```python
+--8<-- "examples/python_bar_exits.py"
+```
+
+The same in C++, with the rule as a member next to the indicators:
+
+```cpp
+#include "lrvx/indicator/atr.h"
+#include "lrvx/indicator/sma.h"
+#include "lrvx/strategy/exits.h"
+#include "lrvx/strategy/strategy.h"
+
+class SmaCrossWithChandelier : public lrvx::Strategy
+{
+ public:
+  using Strategy::Strategy;
+
+ protected:
+  void onSymbolBar(SymbolContext& ctx, const BarEvent& ev) override
+  {
+    const double high = ev.bar.high.toDouble();
+    const double low = ev.bar.low.toDouble();
+    const double close = ev.bar.close.toDouble();
+    _fast.update(close);
+    _slow.update(close);
+    _atr.update(high, low, close);
+    if (!_fast.ready() || !_slow.ready() || !_atr.ready())
+    {
+      return;
+    }
+    const double atr = _atr.value();
+
+    if (ctx.position.raw() > 0)
+    {
+      if (!_exit.armed())
+      {
+        _exit.arm(lrvx::Side::BUY, ev.bar.open.toDouble(), atr);
+      }
+      if (_exit.update(high, low, atr))
+      {
+        emitClosePosition(ev.symbol);
+        _exit.disarm();
+        return;
+      }
+    }
+
+    if (_fast.value() > _slow.value() && ctx.position.raw() == 0)
+    {
+      emitMarketBuy(ev.symbol, Quantity::fromDouble(0.01));
+    }
+    else if (_fast.value() < _slow.value() && ctx.position.raw() > 0)
+    {
+      emitClosePosition(ev.symbol);
+      _exit.disarm();
+    }
+  }
+
+ private:
+  lrvx::indicator::SMA _fast{10};
+  lrvx::indicator::SMA _slow{40};
+  lrvx::indicator::ATR _atr{14};
+  lrvx::exits::ChandelierExit _exit{0, 3.0};
+};
+```
+
+## Sweeping the rule
+
+A rule's parameters are numbers, so they go on a grid axis like any other: a `ChandelierExit(0, m)` per combination with `m` from the axis, inside the factory of [a sweep over bars](sweep-over-bars.md). The [overfitting checks](robustness-statistics.md) then apply to the exit parameters the same way they apply to the entry's.
+
+## See also
+
+- [Sweep parameters over bars](sweep-over-bars.md)
+- [The reference backtest](../explanation/reference-backtest.md)
+- [Advanced orders](advanced-orders.md) for the venue-side stop, take-profit and trailing-stop order types
 
 ------------------------------------------------------------------------------
 # Source: docs/how-to/advanced-orders.md
@@ -9118,7 +9279,7 @@ Generated by `scripts/gen_api_index.py` from
 
 Module: `lrvx`
 
-Surface: 118 classes, 79 functions, 41 constants.
+Surface: 118 classes, 82 functions, 41 constants.
 
 ### Constants
 
@@ -9192,6 +9353,7 @@ Surface: 118 classes, 79 functions, 41 constants.
 - `correlation(x: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], y: typing.Annotated[numpy.typing.ArrayLike, numpy.float64]) -> float` — Pearson correlation coefficient
 - `cost_of_carry(rate: typing.SupportsFloat | typing.SupportsIndex, dividend_yield: typing.SupportsFloat | typing.SupportsIndex = 0.0, borrow_rate: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> float` — Cost-of-carry b = rate - dividend_yield - borrow_rate. Crypto/Black-76 pass all zero; equity nets the financing pieces; FX passes the foreign rate as dividend_yield.
 - `cvd(open: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], high: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], low: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], volume: typing.Annotated[numpy.typing.ArrayLike, numpy.float64]) -> numpy.typing.NDArray[numpy.float64]`
+- `deflated_sharpe(returns: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], trial_sharpes: typing.Annotated[numpy.typing.ArrayLike, numpy.float64] | None = None) -> dict` — Deflated Sharpe ratio. `returns` is the selected strategy's per-period return series; `trial_sharpes` holds the per-period Sharpe ratio of every trial the selection ran over (None or fewer than two means no selection, so the expected maximum is 0 and dsr is the probabilistic Sharpe ratio against zero). Returns sharpe, skewness, kurtosis (3 for normal returns), expected_max_sharpe and dsr, the probability that the true Sharpe ratio exceeds the expected maximum of that many unskilled trials. NaN with fewer than two periods or a zero return variance.
 - `dema(input: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], period: typing.SupportsInt | typing.SupportsIndex) -> numpy.typing.NDArray[numpy.float64]`
 - `ema(input: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], period: typing.SupportsInt | typing.SupportsIndex) -> numpy.typing.NDArray[numpy.float64]`
 - `export_data(input_path: str, output_path: str, format: str = 'csv', from_ns: typing.Any = None, to_ns: typing.Any = None, symbols: typing.Any = None) -> dict`
@@ -9199,6 +9361,7 @@ Surface: 118 classes, 79 functions, 41 constants.
 - `extract_time_range(input_path: str, output_path: str, from_ns: typing.SupportsInt | typing.SupportsIndex, to_ns: typing.SupportsInt | typing.SupportsIndex) -> int`
 - `forward_price(spot: typing.SupportsFloat | typing.SupportsIndex, t: typing.SupportsFloat | typing.SupportsIndex, carry: typing.SupportsFloat | typing.SupportsIndex) -> float` — Forward price spot * exp(carry * t).
 - `greeks(option_type: OptionType, spot: typing.SupportsFloat | typing.SupportsIndex, strike: typing.SupportsFloat | typing.SupportsIndex, t: typing.SupportsFloat | typing.SupportsIndex, vol: typing.SupportsFloat | typing.SupportsIndex, rate: typing.SupportsFloat | typing.SupportsIndex = 0.0, carry: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> dict` — First-order greeks dict(delta, gamma, vega, theta, rho). theta is per year (divide by 365 for per-day); rho is the b-fixed partial dV/dr. carry=b (0 for crypto).
+- `grid_neighborhood(values: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], radius: typing.SupportsInt | typing.SupportsIndex = 1) -> dict` — The neighbourhood of every point of a parameter grid. `values` is an n-dimensional array of one metric per grid point; a cell's neighbours are the cells whose index differs by at most `radius` on every axis, the cell itself excluded, NaN values skipped. Returns neighbor_mean (the mean of the neighbours' values, NaN when there are none) and neighbor_count, both shaped like `values`.
 - `hurst_dfa(returns: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], scales: typing.Any = None) -> float` — Hurst exponent via Detrended Fluctuation Analysis on a series of returns (NOT prices). H ≈ 0.5 random, H > 0.5 persistent / trending, H < 0.5 anti-persistent / mean-reverting. If `scales` is None, uses a log-spaced default grid from 4 to N/4. Returns NaN if input is too short (< 32) or degenerate.
 - `i256_roundtrip(value: int) -> int`
 - `implied_percentile_in_cone(realized_samples: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], implied_vol: typing.SupportsFloat | typing.SupportsIndex) -> float` — Fraction of realized-vol samples at or below implied_vol (0..1). High = options rich vs realized history; low = cheap. NaN on empty samples.
@@ -9214,6 +9377,7 @@ Surface: 118 classes, 79 functions, 41 constants.
 - `order_type_code(name: str) -> int` — Wire code of a canonical order-type name (lrvx::OrderType space).
 - `order_type_name(code: typing.SupportsInt | typing.SupportsIndex) -> str` — Canonical name of an order-type wire code (lrvx::OrderType space).
 - `parkinson_vol(high: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], low: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], period: typing.SupportsInt | typing.SupportsIndex) -> numpy.typing.NDArray[numpy.float64]`
+- `pbo_cscv(returns: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], num_blocks: typing.SupportsInt | typing.SupportsIndex = 16) -> dict` — Probability of backtest overfitting by combinatorially symmetric cross-validation. `returns` is a (trials, periods) array of per-period returns, one row per parameter combination; `num_blocks` is the even number of period blocks the C(S, S/2) splits are drawn from. Returns pbo (the fraction of splits whose in-sample best ranks below the out-of-sample median; NaN when the inputs cannot be split), splits, mean_oos_rank and mean_logit. Deterministic.
 - `permutation_test(group1: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], group2: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], num_permutations: typing.SupportsInt | typing.SupportsIndex = 10000) -> float` — Two-sample permutation test, returns p-value
 - `prices_to_double(raw: typing.Annotated[numpy.typing.ArrayLike, numpy.int64]) -> numpy.typing.NDArray[numpy.float64]` — Convert raw int64 price array to float64 array (divides by PRICE_SCALE).
 - `profit_factor(returns: typing.Annotated[numpy.typing.ArrayLike, numpy.float64]) -> float`
@@ -12308,6 +12472,18 @@ White's reality check via stationary bootstrap. Tests whether the best of `K` ca
 result = lrvx.whites_reality_check(excess_returns)
 print(result['best_index'], result['p_value'])
 ```
+
+### `pbo_cscv(returns, num_blocks=16) -> dict`
+
+Probability of backtest overfitting by combinatorially symmetric cross-validation. `returns` is a `(trials, periods)` array of per-period returns, one row per parameter combination; `num_blocks` is the even number of period blocks the `C(S, S/2)` splits are drawn from. Returns `pbo` (the fraction of splits whose in-sample best ranks below the out-of-sample median; NaN when the inputs cannot be split), `splits`, `mean_oos_rank` and `mean_logit`. Deterministic.
+
+### `deflated_sharpe(returns, trial_sharpes=None) -> dict`
+
+Deflated Sharpe ratio. `returns` is the selected strategy's per-period return series; `trial_sharpes` holds the per-period Sharpe ratio of every trial the selection ran over. Returns `sharpe`, `skewness`, `kurtosis` (3 for normal returns), `expected_max_sharpe` (0 without trials) and `dsr`, the probability that the true Sharpe ratio exceeds the expected maximum of that many unskilled trials.
+
+### `grid_neighborhood(values, radius=1) -> dict`
+
+The neighbourhood of every point of a parameter grid. `values` is an n-dimensional array of one metric per grid point. Returns `neighbor_mean` (the mean over the cells whose index differs by at most `radius` on every axis, the cell itself excluded, NaN values skipped; NaN with no neighbour) and `neighbor_count`, both shaped like `values`.
 
 ### `list_indicators() -> list`
 

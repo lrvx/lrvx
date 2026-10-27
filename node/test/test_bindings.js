@@ -618,5 +618,44 @@ console.log("=== lrvx.whitesRealityCheck ===");
         `same inputs are deterministic (${a.p_value} vs ${b.p_value})`);
 }
 
+console.log("=== lrvx.pboCscv / deflatedSharpe / gridNeighborhood ===");
+{
+  // Two trials, four periods, two blocks: trial A beats B on every block,
+  // so the in-sample best is A and A is also the better one out of sample.
+  const consistent = new Float64Array([1, 2, 1, 2, -1, -2, -1, -2]);
+  const p = lrvx.pboCscv(consistent, 2, 4, 2);
+  check(p.splits === 2, `two blocks give two splits (got ${p.splits})`);
+  check(p.pbo === 0, `a consistent winner has pbo 0 (got ${p.pbo})`);
+  check(Math.abs(p.mean_oos_rank - 2 / 3) < 1e-12, `mean_oos_rank 2/3 (got ${p.mean_oos_rank})`);
+  // The winner of each block loses the other: pbo 1.
+  const flipping = new Float64Array([1, 2, -1, -2, -1, -2, 1, 2]);
+  check(lrvx.pboCscv(flipping, 2, 4, 2).pbo === 1, "a flipping winner has pbo 1");
+  check(Number.isNaN(lrvx.pboCscv(flipping, 2, 4, 3).pbo), "an odd block count is NaN");
+
+  // Deflated Sharpe: with no trials the expected maximum is 0 and dsr is the
+  // probabilistic Sharpe ratio; with many trials of spread-out Sharpe ratios
+  // the same series is less convincing.
+  const g = gaussian(7);
+  const r = new Float64Array(400);
+  for (let t = 0; t < 400; ++t) r[t] = g() * 0.01 + 0.002;
+  const one = lrvx.deflatedSharpe(r);
+  check(one.expected_max_sharpe === 0, "no trials: expected maximum is 0");
+  check(one.dsr > 0.9 && one.dsr <= 1,
+        `a 0.2 sigma edge over 400 periods is significant (dsr=${one.dsr})`);
+  check(Math.abs(one.kurtosis - 3) < 1.5, `kurtosis near 3 for gaussian returns (${one.kurtosis})`);
+  const trials = new Float64Array(500);
+  for (let k = 0; k < 500; ++k) trials[k] = (k - 249.5) / 1000;
+  const many = lrvx.deflatedSharpe(r, trials);
+  check(many.expected_max_sharpe > 0, "trials give a positive expected maximum");
+  check(many.dsr < one.dsr, `more trials, lower dsr (${many.dsr} < ${one.dsr})`);
+
+  // 3x3 grid, radius 1: the centre has 8 neighbours averaging 5, a corner 3.
+  const grid = new Float64Array([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  const n = lrvx.gridNeighborhood(grid, [3, 3], 1);
+  check(n.neighbor_count[4] === 8 && n.neighbor_mean[4] === 5, "centre: 8 neighbours, mean 5");
+  check(n.neighbor_count[0] === 3 && Math.abs(n.neighbor_mean[0] - 11 / 3) < 1e-12,
+        "corner: 3 neighbours, mean 11/3");
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
