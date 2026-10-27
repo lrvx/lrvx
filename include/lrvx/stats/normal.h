@@ -20,6 +20,10 @@
 namespace lrvx::stats
 {
 
+// sqrt(2 pi); spelled out because M_PI is not standard C++ and MSVC does
+// not define it without _USE_MATH_DEFINES.
+inline constexpr double kSqrtTwoPi = 2.5066282746310005024;
+
 // P(Z <= x) for Z standard normal.
 inline double normalCdf(double x)
 {
@@ -82,7 +86,7 @@ inline double normalQuantile(double p)
 
   // One Halley step on f(x) = Phi(x) - p.
   const double e = normalCdf(x) - p;
-  const double u = e * std::sqrt(2.0 * M_PI) * std::exp(x * x / 2.0);
+  const double u = e * kSqrtTwoPi * std::exp(x * x / 2.0);
   x = x - u / (1.0 + x * u / 2.0);
   return x;
 }

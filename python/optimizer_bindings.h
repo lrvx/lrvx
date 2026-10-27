@@ -343,12 +343,12 @@ inline void bindOptimizer(py::module_& m)
                                 "values must be an array with at least one axis.");
         }
         std::vector<size_t> shape(ndim);
-        std::vector<ssize_t> pyShape(ndim);
+        std::vector<py::ssize_t> pyShape(ndim);
         size_t total = 1;
         for (size_t i = 0; i < ndim; ++i)
         {
-          shape[i] = static_cast<size_t>(values.shape(static_cast<ssize_t>(i)));
-          pyShape[i] = values.shape(static_cast<ssize_t>(i));
+          shape[i] = static_cast<size_t>(values.shape(static_cast<py::ssize_t>(i)));
+          pyShape[i] = values.shape(static_cast<py::ssize_t>(i));
           total *= shape[i];
         }
         py::array_t<double> mean(pyShape);
