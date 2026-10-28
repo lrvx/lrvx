@@ -123,6 +123,13 @@ jobs:
     # LRVX_LTO=OFF: this matrix checks that each flag combination
     # configures and builds; the whole-program link step adds nothing to
     # that and dominated the tests-only row.
+    #
+    # LRVX_NATIVE=OFF: Release defaults to -march=native, and ccache hashes
+    # that flag literally, so an object compiled on one runner is a hit on
+    # the next one even when the CPUs differ. The restored cache then links
+    # instructions the current host cannot execute and the smoke step dies
+    # with SIGILL. OFF falls back to x86-64-v3, which every runner in the
+    # fleet satisfies; ci.yml's Linux jobs disable it for the same reason.
     - name: Configure
       run: |
         cmake -B build -G Ninja \
@@ -131,6 +138,7 @@ jobs:
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DCMAKE_BUILD_TYPE=Release \
               -DLRVX_LTO=OFF \
+              -DLRVX_NATIVE=OFF \
               -DCMAKE_PREFIX_PATH="$HOME/gtest-install" \
               ${{ matrix.flags }}
 
