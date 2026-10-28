@@ -9290,7 +9290,7 @@ Surface: 118 classes, 82 functions, 41 constants.
 - `BookOnly: MarkImpactModel = ...`
 - `Bybit: AdlRanking = ...`
 - `CANCELLED: OrderGroupState = ...`
-- `CAPI_ABI_VERSION: int = 4`
+- `CAPI_ABI_VERSION: int = 5`
 - `Cross: MarginMode = ...`
 - `FAILED: OrderGroupState = ...`
 - `FILLED: OrderGroupState = ...`
@@ -18028,6 +18028,7 @@ arrived with ABI version 4.
 | `last_trade_price_raw` | `int64_t` | Last trade price × 1e8 |
 | `last_update_ns` | `int64_t` | Last update timestamp (ns) |
 | `book` | `LrvxBookSnapshot` | Top-of-book snapshot |
+| `last_touch_ns` | `int64_t` | Timestamp (ns) of the frame that last wrote the touch; can be fresher than `last_update_ns`, which stamps dispatched events only |
 
 ### `LrvxBarData`
 

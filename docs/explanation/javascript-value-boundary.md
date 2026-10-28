@@ -36,6 +36,7 @@ Measured on a real dispatch, before and after:
 Read side, now `BigInt`:
 
 - `ctx.lastUpdateNs`
+- `ctx.lastTouchNs`
 - `trade.timestampNs`, `book.timestampNs`
 - `bar.startTimeNs`, `bar.endTimeNs`
 - on an order event: `exchangeTsNs`, `submittedAtNs`, `acceptedAtNs`,

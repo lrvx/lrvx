@@ -55,6 +55,8 @@ struct TouchCaptured
   int bookCalls = 0;
   int tradeCalls = 0;
   LrvxBookSnapshot tradeContext{};
+  int64_t lastUpdateNs = 0;
+  int64_t lastTouchNs = 0;
 };
 
 void onBookCount(void* user, const LrvxSymbolContext*, const LrvxBookData*)
@@ -67,6 +69,8 @@ void onTradeTouch(void* user, const LrvxSymbolContext* ctx, const LrvxTradeData*
   auto* c = static_cast<TouchCaptured*>(user);
   ++c->tradeCalls;
   c->tradeContext = ctx->book;
+  c->lastUpdateNs = ctx->last_update_ns;
+  c->lastTouchNs = ctx->last_touch_ns;
 }
 
 SymbolId addSymbol(SymbolRegistry& reg)
@@ -161,6 +165,7 @@ TEST(CApiBookSnapshot, TopOfBookRefreshesTheTouchWithoutABookCallback)
   auto top = makeSnapshot(pool, sym, {{Price::fromDouble(100.02), Quantity::fromDouble(4.0)}},
                           {{Price::fromDouble(100.03), Quantity::fromDouble(3.0)}});
   top->update.type = BookUpdateType::TOP_OF_BOOK;
+  top->update.exchangeTsNs = UnixNanos{1'776'606'961'000'000'000LL};
   bridge->onBookUpdate(*top);
   EXPECT_EQ(cap.bookCalls, 1);
 
@@ -168,6 +173,7 @@ TEST(CApiBookSnapshot, TopOfBookRefreshesTheTouchWithoutABookCallback)
   tr.trade.symbol = sym;
   tr.trade.price = Price::fromDouble(100.02);
   tr.trade.quantity = Quantity::fromDouble(0.1);
+  tr.trade.exchangeTsNs = UnixNanos{1'776'606'962'000'000'000LL};
   bridge->onTrade(tr);
 
   ASSERT_EQ(cap.tradeCalls, 1);
@@ -191,6 +197,16 @@ TEST(CApiBookSnapshot, TopOfBookRefreshesTheTouchWithoutABookCallback)
   EXPECT_EQ(lrvx_best_bid_raw(h, sym), Price::fromDouble(100.02).raw());
   EXPECT_EQ(lrvx_best_ask_raw(h, sym), Price::fromDouble(100.03).raw());
   EXPECT_EQ(lrvx_mid_price_raw(h, sym), Price::fromDouble(100.025).raw());
+
+  // The two stamps answer different questions: last_update_ns is the last
+  // dispatched event (the trade), last_touch_ns the TOP_OF_BOOK frame.
+  EXPECT_EQ(cap.lastUpdateNs, 1'776'606'962'000'000'000LL);
+  EXPECT_EQ(cap.lastTouchNs, 1'776'606'961'000'000'000LL);
+
+  LrvxSymbolContext fctx{};
+  lrvx_get_symbol_context(h, sym, &fctx);
+  EXPECT_EQ(fctx.last_update_ns, 1'776'606'962'000'000'000LL);
+  EXPECT_EQ(fctx.last_touch_ns, 1'776'606'961'000'000'000LL);
 }
 
 TEST(CApiBookSnapshot, EmptySideReportsZeroPriceAndZeroSize)

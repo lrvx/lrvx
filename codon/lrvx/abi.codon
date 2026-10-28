@@ -17,7 +17,7 @@ from sys import exit
 
 from C import lrvx_capi_abi_version() -> u32
 
-LRVX_CAPI_ABI_VERSION: int = 4
+LRVX_CAPI_ABI_VERSION: int = 5
 
 
 def check_abi_version():

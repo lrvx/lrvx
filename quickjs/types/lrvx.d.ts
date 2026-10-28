@@ -15,6 +15,7 @@ interface SymbolContext {
     readonly avgEntryPrice: number;
     readonly lastTradePrice: number;
     readonly lastUpdateNs: bigint;
+    readonly lastTouchNs: bigint;
     readonly book: BookSnapshot;
 }
 

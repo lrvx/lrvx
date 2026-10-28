@@ -144,6 +144,7 @@ arrived with ABI version 4.
 | `last_trade_price_raw` | `int64_t` | Last trade price × 1e8 |
 | `last_update_ns` | `int64_t` | Last update timestamp (ns) |
 | `book` | `LrvxBookSnapshot` | Top-of-book snapshot |
+| `last_touch_ns` | `int64_t` | Timestamp (ns) of the frame that last wrote the touch; can be fresher than `last_update_ns`, which stamps dispatched events only |
 
 ### `LrvxBarData`
 

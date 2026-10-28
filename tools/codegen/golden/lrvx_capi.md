@@ -94,7 +94,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 
 ### abi_version
 
-- `LRVX_CAPI_ABI_VERSION` = `4`
+- `LRVX_CAPI_ABI_VERSION` = `5`
 
 ### feature_flags
 
@@ -233,6 +233,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 | `last_trade_price_raw` | `int64_t` |
 | `last_update_ns` | `int64_t` |
 | `book` | `LrvxBookSnapshot` |
+| `last_touch_ns` | `int64_t` |
 
 ### `LrvxOrderEventData`
 

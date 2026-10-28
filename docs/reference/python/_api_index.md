@@ -27,7 +27,7 @@ Surface: 118 classes, 82 functions, 41 constants.
 - `BookOnly: MarkImpactModel = ...`
 - `Bybit: AdlRanking = ...`
 - `CANCELLED: OrderGroupState = ...`
-- `CAPI_ABI_VERSION: int = 4`
+- `CAPI_ABI_VERSION: int = 5`
 - `Cross: MarginMode = ...`
 - `FAILED: OrderGroupState = ...`
 - `FILLED: OrderGroupState = ...`

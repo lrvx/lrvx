@@ -24,9 +24,10 @@
 // whenever a struct on this boundary changes shape, a function changes
 // signature, or an existing code space gains a meaning. 2: LrvxSignal grew
 // range_lower / range_upper / liquidity. 3: LrvxBar grew close_reason.
-// 4: LrvxBookSnapshot grew has_bid / has_ask.
+// 4: LrvxBookSnapshot grew has_bid / has_ask. 5: LrvxSymbolContext grew
+// last_touch_ns.
 // lrvx::export_macro(group="abi_version")
-#define LRVX_CAPI_ABI_VERSION 4
+#define LRVX_CAPI_ABI_VERSION 5
 
 #ifdef __cplusplus
 extern "C"
@@ -118,9 +119,8 @@ extern "C"
   // then 0 and means nothing, and bindings surface the unrealized PnL built
   // on it as NaN. The flag sits in padding the struct already had.
   /* book is the touch, which a TOP_OF_BOOK frame can refresh without a
-   * dispatch; last_update_ns stamps dispatched events only, so the top can be
-   * fresher than the stamp. The touch's own stamp (C++ lastTouchNs) is not in
-   * this struct: adding a field is an ABI bump. */
+   * dispatch. last_update_ns stamps dispatched events; last_touch_ns stamps
+   * the touch itself, so the two can differ. */
   typedef struct
   {
     uint32_t symbol_id;
@@ -130,6 +130,7 @@ extern "C"
     int64_t last_trade_price_raw;
     int64_t last_update_ns;
     LrvxBookSnapshot book;
+    int64_t last_touch_ns;
   } LrvxSymbolContext;
 
   // ============================================================

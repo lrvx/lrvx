@@ -62,6 +62,7 @@ extern "C"
       {"LrvxSymbolContext", "last_trade_price_raw", 24, 8},
       {"LrvxSymbolContext", "last_update_ns", 32, 8},
       {"LrvxSymbolContext", "book", 40, 56},
+      {"LrvxSymbolContext", "last_touch_ns", 96, 8},
       {"LrvxBarData", "symbol", 0, 4},
       {"LrvxBarData", "bar_type", 4, 1},
       {"LrvxBarData", "close_reason", 5, 1},
@@ -112,7 +113,7 @@ extern "C"
   static const LrvxStructLayout kLrvxEventStructLayout[] = {
       {"LrvxTradeData", 40, 8},
       {"LrvxBookSnapshot", 56, 8},
-      {"LrvxSymbolContext", 96, 8},
+      {"LrvxSymbolContext", 104, 8},
       {"LrvxBarData", 88, 8},
       {"LrvxOrderEventData", 144, 8},
       {"LrvxBar", 72, 8},

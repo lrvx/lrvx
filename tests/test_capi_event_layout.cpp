@@ -78,6 +78,7 @@ const std::vector<Field>& expectedFields()
       LRVX_FIELD(LrvxSymbolContext, last_trade_price_raw),
       LRVX_FIELD(LrvxSymbolContext, last_update_ns),
       LRVX_FIELD(LrvxSymbolContext, book),
+      LRVX_FIELD(LrvxSymbolContext, last_touch_ns),
 
       LRVX_FIELD(LrvxBarData, symbol),
       LRVX_FIELD(LrvxBarData, bar_type),
