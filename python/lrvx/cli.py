@@ -647,6 +647,7 @@ def _materialize_merged_tape(paths: list[Path], out_dir: Path) -> None:
         "has_trades": True,
         "has_book_snapshots": bool(headers.size),
         "has_book_deltas": False,
+        "has_book_tops": False,
         "price_scale": 100000000,
         "qty_scale": 100000000,
         "description": (

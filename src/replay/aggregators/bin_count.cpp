@@ -84,6 +84,7 @@ void BinCountAggregator::onEvent(const ReplayEvent& ev)
       break;
     case EventType::BookSnapshot:
     case EventType::BookDelta:
+    case EventType::BookTop:
       if (_event_filter == AggregatorEventFilter::Trades)
       {
         return;

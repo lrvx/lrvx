@@ -72,7 +72,10 @@ class BinaryLogRecorderHook
   // there's no double conversion in the hot path.
   void onTrade(uint32_t symbol_id, int64_t price_raw, int64_t qty_raw,
                bool is_buy, int64_t exchange_ts_ns, int64_t recv_ts_ns) noexcept;
-  void onBookUpdate(uint32_t symbol_id, bool is_snapshot,
+  // update_type is the recorder-callback byte: 1 snapshot, 0 delta,
+  // 2 top-of-book. It used to be a bool, which recorded a top as a
+  // snapshot and wiped depth on replay.
+  void onBookUpdate(uint32_t symbol_id, uint8_t update_type,
                     const BookLevel* bids, uint32_t n_bids,
                     const BookLevel* asks, uint32_t n_asks,
                     int64_t exchange_ts_ns, int64_t recv_ts_ns) noexcept;

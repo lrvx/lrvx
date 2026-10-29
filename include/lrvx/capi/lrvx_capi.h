@@ -846,6 +846,9 @@ extern "C"
   typedef void (*LrvxPnLTrackerOnSignalFn)(void*, const LrvxSignal*);
   typedef void (*LrvxStorageSinkStoreFn)(void*, const LrvxSignal*);
   typedef void (*LrvxRecorderOnTradeFn)(void*, const LrvxTradeData*);
+  /* The uint8_t is a byte, not a bool: 1 snapshot, 0 delta, 2 top-of-book
+   * (one level per side, must not be applied as book depth). The two
+   * boolean values predate the third and keep their meaning. */
   typedef void (*LrvxRecorderOnBookUpdateFn)(void*, uint32_t, uint8_t, const LrvxBookLevel*, uint32_t, const LrvxBookLevel*, uint32_t, int64_t);
   typedef void (*LrvxRecorderLifecycleFn)(void*);
   typedef uint8_t (*LrvxReplaySourceNextFn)(void*, LrvxReplayEvent*);

@@ -676,7 +676,19 @@ bool BinaryLogWriter::writeBook(const BookRecordHeader& hdr, std::span<const Boo
   }
   auto* payload = _payload_buffer.data();
 
-  EventType type = (hdr.type == 0) ? EventType::BookSnapshot : EventType::BookDelta;
+  EventType type = (hdr.type == 0)   ? EventType::BookSnapshot
+                   : (hdr.type == 2) ? EventType::BookTop
+                                     : EventType::BookDelta;
+  if (hdr.type == 2)
+  {
+    // Inline, not setHasBookTops(): writeBook already holds _mutex and the
+    // setter takes it again.
+    if (!_metadata)
+    {
+      _metadata = RecordingMetadata{};
+    }
+    _metadata->has_book_tops = true;
+  }
 
   bool ok;
   if (isCompressed())
@@ -920,6 +932,16 @@ void BinaryLogWriter::setHasBookSnapshots(bool v)
     _metadata = RecordingMetadata{};
   }
   _metadata->has_book_snapshots = v;
+}
+
+void BinaryLogWriter::setHasBookTops(bool v)
+{
+  std::lock_guard lock(_mutex);
+  if (!_metadata)
+  {
+    _metadata = RecordingMetadata{};
+  }
+  _metadata->has_book_tops = v;
 }
 
 void BinaryLogWriter::setHasBookDeltas(bool v)

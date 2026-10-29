@@ -591,6 +591,9 @@ inline void recOnBookBridge(void* ud, uint32_t symbol, uint8_t is_snap,
       a.emplace_back(static_cast<double>(asks[i].price_raw) / 1e8,
                      static_cast<double>(asks[i].quantity_raw) / 1e8);
 }
+    // The byte is 1 snapshot, 0 delta, 2 top-of-book; the Python hook's
+    // signature is a bool, so a top degrades to "snapshot" here — it is the
+    // venue's complete word on the touch, which is what a snapshot promises.
     py_obj->on_book_update(symbol, is_snap != 0, b, a, ts); });
 }
 

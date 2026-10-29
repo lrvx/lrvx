@@ -2595,6 +2595,9 @@ extern "C"
   // ============================================================
 
   typedef void (*LrvxRecorderOnTradeFn)(void* user_data, const LrvxTradeData* trade);
+  /* is_snapshot is a byte, not a bool: 1 snapshot, 0 delta, 2 top-of-book
+   * (one level per side, must not be applied as book depth). The two
+   * boolean values predate the third and keep their meaning. */
   typedef void (*LrvxRecorderOnBookUpdateFn)(void* user_data,
                                              uint32_t symbol,
                                              uint8_t is_snapshot,

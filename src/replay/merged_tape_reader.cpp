@@ -186,7 +186,7 @@ void MergedTapeReader::detectBookOverlap()
   for (size_t i = 0; i < _manifests.size(); ++i)
   {
     const auto& meta = _manifests[i];
-    const bool has_book = meta.has_book_snapshots || meta.has_book_deltas;
+    const bool has_book = meta.has_book_snapshots || meta.has_book_deltas || meta.has_book_tops;
     const auto& stats = _per_tape_stats[i];
     for (const auto& s : meta.symbols)
     {
@@ -347,7 +347,7 @@ MergedTapeReader::readBooks()
         [&](const ReplayEvent& ev) -> bool
         {
           if (ev.type != EventType::BookSnapshot &&
-              ev.type != EventType::BookDelta)
+              ev.type != EventType::BookDelta && ev.type != EventType::BookTop)
           {
             return true;
           }
@@ -368,7 +368,9 @@ MergedTapeReader::readBooks()
           // Map writer's type byte (0=snap, 1=delta) onto reader's event
           // type convention (2=snap, 3=delta) to match
           // BinaryLogReader.read_book_updates output.
-          p.row.event_type = (ev.type == EventType::BookSnapshot) ? 2 : 3;
+          p.row.event_type = (ev.type == EventType::BookSnapshot) ? 2
+                             : (ev.type == EventType::BookTop)    ? 6
+                                                                  : 3;
           p.bids = ev.bids;
           p.asks = ev.asks;
           pending.push_back(std::move(p));
@@ -684,7 +686,8 @@ bool MergedTapeReader::streamEvents(StreamCallback callback)
         ev.trade.symbol_id = gid;
       }
     }
-    else if (ev.type == EventType::BookSnapshot ||
+    else if (ev.type == EventType::BookTop ||
+             ev.type == EventType::BookSnapshot ||
              ev.type == EventType::BookDelta)
     {
       uint32_t gid = globalIdForLocal(ti, ev.book_header.symbol_id);

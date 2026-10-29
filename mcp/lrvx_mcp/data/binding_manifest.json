@@ -14962,6 +14962,11 @@
         },
         {
           "kind": "method",
+          "name": "setHasBookTops",
+          "parent": "BinaryLogWriter"
+        },
+        {
+          "kind": "method",
           "name": "setHasTrades",
           "parent": "BinaryLogWriter"
         },

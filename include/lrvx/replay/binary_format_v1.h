@@ -51,7 +51,12 @@ enum class EventType : uint8_t
   // timeline as trades and books. Additive, like OptionQuote: an old reader skips it
   // via FrameHeader.size. The payload bytes are interpreted by the pool-state-tape
   // layer (PoolStateReplay), which the format header does not depend on.
-  PoolState = 5
+  PoolState = 5,
+  // One-level top-of-book refresh (BookUpdateType::TOP_OF_BOOK): same payload
+  // shape as BookSnapshot/BookDelta — a BookRecordHeader (type = 2) and up to
+  // one level per side. Additive, like OptionQuote: an old reader skips the
+  // frame via FrameHeader.size instead of misreading a touch as book depth.
+  BookTop = 6
 };
 
 // Fixed-point scale for implied volatility stored in OptionQuoteRecord.iv_raw.
@@ -206,6 +211,7 @@ struct alignas(8) BookRecordHeader
   uint32_t symbol_id{0};
   uint16_t bid_count{0};
   uint16_t ask_count{0};
+  // BookUpdateType numeric space: 0 snapshot, 1 delta, 2 top-of-book.
   uint8_t type{0};
   uint8_t instrument{0};
   uint16_t exchange_id{0};
