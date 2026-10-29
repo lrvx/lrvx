@@ -297,6 +297,18 @@ result = lrvx.whites_reality_check(excess_returns)
 print(result['best_index'], result['p_value'])
 ```
 
+### `pbo_cscv(returns, num_blocks=16) -> dict`
+
+Probability of backtest overfitting by combinatorially symmetric cross-validation. `returns` is a `(trials, periods)` array of per-period returns, one row per parameter combination; `num_blocks` is the even number of period blocks the `C(S, S/2)` splits are drawn from. Returns `pbo` (the fraction of splits whose in-sample best ranks below the out-of-sample median; NaN when the inputs cannot be split), `splits`, `mean_oos_rank` and `mean_logit`. Deterministic.
+
+### `deflated_sharpe(returns, trial_sharpes=None) -> dict`
+
+Deflated Sharpe ratio. `returns` is the selected strategy's per-period return series; `trial_sharpes` holds the per-period Sharpe ratio of every trial the selection ran over. Returns `sharpe`, `skewness`, `kurtosis` (3 for normal returns), `expected_max_sharpe` (0 without trials) and `dsr`, the probability that the true Sharpe ratio exceeds the expected maximum of that many unskilled trials.
+
+### `grid_neighborhood(values, radius=1) -> dict`
+
+The neighbourhood of every point of a parameter grid. `values` is an n-dimensional array of one metric per grid point. Returns `neighbor_mean` (the mean over the cells whose index differs by at most `radius` on every axis, the cell itself excluded, NaN values skipped; NaN with no neighbour) and `neighbor_count`, both shaped like `values`.
+
 ### `list_indicators() -> list`
 
 Names of every indicator class registered in this build.

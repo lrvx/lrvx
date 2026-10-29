@@ -13256,6 +13256,119 @@
     },
     {
       "group": "additional_stats",
+      "name": "lrvx_stat_deflated_sharpe",
+      "params": [
+        {
+          "name": "returns",
+          "type": "const double *"
+        },
+        {
+          "name": "num_periods",
+          "type": "size_t"
+        },
+        {
+          "name": "trial_sharpes",
+          "type": "const double *"
+        },
+        {
+          "name": "num_trials",
+          "type": "size_t"
+        },
+        {
+          "name": "sharpe_out",
+          "type": "double *"
+        },
+        {
+          "name": "skewness_out",
+          "type": "double *"
+        },
+        {
+          "name": "kurtosis_out",
+          "type": "double *"
+        },
+        {
+          "name": "expected_max_sharpe_out",
+          "type": "double *"
+        },
+        {
+          "name": "dsr_out",
+          "type": "double *"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "additional_stats",
+      "name": "lrvx_stat_grid_neighborhood",
+      "params": [
+        {
+          "name": "values",
+          "type": "const double *"
+        },
+        {
+          "name": "shape",
+          "type": "const size_t *"
+        },
+        {
+          "name": "ndim",
+          "type": "size_t"
+        },
+        {
+          "name": "radius",
+          "type": "size_t"
+        },
+        {
+          "name": "neighbor_mean_out",
+          "type": "double *"
+        },
+        {
+          "name": "neighbor_count_out",
+          "type": "uint32_t *"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "additional_stats",
+      "name": "lrvx_stat_pbo_cscv",
+      "params": [
+        {
+          "name": "returns",
+          "type": "const double *"
+        },
+        {
+          "name": "num_trials",
+          "type": "size_t"
+        },
+        {
+          "name": "num_periods",
+          "type": "size_t"
+        },
+        {
+          "name": "num_blocks",
+          "type": "uint32_t"
+        },
+        {
+          "name": "pbo_out",
+          "type": "double *"
+        },
+        {
+          "name": "splits_out",
+          "type": "uint64_t *"
+        },
+        {
+          "name": "mean_oos_rank_out",
+          "type": "double *"
+        },
+        {
+          "name": "mean_logit_out",
+          "type": "double *"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "additional_stats",
       "name": "lrvx_stat_permutation_test",
       "params": [
         {
@@ -14576,7 +14689,7 @@
     {
       "group": "abi_version",
       "name": "LRVX_CAPI_ABI_VERSION",
-      "value": "4"
+      "value": "5"
     },
     {
       "group": "feature_flags",
@@ -16482,6 +16595,10 @@
         {
           "name": "book",
           "type": "LrvxBookSnapshot"
+        },
+        {
+          "name": "last_touch_ns",
+          "type": "int64_t"
         }
       ],
       "name": "LrvxSymbolContext"

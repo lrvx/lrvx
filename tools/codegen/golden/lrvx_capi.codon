@@ -7,7 +7,7 @@
 # file is the flat reference, not directly imported by user code.
 
 # ── macro: abi_version ──
-LRVX_CAPI_ABI_VERSION: int = 4
+LRVX_CAPI_ABI_VERSION: int = 5
 
 # ── macro: feature_flags ──
 LRVX_HAS_OPTIONAL_RAW_BEST_QUOTE: int = 1
@@ -62,6 +62,9 @@ from C import lrvx_aggregate_renko_bars(Ptr[i64], Ptr[float], Ptr[float], Ptr[u8
 from C import lrvx_stat_permutation_test(Ptr[float], int, Ptr[float], int, u32) -> float
 from C import lrvx_stat_bootstrap_ci(Ptr[float], int, float, u32, Ptr[float], Ptr[float], Ptr[float])
 from C import lrvx_stat_whites_reality_check(Ptr[float], int, int, u32, float, Ptr[float], Ptr[float], Ptr[i32])
+from C import lrvx_stat_pbo_cscv(Ptr[float], int, int, u32, Ptr[float], Ptr[u64], Ptr[float], Ptr[float])
+from C import lrvx_stat_deflated_sharpe(Ptr[float], int, Ptr[float], int, Ptr[float], Ptr[float], Ptr[float], Ptr[float], Ptr[float])
+from C import lrvx_stat_grid_neighborhood(Ptr[float], Ptr[int], int, int, Ptr[float], Ptr[u32])
 
 # ── amm_curve ──
 from C import lrvx_curve_constant_product(cobj, cobj, u64, u64) -> cobj

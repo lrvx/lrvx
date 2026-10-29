@@ -211,7 +211,6 @@ struct alignas(8) BookRecordHeader
   uint32_t symbol_id{0};
   uint16_t bid_count{0};
   uint16_t ask_count{0};
-  // BookUpdateType numeric space: 0 snapshot, 1 delta, 2 top-of-book.
   uint8_t type{0};
   uint8_t instrument{0};
   uint16_t exchange_id{0};

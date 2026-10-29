@@ -28,12 +28,21 @@
 #include "lrvx/error/lrvx_error.h"
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <cmath>
 #include <stdexcept>
 #include <vector>
 
 using namespace lrvx;
 using namespace lrvx::indicator;
+
+// The buffer overload and the allocating overload run the same inline
+// arithmetic, but each call site is its own inlining context: under GCC's
+// default -ffp-contract=fast with an FMA-capable -march, one copy can fuse a
+// multiply-add that the other rounds twice, and the two results differ by a
+// few ULP (seen on Skewness at -O3 -march=x86-64-v3 without LTO). The
+// contract is the same value, not the same bits.
+#define EXPECT_SAME_VALUE(a, b) EXPECT_NEAR((a), (b), 1e-12 * std::max(1.0, std::abs(b)))
 
 static std::vector<double> prices()
 {
@@ -134,7 +143,7 @@ TEST(EMA, WriteToBuffer)
     }
     else
     {
-      EXPECT_DOUBLE_EQ(buf[i], alloced[i]);
+      EXPECT_SAME_VALUE(buf[i], alloced[i]);
     }
   }
 }
@@ -1152,7 +1161,7 @@ TEST(Skewness, WriteToBuffer)
     }
     else
     {
-      EXPECT_DOUBLE_EQ(buf[i], alloced[i]);
+      EXPECT_SAME_VALUE(buf[i], alloced[i]);
     }
   }
 }
@@ -1203,7 +1212,7 @@ TEST(Kurtosis, WriteToBuffer)
     }
     else
     {
-      EXPECT_DOUBLE_EQ(buf[i], alloced[i]);
+      EXPECT_SAME_VALUE(buf[i], alloced[i]);
     }
   }
 }
@@ -1252,7 +1261,7 @@ TEST(RollingZScore, WriteToBuffer)
     }
     else
     {
-      EXPECT_DOUBLE_EQ(buf[i], alloced[i]);
+      EXPECT_SAME_VALUE(buf[i], alloced[i]);
     }
   }
 }

@@ -107,7 +107,7 @@ Optional callback invoked periodically during optimization.
 std::vector<OptimizationResult<ParamsT>> runLocal(size_t numThreads = 0);
 ```
 
-Run all backtests. Returns empty vector if no factory set or grid is empty.
+Runs every combination and returns one result per combination, in grid order; empty if no factory is set or the grid is empty. `numThreads` is the number of worker threads, 0 meaning one per hardware thread, and the calling thread is one of them. Combinations are handed out through an atomic index, so with more than one thread the factory is called from several threads at once: it has to build everything a backtest touches per call and share only read-only inputs. The progress callback is serialised and sees every tenth completion and the last, in completion order. An exception from the factory on any thread stops the hand-out and is rethrown once the workers have joined.
 
 ### runSingle
 

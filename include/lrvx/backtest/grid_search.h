@@ -54,9 +54,17 @@ class GridSearch
   /// entry per axis in registration order.
   std::vector<double> paramsForIndex(std::size_t index) const;
 
-  /// Run the grid sequentially. Returns one result per combination,
-  /// in flat-index order. `numThreads` is currently unused (parallel
-  /// backend is the multi-process backend).
+  /// Run every combination and return one result per combination, in
+  /// flat-index order. `numThreads` is the number of worker threads, 0
+  /// meaning one per hardware thread; the calling thread is one of them.
+  /// With more than one thread the factory is called from several threads
+  /// at once, so it has to build everything a backtest touches per call and
+  /// share only read-only inputs. An exception from the factory on any
+  /// thread stops the hand-out and is rethrown once the workers have joined.
+  /// The language bindings do not go through this method: their factories
+  /// run on the binding's own thread (the Python factory holds the GIL, a
+  /// Node factory is a JavaScript function), so `GridSearch.run()` there is
+  /// sequential and a parallel sweep uses processes.
   std::vector<GridSearchResult> run(std::size_t numThreads = 0);
 
  private:

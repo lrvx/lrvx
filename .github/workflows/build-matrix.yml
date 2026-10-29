@@ -28,7 +28,9 @@ jobs:
   # gating the flag matrix on it bought nothing.
   matrix:
     runs-on: ubuntu-24.04
-    # Observed: 1-3 min for most entries, ~7.5 min for tests-only.
+    # Observed: 1-3 min for most entries; tests-only 14 min cold and well
+    # under that warm (with LTO on and no ccache, it ran past 20 min
+    # relinking every test binary and was cancelled).
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -67,6 +69,11 @@ jobs:
             needs_gtest: false
             needs_pybind: true
     name: ${{ matrix.name }}
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      # See ci.yml: hash the compiler's bytes, not its mtime, so a fresh
+      # apt-get on an ephemeral runner does not miss the whole cache.
+      CCACHE_COMPILERCHECK: content
     steps:
     - uses: actions/checkout@v5
 
@@ -74,9 +81,22 @@ jobs:
       run: |
         sudo apt-get update -qq
         sudo apt-get install -y --no-install-recommends \
-          cmake ninja-build g++-14 \
+          cmake ninja-build g++-14 ccache \
           libssl-dev zlib1g-dev libcurl4-openssl-dev liblz4-dev \
           python3-dev python3-pip
+
+    # One cache per row, keyed like ci.yml's jobs; restore-keys falls back
+    # to the newest cache for this row, which on a PR is main's. tests-only
+    # compiled every test from scratch on every run and took 14 minutes of
+    # its 20-minute limit cold.
+    - name: Restore ccache
+      id: ccache-restore
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ccache-${{ runner.os }}-gcc14-matrix-${{ matrix.name }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', '**/CMakeLists.txt') }}-${{ github.run_id }}
+        restore-keys: |
+          ccache-${{ runner.os }}-gcc14-matrix-${{ matrix.name }}-
 
     - name: Install GoogleTest
       if: matrix.needs_gtest
@@ -84,6 +104,8 @@ jobs:
         git clone --depth=1 https://github.com/google/googletest.git
         cmake -B gtest-build -S googletest -G Ninja \
           -DCMAKE_CXX_COMPILER=g++-14 \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -DCMAKE_INSTALL_PREFIX=$HOME/gtest-install
         cmake --build gtest-build
         cmake --install gtest-build
@@ -98,16 +120,56 @@ jobs:
       run: |
         echo "pybind11_DIR=$(python3 -c 'import pybind11; print(pybind11.get_cmake_dir())')" >> $GITHUB_ENV
 
+    # LRVX_LTO=OFF: this matrix checks that each flag combination
+    # configures and builds; the whole-program link step adds nothing to
+    # that and dominated the tests-only row.
+    #
+    # LRVX_NATIVE=OFF: Release defaults to -march=native, and ccache hashes
+    # that flag literally, so an object compiled on one runner is a hit on
+    # the next one even when the CPUs differ. The restored cache then links
+    # instructions the current host cannot execute and the smoke step dies
+    # with SIGILL. OFF falls back to x86-64-v3, which every runner in the
+    # fleet satisfies; ci.yml's Linux jobs disable it for the same reason.
     - name: Configure
       run: |
         cmake -B build -G Ninja \
               -DCMAKE_CXX_COMPILER=g++-14 \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DCMAKE_BUILD_TYPE=Release \
+              -DLRVX_LTO=OFF \
+              -DLRVX_NATIVE=OFF \
               -DCMAKE_PREFIX_PATH="$HOME/gtest-install" \
               ${{ matrix.flags }}
 
+    - name: ccache zero stats
+      run: ccache -z
+
     - name: Build
       run: cmake --build build -j$(nproc)
+
+    - name: ccache stats
+      if: always()
+      run: ccache -s
+
+    # Main only; see ci.yml's linux-gcc Save ccache for why.
+    - name: Save ccache
+      if: always() && github.ref == 'refs/heads/main'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ env.CCACHE_DIR }}
+        key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
+
+    # Build the wheel from the root pyproject.toml, install it into a
+    # throwaway venv, and assert every documented pure-Python module is
+    # importable. Catches the regression where scikit-build-core only
+    # collects the install component contents and silently drops new
+    # `.py` files added under `python/lrvx/`. It lives here rather than in
+    # ci.yml's linux-gcc because it rebuilds the extension from scratch,
+    # two minutes that sat on the critical path of the slowest job.
+    - name: Verify wheel ships every pure-Python module
+      if: matrix.name == 'python-only'
+      run: bash scripts/check_lrvx_wheel.sh
 
     - name: Venue-stack composition smoke
       if: matrix.name == 'python-only' || matrix.name == 'production-typical'

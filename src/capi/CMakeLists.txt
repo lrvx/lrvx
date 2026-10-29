@@ -21,7 +21,10 @@ if(NOT MSVC)
   # the LRVX_NATIVE option; the shared CAPI lib is a distribution target
   # (Codon/QuickJS/Node load it at runtime), so set LRVX_NATIVE=OFF when
   # shipping it to heterogeneous CPUs.
-  set(_LRVX_CAPI_OPTS -O3 -flto)
+  set(_LRVX_CAPI_OPTS -O3)
+  if(LRVX_LTO)
+    list(APPEND _LRVX_CAPI_OPTS -flto)
+  endif()
   if(LRVX_ARCH_OPT)
     list(APPEND _LRVX_CAPI_OPTS ${LRVX_ARCH_OPT})
   endif()

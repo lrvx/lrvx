@@ -92,6 +92,94 @@ inline Napi::Value stat_whites_reality_check(const Napi::CallbackInfo& info)
   return o;
 }
 
+// pboCscv(returns: Float64Array, numTrials, numPeriods, numBlocks = 16)
+// Probability of backtest overfitting by CSCV; returns is trials x periods
+// row-major. Returns { pbo, splits, mean_oos_rank, mean_logit }; pbo is NaN
+// and splits 0 when the inputs cannot be split.
+inline Napi::Value stat_pbo_cscv(const Napi::CallbackInfo& info)
+{
+  auto returns = info[0].As<Napi::Float64Array>();
+  size_t N = info[1].As<Napi::Number>().Uint32Value();
+  size_t T = info[2].As<Napi::Number>().Uint32Value();
+  uint32_t numBlocks = info.Length() > 3 ? info[3].As<Napi::Number>().Uint32Value() : 16u;
+  if (returns.ElementLength() < N * T)
+  {
+    Napi::TypeError::New(info.Env(), "returns array shorter than numTrials*numPeriods")
+        .ThrowAsJavaScriptException();
+    return info.Env().Undefined();
+  }
+  double pbo = 0.0;
+  uint64_t splits = 0;
+  double meanRank = 0.0;
+  double meanLogit = 0.0;
+  lrvx_stat_pbo_cscv(returns.Data(), N, T, numBlocks, &pbo, &splits, &meanRank, &meanLogit);
+  auto o = Napi::Object::New(info.Env());
+  o.Set("pbo", pbo);
+  o.Set("splits", static_cast<double>(splits));
+  o.Set("mean_oos_rank", meanRank);
+  o.Set("mean_logit", meanLogit);
+  return o;
+}
+
+// deflatedSharpe(returns: Float64Array, trialSharpes?: Float64Array)
+// Returns { sharpe, skewness, kurtosis, expected_max_sharpe, dsr }.
+inline Napi::Value stat_deflated_sharpe(const Napi::CallbackInfo& info)
+{
+  auto returns = info[0].As<Napi::Float64Array>();
+  const double* trials = nullptr;
+  size_t numTrials = 0;
+  if (info.Length() > 1 && !info[1].IsUndefined() && !info[1].IsNull())
+  {
+    auto t = info[1].As<Napi::Float64Array>();
+    trials = t.Data();
+    numTrials = t.ElementLength();
+  }
+  double sharpe = 0, skewness = 0, kurtosis = 0, expectedMax = 0, dsr = 0;
+  lrvx_stat_deflated_sharpe(returns.Data(), returns.ElementLength(), trials, numTrials, &sharpe,
+                            &skewness, &kurtosis, &expectedMax, &dsr);
+  auto o = Napi::Object::New(info.Env());
+  o.Set("sharpe", sharpe);
+  o.Set("skewness", skewness);
+  o.Set("kurtosis", kurtosis);
+  o.Set("expected_max_sharpe", expectedMax);
+  o.Set("dsr", dsr);
+  return o;
+}
+
+// gridNeighborhood(values: Float64Array, shape: number[], radius = 1)
+// values is row-major over shape. Returns { neighbor_mean: Float64Array,
+// neighbor_count: Uint32Array }, both with one entry per cell.
+inline Napi::Value stat_grid_neighborhood(const Napi::CallbackInfo& info)
+{
+  auto values = info[0].As<Napi::Float64Array>();
+  auto shapeArr = info[1].As<Napi::Array>();
+  size_t radius = info.Length() > 2 ? info[2].As<Napi::Number>().Uint32Value() : 1u;
+  std::vector<size_t> shape(shapeArr.Length());
+  size_t total = shape.empty() ? 0 : 1;
+  for (uint32_t i = 0; i < shapeArr.Length(); ++i)
+  {
+    shape[i] = shapeArr.Get(i).As<Napi::Number>().Uint32Value();
+    total *= shape[i];
+  }
+  if (values.ElementLength() < total)
+  {
+    Napi::TypeError::New(info.Env(), "values array shorter than the product of shape")
+        .ThrowAsJavaScriptException();
+    return info.Env().Undefined();
+  }
+  auto mean = Napi::Float64Array::New(info.Env(), total);
+  auto count = Napi::Uint32Array::New(info.Env(), total);
+  if (total > 0)
+  {
+    lrvx_stat_grid_neighborhood(values.Data(), shape.data(), shape.size(), radius, mean.Data(),
+                                count.Data());
+  }
+  auto o = Napi::Object::New(info.Env());
+  o.Set("neighbor_mean", mean);
+  o.Set("neighbor_count", count);
+  return o;
+}
+
 // n used to come from `sl` alone, with `ss`/`lr` indexed at that same
 // length -- the same missing-length-check defect as the pybind11
 // bar_returns/trade_pnl bindings (see indicator_bindings.h).
@@ -168,6 +256,9 @@ inline void registerStats(Napi::Env env, Napi::Object exports)
   exports.Set("bootstrapCI", Napi::Function::New(env, stat_bootstrap_ci));
   exports.Set("permutationTest", Napi::Function::New(env, stat_permutation_test));
   exports.Set("whitesRealityCheck", Napi::Function::New(env, stat_whites_reality_check));
+  exports.Set("pboCscv", Napi::Function::New(env, stat_pbo_cscv));
+  exports.Set("deflatedSharpe", Napi::Function::New(env, stat_deflated_sharpe));
+  exports.Set("gridNeighborhood", Napi::Function::New(env, stat_grid_neighborhood));
   exports.Set("barReturns", Napi::Function::New(env, stat_bar_returns));
   exports.Set("tradePnl", Napi::Function::New(env, stat_trade_pnl));
 }

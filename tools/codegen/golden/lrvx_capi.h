@@ -89,7 +89,7 @@ extern "C"
   // ============================================================
 
   // ABI version
-#define LRVX_CAPI_ABI_VERSION 4
+#define LRVX_CAPI_ABI_VERSION 5
 
   // Feature Flags
 #define LRVX_HAS_OPTIONAL_RAW_BEST_QUOTE 1
@@ -203,6 +203,7 @@ extern "C"
     int64_t last_trade_price_raw;
     int64_t last_update_ns;
     LrvxBookSnapshot book;
+    int64_t last_touch_ns;
   } LrvxSymbolContext;
 
   typedef struct
@@ -934,6 +935,16 @@ extern "C"
                                       size_t num_periods, uint32_t num_bootstrap,
                                       double avg_block_size, double* p_value_out,
                                       double* best_stat_out, int32_t* best_index_out);
+  void lrvx_stat_pbo_cscv(const double* returns, size_t num_trials, size_t num_periods,
+                          uint32_t num_blocks, double* pbo_out, uint64_t* splits_out,
+                          double* mean_oos_rank_out, double* mean_logit_out);
+  void lrvx_stat_deflated_sharpe(const double* returns, size_t num_periods,
+                                 const double* trial_sharpes, size_t num_trials,
+                                 double* sharpe_out, double* skewness_out, double* kurtosis_out,
+                                 double* expected_max_sharpe_out, double* dsr_out);
+  void lrvx_stat_grid_neighborhood(const double* values, const size_t* shape, size_t ndim,
+                                   size_t radius, double* neighbor_mean_out,
+                                   uint32_t* neighbor_count_out);
 
   // ============================================================
   // Amm Curve

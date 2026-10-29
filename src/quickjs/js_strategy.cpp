@@ -1163,6 +1163,8 @@ JSValue LrvxJsStrategy::makeCtxObject(const LrvxSymbolContext* ctx)
                     JS_NewFloat64(c, lrvx_price_to_double(ctx->last_trade_price_raw)));
   JS_SetPropertyStr(c, obj, "lastUpdateNs",
                     JS_NewBigInt64(c, static_cast<int64_t>(ctx->last_update_ns)));
+  JS_SetPropertyStr(c, obj, "lastTouchNs",
+                    JS_NewBigInt64(c, static_cast<int64_t>(ctx->last_touch_ns)));
 
   JS_SetPropertyStr(c, obj, "book", makeBookSnapshotObject(&ctx->book));
   return obj;

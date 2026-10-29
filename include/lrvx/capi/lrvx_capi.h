@@ -24,8 +24,8 @@
  * rather than a failed load -- compare LRVX_CAPI_ABI_VERSION against
  * lrvx_capi_abi_version() once at startup and refuse the mismatch.
  * 3: LrvxBar grew close_reason. 4: LrvxBookSnapshot grew has_bid and
- * has_ask. */
-#define LRVX_CAPI_ABI_VERSION 4
+ * has_ask. 5: LrvxSymbolContext grew last_touch_ns. */
+#define LRVX_CAPI_ABI_VERSION 5
 
 /* Declared by a header that carries lrvx_best_bid_raw_opt and its two
  * siblings, so a binding can compile against a header with or without them.
@@ -235,9 +235,8 @@ extern "C"
    * on it as NaN rather than as the position's whole notional. The flag sits
    * in padding the struct already had, so the layout does not move. */
   /* book is the touch, which a TOP_OF_BOOK frame can refresh without a
-   * dispatch; last_update_ns stamps dispatched events only, so the top can be
-   * fresher than the stamp. The touch's own stamp (C++ lastTouchNs) is not in
-   * this struct: adding a field is an ABI bump. */
+   * dispatch. last_update_ns stamps dispatched events; last_touch_ns stamps
+   * the touch itself, so the two can differ. */
   typedef struct
   {
     uint32_t symbol_id;
@@ -247,6 +246,7 @@ extern "C"
     int64_t last_trade_price_raw;
     int64_t last_update_ns;
     LrvxBookSnapshot book;
+    int64_t last_touch_ns;
   } LrvxSymbolContext;
 
   /* order_type here is the C++ lrvx::OrderType space (LIMIT=0, MARKET=1,
@@ -846,9 +846,6 @@ extern "C"
   typedef void (*LrvxPnLTrackerOnSignalFn)(void*, const LrvxSignal*);
   typedef void (*LrvxStorageSinkStoreFn)(void*, const LrvxSignal*);
   typedef void (*LrvxRecorderOnTradeFn)(void*, const LrvxTradeData*);
-  /* The uint8_t is a byte, not a bool: 1 snapshot, 0 delta, 2 top-of-book
-   * (one level per side, must not be applied as book depth). The two
-   * boolean values predate the third and keep their meaning. */
   typedef void (*LrvxRecorderOnBookUpdateFn)(void*, uint32_t, uint8_t, const LrvxBookLevel*, uint32_t, const LrvxBookLevel*, uint32_t, int64_t);
   typedef void (*LrvxRecorderLifecycleFn)(void*);
   typedef uint8_t (*LrvxReplaySourceNextFn)(void*, LrvxReplayEvent*);
@@ -1042,6 +1039,33 @@ extern "C"
                                       size_t num_periods, uint32_t num_bootstrap,
                                       double avg_block_size, double* p_value_out,
                                       double* best_stat_out, int32_t* best_index_out);
+  /* Probability of backtest overfitting by CSCV (Bailey, Borwein, Lopez de
+   * Prado, Zhu). returns is trials x periods, row-major; num_blocks is the
+   * even number of period blocks the splits are drawn from. pbo_out is NaN
+   * when the inputs cannot be split (fewer than 2 trials, an odd or
+   * out-of-range block count, fewer periods than blocks), and splits_out is
+   * then 0. Deterministic. */
+  void lrvx_stat_pbo_cscv(const double* returns, size_t num_trials, size_t num_periods,
+                          uint32_t num_blocks, double* pbo_out, uint64_t* splits_out,
+                          double* mean_oos_rank_out, double* mean_logit_out);
+  /* Deflated Sharpe ratio (Bailey, Lopez de Prado). returns is the selected
+   * strategy's per-period return series; trial_sharpes holds the per-period
+   * Sharpe ratio of every trial the selection ran over (NULL or fewer than 2
+   * of them means no selection, SR0 = 0). Every output is NaN with fewer than
+   * 2 periods or a zero return variance; dsr_out alone is NaN when the
+   * non-normality correction has no real root. */
+  void lrvx_stat_deflated_sharpe(const double* returns, size_t num_periods,
+                                 const double* trial_sharpes, size_t num_trials,
+                                 double* sharpe_out, double* skewness_out, double* kurtosis_out,
+                                 double* expected_max_sharpe_out, double* dsr_out);
+  /* Per-cell neighbourhood of a parameter grid: the mean of the neighbouring
+   * cells' values (every cell whose index differs by at most radius on every
+   * axis, the cell itself excluded, NaN values skipped) and their count.
+   * values is row-major over shape[ndim]; both outputs have as many cells as
+   * values. A cell with no neighbour gets a NaN mean and a count of 0. */
+  void lrvx_stat_grid_neighborhood(const double* values, const size_t* shape, size_t ndim,
+                                   size_t radius, double* neighbor_mean_out,
+                                   uint32_t* neighbor_count_out);
 
   // ============================================================
   // Amm Curve

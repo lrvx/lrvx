@@ -1882,6 +1882,51 @@ export function whitesRealityCheck(
   numBootstrap?: number,
   avgBlockSize?: number,
 ): { p_value: number; best_stat: number; best_index: number };
+/**
+ * Probability of backtest overfitting by combinatorially symmetric
+ * cross-validation. `returns` is a flat row-major `numTrials * numPeriods`
+ * matrix of per-period returns, one row per parameter combination;
+ * `numBlocks` (default 16, even) is the number of period blocks the
+ * C(S, S/2) splits are drawn from. `pbo` is the fraction of splits whose
+ * in-sample best ranks below the out-of-sample median, NaN with `splits`
+ * 0 when the inputs cannot be split. Deterministic.
+ */
+export function pboCscv(
+  returns: Float64Array,
+  numTrials: number,
+  numPeriods: number,
+  numBlocks?: number,
+): { pbo: number; splits: number; mean_oos_rank: number; mean_logit: number };
+/**
+ * Deflated Sharpe ratio. `returns` is the selected strategy's per-period
+ * return series; `trialSharpes` holds the per-period Sharpe ratio of every
+ * trial the selection ran over (omit it for no selection: the expected
+ * maximum is then 0 and `dsr` is the probabilistic Sharpe ratio against
+ * zero). `kurtosis` is 3 for normal returns. Every field is NaN with fewer
+ * than two periods or a zero return variance.
+ */
+export function deflatedSharpe(
+  returns: Float64Array,
+  trialSharpes?: Float64Array,
+): {
+  sharpe: number;
+  skewness: number;
+  kurtosis: number;
+  expected_max_sharpe: number;
+  dsr: number;
+};
+/**
+ * The neighbourhood of every point of a parameter grid. `values` is
+ * row-major over `shape`; a cell's neighbours are the cells whose index
+ * differs by at most `radius` (default 1) on every axis, the cell itself
+ * excluded, NaN values skipped. Both outputs have one entry per cell;
+ * `neighbor_mean` is NaN where a cell has no neighbour.
+ */
+export function gridNeighborhood(
+  values: Float64Array,
+  shape: number[],
+  radius?: number,
+): { neighbor_mean: Float64Array; neighbor_count: Uint32Array };
 export function barReturns(
   longSignals: Int8Array,
   shortSignals: Int8Array,

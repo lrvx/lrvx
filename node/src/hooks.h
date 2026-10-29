@@ -491,6 +491,13 @@ struct MarketDataRecorderHookHost
     {
       return;
     }
+    // The byte is 1 snapshot, 0 delta, 2 top-of-book. This hook's JS
+    // signature is a bool, so tops are skipped the way an old reader skips
+    // the frame.
+    if (is_snap == 2)
+    {
+      return;
+    }
     self->on_book_fn.Call({
         Napi::Number::New(self->env, symbol),
         Napi::Boolean::New(self->env, is_snap != 0),
