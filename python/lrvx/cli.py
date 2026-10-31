@@ -612,6 +612,10 @@ def _materialize_merged_tape(paths: list[Path], out_dir: Path) -> None:
             offset = int(h["level_offset"])
             n_bid = int(h["bid_count"])
             n_ask = int(h["ask_count"])
+            if int(h["event_type"]) == 6:
+                # A top-of-book frame; write_book is bool-shaped and a
+                # one-level "delta" would strand stale better levels.
+                continue
             bids = levels[offset:offset + n_bid]
             asks = levels[offset + n_bid:offset + n_bid + n_ask]
             writer.write_book(

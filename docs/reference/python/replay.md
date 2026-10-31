@@ -214,7 +214,7 @@ Segment metadata.
 | `recv_ts_ns` | `int64` | Local receive timestamp (ns) |
 | `seq` | `int64` | Exchange sequence number |
 | `symbol_id` | `uint32` | Symbol ID |
-| `event_type` | `uint8` | 2 = snapshot, 3 = delta |
+| `event_type` | `uint8` | 0 = snapshot, 1 = delta, 2 = top-of-book (the record byte, not the frame type) |
 | `bid_price_raw` | `int64` | Best bid price * 10^8 (0 if absent) |
 | `bid_qty_raw` | `int64` | Best bid quantity * 10^8 |
 | `ask_price_raw` | `int64` | Best ask price * 10^8 (0 if absent) |
@@ -231,7 +231,7 @@ Segment metadata.
 | `bid_count` | `uint16` | Number of bid levels for this event |
 | `ask_count` | `uint16` | Number of ask levels for this event |
 | `level_offset` | `uint32` | Index of this event's first level in the levels array |
-| `event_type` | `uint8` | 2 = snapshot, 3 = delta |
+| `event_type` | `uint8` | 0 = snapshot, 1 = delta, 2 = top-of-book (the record byte, not the frame type) |
 
 ### PyLevel Dtype
 

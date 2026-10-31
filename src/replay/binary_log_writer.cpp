@@ -679,14 +679,11 @@ bool BinaryLogWriter::writeBook(const BookRecordHeader& hdr, std::span<const Boo
   EventType type = (hdr.type == 0)   ? EventType::BookSnapshot
                    : (hdr.type == 2) ? EventType::BookTop
                                      : EventType::BookDelta;
-  if (hdr.type == 2)
+  // Inline, not setHasBookTops(): writeBook already holds _mutex and the
+  // setter takes it again. Only flags, never creates: an implicit
+  // RecordingMetadata would make close() emit a half-empty metadata.json.
+  if (hdr.type == 2 && _metadata)
   {
-    // Inline, not setHasBookTops(): writeBook already holds _mutex and the
-    // setter takes it again.
-    if (!_metadata)
-    {
-      _metadata = RecordingMetadata{};
-    }
     _metadata->has_book_tops = true;
   }
 

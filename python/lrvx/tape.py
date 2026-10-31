@@ -268,6 +268,9 @@ def replay_tapes(
             offset = int(h["level_offset"])
             n_bid = int(h["bid_count"])
             n_ask = int(h["ask_count"])
+            if int(h["event_type"]) == 6:
+                # A top-of-book frame; on_book is bool-shaped.
+                continue
             bids = [
                 (float(levels[offset + i]["price_raw"]) / 1e8,
                  float(levels[offset + i]["qty_raw"]) / 1e8)

@@ -9,6 +9,7 @@
 
 #include "lrvx/replay/abstract_event_reader.h"
 #include "lrvx/replay/binary_format_v1.h"
+#include "lrvx/replay/binary_log_recorder_hook.h"
 #include "lrvx/replay/ops/index_builder.h"
 #include "lrvx/replay/readers/binary_log_reader.h"
 #include "lrvx/replay/time_utils.h"
@@ -17,7 +18,9 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <random>
+#include <sstream>
 
 using namespace lrvx::replay;
 
@@ -160,6 +163,45 @@ TEST_F(BinaryLogTest, TopOfBookRoundTripsAsItsOwnFrameType)
     EXPECT_EQ(recordTypes[0], 0);
     EXPECT_EQ(recordTypes[1], 2);
   }
+}
+
+TEST_F(BinaryLogTest, RecorderHookByteTwoLandsAsBookTopWithMetadata)
+{
+  // The hook's update_type byte: 1 snapshot, 0 delta, 2 top-of-book.
+  {
+    BinaryLogRecorderHookConfig cfg{};
+    cfg.output_dir = _test_dir;
+    BinaryLogRecorderHook hook(cfg);
+    hook.start();
+
+    BookLevel bid{100LL * 1000000LL, 1LL * 1000000LL};
+    BookLevel ask{101LL * 1000000LL, 1LL * 1000000LL};
+    hook.onBookUpdate(7, /*update_type=*/1, &bid, 1, &ask, 1, 1000, 1000);
+    hook.onBookUpdate(7, /*update_type=*/2, &bid, 1, &ask, 1, 2000, 2000);
+    hook.stop();
+  }
+
+  {
+    ReaderConfig config{.data_dir = _test_dir};
+    BinaryLogReader reader(config);
+
+    std::vector<EventType> frames;
+    reader.forEach([&](const ReplayEvent& event)
+                   {
+      frames.push_back(event.type);
+      return true; });
+    ASSERT_EQ(frames.size(), 2u);
+    EXPECT_EQ(frames[0], EventType::BookSnapshot);
+    EXPECT_EQ(frames[1], EventType::BookTop);
+  }
+
+  std::ifstream meta(std::filesystem::path(_test_dir) / "metadata.json");
+  ASSERT_TRUE(meta.good());
+  std::stringstream buf;
+  buf << meta.rdbuf();
+  const std::string metaText = buf.str();
+  EXPECT_NE(metaText.find("\"has_book_snapshots\": true"), std::string::npos);
+  EXPECT_NE(metaText.find("\"has_book_tops\": true"), std::string::npos);
 }
 
 TEST_F(BinaryLogTest, WriteAndReadTrades)

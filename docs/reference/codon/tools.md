@@ -309,7 +309,7 @@ events = reader.read_book_updates()
 
 `TradeRecord` fields: `exchange_ts_ns`, `recv_ts_ns`, `price_raw`, `qty_raw`, `trade_id`, `symbol_id`, `side`. Methods: `price()`, `qty()`, `is_buy()`.
 
-`BBO` fields: `exchange_ts_ns`, `recv_ts_ns`, `seq`, `symbol_id`, `event_type` (2=snapshot, 3=delta), `bid_price_raw`, `bid_qty_raw`, `ask_price_raw`, `ask_qty_raw`. Methods: `bid_price()`, `ask_price()`, `bid_qty()`, `ask_qty()`.
+`BBO` fields: `exchange_ts_ns`, `recv_ts_ns`, `seq`, `symbol_id`, `event_type` (0=snapshot, 1=delta, 2=top-of-book — the record byte, not the frame type), `bid_price_raw`, `bid_qty_raw`, `ask_price_raw`, `ask_qty_raw`. Methods: `bid_price()`, `ask_price()`, `bid_qty()`, `ask_qty()`.
 
 `BookLevel` fields: `price_raw`, `qty_raw`, `side` (0=bid, 1=ask). Methods: `price()`, `qty()`.
 
