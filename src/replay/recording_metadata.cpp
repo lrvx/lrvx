@@ -246,6 +246,7 @@ bool RecordingMetadata::save(const std::filesystem::path& path) const
   file << "  \"has_trades\": " << (has_trades ? "true" : "false") << ",\n";
   file << "  \"has_book_snapshots\": " << (has_book_snapshots ? "true" : "false") << ",\n";
   file << "  \"has_book_deltas\": " << (has_book_deltas ? "true" : "false") << ",\n";
+  file << "  \"has_book_tops\": " << (has_book_tops ? "true" : "false") << ",\n";
   file << "  \"total_trades\": " << total_trades << ",\n";
   file << "  \"total_book_updates\": " << total_book_updates << ",\n";
   file << "  \"book_depth\": " << book_depth << ",\n";
@@ -309,6 +310,7 @@ std::optional<RecordingMetadata> RecordingMetadata::load(const std::filesystem::
   meta.has_trades = extractBoolValue(content, "has_trades");
   meta.has_book_snapshots = extractBoolValue(content, "has_book_snapshots");
   meta.has_book_deltas = extractBoolValue(content, "has_book_deltas");
+  meta.has_book_tops = extractBoolValue(content, "has_book_tops");
   meta.total_trades = static_cast<uint64_t>(extractIntValue(content, "total_trades"));
   meta.total_book_updates =
       static_cast<uint64_t>(extractIntValue(content, "total_book_updates"));

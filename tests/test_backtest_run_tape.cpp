@@ -101,6 +101,81 @@ TEST(BacktestRunTape, RoundTripsRecordedSession)
   std::filesystem::remove_all(td);
 }
 
+namespace
+{
+
+class BookWatcher : public Strategy
+{
+ public:
+  using Strategy::ctx;
+  using Strategy::Strategy;
+  size_t books_seen{0};
+
+ protected:
+  void onSymbolBook(SymbolContext& /*c*/, const BookUpdateEvent& /*ev*/) override
+  {
+    ++books_seen;
+  }
+};
+
+}  // namespace
+
+TEST(BacktestRunTape, TopOfBookRecordsMoveTheTouchWithoutDispatch)
+{
+  auto td = std::filesystem::temp_directory_path() / "lrvx_run_tape_top_test";
+  std::filesystem::remove_all(td);
+  std::filesystem::create_directories(td);
+
+  SymbolRegistry reg;
+  SymbolId sym = addSymbol(reg, "BTCUSDT");
+
+  constexpr int64_t base_ns = 1'700'000'000'000'000'000;
+  {
+    replay::WriterConfig cfg;
+    cfg.output_dir = td;
+    cfg.create_index = false;
+    replay::BinaryLogWriter writer(cfg);
+
+    replay::BookRecordHeader snap{};
+    snap.exchange_ts_ns = base_ns;
+    snap.recv_ts_ns = base_ns;
+    snap.symbol_id = sym;
+    snap.bid_count = 1;
+    snap.ask_count = 1;
+    snap.type = 0;
+    std::vector<replay::BookLevel> bids = {{Price::fromDouble(100.0).raw(), Quantity::fromDouble(1.0).raw()}};
+    std::vector<replay::BookLevel> asks = {{Price::fromDouble(101.0).raw(), Quantity::fromDouble(1.0).raw()}};
+    writer.writeBook(snap, bids, asks);
+
+    replay::BookRecordHeader top{};
+    top.exchange_ts_ns = base_ns + 1'000'000'000;
+    top.recv_ts_ns = top.exchange_ts_ns;
+    top.symbol_id = sym;
+    top.bid_count = 1;
+    top.ask_count = 1;
+    top.type = 2;
+    std::vector<replay::BookLevel> tb = {{Price::fromDouble(100.4).raw(), Quantity::fromDouble(3.0).raw()}};
+    std::vector<replay::BookLevel> ta = {{Price::fromDouble(100.6).raw(), Quantity::fromDouble(2.0).raw()}};
+    writer.writeBook(top, tb, ta);
+    writer.close();
+  }
+
+  BookWatcher strat(1, std::vector<SymbolId>{sym}, reg);
+  BacktestRunner runner;
+  runner.setStrategy(&strat);
+  runner.runTape(td);
+
+  // Only the snapshot dispatched; the top moved the touch and nothing else.
+  EXPECT_EQ(strat.books_seen, 1u);
+  const auto& c = strat.ctx(sym);
+  EXPECT_EQ(c.book.bestBid(), Price::fromDouble(100.0));
+  ASSERT_TRUE(c.touchBid.has_value());
+  EXPECT_EQ(c.touchBid->price, Price::fromDouble(100.4));
+  EXPECT_EQ(c.touchAsk->price, Price::fromDouble(100.6));
+  EXPECT_EQ(c.lastTouchNs, base_ns + 1'000'000'000);
+  EXPECT_EQ(c.lastUpdateNs, base_ns);
+}
+
 TEST(BacktestRunTape, ThrowsOnMissingDirectory)
 {
   SymbolRegistry reg;

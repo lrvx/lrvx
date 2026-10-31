@@ -591,6 +591,13 @@ inline void recOnBookBridge(void* ud, uint32_t symbol, uint8_t is_snap,
       a.emplace_back(static_cast<double>(asks[i].price_raw) / 1e8,
                      static_cast<double>(asks[i].quantity_raw) / 1e8);
 }
+    // The byte is 1 snapshot, 0 delta, 2 top-of-book. This hook's signature
+    // is a bool, so tops are skipped the way an old reader skips the frame;
+    // a recorder that wants them uses the typed surfaces.
+    if (is_snap == 2)
+    {
+      return;
+    }
     py_obj->on_book_update(symbol, is_snap != 0, b, a, ts); });
 }
 

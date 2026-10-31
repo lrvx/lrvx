@@ -97,6 +97,7 @@ class BinaryLogWriter
   void setHasTrades(bool v);
   void setHasBookSnapshots(bool v);
   void setHasBookDeltas(bool v);
+  void setHasBookTops(bool v);
 
  private:
   bool ensureOpen();

@@ -273,7 +273,8 @@ bool SegmentValidator::validateEventsUncompressed(std::FILE* file, SegmentValida
         ++result.trades_found;
       }
     }
-    else if (type == EventType::BookSnapshot || type == EventType::BookDelta)
+    else if (type == EventType::BookSnapshot || type == EventType::BookDelta ||
+             type == EventType::BookTop)
     {
       if (frame.size >= sizeof(BookRecordHeader))
       {
@@ -485,7 +486,8 @@ bool SegmentValidator::validateEventsCompressed(std::FILE* file, SegmentValidati
         event_ts = trade.exchange_ts_ns;
         ++result.trades_found;
       }
-      else if ((type == EventType::BookSnapshot || type == EventType::BookDelta) &&
+      else if ((type == EventType::BookSnapshot || type == EventType::BookDelta ||
+                type == EventType::BookTop) &&
                frame.size >= sizeof(BookRecordHeader))
       {
         BookRecordHeader book;

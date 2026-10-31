@@ -29,7 +29,7 @@ Segments are independently parseable; both sidecars are conveniences, not requir
 
 `.manifest` is a **binary** file — see [Manifest](#manifest) — not JSON. It can be rebuilt from the segments at any time.
 
-`metadata.json` is the only JSON sidecar. It carries recording-level metadata the segment headers do not: `recording_id`, `description`, `exchange`, `exchange_type`, `instrument_type`, `connector_version`, the symbol table, `has_trades` / `has_book_snapshots` / `has_book_deltas`, `total_trades`, `total_book_updates`, `book_depth`, `recording_start` / `recording_end` (ISO 8601), `price_scale` / `qty_scale`, `hostname`, `timezone`, `lrvx_version`, and a free-form `custom` string map. It is written by `BinaryLogWriter::close()` and only when metadata was set on the writer.
+`metadata.json` is the only JSON sidecar. It carries recording-level metadata the segment headers do not: `recording_id`, `description`, `exchange`, `exchange_type`, `instrument_type`, `connector_version`, the symbol table, `has_trades` / `has_book_snapshots` / `has_book_deltas` / `has_book_tops`, `total_trades`, `total_book_updates`, `book_depth`, `recording_start` / `recording_end` (ISO 8601), `price_scale` / `qty_scale`, `hostname`, `timezone`, `lrvx_version`, and a free-form `custom` string map. It is written by `BinaryLogWriter::close()` and only when metadata was set on the writer.
 
 ## Magic numbers and constants
 
@@ -86,8 +86,9 @@ A frame is a `FrameHeader` followed by `size` bytes of payload. Payload meaning 
 - `type = 3` → same shape as `type = 2`, but the levels are deltas (positive qty = upsert, qty == 0 = remove)
 - `type = 4` → `OptionQuoteRecord` (112 bytes) — option side-channel: mark price, index price, underlying forward, implied vol, best bid/ask with sizes and IVs, open interest
 - `type = 5` → `PoolStateRecordHeader` (32 bytes) followed by `payload_len` bytes of u256-native DEX pool payload
+- `type = 6` → same shape as `type = 2`, but the record is a one-level top-of-book refresh (`BookUpdateType::TOP_OF_BOOK`); depth consumers must not apply it as book depth
 
-Types 4 and 5 are **additive**. A reader that does not know a type skips the frame using `FrameHeader.size` and continues; it must not reject the segment. Unknown types are therefore not an error, unlike unknown `flags` bits or an unknown `rec_version`.
+Types 4 through 6 are **additive**. A reader that does not know a type skips the frame using `FrameHeader.size` and continues; it must not reject the segment. Unknown types are therefore not an error, unlike unknown `flags` bits or an unknown `rec_version`.
 
 If `Compressed` is set, the entire frame stream from the byte after the segment header lives inside one or more `CompressedBlock`s.
 
@@ -97,7 +98,7 @@ If `Compressed` is set, the entire frame stream from the byte after the segment 
 |---:|---:|---|---|
 | 0 | 4 | `size` | Payload bytes, excluding this header. |
 | 4 | 4 | `crc32` | CRC32 of the payload bytes (header excluded). |
-| 8 | 1 | `type` | `1` Trade, `2` BookSnapshot, `3` BookDelta, `4` OptionQuote, `5` PoolState. |
+| 8 | 1 | `type` | `1` Trade, `2` BookSnapshot, `3` BookDelta, `4` OptionQuote, `5` PoolState, `6` BookTop. |
 | 9 | 1 | `rec_version` | Per-record version. `1` for the layouts below. |
 | 10 | 2 | `flags` | Reserved. Must be zero. |
 
@@ -133,7 +134,7 @@ What was wrong was the read side. Until this was fixed, `ReplayConnector`, `Back
 | 24 | 4 | `symbol_id` | |
 | 28 | 2 | `bid_count` | Number of `BookLevel` entries that follow on the bid side. |
 | 30 | 2 | `ask_count` | Number of `BookLevel` entries on the ask side. |
-| 32 | 1 | `type` | `2` snapshot, `3` delta. Mirrors the frame type. |
+| 32 | 1 | `type` | `BookUpdateType` numeric space: `0` snapshot, `1` delta, `2` top-of-book. (Every writer has always emitted `0`/`1` here; this table used to claim the frame-type space.) |
 | 33 | 1 | `instrument` | |
 | 34 | 2 | `exchange_id` | |
 | 36 | 4 | `_pad` | Zero. |

@@ -118,7 +118,7 @@ void BinaryLogRecorderHook::onTrade(uint32_t symbol_id, int64_t price_raw,
   }
 }
 
-void BinaryLogRecorderHook::onBookUpdate(uint32_t symbol_id, bool is_snapshot,
+void BinaryLogRecorderHook::onBookUpdate(uint32_t symbol_id, uint8_t update_type,
                                          const BookLevel* bids, uint32_t n_bids,
                                          const BookLevel* asks, uint32_t n_asks,
                                          int64_t exchange_ts_ns,
@@ -135,7 +135,8 @@ void BinaryLogRecorderHook::onBookUpdate(uint32_t symbol_id, bool is_snapshot,
   header.symbol_id = symbol_id;
   header.bid_count = static_cast<uint16_t>(n_bids);
   header.ask_count = static_cast<uint16_t>(n_asks);
-  header.type = is_snapshot ? 0 : 1;
+  header.type = (update_type == 1) ? 0 : (update_type == 2) ? 2
+                                                            : 1;
   header.exchange_id = _config.exchange_id;
 
   std::span<const BookLevel> bid_span(bids, n_bids);
@@ -144,9 +145,13 @@ void BinaryLogRecorderHook::onBookUpdate(uint32_t symbol_id, bool is_snapshot,
   if (_writer->writeBook(header, bid_span, ask_span))
   {
     ++_stats.book_updates_written;
-    if (is_snapshot)
+    if (update_type == 1)
     {
       _writer->setHasBookSnapshots(true);
+    }
+    else if (update_type == 2)
+    {
+      _writer->setHasBookTops(true);
     }
     else
     {

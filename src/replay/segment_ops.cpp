@@ -56,6 +56,7 @@ static size_t replayEventPayloadBytes(const ReplayEvent& event)
       return sizeof(PoolStateRecordHeader) + event.pool_state_payload.size();
     case EventType::BookSnapshot:
     case EventType::BookDelta:
+    case EventType::BookTop:
       return sizeof(BookRecordHeader) +
              (event.bids.size() + event.asks.size()) * sizeof(BookLevel);
   }
@@ -81,6 +82,7 @@ static bool writeReplayEvent(BinaryLogWriter& writer, const ReplayEvent& event)
                                    event.pool_state_payload.size());
     case EventType::BookSnapshot:
     case EventType::BookDelta:
+    case EventType::BookTop:
       return writer.writeBook(event.book_header, event.bids, event.asks);
   }
   return false;
@@ -811,7 +813,9 @@ std::string SegmentOps::formatCSVEvent(const ReplayEvent& event, char delimiter)
   else
   {
     const char* type_str =
-        (event.type == EventType::BookSnapshot) ? "book_snapshot" : "book_delta";
+        (event.type == EventType::BookSnapshot) ? "book_snapshot"
+        : (event.type == EventType::BookTop)    ? "book_top"
+                                                : "book_delta";
     oss << type_str << delimiter << event.book_header.exchange_ts_ns << delimiter
         << event.book_header.symbol_id << delimiter << 0 << delimiter << 0 << delimiter << 0
         << delimiter << 0 << delimiter << event.book_header.bid_count << delimiter
@@ -857,7 +861,9 @@ std::string SegmentOps::formatJSONEvent(const ReplayEvent& event, bool pretty, i
   else
   {
     const char* type_str =
-        (event.type == EventType::BookSnapshot) ? "book_snapshot" : "book_delta";
+        (event.type == EventType::BookSnapshot) ? "book_snapshot"
+        : (event.type == EventType::BookTop)    ? "book_top"
+                                                : "book_delta";
     oss << "{" << nl << ind << "\"type\":" << sp << "\"" << type_str << "\"," << nl << ind
         << "\"timestamp_ns\":" << sp << event.book_header.exchange_ts_ns << "," << nl << ind
         << "\"symbol_id\":" << sp << event.book_header.symbol_id << "," << nl << ind

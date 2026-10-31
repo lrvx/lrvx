@@ -53,7 +53,7 @@ struct MergedBookRow
   uint16_t bid_count{0};
   uint16_t ask_count{0};
   uint64_t level_offset{0};
-  uint8_t event_type{0};  // 2 = snapshot, 3 = delta (matches reader convention)
+  uint8_t event_type{0};  // frame type: 2 = snapshot, 3 = delta, 6 = top-of-book
 };
 
 struct MergedSymbol

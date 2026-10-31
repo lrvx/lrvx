@@ -1266,7 +1266,7 @@ class PyStrategyRunner
                              int64_t ts)
       {
         auto* hk = static_cast<lrvx::replay::BinaryLogRecorderHook*>(ud);
-        hk->onBookUpdate(symbol, is_snap != 0,
+        hk->onBookUpdate(symbol, is_snap,
                          reinterpret_cast<const lrvx::replay::BookLevel*>(bids), n_bids,
                          reinterpret_cast<const lrvx::replay::BookLevel*>(asks), n_asks,
                          ts, 0);
@@ -1587,7 +1587,7 @@ class PyLiveEngine
                              int64_t ts)
       {
         auto* hk = static_cast<lrvx::replay::BinaryLogRecorderHook*>(ud);
-        hk->onBookUpdate(symbol, is_snap != 0,
+        hk->onBookUpdate(symbol, is_snap,
                          reinterpret_cast<const lrvx::replay::BookLevel*>(bids), n_bids,
                          reinterpret_cast<const lrvx::replay::BookLevel*>(asks), n_asks,
                          ts, 0);

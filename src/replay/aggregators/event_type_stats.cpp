@@ -52,6 +52,8 @@ void EventTypeStatsAggregator::onEvent(const ReplayEvent& ev)
       symbol_id = ev.trade.symbol_id;
       is_trade = true;
       break;
+    // BookTop lands in default: the overview promises the three original
+    // kinds, and a new column is a C-struct change for every binding.
     case EventType::BookSnapshot:
       if (_event_filter == AggregatorEventFilter::Trades)
       {
