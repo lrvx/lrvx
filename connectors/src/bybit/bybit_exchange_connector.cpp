@@ -268,8 +268,13 @@ BybitExchangeConnector::BybitExchangeConnector(const BybitConfig& config,
     _exchangeId = _registry->registerExchange("bybit");
   }
 
-  _wsClient = std::make_unique<IxWebSocketClient>(config.publicEndpoint, BYBIT_ORIGIN,
-                                                  config.reconnectDelayMs, _logger.get(), 20);
+  _wsClient = makePublicClient();
+}
+
+std::unique_ptr<IWebSocketClient> BybitExchangeConnector::makePublicClient() const
+{
+  return std::make_unique<IxWebSocketClient>(_config.publicEndpoint, BYBIT_ORIGIN,
+                                             _config.reconnectDelayMs, _logger.get(), 20);
 }
 
 void BybitExchangeConnector::start()
@@ -284,6 +289,13 @@ void BybitExchangeConnector::start()
   if (_running.exchange(true))
   {
     return;
+  }
+
+  // stop() releases the public client, so a start() after it builds a fresh
+  // one.
+  if (!_wsClient)
+  {
+    _wsClient = makePublicClient();
   }
 
   _wsClient->onOpen(

@@ -68,6 +68,13 @@ class HyperliquidExchangeConnector : public IExchangeConnector
   ~HyperliquidExchangeConnector() override { stop(); }
 
   void start() override;
+
+  // Joins the ping thread and the websocket delivery thread before
+  // returning: afterwards no callback of this connector runs, and
+  // handleMessage drops any frame until the next start(). Called from inside
+  // one of the connector's own websocket callbacks it requests the stop
+  // instead, and the next start() or the destructor collects the delivery
+  // thread.
   void stop() override;
 
   std::string exchangeId() const override { return "hyperliquid"; }
@@ -109,6 +116,10 @@ class HyperliquidExchangeConnector : public IExchangeConnector
 
   std::unique_ptr<IWebSocketClient> _wsClient;
   std::atomic<bool> _running{false};
+  // Set by stop(), cleared by start(). Separate from _running because
+  // handleMessage is also driven offline without start(), and those frames
+  // must still be processed.
+  std::atomic<bool> _stopped{false};
 
   std::thread _pingThread;
   void pingLoop();

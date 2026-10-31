@@ -63,6 +63,8 @@ Timeouts are milliseconds throughout — `CurlTimeoutConfig` and `postWithTimeou
 
 Because a deferred request runs after its entry point returned, each send path owns what it needs — it copies the order, or re-reads the tracker — instead of borrowing from the caller's frame.
 
+**Market data arrives on the WebSocket client's own thread**, and every `onOpen`, `onMessage` and `onClose` callback runs there. `IxWebSocketClient::stop()` returns only after that thread has exited, so once a connector's `stop()` has returned none of its callbacks is running or will run again, and the connector can be destroyed straight away. The close that `stop()` itself causes reaches the connector's disconnect callback synchronously, inside `stop()` and on the socket's thread, so a caller must not hold a lock its disconnect handler takes while it calls `stop()`. From inside one of those callbacks, `stop()` only requests the stop, because the thread cannot wait for itself; the next `start()` or the destructor collects the thread, and the client may be destroyed there too. `start()` and the callback setters called from inside a callback are refused with an error log, so restarting a connector from its own disconnect handler does nothing: restart it from another thread.
+
 ## The live fill contract
 
 Every connector that reports fills must honour all of the following. The engine has no way to detect a violation — a fill that breaks one of these rules looks exactly like a correct fill, and the damage shows up as a wrong position or a wrong PnL much later.
@@ -134,7 +136,7 @@ The trade-off: every push that touches connectors runs the full lrvx CI. The `co
 
 `connectors/tests/` holds two kinds of test:
 
-- `unit_test_*.cpp` are offline — no sockets, no exchange credentials. Order-serialization tests fake the transport (`ITransport`) or the client-provided injection point and assert on the exact request body a connector builds; protocol tests feed raw WebSocket frames straight into a connector's message handler. They build and register with `ctest` whenever `LRVX_BUILD_CONNECTORS=ON` and `LRVX_BUILD_TESTS=ON` — no extra flag — and run in the default CI matrix.
+- `unit_test_*.cpp` are offline — no exchange endpoints and no credentials; the few that need a live session use a listener on `127.0.0.1`. Order-serialization tests fake the transport (`ITransport`) or the client-provided injection point and assert on the exact request body a connector builds; protocol tests feed raw WebSocket frames straight into a connector's message handler. They build and register with `ctest` whenever `LRVX_BUILD_CONNECTORS=ON` and `LRVX_BUILD_TESTS=ON` — no extra flag — and run in the default CI matrix.
 - `integration_test_*.cpp` connect to real exchange WebSocket endpoints. Building them is gated by both `LRVX_BUILD_TESTS=ON` and `LRVX_BUILD_CONNECTOR_INTEGRATION_TESTS=ON`; running them via `ctest` requires the further `LRVX_RUN_CONNECTOR_INTEGRATION_TESTS=ON`. The default lrvx CI build skips them entirely.
 
 To build the integration tests locally:

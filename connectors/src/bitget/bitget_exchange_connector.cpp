@@ -180,8 +180,14 @@ BitgetExchangeConnector::BitgetExchangeConnector(const BitgetConfig& cfg, BookUp
     _exchangeId = _registry->registerExchange("bitget");
   }
 
-  _wsClient = std::make_unique<IxWebSocketClient>(
-      cfg.publicEndpoint, BITGET_ORIGIN, cfg.reconnectDelayMs, _logger.get(), 0, BITGET_USER_AGENT);
+  _wsClient = makePublicClient();
+}
+
+std::unique_ptr<IWebSocketClient> BitgetExchangeConnector::makePublicClient() const
+{
+  return std::make_unique<IxWebSocketClient>(_config.publicEndpoint, BITGET_ORIGIN,
+                                             _config.reconnectDelayMs, _logger.get(), 0,
+                                             BITGET_USER_AGENT);
 }
 
 void BitgetExchangeConnector::start()
@@ -195,6 +201,13 @@ void BitgetExchangeConnector::start()
   if (_running.exchange(true))
   {
     return;
+  }
+
+  // stop() releases the public client, so a start() after it builds a fresh
+  // one.
+  if (!_wsClient)
+  {
+    _wsClient = makePublicClient();
   }
 
   _wsClient->onOpen(
