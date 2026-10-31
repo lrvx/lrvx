@@ -162,6 +162,10 @@ class BitgetExchangeConnector : public IExchangeConnector
 
   void resubscribeBook(std::string_view symbolName);
 
+  // The public market-data client. Built by the constructor, released by
+  // stop() and built again by the next start().
+  std::unique_ptr<IWebSocketClient> makePublicClient() const;
+
   std::shared_ptr<ILogger> _logger;
 
   std::unique_ptr<IWebSocketClient> _wsClient;

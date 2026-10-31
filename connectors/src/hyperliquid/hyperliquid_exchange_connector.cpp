@@ -53,6 +53,7 @@ void HyperliquidExchangeConnector::start()
   {
     return;
   }
+  _stopped.store(false, std::memory_order_release);
 
   if (!_wsClient || !_bookBus || !_tradeBus)
   {
@@ -60,12 +61,17 @@ void HyperliquidExchangeConnector::start()
     return;
   }
 
+  // Collects a delivery thread that a stop() from inside a callback left
+  // running, so the callbacks below are never replaced while it may still
+  // invoke them. A no-op when nothing is running.
+  _wsClient->stop();
+
   _wsClient->onOpen(
       [this]()
       {
         LRVX_LOG("[Hyperliquid] WS open, sending subscriptions");
 
-        for (size_t i = 0; i < _config.symbols.size(); ++i)
+        for (size_t i = 0; i < _config.symbols.size() && _running.load(); ++i)
         {
           for (const auto& payload : subscriptionPayloads(_config, _config.symbols[i]))
           {
@@ -157,16 +163,19 @@ void HyperliquidExchangeConnector::pingLoop()
 
 void HyperliquidExchangeConnector::stop()
 {
-  if (!_running.exchange(false))
-  {
-    return;
-  }
-
-  if (_pingThread.joinable())
+  _stopped.store(true, std::memory_order_release);
+  if (_running.exchange(false) && _pingThread.joinable())
   {
     _pingThread.join();
   }
 
+  // Waits for the websocket delivery thread to exit, so no callback reaches
+  // handleMessage or handleDisconnect once stop() has returned and the
+  // members they touch (_coins, _bookPool) can be destroyed. Runs even when
+  // the connector was already stopped: a stop() from inside a callback only
+  // requests the client stop, and the destructor's stop() is what collects
+  // the thread. _wsClient stays set until the destructor because the onOpen
+  // callback sends through it.
   if (_wsClient)
   {
     _wsClient->stop();
@@ -303,6 +312,13 @@ int64_t frameTimeMs(Json&& data)
 
 void HyperliquidExchangeConnector::handleMessage(std::string_view payload)
 {
+  // A stopped connector publishes nothing, whether the frame comes from the
+  // socket while stop() is draining it or through this public entry point.
+  if (_stopped.load(std::memory_order_acquire))
+  {
+    return;
+  }
+
   // Stamped before parsing, so it measures when the frame reached this
   // process. CompositeBookMatrix::checkStaleness skips any venue whose
   // lastUpdateNs is still zero, so a book event without it left a frozen

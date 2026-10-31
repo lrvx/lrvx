@@ -113,6 +113,10 @@ class BybitExchangeConnector : public IExchangeConnector
   // reconnect re-subscribes everything from onOpen.
   void resubscribeBook(std::string_view symbolName);
 
+  // The public market-data client. Built by the constructor, released by
+  // stop() and built again by the next start().
+  std::unique_ptr<IWebSocketClient> makePublicClient() const;
+
   // Advances the per-order fill watermark to the venue's cumulative filled
   // quantity and writes the increment into ev.fillQty. Returns false when a
   // fill status brings no new quantity -- the same execution already reached

@@ -11,8 +11,6 @@
 
 #include <ixwebsocket/IXWebSocket.h>
 
-#include <atomic>
-#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -25,6 +23,27 @@
 namespace lrvx
 {
 
+// Callback threading. Every onOpen, onMessage and onClose callback runs on
+// ix's worker thread; run() owns the socket on a thread of its own and joins
+// that worker whenever it stops a socket.
+//
+//  - stop() from any other thread returns once run() has exited: no callback
+//    is running or will run after it, so the owner may release anything the
+//    callbacks capture.
+//  - stop() from inside a callback only requests the stop, since the thread
+//    cannot wait for itself. The next start() or the destructor collects the
+//    run() thread.
+//  - start() and the onOpen/onMessage/onClose setters called from inside a
+//    callback are refused with an error log: they would replace or restart
+//    what is executing on that very thread.
+//  - The destructor may run inside a callback (an owner that stops and
+//    releases the client from its own disconnect handler). Every piece of
+//    state run() and the ix worker use lives in a shared Core that the run()
+//    thread co-owns, so the destructor marks the core orphaned, requests the
+//    stop and detaches run(). An orphaned core invokes no callback and
+//    writes no log line, so nothing reaches the owner or its logger after
+//    the destructor returns; run() stops the socket, joins the worker and
+//    releases the core.
 class IxWebSocketClient : public IWebSocketClient
 {
  public:
@@ -44,37 +63,17 @@ class IxWebSocketClient : public IWebSocketClient
   void start() override;
   void stop() override;
 
+  struct Core;
+
  private:
-  void run();
+  bool refuseFromCallback(const char* what) const;
 
-  std::string _url;
-  std::string _origin;
-  int _reconnectDelayMs;
-  int _pingIntervalSec;
-  std::string _userAgent;
-  ILogger* _logger;
-
-  std::atomic<bool> _running{false};
-  std::unique_ptr<ix::WebSocket> _ws;
+  std::shared_ptr<Core> _core;
   std::thread _thread;
-  std::mutex _sendMutex;
-
-  // Guards the reconnect backoff wait so stop() can interrupt it instead of
-  // sleeping it out (an uninterruptible sleep_for here used to make
-  // shutdown take up to MAX_BACKOFF_MS instead of one wait-loop tick).
-  std::mutex _backoffMutex;
-  std::condition_variable _backoffCv;
-
-  MoveOnlyFunction<void()> _onOpen;
-  MoveOnlyFunction<void(std::string_view)> _onMessage;
-  MoveOnlyFunction<void(int, std::string_view)> _onClose;
-
-  // Written from the ix callback thread (reset to 0 on Open), read and
-  // incremented from run(). Plain int next to a deliberately atomic _running
-  // was flagged as a hygiene risk: the only path that could race it
-  // requires ix::WebSocket::stop() to throw and leave its worker thread
-  // alive, which was not reproduced, but atomic costs nothing here.
-  std::atomic<int> _consecutiveFailures{0};
+  // Serialises start() and stop() from outside callbacks, so two threads
+  // never join _thread at once, start() never overwrites a joinable one, and
+  // a start() never re-arms a run() that a stop() is collecting.
+  std::mutex _lifecycleMutex;
 };
 
 }  // namespace lrvx
