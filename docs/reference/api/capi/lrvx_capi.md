@@ -1092,7 +1092,7 @@ uint64_t lrvx_data_reader_read_book_updates(LrvxDataReaderHandle reader,
 
 `LrvxTradeRecord` fields: `exchange_ts_ns`, `recv_ts_ns`, `price_raw`, `qty_raw`, `trade_id`, `symbol_id`, `side`.
 
-`LrvxBBO` fields (size: 64 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `bid_price_raw`, `bid_qty_raw`, `ask_price_raw`, `ask_qty_raw`, `symbol_id`, `event_type` (2=snapshot, 3=delta).
+`LrvxBBO` fields (size: 64 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `bid_price_raw`, `bid_qty_raw`, `ask_price_raw`, `ask_qty_raw`, `symbol_id`, `event_type` (0=snapshot, 1=delta, 2=top-of-book — the record byte, not the frame type).
 
 `LrvxBookUpdateHeader` fields (size: 48 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `level_offset`, `symbol_id`, `bid_count`, `ask_count`, `event_type`.
 

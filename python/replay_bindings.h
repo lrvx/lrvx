@@ -141,7 +141,7 @@ struct PyBBO
   int64_t recv_ts_ns;
   int64_t seq;
   uint32_t symbol_id;
-  uint8_t event_type;  // 2=snapshot, 3=delta
+  uint8_t event_type;  // record byte: 0=snapshot, 1=delta, 2=top-of-book
   uint8_t _pad[3];
   int64_t bid_price_raw;
   int64_t bid_qty_raw;
@@ -188,7 +188,7 @@ struct PyBookUpdateHeader
   uint16_t bid_count;
   uint16_t ask_count;
   uint32_t level_offset;  // index into the flat levels array for this event
-  uint8_t event_type;     // 2=snapshot, 3=delta
+  uint8_t event_type;     // record byte: 0=snapshot, 1=delta, 2=top-of-book
   uint8_t _pad[3];
 };
 #pragma pack(pop)
@@ -485,7 +485,8 @@ class PyDataReader
     std::vector<PyBBO> bbos;
     auto cb = [&](const ReplayEvent& ev) -> bool
     {
-      if (ev.type != EventType::BookSnapshot && ev.type != EventType::BookDelta)
+      if (ev.type != EventType::BookSnapshot && ev.type != EventType::BookDelta &&
+          ev.type != EventType::BookTop)
       {
         return true;
       }
@@ -553,7 +554,8 @@ class PyDataReader
     std::vector<PyLevel> levels;
     auto cb = [&](const ReplayEvent& ev) -> bool
     {
-      if (ev.type != EventType::BookSnapshot && ev.type != EventType::BookDelta)
+      if (ev.type != EventType::BookSnapshot && ev.type != EventType::BookDelta &&
+          ev.type != EventType::BookTop)
       {
         return true;
       }

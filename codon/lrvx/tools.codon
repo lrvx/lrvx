@@ -960,7 +960,7 @@ class BBO:
     recv_ts_ns: int
     seq: int
     symbol_id: int
-    event_type: int  # 2=snapshot, 3=delta
+    event_type: int  # record byte: 0=snapshot, 1=delta, 2=top-of-book
     bid_price_raw: int
     bid_qty_raw: int
     ask_price_raw: int
@@ -998,7 +998,7 @@ class BookUpdate:
     recv_ts_ns: int
     seq: int
     symbol_id: int
-    event_type: int  # 2=snapshot, 3=delta
+    event_type: int  # record byte: 0=snapshot, 1=delta, 2=top-of-book
     bids: List[BookLevel]
     asks: List[BookLevel]
 

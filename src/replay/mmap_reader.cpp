@@ -357,7 +357,8 @@ bool MmapSegmentReader::next(ReplayEvent& out)
     out.pool_state_payload.assign(pool_payload, pool_payload + payload_len);
   }
   else if (frame->type == static_cast<uint8_t>(EventType::BookSnapshot) ||
-           frame->type == static_cast<uint8_t>(EventType::BookDelta))
+           frame->type == static_cast<uint8_t>(EventType::BookDelta) ||
+           frame->type == static_cast<uint8_t>(EventType::BookTop))
   {
     if (frame->size < sizeof(BookRecordHeader))
     {

@@ -133,6 +133,7 @@ void ReplayConnector::replayLoop()
           break;
         case replay::EventType::BookSnapshot:
         case replay::EventType::BookDelta:
+        case replay::EventType::BookTop:
           emitBookFromRecord(event.book_header, event.bids, event.asks);
           break;
         case replay::EventType::OptionQuote:
@@ -211,7 +212,9 @@ void ReplayConnector::emitBookFromRecord(const replay::BookRecordHeader& header,
 
   event.update.symbol = header.symbol_id;
   event.update.instrument = static_cast<InstrumentType>(header.instrument);
-  event.update.type = (header.type == 0) ? BookUpdateType::SNAPSHOT : BookUpdateType::DELTA;
+  event.update.type = (header.type == 0)   ? BookUpdateType::SNAPSHOT
+                      : (header.type == 2) ? BookUpdateType::TOP_OF_BOOK
+                                           : BookUpdateType::DELTA;
   event.update.exchangeTsNs = UnixNanos::fromRaw(header.exchange_ts_ns);
 
   event.seq = header.seq;

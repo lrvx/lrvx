@@ -13707,7 +13707,7 @@ Segment metadata.
 | `recv_ts_ns` | `int64` | Local receive timestamp (ns) |
 | `seq` | `int64` | Exchange sequence number |
 | `symbol_id` | `uint32` | Symbol ID |
-| `event_type` | `uint8` | 2 = snapshot, 3 = delta |
+| `event_type` | `uint8` | 0 = snapshot, 1 = delta, 2 = top-of-book (the record byte, not the frame type) |
 | `bid_price_raw` | `int64` | Best bid price * 10^8 (0 if absent) |
 | `bid_qty_raw` | `int64` | Best bid quantity * 10^8 |
 | `ask_price_raw` | `int64` | Best ask price * 10^8 (0 if absent) |
@@ -13724,7 +13724,7 @@ Segment metadata.
 | `bid_count` | `uint16` | Number of bid levels for this event |
 | `ask_count` | `uint16` | Number of ask levels for this event |
 | `level_offset` | `uint32` | Index of this event's first level in the levels array |
-| `event_type` | `uint8` | 2 = snapshot, 3 = delta |
+| `event_type` | `uint8` | 0 = snapshot, 1 = delta, 2 = top-of-book (the record byte, not the frame type) |
 
 ### PyLevel Dtype
 
@@ -17235,7 +17235,7 @@ events = reader.read_book_updates()
 
 `TradeRecord` fields: `exchange_ts_ns`, `recv_ts_ns`, `price_raw`, `qty_raw`, `trade_id`, `symbol_id`, `side`. Methods: `price()`, `qty()`, `is_buy()`.
 
-`BBO` fields: `exchange_ts_ns`, `recv_ts_ns`, `seq`, `symbol_id`, `event_type` (2=snapshot, 3=delta), `bid_price_raw`, `bid_qty_raw`, `ask_price_raw`, `ask_qty_raw`. Methods: `bid_price()`, `ask_price()`, `bid_qty()`, `ask_qty()`.
+`BBO` fields: `exchange_ts_ns`, `recv_ts_ns`, `seq`, `symbol_id`, `event_type` (0=snapshot, 1=delta, 2=top-of-book — the record byte, not the frame type), `bid_price_raw`, `bid_qty_raw`, `ask_price_raw`, `ask_qty_raw`. Methods: `bid_price()`, `ask_price()`, `bid_qty()`, `ask_qty()`.
 
 `BookLevel` fields: `price_raw`, `qty_raw`, `side` (0=bid, 1=ask). Methods: `price()`, `qty()`.
 
@@ -18976,7 +18976,7 @@ uint64_t lrvx_data_reader_read_book_updates(LrvxDataReaderHandle reader,
 
 `LrvxTradeRecord` fields: `exchange_ts_ns`, `recv_ts_ns`, `price_raw`, `qty_raw`, `trade_id`, `symbol_id`, `side`.
 
-`LrvxBBO` fields (size: 64 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `bid_price_raw`, `bid_qty_raw`, `ask_price_raw`, `ask_qty_raw`, `symbol_id`, `event_type` (2=snapshot, 3=delta).
+`LrvxBBO` fields (size: 64 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `bid_price_raw`, `bid_qty_raw`, `ask_price_raw`, `ask_qty_raw`, `symbol_id`, `event_type` (0=snapshot, 1=delta, 2=top-of-book — the record byte, not the frame type).
 
 `LrvxBookUpdateHeader` fields (size: 48 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `level_offset`, `symbol_id`, `bid_count`, `ask_count`, `event_type`.
 

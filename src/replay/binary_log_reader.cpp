@@ -53,7 +53,8 @@ int64_t firstTimestampInBlock(const std::vector<std::byte>& data)
       std::memcpy(&tr, data.data() + offset, sizeof(TradeRecord));
       ts = tr.exchange_ts_ns;
     }
-    else if ((type == EventType::BookSnapshot || type == EventType::BookDelta) &&
+    else if ((type == EventType::BookSnapshot || type == EventType::BookDelta ||
+              type == EventType::BookTop) &&
              frame.size >= sizeof(BookRecordHeader))
     {
       BookRecordHeader bh;
@@ -105,7 +106,8 @@ int64_t lastTimestampInBlock(const std::vector<std::byte>& data)
       std::memcpy(&tr, data.data() + offset, sizeof(TradeRecord));
       ts = tr.exchange_ts_ns;
     }
-    else if ((type == EventType::BookSnapshot || type == EventType::BookDelta) &&
+    else if ((type == EventType::BookSnapshot || type == EventType::BookDelta ||
+              type == EventType::BookTop) &&
              frame.size >= sizeof(BookRecordHeader))
     {
       BookRecordHeader bh;
@@ -377,6 +379,7 @@ inline bool isKnownEventType(uint8_t type) noexcept
     case EventType::Trade:
     case EventType::BookSnapshot:
     case EventType::BookDelta:
+    case EventType::BookTop:
     case EventType::OptionQuote:
     case EventType::PoolState:
       return true;
@@ -2227,7 +2230,8 @@ bool BinaryLogIterator::parseFrame(EventType type, const std::byte* data, size_t
     out.asks.clear();
     return true;
   }
-  else if (type == EventType::BookSnapshot || type == EventType::BookDelta)
+  else if (type == EventType::BookSnapshot || type == EventType::BookDelta ||
+           type == EventType::BookTop)
   {
     if (size < sizeof(BookRecordHeader))
     {

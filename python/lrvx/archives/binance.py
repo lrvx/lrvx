@@ -669,7 +669,9 @@ def _existing_book_state(out_tape: Path, symbol_id: int) -> Tuple[int, int, dict
         for h in headers:
             if int(h["symbol_id"]) != symbol_id:
                 continue
-            is_snapshot = int(h["event_type"]) == 2
+            # DataReader rows carry the record byte (0 snapshot, 1 delta),
+            # not the frame type; == 2 was never true here.
+            is_snapshot = int(h["event_type"]) == 0
             n_bid = int(h["bid_count"])
             n_ask = int(h["ask_count"])
             off = int(h["level_offset"])

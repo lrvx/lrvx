@@ -2623,6 +2623,10 @@ extern "C"
   //
   // The trade / book pointers and book level arrays are valid only for
   // the duration of the callback; copy if retained.
+  //
+  // on_book_update's uint8_t is a byte, not a bool: 1 snapshot, 0 delta,
+  // 2 top-of-book (one level per side, not book depth). The two boolean
+  // values predate the third and keep their meaning.
   // ============================================================
 
   typedef void (*LrvxRecorderOnTradeFn)(void* user_data, const LrvxTradeData* trade);
@@ -2718,13 +2722,13 @@ extern "C"
   // `next` until it returns 0.
   //
   // Event shape: `next` populates a LrvxReplayEvent describing one
-  // event (Trade, BookSnapshot, or BookDelta). For book events, the
+  // event (Trade, BookSnapshot, BookDelta, or BookTop). For book events, the
   // binding sets `bids` / `asks` to point at its own buffer; the
   // pointers must remain valid until the next `next` call. The engine
   // copies the levels it needs before invoking the callback again.
   // ============================================================
 
-  // 1=Trade, 2=BookSnapshot, 3=BookDelta. Matches lrvx::replay::EventType.
+  // 1=Trade, 2=BookSnapshot, 3=BookDelta, 6=BookTop. Matches lrvx::replay::EventType.
   typedef struct
   {
     uint8_t type;

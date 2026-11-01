@@ -394,14 +394,18 @@ void BacktestRunner::processEvent(const replay::ReplayEvent& event)
       subscriber->onTrade(trade_ev);
     }
   }
-  else if (event.type == replay::EventType::BookSnapshot || event.type == replay::EventType::BookDelta)
+  else if (event.type == replay::EventType::BookSnapshot ||
+           event.type == replay::EventType::BookDelta ||
+           event.type == replay::EventType::BookTop)
   {
     ++_bookUpdateCount;
 
     BookUpdateEvent book_ev(_pool.get());
     book_ev.update.symbol = event.book_header.symbol_id;
-    book_ev.update.type =
-        (event.type == replay::EventType::BookSnapshot) ? BookUpdateType::SNAPSHOT : BookUpdateType::DELTA;
+    book_ev.update.type = (event.type == replay::EventType::BookSnapshot) ? BookUpdateType::SNAPSHOT
+                          : (event.type == replay::EventType::BookTop)
+                              ? BookUpdateType::TOP_OF_BOOK
+                              : BookUpdateType::DELTA;
     book_ev.update.instrument = static_cast<InstrumentType>(event.book_header.instrument);
     book_ev.update.exchangeTsNs = UnixNanos::fromRaw(event.book_header.exchange_ts_ns);
     book_ev.seq = event.book_header.seq;
@@ -418,7 +422,12 @@ void BacktestRunner::processEvent(const replay::ReplayEvent& event)
       book_ev.update.asks.emplace_back(Price::fromRaw(ask.price_raw), Quantity::fromRaw(ask.qty_raw));
     }
 
-    sim().onBookUpdate(book_ev.update.symbol, book_ev.update.bids, book_ev.update.asks);
+    // The simulated venue's ladder and queue tracker take depth frames; a
+    // one-level top would wipe every other tracked level.
+    if (book_ev.update.type != BookUpdateType::TOP_OF_BOOK)
+    {
+      sim().onBookUpdate(book_ev.update.symbol, book_ev.update.bids, book_ev.update.asks);
+    }
 
     if (_strategy)
     {

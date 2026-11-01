@@ -3485,7 +3485,10 @@ uint8_t lrvx_data_writer_write_book(LrvxDataWriterHandle h,
   header.symbol_id = symbol_id;
   header.bid_count = static_cast<uint16_t>(n_bids);
   header.ask_count = static_cast<uint16_t>(n_asks);
-  header.type = is_snapshot ? 0 : 1;
+  // The callback byte (1 snapshot, 0 delta, 2 top) to the record byte
+  // (BookUpdateType's space).
+  header.type = (is_snapshot == 1) ? 0 : (is_snapshot == 2) ? 2
+                                                            : 1;
 
   // LrvxBookLevel and replay::BookLevel are layout-compatible
   // (int64 price_raw, int64 qty_raw). Cast is intentional.
@@ -4867,7 +4870,8 @@ uint64_t lrvx_data_reader_read_bbo(LrvxDataReaderHandle h, LrvxBBO* bbos_out,
       [&](const replay::ReplayEvent& ev) -> bool
       {
         if (ev.type != replay::EventType::BookSnapshot &&
-            ev.type != replay::EventType::BookDelta)
+            ev.type != replay::EventType::BookDelta &&
+            ev.type != replay::EventType::BookTop)
         {
           return true;
         }
@@ -4909,7 +4913,8 @@ uint64_t lrvx_data_reader_count_book_updates(LrvxDataReaderHandle h, uint64_t* t
       [&](const replay::ReplayEvent& ev) -> bool
       {
         if (ev.type == replay::EventType::BookSnapshot ||
-            ev.type == replay::EventType::BookDelta)
+            ev.type == replay::EventType::BookDelta ||
+            ev.type == replay::EventType::BookTop)
         {
           ++events;
           levels += ev.bids.size() + ev.asks.size();
@@ -4938,7 +4943,8 @@ uint64_t lrvx_data_reader_read_book_updates(LrvxDataReaderHandle h,
       [&](const replay::ReplayEvent& ev) -> bool
       {
         if (ev.type != replay::EventType::BookSnapshot &&
-            ev.type != replay::EventType::BookDelta)
+            ev.type != replay::EventType::BookDelta &&
+            ev.type != replay::EventType::BookTop)
         {
           return true;
         }
@@ -5021,7 +5027,8 @@ uint64_t lrvx_data_reader_read_bbo_from(LrvxDataReaderHandle h, int64_t start_ts
                       [&](const replay::ReplayEvent& ev) -> bool
                       {
                         if (ev.type != replay::EventType::BookSnapshot &&
-                            ev.type != replay::EventType::BookDelta)
+                            ev.type != replay::EventType::BookDelta &&
+                            ev.type != replay::EventType::BookTop)
                         {
                           return true;
                         }
@@ -5064,7 +5071,8 @@ uint64_t lrvx_data_reader_count_book_updates_from(LrvxDataReaderHandle h, int64_
                       [&](const replay::ReplayEvent& ev) -> bool
                       {
                         if (ev.type == replay::EventType::BookSnapshot ||
-                            ev.type == replay::EventType::BookDelta)
+                            ev.type == replay::EventType::BookDelta ||
+                            ev.type == replay::EventType::BookTop)
                         {
                           ++events;
                           levels += ev.bids.size() + ev.asks.size();
@@ -5092,7 +5100,8 @@ uint64_t lrvx_data_reader_read_book_updates_from(LrvxDataReaderHandle h, int64_t
                       [&](const replay::ReplayEvent& ev) -> bool
                       {
                         if (ev.type != replay::EventType::BookSnapshot &&
-                            ev.type != replay::EventType::BookDelta)
+                            ev.type != replay::EventType::BookDelta &&
+                            ev.type != replay::EventType::BookTop)
                         {
                           return true;
                         }
@@ -6070,9 +6079,11 @@ class CapiReplaySourceReader : public lrvx::replay::IMultiSegmentReader
         }
         case 2:  // BookSnapshot
         case 3:  // BookDelta
+        case 6:  // BookTop
         {
-          re.type = (ev.type == 2) ? lrvx::replay::EventType::BookSnapshot
-                                   : lrvx::replay::EventType::BookDelta;
+          re.type = (ev.type == 2)   ? lrvx::replay::EventType::BookSnapshot
+                    : (ev.type == 6) ? lrvx::replay::EventType::BookTop
+                                     : lrvx::replay::EventType::BookDelta;
           re.book_header.exchange_ts_ns = ev.timestamp_ns;
           re.book_header.recv_ts_ns = ev.timestamp_ns;
           re.book_header.symbol_id = ev.book_symbol;
@@ -6722,7 +6733,12 @@ struct LrvxRunnerImpl
         askPtr[i].price_raw = ev.update.asks[i].price.raw();
         askPtr[i].quantity_raw = ev.update.asks[i].quantity.raw();
       }
-      r->cb.on_book_update(r->cb.user_data, symbol, /*is_snapshot=*/1u,
+      // 1 snapshot, 0 delta, 2 top. Used to be hardcoded to 1, which
+      // reported every delta as a snapshot.
+      const uint8_t updateType = (ev.update.type == BookUpdateType::SNAPSHOT) ? 1u
+                                 : (ev.update.type == BookUpdateType::DELTA)  ? 0u
+                                                                              : 2u;
+      r->cb.on_book_update(r->cb.user_data, symbol, updateType,
                            bidPtr, n_bids, askPtr, n_asks, ts_ns);
     }
   }
@@ -7846,7 +7862,7 @@ static void blrhOnBookUpdate(void* ud, uint32_t symbol, uint8_t is_snapshot,
   auto* self = static_cast<LrvxBinaryLogRecorderHookImpl*>(ud);
   auto* bid_levels = reinterpret_cast<const lrvx::replay::BookLevel*>(bids);
   auto* ask_levels = reinterpret_cast<const lrvx::replay::BookLevel*>(asks);
-  self->hook.onBookUpdate(symbol, is_snapshot != 0, bid_levels, n_bids,
+  self->hook.onBookUpdate(symbol, is_snapshot, bid_levels, n_bids,
                           ask_levels, n_asks, exchange_ts_ns, /*recv_ts_ns=*/0);
 }
 

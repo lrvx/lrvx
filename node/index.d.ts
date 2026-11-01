@@ -1955,7 +1955,7 @@ export interface BboRecord {
   recvTsNs: number;
   seq: number;
   symbolId: number;
-  /** 2 = snapshot, 3 = delta. */
+  /** Record byte: 0 = snapshot, 1 = delta, 2 = top-of-book. */
   eventType: number;
   bidPrice: number;
   bidQty: number;

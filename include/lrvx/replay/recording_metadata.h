@@ -50,6 +50,7 @@ struct RecordingMetadata
   bool has_trades{false};
   bool has_book_snapshots{false};
   bool has_book_deltas{false};
+  bool has_book_tops{false};
 
   // Per-content event counts as written. 0 means "unknown" (legacy
   // manifests written before this field was added) — callers should

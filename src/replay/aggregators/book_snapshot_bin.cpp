@@ -108,6 +108,8 @@ void BookSnapshotBinAggregator::emitCell(uint32_t symbol_id, const SymState& st)
 
 void BookSnapshotBinAggregator::onEvent(const ReplayEvent& ev)
 {
+  // BookTop is skipped on purpose: it carries the touch, not book depth,
+  // and this binner reconstructs depth from snapshots and deltas.
   if (ev.type != EventType::BookSnapshot && ev.type != EventType::BookDelta)
   {
     return;
