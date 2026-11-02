@@ -181,6 +181,9 @@ jobs:
         # IR snapshot is built from the IDL via libclang, plus the
         # binding manifest reads binding_parity.yaml — both deps need
         # to be present in this job for --check to run end-to-end.
+        # For docs.fts.sqlite (generated at package time, not
+        # committed) --check is a build step: it proves the index
+        # still builds from docs/, with nothing to diff against.
         python3 -m pip install --break-system-packages libclang pyyaml
         python3 scripts/sync_mcp_data.py --check
     - name: Dependency ranges match between package and CI
@@ -218,6 +221,18 @@ jobs:
               -DLRVX_ENABLE_BACKTEST=ON \
               -Dpybind11_DIR="$(python3 -c 'import pybind11; print(pybind11.get_cmake_dir())')"
         cmake --build build -j$(nproc)
+
+    - name: Generate docs.fts.sqlite
+      # mcp/tests open the index read-only the way the docs_search tool
+      # does at request time. The file is generated at package time,
+      # not committed, so the suite needs it built first. --check runs
+      # ahead of the write so a drifted committed artifact fails here
+      # instead of being silently rewritten into what the tests then
+      # read.
+      run: |
+        python3 -m pip install --break-system-packages pyyaml libclang
+        python3 scripts/sync_mcp_data.py --check
+        python3 scripts/sync_mcp_data.py
 
     - name: lrvx-mcp unit tests
       # `mcp` was never installed, so lrvx_mcp.server was unimportable and

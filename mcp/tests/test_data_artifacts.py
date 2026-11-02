@@ -254,7 +254,10 @@ def test_examples_index_languages_covered(examples_index: dict) -> None:
 @pytest.fixture(scope="module")
 def docs_db():
     path = DATA / "docs.fts.sqlite"
-    assert path.exists()
+    # Generated at package time, not committed; a fresh checkout does
+    # not have it until the sync script runs.
+    assert path.exists(), (
+        "docs.fts.sqlite missing -- run scripts/sync_mcp_data.py first")
     # Open read-only + immutable so the test path mirrors how MCP
     # opens it at request time.
     uri = f"file:{path}?mode=ro&immutable=1"

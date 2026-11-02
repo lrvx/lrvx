@@ -20,10 +20,18 @@ the installable package works offline. Six artifacts:
 * ``docs.fts.sqlite``       SQLite FTS5 full-text index over an
                             allowlisted set of doc roots (NEVER
                             ``.notes/``, NEVER ``CLAUDE.md``).
+                            Generated, never committed: it is a pure
+                            function of ``docs/`` whose bytes vary with
+                            the libsqlite that wrote them, so a
+                            committed copy conflicted on every pair of
+                            branches touching docs. The wheel job builds
+                            it at package time.
 
-CI gate: ``--check`` rebuilds every artifact in memory and exits 1 on
-any byte-level drift from the committed copies. Total bundle size is
-clamped to 10 MB so the wheel stays light.
+CI gate: ``--check`` rebuilds every committed artifact in memory and
+exits 1 on any byte-level drift from the committed copies; for the FTS
+index it is a build step instead — it proves the index still builds
+from docs/. Total bundle size is clamped to 10 MB so the wheel stays
+light.
 """
 from __future__ import annotations
 
@@ -252,59 +260,22 @@ def _sync_example_sources(drifts: List[str], *, check_only: bool) -> None:
                     old.unlink()
 
 
-def _sync_binary(name: str, dst: Path, build_to_path, drifts: List[str], *, check_only: bool) -> None:
-    """Build via a function that writes to a path; compare byte-for-byte."""
-    with tempfile.TemporaryDirectory() as td:
-        tmp = Path(td) / dst.name
-        build_to_path(tmp)
-        new = tmp.read_bytes()
-    if dst.exists() and dst.read_bytes() == new:
-        return
-    if check_only:
-        drifts.append(str(dst.relative_to(REPO_ROOT)))
-        return
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_bytes(new)
+def _generate_docs_fts(dst: Path, *, check_only: bool) -> int:
+    """Build the docs FTS index; return its size in bytes.
 
-
-def _docs_fts_rows(path: Path) -> List[tuple]:
-    """Return (path, title, body) rows from a docs FTS sqlite file,
-    sorted by path. Used by --check because the FTS5 binary layout is
-    not byte-stable across libsqlite versions; the row set is."""
-    if not path.exists():
-        return []
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    try:
-        return sorted(
-            conn.execute("SELECT path, title, body FROM docs").fetchall()
-        )
-    except sqlite3.OperationalError:
-        return []
-    finally:
-        conn.close()
-
-
-def _sync_docs_fts(dst: Path, drifts: List[str], *, check_only: bool) -> None:
-    """FTS5 specific sync: row-set equality, not byte equality.
-
-    Different libsqlite versions emit slightly different on-disk segment
-    layouts for the same logical content, so a strict bytes compare
-    breaks any time the runner's sqlite differs from the developer's.
-    The semantically-meaningful contract is "same (path, title, body)
-    rows in the same order" — we check that.
+    The one artifact here that is generated rather than committed: on
+    ``--check`` it is built to a temp path — the same build the wheel
+    job runs at package time, so a doc that breaks indexing fails the
+    gate — and nothing is compared, because there is no committed copy
+    to compare against.
     """
-    with tempfile.TemporaryDirectory() as td:
-        tmp = Path(td) / dst.name
-        _build_docs_fts(tmp)
-        new_rows = _docs_fts_rows(tmp)
-        new_bytes = tmp.read_bytes()
-    if dst.exists() and _docs_fts_rows(dst) == new_rows:
-        return
     if check_only:
-        drifts.append(str(dst.relative_to(REPO_ROOT)))
-        return
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    dst.write_bytes(new_bytes)
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td) / dst.name
+            _build_docs_fts(tmp)
+            return tmp.stat().st_size
+    _build_docs_fts(dst)
+    return dst.stat().st_size
 
 
 def _validate_gotchas(gotchas_path: Path, ir_json: str,
@@ -436,8 +407,9 @@ def main(argv=None) -> int:
                drifts, check_only=args.check)
     _sync_example_sources(drifts, check_only=args.check)
 
-    # 4. Docs FTS5 index — content-equal (row set), not byte-equal.
-    _sync_docs_fts(DST_FTS, drifts, check_only=args.check)
+    # 4. Docs FTS5 index — generated, not committed; --check only
+    # proves it builds.
+    fts_bytes = _generate_docs_fts(DST_FTS, check_only=args.check)
 
     # 4b. gotchas.json — hand-curated, not regenerated. Validate that
     # every key still resolves to a real symbol; otherwise a rename
@@ -451,8 +423,12 @@ def main(argv=None) -> int:
 
     # 5. Bundle budget. Reported (not enforced) on --check; enforced on
     # write so an over-budget commit fails locally before it lands.
+    # The FTS index may only exist in a temp dir under --check, so its
+    # size is carried over from the build instead of read off disk.
     if DST_DATA.exists():
-        total = sum(p.stat().st_size for p in DST_DATA.rglob("*") if p.is_file())
+        total = fts_bytes + sum(
+            p.stat().st_size for p in DST_DATA.rglob("*")
+            if p.is_file() and p != DST_FTS)
         if total > BUNDLE_BUDGET_BYTES:
             print(
                 f"::error::lrvx-mcp bundled data is "

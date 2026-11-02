@@ -5,17 +5,9 @@
 # CI when contributors forget to re-run the generators after editing
 # the canonical input.
 #
-# Install (one-time, per checkout) -- two lines, both needed:
+# Install (one-time, per checkout):
 #
 #     git config core.hooksPath scripts
-#     git config merge.ours.driver true
-#
-# The second one is what keeps mcp/lrvx_mcp/data/docs.fts.sqlite out of merge
-# conflicts: .gitattributes marks it merge=ours, git needs the driver declared
-# before it will honour that, and scripts/post-rewrite rebuilds the index after
-# a rebase so the one that survives describes the right docs. Without it every
-# two branches that touch docs/ conflict on a 3.3 MiB binary neither of them
-# wrote by hand.
 #
 # After that this fires on every `git commit`. To skip in an emergency:
 # `git commit --no-verify` (don't make a habit of it; CI catches drift
@@ -91,8 +83,7 @@ if echo "$FILES" | grep -qE '^include/lrvx/capi/lrvx_capi_spec\.hpp$'; then
           tools/codegen/golden/lrvx_capi.md .api/c-api.snapshot \
           mcp/lrvx_mcp/data/c-api.snapshot mcp/lrvx_mcp/data/ir.snapshot.json \
           mcp/lrvx_mcp/data/binding_manifest.json \
-          mcp/lrvx_mcp/data/examples_index.json \
-          mcp/lrvx_mcp/data/docs.fts.sqlite 2>/dev/null || true
+          mcp/lrvx_mcp/data/examples_index.json 2>/dev/null || true
 fi
 
 # ── docs/ or mcp/README.md → llms.txt + FTS re-sync ────────────────
@@ -108,7 +99,7 @@ if [ "$DOCS_TOUCHED" = "1" ]; then
   python3 scripts/gen_llms_txt.py > /dev/null
   git add docs/llms.txt docs/llms-full.txt 2>/dev/null || true
 
-  echo "[pre-commit] re-sync mcp bundled data (docs.fts.sqlite)..."
+  echo "[pre-commit] re-sync mcp bundled data..."
   python3 scripts/sync_mcp_data.py > /dev/null
   git add mcp/lrvx_mcp/data/ 2>/dev/null || true
 fi
