@@ -23,3 +23,7 @@ compile_commands.json
 
 *.egg-info/
 node/authoring/index.js
+
+# Generated at package time by scripts/sync_mcp_data.py; a pure
+# function of docs/ whose bytes vary with the libsqlite that wrote it.
+mcp/lrvx_mcp/data/docs.fts.sqlite
