@@ -422,9 +422,13 @@ void BacktestRunner::processEvent(const replay::ReplayEvent& event)
       book_ev.update.asks.emplace_back(Price::fromRaw(ask.price_raw), Quantity::fromRaw(ask.qty_raw));
     }
 
-    // The simulated venue's ladder and queue tracker take depth frames; a
-    // one-level top would wipe every other tracked level.
-    if (book_ev.update.type != BookUpdateType::TOP_OF_BOOK)
+    // A top frame repositions the simulated venue's touch without replacing
+    // its ladder; depth frames replace it wholesale.
+    if (book_ev.update.type == BookUpdateType::TOP_OF_BOOK)
+    {
+      sim().onTopOfBook(book_ev.update.symbol, book_ev.update.bids, book_ev.update.asks);
+    }
+    else
     {
       sim().onBookUpdate(book_ev.update.symbol, book_ev.update.bids, book_ev.update.asks);
     }

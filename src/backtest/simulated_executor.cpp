@@ -1247,27 +1247,34 @@ void SimulatedExecutor::onBracketFillEvent(const Order& filledOrder)
   }
 }
 
+bool SimulatedExecutor::bookFeedAllowed()
+{
+  if (!_venue)
+  {
+    return true;
+  }
+  const int64_t now = _clock.nowNs().raw();
+  const bool up = _venue->isUp(now);
+  if (!up && _venueWasUp)
+  {
+    applyOutagePolicy();
+    _venueWasUp = false;
+  }
+  else if (up && !_venueWasUp)
+  {
+    _venueWasUp = true;
+    flushOutageBuffer();
+  }
+  // False during a Total or StaleBook outage: the caller drops the frame.
+  return _venue->bookUpdatesAllowed(now);
+}
+
 void SimulatedExecutor::onBookUpdate(SymbolId symbol, const std::pmr::vector<BookLevel>& bids,
                                      const std::pmr::vector<BookLevel>& asks)
 {
-  if (_venue)
+  if (!bookFeedAllowed())
   {
-    const int64_t now = _clock.nowNs().raw();
-    const bool up = _venue->isUp(now);
-    if (!up && _venueWasUp)
-    {
-      applyOutagePolicy();
-      _venueWasUp = false;
-    }
-    else if (up && !_venueWasUp)
-    {
-      _venueWasUp = true;
-      flushOutageBuffer();
-    }
-    if (!_venue->bookUpdatesAllowed(now))
-    {
-      return;  // book feed dropped (Total or StaleBook outage)
-    }
+    return;
   }
   MarketState& state = getMarketState(symbol);
 
@@ -1360,6 +1367,105 @@ void SimulatedExecutor::onBookUpdate(SymbolId symbol, const std::pmr::vector<Boo
         _queueTracker.onLevelUpdate(symbol, Side::SELL, p, Quantity::fromRaw(0));
       }
     }
+    maybeEmitQueuePositionChanges();
+  }
+  maybeEmitMarketPositionChanges();
+
+  finalizePendingSubmissions();
+  finalizePendingCancels();
+  finalizePendingReplaces();
+  processExpiredOrders();
+  processPendingOrders(symbol, state);
+  processConditionalOrders(symbol, state);
+}
+
+void SimulatedExecutor::onTopOfBook(SymbolId symbol, const std::pmr::vector<BookLevel>& bids,
+                                    const std::pmr::vector<BookLevel>& asks)
+{
+  if (!bookFeedAllowed())
+  {
+    return;
+  }
+  MarketState& state = getMarketState(symbol);
+
+  state.hasBid = !bids.empty();
+  state.hasAsk = !asks.empty();
+  if (state.hasBid)
+  {
+    state.bestBidRaw = bids[0].price.raw();
+    state.bestBidQtyRaw = bids[0].quantity.raw();
+  }
+  if (state.hasAsk)
+  {
+    state.bestAskRaw = asks[0].price.raw();
+    state.bestAskQtyRaw = asks[0].quantity.raw();
+  }
+
+  // Levels more aggressive than the touch are gone, the touch level takes
+  // the reported size, deeper ones are not the frame's to update.
+  {
+    DepthLadder& ladder = _ladders[symbol];
+    auto reconcile = [](std::vector<std::pair<int64_t, int64_t>>& levels, bool has,
+                        int64_t touchRaw, int64_t touchQtyRaw, bool isBid)
+    {
+      if (!has)
+      {
+        levels.clear();
+        return;
+      }
+      size_t gone = 0;
+      while (gone < levels.size() && (isBid ? levels[gone].first > touchRaw
+                                            : levels[gone].first < touchRaw))
+      {
+        ++gone;
+      }
+      if (gone > 0)
+      {
+        levels.erase(levels.begin(), levels.begin() + static_cast<std::ptrdiff_t>(gone));
+      }
+      if (!levels.empty() && levels.front().first == touchRaw)
+      {
+        levels.front().second = touchQtyRaw;
+        if (touchQtyRaw == 0)
+        {
+          levels.erase(levels.begin());
+        }
+      }
+      else if (touchQtyRaw > 0)
+      {
+        levels.insert(levels.begin(), {touchRaw, touchQtyRaw});
+      }
+    };
+    reconcile(ladder.bids, state.hasBid, state.bestBidRaw, state.bestBidQtyRaw,
+              /*isBid=*/true);
+    reconcile(ladder.asks, state.hasAsk, state.bestAskRaw, state.bestAskQtyRaw,
+              /*isBid=*/false);
+  }
+
+  if (_queueTracker.enabled())
+  {
+    // Same assertion against the tracked queue levels.
+    auto sweep = [&](Side side, bool has, int64_t touchRaw, int64_t touchQtyRaw)
+    {
+      std::vector<Price> tracked;
+      _queueTracker.trackedPrices(symbol, side, tracked);
+      for (const Price& p : tracked)
+      {
+        const bool emptied = !has || (side == Side::BUY ? p.raw() > touchRaw
+                                                        : p.raw() < touchRaw);
+        if (emptied)
+        {
+          _queueTracker.onLevelUpdate(symbol, side, p, Quantity::fromRaw(0));
+        }
+      }
+      if (has)
+      {
+        _queueTracker.onLevelUpdate(symbol, side, Price::fromRaw(touchRaw),
+                                    Quantity::fromRaw(touchQtyRaw));
+      }
+    };
+    sweep(Side::BUY, state.hasBid, state.bestBidRaw, state.bestBidQtyRaw);
+    sweep(Side::SELL, state.hasAsk, state.bestAskRaw, state.bestAskQtyRaw);
     maybeEmitQueuePositionChanges();
   }
   maybeEmitMarketPositionChanges();

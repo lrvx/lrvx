@@ -213,6 +213,13 @@ class SimulatedExecutor : public IOrderExecutor
 
   void onBookUpdate(SymbolId symbol, const std::pmr::vector<BookLevel>& bids,
                     const std::pmr::vector<BookLevel>& asks);
+  // Touch-only frame (BookUpdateType::TOP_OF_BOOK): the venue's complete
+  // word on the touch and nothing deeper, read with the same contract as
+  // CompositeBookMatrix, so an empty side means an empty side. Levels more
+  // aggressive than the touch are gone, deeper ones stay as the last depth
+  // frame reported them; then the same matching pass as onBookUpdate.
+  void onTopOfBook(SymbolId symbol, const std::pmr::vector<BookLevel>& bids,
+                   const std::pmr::vector<BookLevel>& asks);
   void onTrade(SymbolId symbol, Price price, bool isBuy);
   void onTrade(SymbolId symbol, Price price, Quantity qty, bool isBuy);
   // Close-only: sets bid=ask=last=close and matches at close. Intrabar SL/TP
@@ -321,8 +328,9 @@ class SimulatedExecutor : public IOrderExecutor
   // The visible ladder as of the last book update, most aggressive level
   // first. A taker consumes it, so its size decides the price the taker pays
   // and the next order in the same step sees what the previous one left
-  // behind. Only onBookUpdate fills it in: a bar or a trade-only feed reports
-  // no depth, and those paths keep the single-price behaviour.
+  // behind. onBookUpdate replaces it wholesale and onTopOfBook reconciles
+  // its front with the touch; a bar or a trade-only feed reports no depth,
+  // and those paths keep the single-price behaviour.
   struct DepthLadder
   {
     std::vector<std::pair<int64_t, int64_t>> bids;  // (priceRaw, qtyRaw)
@@ -459,6 +467,9 @@ class SimulatedExecutor : public IOrderExecutor
   // Shared prologue of every onBar overload: runs the outage state machine and
   // says whether the venue is up enough to take the bar at all.
   bool barFeedAllowed();
+  // Same for the book-frame paths (onBookUpdate / onTopOfBook), gating on
+  // bookUpdatesAllowed instead.
+  bool bookFeedAllowed();
 
   // reduce_only enforcement: simulator-side net position per symbol,
   // updated in executeFill. A reduce-only submit that would open or

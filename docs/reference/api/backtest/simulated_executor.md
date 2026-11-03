@@ -290,6 +290,7 @@ SELL trailing: trigger follows price up (never down). BUY trailing: trigger foll
 | Call | When to use |
 |------|-------------|
 | `onBookUpdate(symbol, bids, asks)` | Full L2 snapshot. Replaces the visible ladder, updates top-of-book state and drives the queue tracker's level-update heuristic. |
+| `onTopOfBook(symbol, bids, asks)` | Touch-only frame (`BookUpdateType::TOP_OF_BOOK`): moves the touch, drops levels more aggressive than it, keeps deeper depth from the last `onBookUpdate`, then the same matching pass. An empty side means an empty side. |
 | `onTrade(symbol, price, isBuy)` | Trade event without quantity. Keeps legacy behavior but does **not** drive queue-simulated fills. |
 | `onTrade(symbol, price, qty, isBuy)` | Trade event with quantity. Required for queue simulation. |
 | `onBar(symbol, close)` | Bar close shortcut. Sets best bid, best ask, and last trade to the close price. Intrabar stops and targets that would have triggered against the wick are missed. |
