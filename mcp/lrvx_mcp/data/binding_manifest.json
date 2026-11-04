@@ -23834,6 +23834,11 @@
         },
         {
           "kind": "method",
+          "name": "bookFeedAllowed",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "bookMidPrice",
           "parent": "SimulatedExecutor"
         },
@@ -24110,6 +24115,11 @@
         {
           "kind": "method",
           "name": "onBracketFillEvent",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "onTopOfBook",
           "parent": "SimulatedExecutor"
         },
         {
