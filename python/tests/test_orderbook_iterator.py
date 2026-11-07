@@ -274,5 +274,103 @@ class OutOfOrderEventsTests(unittest.TestCase):
         self.assertEqual(len(snaps), 2)
 
 
+def _upgrade_last_delta_to_top(tape_dir: Path) -> None:
+    """Rewrite the last BookDelta frame of every segment as a BookTop.
+
+    ``DataWriter.write_book`` cannot write a top yet (issue #640), so the
+    fixture patches the frozen v1 layout directly: frame type 3 -> 6 at
+    offset 8 of the FrameHeader, record byte 1 -> 2 at offset 32 of the
+    BookRecordHeader, and the frame's payload CRC-32 (IEEE, same polynomial
+    as zlib.crc32) recomputed. Frames sit back to back from byte 64
+    (SegmentHeader) up to index_offset.
+    """
+    import struct
+    import zlib
+
+    for seg in sorted(tape_dir.glob("*.lrvx")):
+        data = bytearray(seg.read_bytes())
+        (index_offset,) = struct.unpack_from("<Q", data, 40)
+        end = index_offset if index_offset else len(data)
+        pos, last_delta = 64, None
+        while pos + 12 <= end:
+            size, _crc = struct.unpack_from("<II", data, pos)
+            frame_type = data[pos + 8]
+            if frame_type == 3:
+                last_delta = pos
+            pos += 12 + size
+        if last_delta is None:
+            continue
+        size = struct.unpack_from("<I", data, last_delta)[0]
+        payload = slice(last_delta + 12, last_delta + 12 + size)
+        data[last_delta + 8] = 6                      # FrameHeader.type: BookTop
+        data[last_delta + 12 + 32] = 2                # BookRecordHeader.type: top
+        struct.pack_into("<I", data, last_delta + 4,
+                         zlib.crc32(data[payload]) & 0xFFFFFFFF)
+        seg.write_bytes(data)
+
+
+class TopRowTests(unittest.TestCase):
+    """A top row (record byte 2) is the venue's complete word on the touch
+    and nothing deeper. Applying it as a delta stranded stale better
+    levels in the reconstruction."""
+
+    def _apply(self, bids, asks, event_type, bid_levels, ask_levels):
+        levels = _arr([_level(p, q) for p, q in bid_levels + ask_levels])
+        ob._apply_event(bids, asks, event_type=event_type,
+                        n_bid=len(bid_levels), n_ask=len(ask_levels),
+                        off=0, levels=levels)
+
+    def test_top_drops_levels_more_aggressive_than_the_touch(self):
+        bids, asks = {}, {}
+        self._apply(bids, asks, 0,
+                    [(100.0, 1.0), (99.0, 2.0)], [(101.0, 1.5), (102.0, 2.5)])
+        # Bid touch retreats to 99.5: the 100 level provably emptied, the
+        # 99 behind it stays; the ask touch improves to 100.5 and the
+        # snapshot's levels behind it stay.
+        self._apply(bids, asks, 2, [(99.5, 4.0)], [(100.5, 3.0)])
+        self.assertEqual(bids, {_level(99.5, 4.0)[0]: _level(99.5, 4.0)[1],
+                                _level(99.0, 2.0)[0]: _level(99.0, 2.0)[1]})
+        self.assertEqual(asks, {_level(100.5, 3.0)[0]: _level(100.5, 3.0)[1],
+                                _level(101.0, 1.5)[0]: _level(101.0, 1.5)[1],
+                                _level(102.0, 2.5)[0]: _level(102.0, 2.5)[1]})
+
+    def test_top_resizes_the_touch_level_in_place(self):
+        bids, asks = {}, {}
+        self._apply(bids, asks, 0, [(100.0, 1.0)], [(101.0, 1.5)])
+        self._apply(bids, asks, 2, [(100.0, 7.0)], [(101.0, 0.0)])
+        self.assertEqual(bids[_level(100.0, 7.0)[0]], _level(100.0, 7.0)[1])
+        # qty 0 at the touch empties that level.
+        self.assertEqual(asks, {})
+
+    def test_top_empty_side_means_empty_side(self):
+        bids, asks = {}, {}
+        self._apply(bids, asks, 0, [(100.0, 1.0)], [(101.0, 1.5)])
+        self._apply(bids, asks, 2, [(100.0, 1.0)], [])
+        self.assertEqual(asks, {})
+        self.assertIn(_level(100.0, 1.0)[0], bids)
+
+    def test_iterator_and_book_at_keep_depth_behind_a_top(self):
+        tmp = Path(tempfile.mkdtemp(prefix="ob-top-"))
+        tape = tmp / "tape"
+        _write_book_tape(tape, [
+            (_BASE_NS, 1, True,
+             [(100.0, 1.0), (99.0, 2.0)], [(101.0, 1.5), (102.0, 2.5)]),
+            # Written as a delta, rewritten below as a top: bid touch
+            # retreats to 99.5, the ask side goes empty.
+            (_BASE_NS + 30_000_000_000, 1, False, [(99.5, 4.0)], []),
+        ])
+        _upgrade_last_delta_to_top(tape)
+
+        snaps = list(ob.OrderBookIterator(tape, bucket_ns=60_000_000_000,
+                                          levels=5))
+        self.assertEqual(len(snaps), 1)
+        self.assertEqual(snaps[0].bids, [(99.5, 4.0), (99.0, 2.0)])
+        self.assertEqual(snaps[0].asks, [])
+
+        snap = ob.book_at(tape, ts_ns=_BASE_NS + 40_000_000_000, levels=5)
+        self.assertEqual(snap.bids, [(99.5, 4.0), (99.0, 2.0)])
+        self.assertEqual(snap.asks, [])
+
+
 if __name__ == "__main__":
     unittest.main()

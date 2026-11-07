@@ -24,7 +24,8 @@
  * rather than a failed load -- compare LRVX_CAPI_ABI_VERSION against
  * lrvx_capi_abi_version() once at startup and refuse the mismatch.
  * 3: LrvxBar grew close_reason. 4: LrvxBookSnapshot grew has_bid and
- * has_ask. 5: LrvxSymbolContext grew last_touch_ns. */
+ * has_ask. 5: LrvxSymbolContext grew last_touch_ns; the recorder
+ * on_book_update byte gained 2 (top). */
 #define LRVX_CAPI_ABI_VERSION 5
 
 /* Declared by a header that carries lrvx_best_bid_raw_opt and its two

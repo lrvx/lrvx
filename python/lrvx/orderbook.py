@@ -14,8 +14,8 @@ Two surfaces:
   * ``book_at(tape, ts_ns, levels)`` — point query that walks the tape
     up to ``ts_ns`` and returns the latest ladder state.
 
-Both go through ``DataReader.read_book_updates`` and the existing
-snapshot / delta semantics; this module never touches the binary
+Both go through ``DataReader.read_book_updates`` and the record's
+snapshot / delta / top semantics; this module never touches the binary
 format directly.
 
 This is the pure-Python reference implementation — convenient for
@@ -106,13 +106,47 @@ def _read_events(tape_path: PathLike,
     return headers, levels
 
 
+def _apply_touch(side: dict, *, more_aggressive, count: int, off: int,
+                 levels: np.ndarray) -> None:
+    """Apply one side of a top row to a ladder dict in place.
+
+    ``more_aggressive`` compares a resting price against the touch price
+    (``>`` for bids, ``<`` for asks). An empty side (``count == 0``) means
+    that side of the book is empty.
+    """
+    if count == 0:
+        side.clear()
+        return
+    p = int(levels[off]["price_raw"])
+    q = int(levels[off]["qty_raw"])
+    for stale in [s for s in side if more_aggressive(s, p)]:
+        del side[stale]
+    if q == 0:
+        side.pop(p, None)
+    else:
+        side[p] = q
+
+
 def _apply_event(bids: dict, asks: dict,
-                 *, is_snapshot: bool,
+                 *, event_type: int,
                  n_bid: int, n_ask: int, off: int,
                  levels: np.ndarray) -> None:
-    """Apply one book event (snapshot or delta) to the running
-    ladder dicts in place."""
-    if is_snapshot:
+    """Apply one book event to the running ladder dicts in place.
+
+    ``event_type`` is the record byte: 0 snapshot, 1 delta, 2 top. A top
+    is the venue's complete word on the touch and nothing deeper — levels
+    more aggressive than it are gone, the touch level takes the reported
+    size, deeper levels stay — the same reading the simulator's
+    onTopOfBook and CompositeBookMatrix apply. Merging it as a delta
+    strands stale better levels in the reconstruction.
+    """
+    if event_type == 2:
+        _apply_touch(bids, more_aggressive=lambda s, p: s > p,
+                     count=n_bid, off=off, levels=levels)
+        _apply_touch(asks, more_aggressive=lambda s, p: s < p,
+                     count=n_ask, off=off + n_bid, levels=levels)
+        return
+    if event_type == 0:
         bids.clear()
         asks.clear()
     for i in range(n_bid):
@@ -221,7 +255,7 @@ class OrderBookIterator:
             if self._symbol_id is not None and sym != self._symbol_id:
                 continue
             ts = int(h["exchange_ts_ns"])
-            is_snapshot = int(h["event_type"]) == 0
+            event_type = int(h["event_type"])
             off = int(h["level_offset"])
             n_bid = int(h["bid_count"])
             n_ask = int(h["ask_count"])
@@ -245,7 +279,7 @@ class OrderBookIterator:
 
             bids_dict, asks_dict = running[sym]
             _apply_event(bids_dict, asks_dict,
-                         is_snapshot=is_snapshot,
+                         event_type=event_type,
                          n_bid=n_bid, n_ask=n_ask, off=off,
                          levels=levels_arr)
             cur_bucket[sym] = new_bucket
@@ -292,7 +326,7 @@ def book_at(tape_path: PathLike,
             running[sym] = ({}, {})
         bids_dict, asks_dict = running[sym]
         _apply_event(bids_dict, asks_dict,
-                     is_snapshot=int(h["event_type"]) == 0,
+                     event_type=int(h["event_type"]),
                      n_bid=int(h["bid_count"]),
                      n_ask=int(h["ask_count"]),
                      off=int(h["level_offset"]),
