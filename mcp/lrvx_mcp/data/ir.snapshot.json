@@ -12611,6 +12611,45 @@
       "return_type": "void"
     },
     {
+      "group": "backtest_slippage",
+      "name": "lrvx_simulated_executor_on_top_of_book",
+      "params": [
+        {
+          "name": "executor",
+          "type": "LrvxSimulatedExecutorHandle"
+        },
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        },
+        {
+          "name": "has_bid",
+          "type": "uint8_t"
+        },
+        {
+          "name": "bid_price",
+          "type": "double"
+        },
+        {
+          "name": "bid_qty",
+          "type": "double"
+        },
+        {
+          "name": "has_ask",
+          "type": "uint8_t"
+        },
+        {
+          "name": "ask_price",
+          "type": "double"
+        },
+        {
+          "name": "ask_qty",
+          "type": "double"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
       "group": "simulated_executor",
       "name": "lrvx_simulated_executor_on_trade",
       "params": [

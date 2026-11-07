@@ -11131,6 +11131,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - `on_bar_ohlc(self, symbol: typing.SupportsInt | typing.SupportsIndex, open: typing.SupportsFloat | typing.SupportsIndex, high: typing.SupportsFloat | typing.SupportsIndex, low: typing.SupportsFloat | typing.SupportsIndex, close: typing.SupportsFloat | typing.SupportsIndex) -> None`
 - `on_best_levels(self, symbol: typing.SupportsInt | typing.SupportsIndex, bid_price: typing.SupportsFloat | typing.SupportsIndex, bid_qty: typing.SupportsFloat | typing.SupportsIndex, ask_price: typing.SupportsFloat | typing.SupportsIndex, ask_qty: typing.SupportsFloat | typing.SupportsIndex) -> None`
 - `on_book_snapshot(self, symbol: typing.SupportsInt | typing.SupportsIndex, bid_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ask_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]]) -> None`
+- `on_top_of_book(self, symbol: typing.SupportsInt | typing.SupportsIndex, bid: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ask: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None) -> None`
 - `on_trade(self, symbol: typing.SupportsInt | typing.SupportsIndex, price: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool) -> None`
 - `on_trade_qty(self, symbol: typing.SupportsInt | typing.SupportsIndex, price: typing.SupportsFloat | typing.SupportsIndex, quantity: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool) -> None`
 - `reset(self) -> None`
@@ -14287,10 +14288,22 @@ executor.on_trade_qty(symbol=1, price=50000.0, qty=0.5, is_buy=True)
 
 #### `on_best_levels(symbol, bid_price, bid_qty, ask_price, ask_qty)`
 
-Feed a top-of-book snapshot.
+Feed both best levels in one call. Routed to the touch path: depth from the
+last `on_book_snapshot` survives instead of being replaced by a one-level
+book.
 
 ```python
 executor.on_best_levels(1, 49999.0, 2.0, 50001.0, 1.5)
+```
+
+#### `on_top_of_book(symbol, bid, ask)`
+
+Feed a touch-only frame: moves the touch, keeps deeper depth from the last
+snapshot. `bid` / `ask` are `(price, qty)` tuples; `None` means that side
+of the book is empty.
+
+```python
+executor.on_top_of_book(1, (49999.5, 2.0), (50000.5, 1.5))
 ```
 
 #### `set_default_slippage(model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)`
@@ -15022,6 +15035,7 @@ exec.setQueueModel('tob', 1);
 | `beginBarCallbackWindow()` / `endBarCallbackWindow()` | Hold orders submitted between the two calls until the next bar's open |
 | `reset()` | Drop fills and run-scoped state, keeping installed configuration |
 | `onTrade(symbol, price, isBuy)` | Feed a trade |
+| `onTopOfBook(symbol, bid, ask)` | Feed a touch-only frame. `bid` / `ask` are `{ price, qty }`; `null` means that side of the book is empty |
 | `advanceClock(timestampNs)` | Advance simulated time |
 | `setDefaultSlippage(model, ticks, tickSize, bps, impactCoeff)` | Configure slippage. `model` is one of `"none"`, `"fixed_ticks"`, `"fixed_bps"`, `"volume_impact"` |
 | `setQueueModel(model, depth)` | Configure limit order queue. `model` is one of `"none"`, `"tob"`, `"full"`, `"pro_rata"`, `"pro_rata_with_fifo"`, `"top_pro_lmm"`, `"pro_rata_with_priority"` |
@@ -16761,7 +16775,7 @@ SimulatedExecutor()
 | `reset()` | Drop fills and run-scoped state, keeping installed configuration |
 | `on_trade(symbol, price, is_buy)` | Feed a trade |
 | `on_trade_qty(symbol, price, qty, is_buy)` | Feed a trade with quantity (enables queue-fill simulation) |
-| `on_best_levels(symbol, bid_price, bid_qty, ask_price, ask_qty)` | Feed top-of-book snapshot |
+| `on_best_levels(symbol, bid_price, bid_qty, ask_price, ask_qty)` | Feed both best levels. Routed to the touch path: depth the executor already holds survives |
 | `advance_clock(timestamp_ns)` | Advance simulated time |
 | `set_default_slippage(model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)` | Configure slippage for all symbols |
 | `set_symbol_slippage(symbol, model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)` | Per-symbol slippage override |
@@ -18543,6 +18557,9 @@ void lrvx_simulated_executor_on_trade(LrvxSimulatedExecutorHandle executor, uint
                             double price, uint8_t is_buy);
 void lrvx_simulated_executor_on_trade_qty(LrvxSimulatedExecutorHandle executor, uint32_t symbol,
                                 double price, double quantity, uint8_t is_buy);
+// Routed to the touch path (lrvx_simulated_executor_on_top_of_book with
+// both sides present): depth from the last snapshot survives instead of
+// being replaced by a one-level book.
 void lrvx_simulated_executor_on_best_levels(LrvxSimulatedExecutorHandle executor, uint32_t symbol,
                                   double bid_price, double bid_qty,
                                   double ask_price, double ask_qty);
@@ -18551,6 +18568,12 @@ void lrvx_simulated_executor_on_book_snapshot(LrvxSimulatedExecutorHandle execut
                                     uint32_t n_bids,
                                     const double* ask_prices, const double* ask_qtys,
                                     uint32_t n_asks);
+// Touch-only frame: moves the touch, keeps deeper depth from the last
+// snapshot. has_bid == 0 means the bid side is empty and its price/qty
+// are ignored; same for has_ask.
+void lrvx_simulated_executor_on_top_of_book(LrvxSimulatedExecutorHandle executor, uint32_t symbol,
+                                  uint8_t has_bid, double bid_price, double bid_qty,
+                                  uint8_t has_ask, double ask_price, double ask_qty);
 void lrvx_simulated_executor_advance_clock(LrvxSimulatedExecutorHandle executor, int64_t timestamp_ns);
 
 // Fills

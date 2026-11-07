@@ -55,3 +55,20 @@ assert.strictEqual(quotes[1].ask, null, 'a null side quotes null');
 
 runner.stop();
 console.log('test_book_top OK');
+
+// The simulated executor takes the same frame: the touch it carries is
+// what a market order matches against, a null side has nothing to match,
+// and a malformed side throws instead of erasing the touch.
+const exec = new lrvx.SimulatedExecutor();
+exec.onTopOfBook(1, { price: 99.5, qty: 5.0 }, { price: 100.5, qty: 2.0 });
+exec.submitOrder(1, 'buy', 0, 1.0, 'market', 1);
+assert.strictEqual(exec.fillCount, 1, 'a market buy matches the fed ask touch');
+exec.onTopOfBook(1, null, { price: 100.5, qty: 2.0 });
+exec.submitOrder(2, 'sell', 0, 1.0, 'market', 1);
+assert.strictEqual(exec.fillCount, 1, 'no bid side, nothing for a market sell to match');
+assert.throws(
+  () => exec.onTopOfBook(1, 99.5, null),
+  TypeError,
+  'a bare number where a side object belongs must throw',
+);
+console.log('test_book_top executor OK');

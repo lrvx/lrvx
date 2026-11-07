@@ -24,6 +24,63 @@ TEST(CapiBacktest, SlippageFixedBps)
   lrvx_simulated_executor_destroy(exec);
 }
 
+TEST(CapiBacktest, TopOfBookMovesTheTouchAndKeepsDepth)
+{
+  auto exec = lrvx_simulated_executor_create();
+  double bp[] = {99.0};
+  double bq[] = {5.0};
+  double ap[] = {101.0, 102.0};
+  double aq[] = {1.0, 5.0};
+  lrvx_simulated_executor_on_book_snapshot(exec, 1, bp, bq, 1, ap, aq, 2);
+  lrvx_simulated_executor_on_top_of_book(exec, 1, /*has_bid=*/1, 99.5, 5.0,
+                                         /*has_ask=*/1, 100.5, 2.0);
+
+  // Bigger than the touch level, so the walk starts at the moved touch and
+  // continues into the snapshot's surviving 101.
+  lrvx_simulated_executor_submit_order(exec, 1, /*side=buy=*/0, 0.0, 3.0, /*type=market=*/1, 1);
+  ASSERT_EQ(lrvx_simulated_executor_fill_count(exec), 1u);
+  LrvxFill f{};
+  ASSERT_EQ(lrvx_simulated_executor_get_fills(exec, &f, 1), 1u);
+  // VWAP of 100.5 x 2 + 101 x 1 — not the stale 101 touch, not a
+  // one-level book.
+  EXPECT_NEAR(static_cast<double>(f.price_raw) / 1e8, (100.5 * 2 + 101.0) / 3.0, 1e-6);
+  lrvx_simulated_executor_destroy(exec);
+}
+
+// The flag is the only emptiness signal: has_bid == 0 feeds no bid side,
+// so a market sell has nothing to match and no trade to fall back on.
+TEST(CapiBacktest, TopOfBookEmptySideMeansEmptySide)
+{
+  auto exec = lrvx_simulated_executor_create();
+  lrvx_simulated_executor_on_top_of_book(exec, 1, /*has_bid=*/0, 0.0, 0.0,
+                                         /*has_ask=*/1, 100.5, 2.0);
+  lrvx_simulated_executor_submit_order(exec, 1, /*side=sell=*/1, 0.0, 1.0, /*type=market=*/1, 1);
+  EXPECT_EQ(lrvx_simulated_executor_fill_count(exec), 0u);
+  lrvx_simulated_executor_destroy(exec);
+}
+
+// on_best_levels is routed to the same touch path: the depth behind the
+// quoted best survives, so a buy bigger than the best level walks into it
+// instead of printing everything at a book one level deep.
+TEST(CapiBacktest, BestLevelsKeepDeeperDepth)
+{
+  auto exec = lrvx_simulated_executor_create();
+  double bp[] = {99.0};
+  double bq[] = {5.0};
+  double ap[] = {101.0, 102.0};
+  double aq[] = {1.0, 5.0};
+  lrvx_simulated_executor_on_book_snapshot(exec, 1, bp, bq, 1, ap, aq, 2);
+  lrvx_simulated_executor_on_best_levels(exec, 1, 99.5, 5.0, 100.5, 1.0);
+
+  lrvx_simulated_executor_submit_order(exec, 1, /*side=buy=*/0, 0.0, 3.0, /*type=market=*/1, 1);
+  ASSERT_EQ(lrvx_simulated_executor_fill_count(exec), 1u);
+  LrvxFill f{};
+  ASSERT_EQ(lrvx_simulated_executor_get_fills(exec, &f, 1), 1u);
+  // VWAP of 100.5 x 1 + 101 x 1 + 102 x 1, on the fixed-point grid.
+  EXPECT_NEAR(static_cast<double>(f.price_raw) / 1e8, (100.5 + 101.0 + 102.0) / 3.0, 1e-6);
+  lrvx_simulated_executor_destroy(exec);
+}
+
 TEST(CapiBacktest, QueueFillOnTradeAhead)
 {
   auto exec = lrvx_simulated_executor_create();

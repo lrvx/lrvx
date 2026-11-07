@@ -411,6 +411,9 @@ declare class SimulatedExecutor {
     onTrade(symbol: number, price: number, isBuy: boolean): void;
     onTradeQty(symbol: number, price: number, quantity: number, isBuy: boolean): void;
     onBestLevels(symbol: number, bidPrice: number, bidQty: number, askPrice: number, askQty: number): void;
+    /** Touch-only frame: moves the touch; deeper depth the executor already
+     *  holds survives. `null` means that side of the book is empty. */
+    onTopOfBook(symbol: number, bid: { price: number; qty: number } | null, ask: { price: number; qty: number } | null): void;
     advanceClock(timestampNs: bigint | number): void;
     setDefaultSlippage(model: SlippageModelName, ticks?: number, tickSize?: number, bps?: number, impactCoeff?: number): void;
     setSymbolSlippage(symbol: number, model: SlippageModelName, ticks?: number, tickSize?: number, bps?: number, impactCoeff?: number): void;

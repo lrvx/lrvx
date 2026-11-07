@@ -1756,10 +1756,13 @@ extern "C"
   void lrvx_simulated_executor_on_trade_qty(LrvxSimulatedExecutorHandle executor, uint32_t symbol,
                                             double price, double quantity, uint8_t is_buy);
 
-  // Feed a top-of-book snapshot (both best bid and best ask in one call).
-  // For multi-level updates, build a BookUpdate on the C++ side; the C API
-  // intentionally does not expose a stateful per-side helper because that
-  // makes it too easy to accidentally clear the opposite side.
+  // Feed both best levels in one call. Routed to the touch path
+  // (lrvx_simulated_executor_on_top_of_book with both sides present), so
+  // depth from the last snapshot survives instead of being replaced by a
+  // one-level book. For multi-level updates, build a BookUpdate on the C++
+  // side; the C API intentionally does not expose a stateful per-side
+  // helper because that makes it too easy to accidentally clear the
+  // opposite side.
   LRVX_EXPORT(group = "backtest_slippage")
   void lrvx_simulated_executor_on_best_levels(LrvxSimulatedExecutorHandle executor, uint32_t symbol,
                                               double bid_price, double bid_qty, double ask_price,
@@ -1771,6 +1774,14 @@ extern "C"
                                                 const double* bid_prices, const double* bid_qtys,
                                                 uint32_t n_bids, const double* ask_prices,
                                                 const double* ask_qtys, uint32_t n_asks);
+
+  // Feed a touch-only frame: moves the touch and keeps deeper depth from
+  // the last snapshot (SimulatedExecutor::onTopOfBook). Same side contract
+  // as lrvx_runner_on_book_top.
+  LRVX_EXPORT(group = "backtest_slippage")
+  void lrvx_simulated_executor_on_top_of_book(LrvxSimulatedExecutorHandle executor, uint32_t symbol,
+                                              uint8_t has_bid, double bid_price, double bid_qty,
+                                              uint8_t has_ask, double ask_price, double ask_qty);
 
   // BacktestResult handle: aggregates fills into trades + stats + equity curve.
   typedef void* LrvxBacktestResultHandle;

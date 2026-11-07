@@ -79,6 +79,7 @@ exec.setQueueModel('tob', 1);
 | `beginBarCallbackWindow()` / `endBarCallbackWindow()` | Hold orders submitted between the two calls until the next bar's open |
 | `reset()` | Drop fills and run-scoped state, keeping installed configuration |
 | `onTrade(symbol, price, isBuy)` | Feed a trade |
+| `onTopOfBook(symbol, bid, ask)` | Feed a touch-only frame. `bid` / `ask` are `{ price, qty }`; `null` means that side of the book is empty |
 | `advanceClock(timestampNs)` | Advance simulated time |
 | `setDefaultSlippage(model, ticks, tickSize, bps, impactCoeff)` | Configure slippage. `model` is one of `"none"`, `"fixed_ticks"`, `"fixed_bps"`, `"volume_impact"` |
 | `setQueueModel(model, depth)` | Configure limit order queue. `model` is one of `"none"`, `"tob"`, `"full"`, `"pro_rata"`, `"pro_rata_with_fifo"`, `"top_pro_lmm"`, `"pro_rata_with_priority"` |

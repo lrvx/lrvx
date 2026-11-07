@@ -83,7 +83,7 @@ SimulatedExecutor()
 | `reset()` | Drop fills and run-scoped state, keeping installed configuration |
 | `on_trade(symbol, price, is_buy)` | Feed a trade |
 | `on_trade_qty(symbol, price, qty, is_buy)` | Feed a trade with quantity (enables queue-fill simulation) |
-| `on_best_levels(symbol, bid_price, bid_qty, ask_price, ask_qty)` | Feed top-of-book snapshot |
+| `on_best_levels(symbol, bid_price, bid_qty, ask_price, ask_qty)` | Feed both best levels. Routed to the touch path: depth the executor already holds survives |
 | `advance_clock(timestamp_ns)` | Advance simulated time |
 | `set_default_slippage(model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)` | Configure slippage for all symbols |
 | `set_symbol_slippage(symbol, model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)` | Per-symbol slippage override |

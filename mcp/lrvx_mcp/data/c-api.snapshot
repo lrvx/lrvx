@@ -635,6 +635,7 @@ lrvx_simulated_executor_on_bar|void|LrvxSimulatedExecutorHandle|uint32_t|double
 lrvx_simulated_executor_on_bar_ohlc|void|LrvxSimulatedExecutorHandle|uint32_t|double|double|double|double
 lrvx_simulated_executor_on_best_levels|void|LrvxSimulatedExecutorHandle|uint32_t|double|double|double|double
 lrvx_simulated_executor_on_book_snapshot|void|LrvxSimulatedExecutorHandle|uint32_t|const double *|const double *|uint32_t|const double *|const double *|uint32_t
+lrvx_simulated_executor_on_top_of_book|void|LrvxSimulatedExecutorHandle|uint32_t|uint8_t|double|double|uint8_t|double|double
 lrvx_simulated_executor_on_trade|void|LrvxSimulatedExecutorHandle|uint32_t|double|uint8_t
 lrvx_simulated_executor_on_trade_qty|void|LrvxSimulatedExecutorHandle|uint32_t|double|double|uint8_t
 lrvx_simulated_executor_reset|void|LrvxSimulatedExecutorHandle

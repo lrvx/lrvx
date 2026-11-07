@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 748 functions, 58 handles, 59 structs, 43 callback typedefs, 3 enums, 16 macro constants, 73 groups.
+**Surface:** 749 functions, 58 handles, 59 structs, 43 callback typedefs, 3 enums, 16 macro constants, 73 groups.
 
 ## Opaque handles
 
@@ -989,6 +989,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `void lrvx_simulated_executor_on_trade_qty(LrvxSimulatedExecutorHandle executor, uint32_t symbol, double price, double quantity, uint8_t is_buy)`
 - `void lrvx_simulated_executor_on_best_levels(LrvxSimulatedExecutorHandle executor, uint32_t symbol, double bid_price, double bid_qty, double ask_price, double ask_qty)`
 - `void lrvx_simulated_executor_on_book_snapshot(LrvxSimulatedExecutorHandle executor, uint32_t symbol, const double * bid_prices, const double * bid_qtys, uint32_t n_bids, const double * ask_prices, const double * ask_qtys, uint32_t n_asks)`
+- `void lrvx_simulated_executor_on_top_of_book(LrvxSimulatedExecutorHandle executor, uint32_t symbol, uint8_t has_bid, double bid_price, double bid_qty, uint8_t has_ask, double ask_price, double ask_qty)`
 - `LrvxBacktestResultHandle lrvx_backtest_result_create(double initial_capital, double fee_rate, uint8_t use_percentage_fee, double fixed_fee_per_trade, double risk_free_rate, double annualization_factor)`
 - `void lrvx_backtest_result_destroy(LrvxBacktestResultHandle result)`
 - `void lrvx_backtest_result_record_fill(LrvxBacktestResultHandle result, uint64_t order_id, uint32_t symbol, uint8_t side, double price, double quantity, int64_t timestamp_ns)`

@@ -172,8 +172,20 @@ void LrvxJsStrategy::loadStdlib()
       onTradeQty(symbol, price, quantity, isBuy) {
         __lrvx_simulated_executor_on_trade_qty(this._h, symbol, price, quantity, isBuy ? 1 : 0);
       }
+      // Both land on the touch path (see lrvx_simulated_executor_on_best_levels).
+      // A side of onTopOfBook is { price, qty } or null; null means that
+      // side of the book is empty, anything else throws.
       onBestLevels(symbol, bidPrice, bidQty, askPrice, askQty) {
         __lrvx_simulated_executor_on_best_levels(this._h, symbol, bidPrice, bidQty, askPrice, askQty);
+      }
+      onTopOfBook(symbol, bid, ask) {
+        const sideOk = (s) => s === null || s === undefined || typeof s === "object";
+        if (!sideOk(bid) || !sideOk(ask)) {
+          throw new TypeError("onTopOfBook: a side is { price, qty } or null");
+        }
+        __lrvx_simulated_executor_on_top_of_book(this._h, symbol,
+          bid ? 1 : 0, bid ? bid.price : 0, bid ? bid.qty : 0,
+          ask ? 1 : 0, ask ? ask.price : 0, ask ? ask.qty : 0);
       }
       advanceClock(timestampNs) { __lrvx_simulated_executor_advance_clock(this._h, timestampNs); }
       setDefaultSlippage(model, ticks, tickSize, bps, impactCoeff) {

@@ -4388,16 +4388,43 @@ void lrvx_simulated_executor_on_trade_qty(LrvxSimulatedExecutorHandle h, uint32_
   LRVX_CAPI_LEAVE_VOID;
 }
 
+// Build the (at most one level per side) book a touch frame carries and
+// hand it to the executor. Replacing the ladder with a one-level book here
+// would price every taker as if the book were one level deep, so both C
+// entry points below land on SimulatedExecutor::onTopOfBook.
+static void simTopOfBook(LrvxSimulatedExecutorHandle h, uint32_t symbol, bool has_bid,
+                         double bid_price, double bid_qty, bool has_ask, double ask_price,
+                         double ask_qty)
+{
+  std::pmr::monotonic_buffer_resource pool(256);
+  std::pmr::vector<BookLevel> bids(&pool);
+  std::pmr::vector<BookLevel> asks(&pool);
+  if (has_bid)
+  {
+    bids.emplace_back(Price::fromDouble(bid_price), Quantity::fromDouble(bid_qty));
+  }
+  if (has_ask)
+  {
+    asks.emplace_back(Price::fromDouble(ask_price), Quantity::fromDouble(ask_qty));
+  }
+  static_cast<LrvxSimulatedExecutorImpl*>(h)->executor.onTopOfBook(symbol, bids, asks);
+}
+
 void lrvx_simulated_executor_on_best_levels(LrvxSimulatedExecutorHandle h, uint32_t symbol, double bid_price,
                                             double bid_qty, double ask_price, double ask_qty)
 {
   LRVX_CAPI_ENTER_VOID(h);
-  std::pmr::monotonic_buffer_resource pool(512);
-  std::pmr::vector<BookLevel> bids(&pool);
-  std::pmr::vector<BookLevel> asks(&pool);
-  bids.emplace_back(Price::fromDouble(bid_price), Quantity::fromDouble(bid_qty));
-  asks.emplace_back(Price::fromDouble(ask_price), Quantity::fromDouble(ask_qty));
-  static_cast<LrvxSimulatedExecutorImpl*>(h)->executor.onBookUpdate(symbol, bids, asks);
+  simTopOfBook(h, symbol, true, bid_price, bid_qty, true, ask_price, ask_qty);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_simulated_executor_on_top_of_book(LrvxSimulatedExecutorHandle h, uint32_t symbol,
+                                            uint8_t has_bid, double bid_price, double bid_qty,
+                                            uint8_t has_ask, double ask_price, double ask_qty)
+{
+  LRVX_CAPI_ENTER_VOID(h);
+  simTopOfBook(h, symbol, has_bid != 0, bid_price, bid_qty, has_ask != 0, ask_price,
+               ask_qty);
   LRVX_CAPI_LEAVE_VOID;
 }
 

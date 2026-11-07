@@ -111,6 +111,7 @@ from C import lrvx_simulated_executor_set_replace_ack_latency_distribution(cobj,
 from C import lrvx_simulated_executor_on_trade_qty(cobj, u32, float, float, u8)
 from C import lrvx_simulated_executor_on_best_levels(cobj, u32, float, float, float, float)
 from C import lrvx_simulated_executor_on_book_snapshot(cobj, u32, Ptr[float], Ptr[float], u32, Ptr[float], Ptr[float], u32)
+from C import lrvx_simulated_executor_on_top_of_book(cobj, u32, u8, float, float, u8, float, float)
 from C import lrvx_backtest_result_create(float, float, u8, float, float, float) -> cobj
 from C import lrvx_backtest_result_destroy(cobj)
 from C import lrvx_backtest_result_record_fill(cobj, u64, u32, u8, float, float, i64)

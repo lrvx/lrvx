@@ -103,10 +103,22 @@ executor.on_trade_qty(symbol=1, price=50000.0, qty=0.5, is_buy=True)
 
 #### `on_best_levels(symbol, bid_price, bid_qty, ask_price, ask_qty)`
 
-Feed a top-of-book snapshot.
+Feed both best levels in one call. Routed to the touch path: depth from the
+last `on_book_snapshot` survives instead of being replaced by a one-level
+book.
 
 ```python
 executor.on_best_levels(1, 49999.0, 2.0, 50001.0, 1.5)
+```
+
+#### `on_top_of_book(symbol, bid, ask)`
+
+Feed a touch-only frame: moves the touch, keeps deeper depth from the last
+snapshot. `bid` / `ask` are `(price, qty)` tuples; `None` means that side
+of the book is empty.
+
+```python
+executor.on_top_of_book(1, (49999.5, 2.0), (50000.5, 1.5))
 ```
 
 #### `set_default_slippage(model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)`

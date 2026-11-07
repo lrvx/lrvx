@@ -214,6 +214,7 @@ exec.cancelOrder(1);
 exec.cancelAll(1);
 exec.onBar(1, 100);
 exec.onTrade(1, 100, true);
+exec.onTopOfBook(1, { price: 100.02, qty: 4 }, null);
 checkAcceptsBigint(() => exec.advanceClock(1n), "SimulatedExecutor.advanceClock accepts bigint ts");
 exec.setDefaultSlippage("fixed_bps", 0, 0, 2.0, 0);
 exec.setDefaultSlippage(SLIPPAGE_FIXED_BPS, 0, 0, 2.0, 0);

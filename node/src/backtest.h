@@ -101,6 +101,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
                                        &SimulatedExecutorWrap::EndBarCallbackWindow),
                         InstanceMethod("reset", &SimulatedExecutorWrap::Reset),
                         InstanceMethod("onTrade", &SimulatedExecutorWrap::OnTrade),
+                        InstanceMethod("onTopOfBook", &SimulatedExecutorWrap::OnTopOfBook),
                         InstanceMethod("advanceClock", &SimulatedExecutorWrap::AdvanceClock),
                         InstanceMethod("setDefaultSlippage", &SimulatedExecutorWrap::SetDefaultSlippage),
                         InstanceMethod("setQueueModel", &SimulatedExecutorWrap::SetQueueModel),
@@ -253,6 +254,42 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   // reports that run and not the sum of every run.
   void Reset(const Napi::CallbackInfo&) { lrvx_simulated_executor_reset(_h); }
   void OnTrade(const Napi::CallbackInfo& info) { lrvx_simulated_executor_on_trade(_h, info[0].As<Napi::Number>().Uint32Value(), info[1].As<Napi::Number>().DoubleValue(), info[2].As<Napi::Boolean>().Value() ? 1 : 0); }
+
+  // Touch-only frame. A side is `{ price, qty }` or null; null means that
+  // side of the book is empty.
+  // A side is `{ price, qty }` or null; null (or undefined) means that
+  // side of the book is empty. Anything else throws — silently feeding an
+  // empty side for a malformed argument would erase the executor's touch.
+  void OnTopOfBook(const Napi::CallbackInfo& info)
+  {
+    auto side = [&info](Napi::Value v, uint8_t& has, double& price, double& qty) -> bool
+    {
+      if (v.IsNull() || v.IsUndefined())
+      {
+        return true;
+      }
+      if (!v.IsObject())
+      {
+        Napi::TypeError::New(info.Env(), "onTopOfBook: a side is { price, qty } or null")
+            .ThrowAsJavaScriptException();
+        return false;
+      }
+      auto o = v.As<Napi::Object>();
+      has = 1;
+      price = o.Get("price").As<Napi::Number>().DoubleValue();
+      qty = o.Get("qty").As<Napi::Number>().DoubleValue();
+      return true;
+    };
+    uint8_t hasBid = 0;
+    uint8_t hasAsk = 0;
+    double bidPrice = 0, bidQty = 0, askPrice = 0, askQty = 0;
+    if (!side(info[1], hasBid, bidPrice, bidQty) || !side(info[2], hasAsk, askPrice, askQty))
+    {
+      return;
+    }
+    lrvx_simulated_executor_on_top_of_book(_h, info[0].As<Napi::Number>().Uint32Value(),
+                                           hasBid, bidPrice, bidQty, hasAsk, askPrice, askQty);
+  }
   void AdvanceClock(const Napi::CallbackInfo& info) { lrvx_simulated_executor_advance_clock(_h, toInt64Ns(info[0])); }
   void SetDefaultSlippage(const Napi::CallbackInfo& info)
   {
