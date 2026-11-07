@@ -48,6 +48,7 @@ from C import lrvx_runner_stop(cobj)
 from C import lrvx_runner_on_trade(cobj, u32, float, float, u8, i64)
 from C import lrvx_runner_on_book_snapshot(cobj, u32, Ptr[float], Ptr[float], u32,
                                             Ptr[float], Ptr[float], u32, i64)
+from C import lrvx_runner_on_book_top(cobj, u32, u8, float, float, u8, float, float, i64)
 from C import lrvx_runner_on_bar(cobj, u32, u8, u64,
                                   float, float, float, float,
                                   float, float, i64, i64, u8)
@@ -61,6 +62,7 @@ from C import lrvx_live_engine_stop(cobj)
 from C import lrvx_live_engine_publish_trade(cobj, u32, float, float, u8, i64)
 from C import lrvx_live_engine_publish_book_snapshot(cobj, u32, Ptr[float], Ptr[float], u32,
                                                        Ptr[float], Ptr[float], u32, i64)
+from C import lrvx_live_engine_publish_book_top(cobj, u32, u8, float, float, u8, float, float, i64)
 from C import lrvx_live_engine_publish_bar(cobj, u32, u8, u64,
                                             float, float, float, float,
                                             float, float, i64, i64, u8)
@@ -340,6 +342,21 @@ class Runner[F]:
                 bid_prices.arr.ptr, bid_qtys.arr.ptr, nb,
                 ask_prices.arr.ptr, ask_qtys.arr.ptr, na,
                 i64(ts_ns))
+
+    def on_book_top(self, symbol: int,
+                    has_bid: bool, bid_price: float, bid_qty: float,
+                    has_ask: bool, ask_price: float, ask_qty: float,
+                    ts_ns: int = 0):
+        hb = u8(1 if has_bid else 0)
+        ha = u8(1 if has_ask else 0)
+        if self._threaded:
+            lrvx_live_engine_publish_book_top(
+                self._live_handle, u32(symbol),
+                hb, bid_price, bid_qty, ha, ask_price, ask_qty, i64(ts_ns))
+        else:
+            lrvx_runner_on_book_top(
+                self._sync_handle, u32(symbol),
+                hb, bid_price, bid_qty, ha, ask_price, ask_qty, i64(ts_ns))
 
     def on_bar(self, symbol: int,
                open: float, high: float, low: float, close: float,

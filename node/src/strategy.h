@@ -1351,6 +1351,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
             InstanceMethod("stop", &RunnerNode::stop),
             InstanceMethod("onTrade", &RunnerNode::onTrade),
             InstanceMethod("onBookSnapshot", &RunnerNode::onBookSnapshot),
+            InstanceMethod("onBookTop", &RunnerNode::onBookTop),
             InstanceMethod("onBar", &RunnerNode::onBar),
             InstanceMethod("setPnlTracker", &RunnerNode::setPnlTracker),
             InstanceMethod("setStorageSink", &RunnerNode::setStorageSink),
@@ -1585,6 +1586,52 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       lrvx_live_engine_publish_book_snapshot(_engine, sym,
                                              bidP.Data(), bidQ.Data(), static_cast<uint32_t>(bidP.ElementLength()),
                                              askP.Data(), askQ.Data(), static_cast<uint32_t>(askP.ElementLength()), ts);
+    }
+    return info.Env().Undefined();
+  }
+
+  Napi::Value onBookTop(const Napi::CallbackInfo& info)
+  {
+    uint32_t sym = symId(info[0]);
+    // A side is `{ price, qty }` or null; null (or undefined) means that
+    // side of the book is empty, matching the quote reads where "no quote"
+    // is null. Anything else throws — silently publishing an empty side
+    // for a malformed argument would erase the live touch.
+    auto side = [&info](Napi::Value v, uint8_t& has, double& price, double& qty) -> bool
+    {
+      if (v.IsNull() || v.IsUndefined())
+      {
+        return true;
+      }
+      if (!v.IsObject())
+      {
+        Napi::TypeError::New(info.Env(), "onBookTop: a side is { price, qty } or null")
+            .ThrowAsJavaScriptException();
+        return false;
+      }
+      auto o = v.As<Napi::Object>();
+      has = 1;
+      price = o.Get("price").As<Napi::Number>().DoubleValue();
+      qty = o.Get("qty").As<Napi::Number>().DoubleValue();
+      return true;
+    };
+    uint8_t hasBid = 0;
+    uint8_t hasAsk = 0;
+    double bidPrice = 0, bidQty = 0, askPrice = 0, askQty = 0;
+    if (!side(info[1], hasBid, bidPrice, bidQty) || !side(info[2], hasAsk, askPrice, askQty))
+    {
+      return info.Env().Undefined();
+    }
+    int64_t ts = info.Length() > 3 ? toInt64Ns(info[3]) : 0;
+    if (_mode == Mode::Sync)
+    {
+      lrvx_runner_on_book_top(_runner, sym, hasBid, bidPrice, bidQty, hasAsk, askPrice,
+                              askQty, ts);
+    }
+    else
+    {
+      lrvx_live_engine_publish_book_top(_engine, sym, hasBid, bidPrice, bidQty, hasAsk,
+                                        askPrice, askQty, ts);
     }
     return info.Env().Undefined();
   }

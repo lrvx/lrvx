@@ -491,6 +491,7 @@ from C import lrvx_live_engine_start(cobj)
 from C import lrvx_live_engine_stop(cobj)
 from C import lrvx_live_engine_publish_trade(cobj, u32, float, float, u8, i64)
 from C import lrvx_live_engine_publish_book_snapshot(cobj, u32, Ptr[float], Ptr[float], u32, Ptr[float], Ptr[float], u32, i64)
+from C import lrvx_live_engine_publish_book_top(cobj, u32, u8, float, float, u8, float, float, i64)
 from C import lrvx_live_engine_publish_bar(cobj, u32, u8, u64, float, float, float, float, float, float, i64, i64, u8)
 
 # ── lrvxrun ──
@@ -825,6 +826,7 @@ from C import lrvx_runner_start(cobj)
 from C import lrvx_runner_stop(cobj)
 from C import lrvx_runner_on_trade(cobj, u32, float, float, u8, i64)
 from C import lrvx_runner_on_book_snapshot(cobj, u32, Ptr[float], Ptr[float], u32, Ptr[float], Ptr[float], u32, i64)
+from C import lrvx_runner_on_book_top(cobj, u32, u8, float, float, u8, float, float, i64)
 from C import lrvx_runner_on_bar(cobj, u32, u8, u64, float, float, float, float, float, float, i64, i64, u8)
 
 # ── symbol_registry ──

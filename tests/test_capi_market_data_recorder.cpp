@@ -194,6 +194,39 @@ TEST(CapiMarketDataRecorder, FiresOnTradeAndBookUpdate)
   lrvx_market_data_recorder_destroy(rec);
 }
 
+// A top frame reaches the recorder as update type 2 (the byte space is
+// 1 snapshot, 0 delta, 2 top) with one level per side; a side whose
+// has-flag is 0 arrives with zero levels.
+TEST(CapiMarketDataRecorder, BookTopArrivesAsUpdateTypeTwo)
+{
+  State state;
+  RunnerCtx s;
+  make_runner(s);
+
+  auto* rec = lrvx_market_data_recorder_create(make_callbacks(state));
+  ASSERT_NE(rec, nullptr);
+  lrvx_runner_set_market_data_recorder(s.runner, rec);
+  lrvx_runner_start(s.runner);
+
+  lrvx_runner_on_book_top(s.runner, s.symbol_id, /*has_bid=*/1, 100.02, 4.0,
+                          /*has_ask=*/1, 100.03, 3.0, /*ts=*/3'000);
+  EXPECT_EQ(state.book_calls.load(), 1);
+  EXPECT_EQ(state.last_book_is_snapshot, 2);
+  EXPECT_EQ(state.last_n_bids, 1u);
+  EXPECT_EQ(state.last_n_asks, 1u);
+  EXPECT_EQ(state.last_top_bid_price_raw, 10002000000LL);
+  EXPECT_EQ(state.last_top_ask_price_raw, 10003000000LL);
+
+  lrvx_runner_on_book_top(s.runner, s.symbol_id, /*has_bid=*/1, 100.02, 4.0,
+                          /*has_ask=*/0, 0.0, 0.0, /*ts=*/4'000);
+  EXPECT_EQ(state.book_calls.load(), 2);
+  EXPECT_EQ(state.last_n_bids, 1u);
+  EXPECT_EQ(state.last_n_asks, 0u);
+
+  lrvx_runner_stop(s.runner);
+  lrvx_market_data_recorder_destroy(rec);
+}
+
 TEST(CapiMarketDataRecorder, NullDetachesRecorder)
 {
   State state;
@@ -308,4 +341,33 @@ TEST(CapiMarketDataRecorder, ReplaceRecorderRotatesLifecycle)
 
   lrvx_market_data_recorder_destroy(recA);
   lrvx_market_data_recorder_destroy(recB);
+}
+
+// The live engine's publish path mirrors to the recorder on the publisher
+// thread, so the frame is observable synchronously even though strategy
+// consumers run on their own threads.
+TEST(CapiMarketDataRecorder, LiveEnginePublishBookTopMirrorsTypeTwo)
+{
+  State state;
+  auto* registry = lrvx_registry_create();
+  uint32_t sym = lrvx_registry_add_symbol(registry, "test", "BTC", 0.01);
+  auto* engine = lrvx_live_engine_create(registry);
+  auto* rec = lrvx_market_data_recorder_create(make_callbacks(state));
+  ASSERT_NE(rec, nullptr);
+  lrvx_live_engine_set_market_data_recorder(engine, rec);
+  lrvx_live_engine_start(engine);
+
+  lrvx_live_engine_publish_book_top(engine, sym, /*has_bid=*/1, 100.02, 4.0,
+                                    /*has_ask=*/1, 100.03, 3.0, /*ts=*/3'000);
+  EXPECT_EQ(state.book_calls.load(), 1);
+  EXPECT_EQ(state.last_book_is_snapshot, 2);
+  EXPECT_EQ(state.last_n_bids, 1u);
+  EXPECT_EQ(state.last_n_asks, 1u);
+  EXPECT_EQ(state.last_top_bid_price_raw, 10002000000LL);
+  EXPECT_EQ(state.last_top_ask_price_raw, 10003000000LL);
+
+  lrvx_live_engine_stop(engine);
+  lrvx_live_engine_destroy(engine);
+  lrvx_market_data_recorder_destroy(rec);
+  lrvx_registry_destroy(registry);
 }

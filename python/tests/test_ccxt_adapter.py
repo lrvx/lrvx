@@ -73,6 +73,7 @@ class FakeCcxtExchange:
     def init_queues(self):
         self._trades_q = asyncio.Queue()
         self._book_q = asyncio.Queue()
+        self._bbo_q = asyncio.Queue()
         self._orders_q = asyncio.Queue()
 
     def feed_trades(self, trades):
@@ -80,6 +81,9 @@ class FakeCcxtExchange:
 
     def feed_book(self, book):
         self._book_q.put_nowait(book)
+
+    def feed_bbo(self, tickers):
+        self._bbo_q.put_nowait(tickers)
 
     def feed_orders(self, orders):
         self._orders_q.put_nowait(orders)
@@ -96,6 +100,9 @@ class FakeCcxtExchange:
 
     async def watch_order_book(self, symbol, limit=20):
         return await self._book_q.get()
+
+    async def watch_bids_asks(self, symbols):
+        return await self._bbo_q.get()
 
     async def watch_orders(self):
         return await self._orders_q.get()
@@ -301,6 +308,48 @@ class CcxtBrokerTests(unittest.TestCase):
         bid, ask = seen[0]
         self.assertEqual(bid, 100.0)
         self.assertEqual(ask, 100.5)
+
+    def test_bbo_stream_forwards_to_book_top(self):
+        fake = FakeCcxtExchange()
+        broker = CcxtBroker("binance", exchange=fake)
+        book_calls = []
+
+        class S(lrvx.Strategy):
+            def on_book_update(self, ctx):
+                book_calls.append(ctx.best_bid)
+
+        strat = None
+
+        async def go():
+            nonlocal strat
+            btc = await broker.add_symbol("BTC/USDT")
+            strat = S([btc])
+            broker.add_strategy(strat)
+            fake.init_queues()
+            fake.feed_bbo({
+                "BTC/USDT": {
+                    "symbol": "BTC/USDT",
+                    "bid": 100.02, "bidVolume": 4.0,
+                    "ask": 100.03, "askVolume": 3.0,
+                    "timestamp": 1_700_000_000_000,
+                },
+            })
+            run_task = asyncio.create_task(
+                broker.run(streams=("bbo",), reconcile=False)
+            )
+            await asyncio.sleep(0.05)
+            await broker.stop()
+            try:
+                await run_task
+            except asyncio.CancelledError:
+                pass
+
+        asyncio.run(go())
+        # A top frame lands in the touch, not the depth book: the pull
+        # accessors move and on_book_update never fires.
+        self.assertEqual(book_calls, [])
+        self.assertEqual(strat.best_bid(), 100.02)
+        self.assertEqual(strat.best_ask(), 100.03)
 
     def test_orders_stream_dispatches_to_strategy(self):
         fake = FakeCcxtExchange()

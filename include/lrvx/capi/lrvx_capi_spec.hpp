@@ -3074,6 +3074,16 @@ extern "C"
                                               uint32_t n_asks,
                                               int64_t exchange_ts_ns);
 
+  // Publish a touch-only frame (BookUpdateType::TOP_OF_BOOK) to the
+  // BookUpdateBus. Same side contract as lrvx_runner_on_book_top.
+  // Lock-free. Returns immediately; consumer threads process asynchronously.
+  LRVX_EXPORT(group = "lrvxliveengine_disruptor")
+  void lrvx_live_engine_publish_book_top(LrvxLiveEngineHandle engine,
+                                         uint32_t symbol,
+                                         uint8_t has_bid, double bid_price, double bid_qty,
+                                         uint8_t has_ask, double ask_price, double ask_qty,
+                                         int64_t exchange_ts_ns);
+
   // Publish a closed OHLC bar to the BarBus.
   // Lock-free. Returns immediately; consumer threads process asynchronously.
   LRVX_EXPORT(group = "lrvxliveengine_disruptor")
@@ -3177,6 +3187,17 @@ extern "C"
                                     const double* ask_prices, const double* ask_qtys,
                                     uint32_t n_asks,
                                     int64_t exchange_ts_ns);
+
+  // Push a touch-only frame (BookUpdateType::TOP_OF_BOOK): one level per
+  // side. has_bid == 0 means the bid side is empty and its price/qty are
+  // ignored; same for has_ask. The flag is the only emptiness signal — a
+  // side with its flag set and qty 0 is a present, zero-sized touch.
+  // Lands in the strategy's touch fields; the depth book ignores it.
+  LRVX_EXPORT(group = "strategyrunner_synchronous")
+  void lrvx_runner_on_book_top(LrvxRunnerHandle runner, uint32_t symbol,
+                               uint8_t has_bid, double bid_price, double bid_qty,
+                               uint8_t has_ask, double ask_price, double ask_qty,
+                               int64_t exchange_ts_ns);
 
   // Push a closed OHLC bar. Strategy on_bar callbacks fire synchronously.
   // bar_type / bar_type_param / close_reason match LrvxBarData.

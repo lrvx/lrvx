@@ -66,15 +66,19 @@ Other constructor keywords: `password` (for venues that need a passphrase), `on_
 
 ## Streams
 
-Pass any subset of `("trades", "book", "orders")` to `run(streams=...)`:
+Pass any subset of `("trades", "book", "bbo", "orders")` to `run(streams=...)`:
 
 | Stream    | ccxt method               | lrvx target                                                    |
 |-----------|---------------------------|----------------------------------------------------------------|
 | `trades`  | `watch_trades(sym)`       | `runner.on_trade(sym_id, price, qty, is_buy, ts_ns)`           |
 | `book`    | `watch_order_book(sym)`   | `runner.on_book_snapshot(sym_id, bids/asks)`                   |
+| `bbo`     | `watch_bids_asks(sym)`    | `runner.on_book_top(sym_id, bid, ask)`                         |
 | `orders`  | `watch_orders()`          | strategy's `on_order_update(ccxt_sym, status, filled, avg)`    |
 
-Each yields a snapshot per call.
+`trades` and `book` yield a snapshot per call. `bbo` yields a touch-only
+frame: it lands in the strategy's touch fields without replacing the depth
+book `book` maintains, so the touch stays fresh between (often throttled)
+depth updates.
 
 Book depth is a keyword on `run()`, not on the constructor: `run(book_depth=N)`. It defaults to `None`, which means no `limit` is passed to `watch_order_book` and ccxt picks the venue's default channel. The one exception is a built-in per-exchange override — `_BOOK_DEPTH_OVERRIDE = {"bitget": 15}`, because ccxt.pro's default `books50` channel for Bitget USDT-FUTURES is rejected by the venue with error 30016.
 

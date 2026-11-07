@@ -1554,6 +1554,10 @@ extern "C"
                                               uint32_t n_bids, const double* ask_prices,
                                               const double* ask_qtys, uint32_t n_asks,
                                               int64_t exchange_ts_ns);
+  void lrvx_live_engine_publish_book_top(LrvxLiveEngineHandle engine, uint32_t symbol,
+                                         uint8_t has_bid, double bid_price, double bid_qty,
+                                         uint8_t has_ask, double ask_price, double ask_qty,
+                                         int64_t exchange_ts_ns);
   void lrvx_live_engine_publish_bar(LrvxLiveEngineHandle engine, uint32_t symbol, uint8_t bar_type,
                                     uint64_t bar_type_param, double open, double high, double low,
                                     double close, double volume, double buy_volume,
@@ -2477,6 +2481,9 @@ extern "C"
                                     const double* bid_prices, const double* bid_qtys,
                                     uint32_t n_bids, const double* ask_prices,
                                     const double* ask_qtys, uint32_t n_asks, int64_t exchange_ts_ns);
+  void lrvx_runner_on_book_top(LrvxRunnerHandle runner, uint32_t symbol, uint8_t has_bid,
+                               double bid_price, double bid_qty, uint8_t has_ask,
+                               double ask_price, double ask_qty, int64_t exchange_ts_ns);
   void lrvx_runner_on_bar(LrvxRunnerHandle runner, uint32_t symbol, uint8_t bar_type,
                           uint64_t bar_type_param, double open, double high, double low,
                           double close, double volume, double buy_volume, int64_t start_time_ns,

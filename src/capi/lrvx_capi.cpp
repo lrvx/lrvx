@@ -6521,6 +6521,53 @@ class RunnerSignalHandler : public ISignalHandler
   std::atomic<int64_t> _traceFeedTsNs{0};
 };
 
+// Re-pack a book event into LrvxBookLevel arrays and hand it to a recorder
+// hook. Shared by the runner and the live engine: both mirror every book
+// push, and the byte space (1 snapshot, 0 delta, 2 top) has to be computed
+// in exactly one place.
+static void mirrorBookToRecorder(LrvxMarketDataRecorderImpl* r, const BookUpdateEvent& ev,
+                                 uint32_t symbol, uint32_t n_bids, uint32_t n_asks,
+                                 int64_t ts_ns)
+{
+  if (r == nullptr || r->cb.on_book_update == nullptr)
+  {
+    return;
+  }
+  // Stack buffers up to a small threshold; heap-fall back for deep books.
+  constexpr uint32_t kStackLevels = 64;
+  LrvxBookLevel stackBids[kStackLevels];
+  LrvxBookLevel stackAsks[kStackLevels];
+  std::vector<LrvxBookLevel> heapBids;
+  std::vector<LrvxBookLevel> heapAsks;
+  LrvxBookLevel* bidPtr = stackBids;
+  LrvxBookLevel* askPtr = stackAsks;
+  if (n_bids > kStackLevels)
+  {
+    heapBids.resize(n_bids);
+    bidPtr = heapBids.data();
+  }
+  if (n_asks > kStackLevels)
+  {
+    heapAsks.resize(n_asks);
+    askPtr = heapAsks.data();
+  }
+  for (uint32_t i = 0; i < n_bids; ++i)
+  {
+    bidPtr[i].price_raw = ev.update.bids[i].price.raw();
+    bidPtr[i].quantity_raw = ev.update.bids[i].quantity.raw();
+  }
+  for (uint32_t i = 0; i < n_asks; ++i)
+  {
+    askPtr[i].price_raw = ev.update.asks[i].price.raw();
+    askPtr[i].quantity_raw = ev.update.asks[i].quantity.raw();
+  }
+  const uint8_t updateType = (ev.update.type == BookUpdateType::SNAPSHOT) ? 1u
+                             : (ev.update.type == BookUpdateType::DELTA)  ? 0u
+                                                                          : 2u;
+  r->cb.on_book_update(r->cb.user_data, symbol, updateType,
+                       bidPtr, n_bids, askPtr, n_asks, ts_ns);
+}
+
 struct LrvxRunnerImpl
 {
   SymbolRegistry* registry;
@@ -6696,51 +6743,41 @@ struct LrvxRunnerImpl
                                 Quantity::fromDouble(ask_qtys[i])});
     }
 
+    dispatchBook(ev, symbol, n_bids, n_asks, ts_ns);
+  }
+
+  void onBookTop(uint32_t symbol, bool has_bid, double bid_price, double bid_qty,
+                 bool has_ask, double ask_price, double ask_qty, int64_t ts_ns)
+  {
+    BookUpdateEvent ev(&pool);
+    ev.update.symbol = symbol;
+    ev.update.type = BookUpdateType::TOP_OF_BOOK;
+    ev.update.exchangeTsNs = UnixNanos(ts_ns);
+
+    if (has_bid)
+    {
+      ev.update.bids.push_back({Price::fromDouble(bid_price), Quantity::fromDouble(bid_qty)});
+    }
+    if (has_ask)
+    {
+      ev.update.asks.push_back({Price::fromDouble(ask_price), Quantity::fromDouble(ask_qty)});
+    }
+
+    dispatchBook(ev, symbol, static_cast<uint32_t>(ev.update.bids.size()),
+                 static_cast<uint32_t>(ev.update.asks.size()), ts_ns);
+  }
+
+  // Shared tail of onBookSnapshot / onBookTop: strategy dispatch, then the
+  // recorder mirror.
+  void dispatchBook(const BookUpdateEvent& ev, uint32_t symbol, uint32_t n_bids,
+                    uint32_t n_asks, int64_t ts_ns)
+  {
     for (auto* s : strategies)
     {
       s->onBookUpdate(ev);
     }
-
-    if (auto* r = recorder.load(std::memory_order_acquire);
-        r != nullptr && r->cb.on_book_update != nullptr)
-    {
-      // Re-pack levels into LrvxBookLevel for the C ABI. Stack buffers up
-      // to a small threshold; heap-fall back for deep books.
-      constexpr uint32_t kStackLevels = 64;
-      LrvxBookLevel stackBids[kStackLevels];
-      LrvxBookLevel stackAsks[kStackLevels];
-      std::vector<LrvxBookLevel> heapBids;
-      std::vector<LrvxBookLevel> heapAsks;
-      LrvxBookLevel* bidPtr = stackBids;
-      LrvxBookLevel* askPtr = stackAsks;
-      if (n_bids > kStackLevels)
-      {
-        heapBids.resize(n_bids);
-        bidPtr = heapBids.data();
-      }
-      if (n_asks > kStackLevels)
-      {
-        heapAsks.resize(n_asks);
-        askPtr = heapAsks.data();
-      }
-      for (uint32_t i = 0; i < n_bids; ++i)
-      {
-        bidPtr[i].price_raw = ev.update.bids[i].price.raw();
-        bidPtr[i].quantity_raw = ev.update.bids[i].quantity.raw();
-      }
-      for (uint32_t i = 0; i < n_asks; ++i)
-      {
-        askPtr[i].price_raw = ev.update.asks[i].price.raw();
-        askPtr[i].quantity_raw = ev.update.asks[i].quantity.raw();
-      }
-      // 1 snapshot, 0 delta, 2 top. Used to be hardcoded to 1, which
-      // reported every delta as a snapshot.
-      const uint8_t updateType = (ev.update.type == BookUpdateType::SNAPSHOT) ? 1u
-                                 : (ev.update.type == BookUpdateType::DELTA)  ? 0u
-                                                                              : 2u;
-      r->cb.on_book_update(r->cb.user_data, symbol, updateType,
-                           bidPtr, n_bids, askPtr, n_asks, ts_ns);
-    }
+    mirrorBookToRecorder(recorder.load(std::memory_order_acquire), ev, symbol,
+                         n_bids, n_asks, ts_ns);
   }
 
   void onBar(uint32_t symbol, uint8_t bar_type, uint64_t bar_type_param,
@@ -7015,39 +7052,40 @@ struct LrvxLiveEngineImpl
     }
 
     // Mirror to recorder before publish — see publishTrade comment.
-    if (auto* r = recorder.load(std::memory_order_acquire);
-        r != nullptr && r->cb.on_book_update != nullptr)
+    mirrorBookToRecorder(recorder.load(std::memory_order_acquire), *ev, symbol,
+                         n_bids, n_asks, ts_ns);
+
+    bookBus->publish(std::move(evOpt.value()));
+  }
+
+  void publishBookTop(uint32_t symbol,
+                      bool has_bid, double bid_price, double bid_qty,
+                      bool has_ask, double ask_price, double ask_qty,
+                      int64_t ts_ns)
+  {
+    auto evOpt = bookPool.acquire();
+    if (!evOpt)
     {
-      constexpr uint32_t kStackLevels = 64;
-      LrvxBookLevel stackBids[kStackLevels];
-      LrvxBookLevel stackAsks[kStackLevels];
-      std::vector<LrvxBookLevel> heapBids;
-      std::vector<LrvxBookLevel> heapAsks;
-      LrvxBookLevel* bidPtr = stackBids;
-      LrvxBookLevel* askPtr = stackAsks;
-      if (n_bids > kStackLevels)
-      {
-        heapBids.resize(n_bids);
-        bidPtr = heapBids.data();
-      }
-      if (n_asks > kStackLevels)
-      {
-        heapAsks.resize(n_asks);
-        askPtr = heapAsks.data();
-      }
-      for (uint32_t i = 0; i < n_bids; ++i)
-      {
-        bidPtr[i].price_raw = ev->update.bids[i].price.raw();
-        bidPtr[i].quantity_raw = ev->update.bids[i].quantity.raw();
-      }
-      for (uint32_t i = 0; i < n_asks; ++i)
-      {
-        askPtr[i].price_raw = ev->update.asks[i].price.raw();
-        askPtr[i].quantity_raw = ev->update.asks[i].quantity.raw();
-      }
-      r->cb.on_book_update(r->cb.user_data, symbol, /*is_snapshot=*/1u,
-                           bidPtr, n_bids, askPtr, n_asks, ts_ns);
+      return;
     }
+    auto& ev = *evOpt;
+    ev->update.symbol = symbol;
+    ev->update.type = BookUpdateType::TOP_OF_BOOK;
+    ev->update.exchangeTsNs = UnixNanos(ts_ns);
+    ev->update.bids.clear();
+    ev->update.asks.clear();
+    if (has_bid)
+    {
+      ev->update.bids.push_back({Price::fromDouble(bid_price), Quantity::fromDouble(bid_qty)});
+    }
+    if (has_ask)
+    {
+      ev->update.asks.push_back({Price::fromDouble(ask_price), Quantity::fromDouble(ask_qty)});
+    }
+
+    mirrorBookToRecorder(recorder.load(std::memory_order_acquire), *ev, symbol,
+                         static_cast<uint32_t>(ev->update.bids.size()),
+                         static_cast<uint32_t>(ev->update.asks.size()), ts_ns);
 
     bookBus->publish(std::move(evOpt.value()));
   }
@@ -8357,6 +8395,17 @@ void lrvx_runner_on_book_snapshot(LrvxRunnerHandle runner, uint32_t symbol,
   LRVX_CAPI_LEAVE_VOID;
 }
 
+void lrvx_runner_on_book_top(LrvxRunnerHandle runner, uint32_t symbol,
+                             uint8_t has_bid, double bid_price, double bid_qty,
+                             uint8_t has_ask, double ask_price, double ask_qty,
+                             int64_t exchange_ts_ns)
+{
+  LRVX_CAPI_ENTER_VOID(runner);
+  toRunner(runner)->onBookTop(symbol, has_bid != 0, bid_price, bid_qty,
+                              has_ask != 0, ask_price, ask_qty, exchange_ts_ns);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
 void lrvx_runner_on_bar(LrvxRunnerHandle runner, uint32_t symbol,
                         uint8_t bar_type, uint64_t bar_type_param,
                         double open, double high, double low, double close,
@@ -8499,6 +8548,17 @@ void lrvx_live_engine_publish_book_snapshot(LrvxLiveEngineHandle engine,
                                             bid_prices, bid_qtys, n_bids,
                                             ask_prices, ask_qtys, n_asks,
                                             exchange_ts_ns);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_live_engine_publish_book_top(LrvxLiveEngineHandle engine, uint32_t symbol,
+                                       uint8_t has_bid, double bid_price, double bid_qty,
+                                       uint8_t has_ask, double ask_price, double ask_qty,
+                                       int64_t exchange_ts_ns)
+{
+  LRVX_CAPI_ENTER_VOID(engine);
+  toLiveEngine(engine)->publishBookTop(symbol, has_bid != 0, bid_price, bid_qty,
+                                       has_ask != 0, ask_price, ask_qty, exchange_ts_ns);
   LRVX_CAPI_LEAVE_VOID;
 }
 
