@@ -76,7 +76,7 @@ Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The 
 
 ## Record tops
 
-A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`. `EventTypeStatsAggregator` does not count them, since its per-symbol table has columns for trades, snapshots and deltas only; `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
+A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`. `EventTypeStatsAggregator` counts them in its `book_tops` column, and `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
 
 ## See also
 

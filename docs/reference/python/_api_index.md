@@ -598,7 +598,7 @@ Resample with replacement from observed values. Pass three lists of measured lat
 
 ### `class EventTypeStatsAggregator(_AggregatorHandle)`
 
-Per-symbol counters split by event kind (trade / book_snapshot / book_delta). Cheapest of the native aggregators; useful as the 'what's in this tape' overview.
+Per-symbol counters split by event kind (trade / book_snapshot / book_delta / book_top). Cheapest of the native aggregators; useful as the 'what's in this tape' overview.
 
 **Constructor**
 

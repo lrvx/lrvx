@@ -22,13 +22,12 @@ Consumers that read it as a snapshot of the touch:
 
 - `CompositeBookMatrix`, the cross-venue matrix: a top replaces both sides of that venue's touch, like a snapshot would.
 - `SymbolContext`, the per-symbol state every strategy callback receives: a top writes the touch fields and nothing else (next section).
-- `SimulatedExecutor`, the backtest venue: a top moves the touch, drops its own levels that are more aggressive than it, keeps the deeper levels from the last depth frame, then runs the same matching pass as a depth update. The backtest runner routes top frames there. A strategy that sees a fresher touch than the last depth frame therefore fills at that touch, not at the depth frame's best.
+- `SimulatedExecutor`, the backtest venue: a top moves the touch, drops its own levels that are more aggressive than it, keeps the deeper levels from the last depth frame, then runs the same matching pass as a depth update. The backtest runner routes top frames there, and a hand-driven executor takes one through `on_top_of_book` in Python, `onTopOfBook` in Node and embedded JavaScript, and `lrvx_simulated_executor_on_top_of_book` in the C API. The one-level `on_best_levels` feed goes the same way. A strategy that sees a fresher touch than the last depth frame therefore fills at that touch, not at the depth frame's best.
 
 Consumers that ignore it:
 
 - `NLevelOrderBook`, the depth book inside `SymbolContext` and anywhere else it is used.
 - `BookSnapshotBinAggregator`, which reconstructs depth from snapshots and deltas.
-- `EventTypeStatsAggregator`, the per-symbol count of trades, snapshots and deltas: a top is in none of its three columns, so a tape that is all tops reads as having no book events there. `BinCountAggregator` and the writer's `total_book_updates` count them.
 
 ## What the strategy sees
 
@@ -66,7 +65,7 @@ The recorder keeps the frame as its own kind. A top is frame type `6` (`BookTop`
 
 Two byte spaces meet here and the readers say which they speak. The record byte is `0` snapshot, `1` delta, `2` top, and that is what `event_type` carries on the rows of `DataReader.read_book_updates()` and `read_bbo()` and on their C API, Node and Codon equivalents. The frame type is `2`, `3`, `6`, and that is what `event_type` carries on the rows of `MergedTapeReader.read_books()`. A consumer that reconstructs depth from either must treat the top value as a touch, or skip it; applying it as a delta is the stranded-level failure above.
 
-The recorder hook's book callback carries a third value as well. Its `is_snapshot` argument is a byte: `1` snapshot, `0` delta, `2` top. The two boolean values predate the third and keep their meaning. Surfaces whose shape is a bool skip tops the way an old reader skips the frame: the custom recorder hooks in Python and Node, `MergedTapeReader.stream_events`, `replay_tapes`, and `DataWriter.write_book`, which can write snapshots and deltas only. `metadata.json` carries `has_book_tops` next to `has_book_snapshots` and `has_book_deltas`.
+The recorder hook's book callback carries a third value as well. Its `is_snapshot` argument is a byte: `1` snapshot, `0` delta, `2` top. The two boolean values predate the third and keep their meaning. Surfaces whose shape is a bool skip tops the way an old reader skips the frame: the custom recorder hooks in Python and Node, `MergedTapeReader.stream_events`, `replay_tapes`, and `DataWriter.write_book`, which can write snapshots and deltas only. `metadata.json` carries `has_book_tops` next to `has_book_snapshots` and `has_book_deltas`, and `EventTypeStatsAggregator` counts tops in a `book_tops` column next to its snapshot and delta columns.
 
 A backtest from such a tape replays the frame the way live delivered it: the strategy's touch moves, the depth book does not, and the simulated venue fills at the touch the strategy saw.
 
