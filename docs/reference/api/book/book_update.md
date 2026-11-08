@@ -64,3 +64,4 @@ struct BookUpdate
 * Downstream filters can quickly ignore instruments by checking `instrument` without a `SymbolRegistry` lookup.
 * **Option fields are optional:** they are populated only when `instrument == InstrumentType::Option`.
 * Uses `UnixNanos` (int64_t nanoseconds) for precise timestamps.
+* `TOP_OF_BOOK` is consumed as a snapshot of the touch and ignored by depth books; [The touch and the book](../../../explanation/the-touch.md) lists who does which.

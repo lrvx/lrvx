@@ -86,6 +86,7 @@ SECTIONS: list[tuple[str, list[Entry]]] = [
     ("How-to: strategy and backtest", [
         ("docs/how-to/README.md", "How-to index", "Task-oriented recipes"),
         ("docs/how-to/strategy-classes.md", "Strategy class shapes", "Strategy, SignalStrategy, when to pick which"),
+        ("docs/how-to/read-the-touch.md", "Read the touch from a strategy", "Best bid / ask that follow top-of-book frames; last_touch_ns versus last_update_ns"),
         ("docs/how-to/backtest.md", "Run a backtest", "Replay-driven backtest setup"),
         ("docs/how-to/backtest-realistic-fills.md", "Realistic fills", "Slippage and queue simulation"),
         ("docs/how-to/interactive-backtest.md", "Interactive backtest", "Step through a backtest"),
@@ -175,6 +176,7 @@ SECTIONS: list[tuple[str, list[Entry]]] = [
         ("docs/explanation/indicators.md", "Indicators concept", "How indicators participate in the graph"),
         ("docs/explanation/disruptor.md", "Disruptor pattern", "Single-producer ringbuffer model"),
         ("docs/explanation/memory-model.md", "Memory model", "Pools, refcounting, lifetime"),
+        ("docs/explanation/the-touch.md", "The touch and the book", "The one-level top-of-book frame: who consumes it, who ignores it, how it travels through the backtester and the tape"),
     ]),
 ]
 

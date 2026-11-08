@@ -45,6 +45,7 @@ Documentation is grouped below by Diátaxis category — pick the section matchi
 
 - [How-to index](https://docs.lrvx.dev/how-to/): Task-oriented recipes
 - [Strategy class shapes](https://docs.lrvx.dev/how-to/strategy-classes/): Strategy, SignalStrategy, when to pick which
+- [Read the touch from a strategy](https://docs.lrvx.dev/how-to/read-the-touch/): Best bid / ask that follow top-of-book frames; last_touch_ns versus last_update_ns
 - [Run a backtest](https://docs.lrvx.dev/how-to/backtest/): Replay-driven backtest setup
 - [Realistic fills](https://docs.lrvx.dev/how-to/backtest-realistic-fills/): Slippage and queue simulation
 - [Interactive backtest](https://docs.lrvx.dev/how-to/interactive-backtest/): Step through a backtest
@@ -145,3 +146,4 @@ Documentation is grouped below by Diátaxis category — pick the section matchi
 - [Indicators concept](https://docs.lrvx.dev/explanation/indicators/): How indicators participate in the graph
 - [Disruptor pattern](https://docs.lrvx.dev/explanation/disruptor/): Single-producer ringbuffer model
 - [Memory model](https://docs.lrvx.dev/explanation/memory-model/): Pools, refcounting, lifetime
+- [The touch and the book](https://docs.lrvx.dev/explanation/the-touch/): The one-level top-of-book frame: who consumes it, who ignores it, how it travels through the backtester and the tape

@@ -173,3 +173,4 @@ private:
 - [Strategy](strategy.md) - Strategy base class
 - [NLevelOrderBook](../book/nlevel_order_book.md) - Order book implementation
 - [SymbolStateMap](symbol_state_map.md) - O(1) container for per-symbol state
+- [The touch and the book](../../../explanation/the-touch.md) - the touch fields against the book, and the two stamps

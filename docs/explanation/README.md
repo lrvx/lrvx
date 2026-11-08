@@ -24,6 +24,7 @@ Understand concepts and design decisions behind lrvx. These pages are language-a
 | [The reference backtest](reference-backtest.md) | One strategy, one file, pinned numbers, and the execution rules they follow |
 | [Bar-close ordering](bar-close-ordering.md) | Which aggregator fires first when several bars close on the same instant |
 | [Connectors](connectors.md) | The native exchange connectors module and the interfaces it implements |
+| [The touch and the book](the-touch.md) | Where the best bid and ask come from, who reads the one-level top-of-book frame and who ignores it, and how it travels through the backtester and the tape |
 | [MCP control plane](mcp-control-plane.md) | Why the AI-agent control surface is shaped the way it is |
 | [Venue-stack reproducibility](venue-stack-reproducibility.md) | What makes a backtest result reproducible across machines |
 | [Build feature flags](../build/feature-flags.md) | Every CMake option, what it costs, and what it depends on |
