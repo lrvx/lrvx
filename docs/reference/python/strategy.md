@@ -238,6 +238,7 @@ runner.stop()
 | `stop()` | Stop the runner |
 | `on_trade(symbol, price, qty, is_buy, ts_ns=0)` | Inject a trade event |
 | `on_book_snapshot(symbol, bid_prices, bid_qtys, ask_prices, ask_qtys, ts_ns=0)` | Inject an order book snapshot |
+| `on_book_top(symbol, bid, ask, ts_ns=0)` | Inject a touch-only frame: moves the strategy's touch without a book callback. `bid` / `ask` are `(price, qty)` tuples; `None` means that side of the book is empty |
 | `on_bar(symbol, open, high, low, close, volume=0, buy_volume=0, start_time_ns=0, end_time_ns=0, bar_type=0, bar_type_param=0, close_reason=0)` | Inject a closed OHLC bar |
 
 `symbol` accepts a `Symbol` object or a raw `int`.

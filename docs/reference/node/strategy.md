@@ -145,6 +145,7 @@ In threaded mode, events are published to a lock-free ring buffer and callbacks 
 | `stop()` | Stop and clean up |
 | `onTrade(symbol, price, qty, isBuy, tsNs)` | Inject a trade tick |
 | `onBookSnapshot(symbol, bidPrices, bidQtys, askPrices, askQtys, tsNs)` | Inject an L2 snapshot |
+| `onBookTop(symbol, bid, ask, tsNs)` | Inject a touch-only frame: moves the strategy's touch without a book callback. `bid` / `ask` are `{ price, qty }`; `null` means that side of the book is empty |
 | `onBar(symbol, { open, high, low, close, volume?, ... })` | Inject a closed OHLC bar |
 
 `symbol` accepts a `Symbol` object or a raw number. `tsNs` accepts a number or a `bigint`.

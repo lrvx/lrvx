@@ -362,3 +362,44 @@ TEST(CApiBookSnapshot, SymbolContextQueryReportsZeroForAnEmptySide)
   EXPECT_EQ(ctx.book.has_ask, 0)
       << "the ask side has none; the flag, not the zero price, says so";
 }
+
+// The runner's book-top entry point lands in the same touch the bridge
+// path above pins: the pull accessors move, last_touch_ns carries the
+// frame's stamp, and on_book stays silent — a SNAPSHOT dispatch would
+// move the touch too, so the silence is what tells the two apart.
+TEST(CApiBookSnapshot, RunnerBookTopMovesTheStrategyTouch)
+{
+  auto* reg = lrvx_registry_create();
+  uint32_t sym = lrvx_registry_add_symbol(reg, "test", "BTC", 0.01);
+  TouchCaptured cap;
+  LrvxStrategyCallbacks cb{};
+  cb.on_book = &onBookCount;
+  cb.user_data = &cap;
+  uint32_t syms[] = {sym};
+  auto* strat = lrvx_strategy_create(1, syms, 1, reg, cb);
+  auto* runner = lrvx_runner_create(
+      reg, [](void*, const LrvxSignal*) {}, nullptr);
+  lrvx_runner_add_strategy(runner, strat);
+  lrvx_runner_start(runner);
+
+  double bp[] = {100.00};
+  double bq[] = {2.5};
+  double ap[] = {100.05};
+  double aq[] = {1.25};
+  lrvx_runner_on_book_snapshot(runner, sym, bp, bq, 1, ap, aq, 1, /*ts=*/1'000);
+  ASSERT_EQ(cap.bookCalls, 1);
+  lrvx_runner_on_book_top(runner, sym, /*has_bid=*/1, 100.02, 4.0, /*has_ask=*/1, 100.03,
+                          3.0, /*ts=*/2'000);
+  EXPECT_EQ(cap.bookCalls, 1) << "a top frame must not fire on_book";
+
+  EXPECT_EQ(lrvx_best_bid_raw(strat, sym), Price::fromDouble(100.02).raw());
+  EXPECT_EQ(lrvx_best_ask_raw(strat, sym), Price::fromDouble(100.03).raw());
+  LrvxSymbolContext ctx{};
+  lrvx_get_symbol_context(strat, sym, &ctx);
+  EXPECT_EQ(ctx.last_touch_ns, 2'000);
+
+  lrvx_runner_stop(runner);
+  lrvx_runner_destroy(runner);
+  lrvx_strategy_destroy(strat);
+  lrvx_registry_destroy(reg);
+}

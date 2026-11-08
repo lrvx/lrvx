@@ -51,7 +51,8 @@ What the broker does
   up in a ``create_*_order`` call on the exchange.
 - ``run(streams=...)`` spawns one asyncio task per (symbol × stream)
   pair. ``"trades"`` and ``"book"`` forward into ``runner.on_trade`` /
-  ``runner.on_book_snapshot``. ``"orders"`` dispatches to
+  ``runner.on_book_snapshot``; ``"bbo"`` forwards ``watch_bids_asks``
+  into ``runner.on_book_top``. ``"orders"`` dispatches to
   ``strategy.on_order_update(ccxt_sym, status, filled, avg_price)``
   when the strategy defines that method.
 - Before streams start, the broker calls ``fetch_balance()`` and
@@ -471,14 +472,18 @@ class CcxtBroker:
     ) -> None:
         """Start the runner, dispatch positions, spawn streams, await.
 
-        ``streams`` may include ``"trades"``, ``"book"``, and
-        ``"orders"``. The orders stream is a single
-        ``watch_orders()`` task — ccxt aggregates updates across
-        symbols. Returns when every task is cancelled (typically via
-        ``Ctrl+C`` or an outer ``async with`` exit).
+        ``streams`` may include ``"trades"``, ``"book"``, ``"bbo"``,
+        and ``"orders"``. ``"bbo"`` runs ``watch_bids_asks`` next to
+        the book stream and forwards into ``runner.on_book_top``: the
+        touch stays fresh between (often throttled) depth updates
+        without the one-level frame replacing the depth book. The
+        orders stream is a single ``watch_orders()`` task — ccxt
+        aggregates updates across symbols. Returns when every task is
+        cancelled (typically via ``Ctrl+C`` or an outer ``async
+        with`` exit).
         """
         await self._ensure_exchange()
-        valid = {"trades", "book", "orders"}
+        valid = {"trades", "book", "bbo", "orders"}
         unknown = [s for s in streams if s not in valid]
         if unknown:
             raise ValueError(
@@ -516,6 +521,12 @@ class CcxtBroker:
                 self._tasks.append(asyncio.create_task(
                     self._book_loop(ccxt_sym, lrvx_sym, book_depth),
                     name=f"ccxt-book-{ccxt_sym}",
+                ))
+        if "bbo" in streams:
+            for ccxt_sym, lrvx_sym in self._ccxt_to_sym.items():
+                self._tasks.append(asyncio.create_task(
+                    self._bbo_loop(ccxt_sym, lrvx_sym),
+                    name=f"ccxt-bbo-{ccxt_sym}",
                 ))
         if "orders" in streams:
             self._tasks.append(asyncio.create_task(
@@ -597,6 +608,29 @@ class CcxtBroker:
                 [float(a[0]) for a in asks_raw],
                 [float(a[1]) for a in asks_raw],
                 _ccxt_ts_ns(ob),
+            )
+
+    async def _bbo_loop(self, ccxt_sym: str, lrvx_sym: Any) -> None:
+        sym_id = int(lrvx_sym)
+        async for tickers in self._stream(
+            self.exchange.watch_bids_asks, ccxt_sym, [ccxt_sym]
+        ):
+            # watch_bids_asks returns a dict of tickers keyed by symbol on
+            # most venues; a few hand back the single ticker directly. A
+            # frame with neither shape carries no quote and is skipped —
+            # publishing it would erase the live touch under a fresh stamp.
+            t = tickers if "bid" in tickers or "ask" in tickers else tickers.get(ccxt_sym)
+            if t is None:
+                continue
+            bid = t.get("bid")
+            ask = t.get("ask")
+            if bid is None and ask is None:
+                continue
+            self._runner.on_book_top(
+                sym_id,
+                (float(bid), float(t.get("bidVolume") or 0.0)) if bid is not None else None,
+                (float(ask), float(t.get("askVolume") or 0.0)) if ask is not None else None,
+                _ccxt_ts_ns(t),
             )
 
     async def _orders_loop(self) -> None:

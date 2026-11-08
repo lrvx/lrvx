@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 746 functions, 58 handles, 59 structs, 43 callback typedefs, 3 enums, 16 macro constants, 73 groups.
+**Surface:** 748 functions, 58 handles, 59 structs, 43 callback typedefs, 3 enums, 16 macro constants, 73 groups.
 
 ## Opaque handles
 
@@ -1401,6 +1401,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `void lrvx_live_engine_stop(LrvxLiveEngineHandle engine)`
 - `void lrvx_live_engine_publish_trade(LrvxLiveEngineHandle engine, uint32_t symbol, double price, double qty, uint8_t is_buy, int64_t exchange_ts_ns)`
 - `void lrvx_live_engine_publish_book_snapshot(LrvxLiveEngineHandle engine, uint32_t symbol, const double * bid_prices, const double * bid_qtys, uint32_t n_bids, const double * ask_prices, const double * ask_qtys, uint32_t n_asks, int64_t exchange_ts_ns)`
+- `void lrvx_live_engine_publish_book_top(LrvxLiveEngineHandle engine, uint32_t symbol, uint8_t has_bid, double bid_price, double bid_qty, uint8_t has_ask, double ask_price, double ask_qty, int64_t exchange_ts_ns)`
 - `void lrvx_live_engine_publish_bar(LrvxLiveEngineHandle engine, uint32_t symbol, uint8_t bar_type, uint64_t bar_type_param, double open, double high, double low, double close, double volume, double buy_volume, int64_t start_time_ns, int64_t end_time_ns, uint8_t close_reason)`
 
 ### lrvxrun
@@ -1761,6 +1762,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `void lrvx_runner_stop(LrvxRunnerHandle runner)`
 - `void lrvx_runner_on_trade(LrvxRunnerHandle runner, uint32_t symbol, double price, double qty, uint8_t is_buy, int64_t exchange_ts_ns)`
 - `void lrvx_runner_on_book_snapshot(LrvxRunnerHandle runner, uint32_t symbol, const double * bid_prices, const double * bid_qtys, uint32_t n_bids, const double * ask_prices, const double * ask_qtys, uint32_t n_asks, int64_t exchange_ts_ns)`
+- `void lrvx_runner_on_book_top(LrvxRunnerHandle runner, uint32_t symbol, uint8_t has_bid, double bid_price, double bid_qty, uint8_t has_ask, double ask_price, double ask_qty, int64_t exchange_ts_ns)`
 - `void lrvx_runner_on_bar(LrvxRunnerHandle runner, uint32_t symbol, uint8_t bar_type, uint64_t bar_type_param, double open, double high, double low, double close, double volume, double buy_volume, int64_t start_time_ns, int64_t end_time_ns, uint8_t close_reason)`
 
 ### symbol_registry

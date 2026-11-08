@@ -1331,6 +1331,15 @@ class PyStrategyRunner
                                  ts_ns);
   }
 
+  void on_book_top(uint32_t symbol, const std::optional<std::pair<double, double>>& bid,
+                   const std::optional<std::pair<double, double>>& ask, int64_t ts_ns)
+  {
+    lrvx_runner_on_book_top(_runner, symbol,
+                            bid ? 1 : 0, bid ? bid->first : 0.0, bid ? bid->second : 0.0,
+                            ask ? 1 : 0, ask ? ask->first : 0.0, ask ? ask->second : 0.0,
+                            ts_ns);
+  }
+
   void on_bar(uint32_t symbol,
               double open, double high, double low, double close,
               double volume, double buy_volume,
@@ -1375,8 +1384,8 @@ class PyStrategyRunner
 // ──────────────────────────────────────────────────────────────────────
 // PyLiveEngine — Disruptor-based live engine.
 //
-// Each strategy runs in its own bus consumer thread. publish_trade /
-// publish_book_snapshot are lock-free and return immediately.
+// Each strategy runs in its own bus consumer thread. The publish_*
+// methods are lock-free and return immediately.
 // Strategy callbacks and on_signal fire from C++ consumer threads;
 // the GIL is acquired automatically.
 // ──────────────────────────────────────────────────────────────────────
@@ -1430,7 +1439,7 @@ class PyLiveEngine
     lrvx_live_engine_stop(_engine);
   }
 
-  // The three publish_* methods release the GIL for the duration of the
+  // The publish_* methods release the GIL for the duration of the
   // call, the way stop() does. Publishing gates on the consumer once the
   // ring is full (event_bus.h), and the consumer thread needs the GIL to
   // finish the Python callback that would drain it — holding the GIL
@@ -1458,6 +1467,20 @@ class PyLiveEngine
                                            bid_prices.data(), bid_qtys.data(), nb,
                                            ask_prices.data(), ask_qtys.data(), na,
                                            ts_ns);
+  }
+
+  void publish_book_top(uint32_t symbol, const std::optional<std::pair<double, double>>& bid,
+                        const std::optional<std::pair<double, double>>& ask, int64_t ts_ns)
+  {
+    const uint8_t has_bid = bid ? 1 : 0;
+    const double bid_price = bid ? bid->first : 0.0;
+    const double bid_qty = bid ? bid->second : 0.0;
+    const uint8_t has_ask = ask ? 1 : 0;
+    const double ask_price = ask ? ask->first : 0.0;
+    const double ask_qty = ask ? ask->second : 0.0;
+    py::gil_scoped_release release;
+    lrvx_live_engine_publish_book_top(_engine, symbol, has_bid, bid_price, bid_qty,
+                                      has_ask, ask_price, ask_qty, ts_ns);
   }
 
   void publish_bar(uint32_t symbol, uint8_t bar_type, uint64_t bar_type_param,
@@ -1783,6 +1806,19 @@ class PyRunner
     {
       _sync->on_book_snapshot(symbol, bid_prices, bid_qtys,
                               ask_prices, ask_qtys, ts_ns);
+    }
+  }
+
+  void on_book_top(uint32_t symbol, const std::optional<std::pair<double, double>>& bid,
+                   const std::optional<std::pair<double, double>>& ask, int64_t ts_ns)
+  {
+    if (_live)
+    {
+      _live->publish_book_top(symbol, bid, ask, ts_ns);
+    }
+    else
+    {
+      _sync->on_book_top(symbol, bid, ask, ts_ns);
     }
   }
 
@@ -2953,6 +2989,8 @@ inline void bindStrategy(py::module_& m)
            { r.on_trade(symId(sym), price, qty, is_buy, ts_ns); }, py::arg("symbol"), py::arg("price"), py::arg("qty"), py::arg("is_buy"), py::arg("ts_ns") = 0)
       .def("on_book_snapshot", [](PyRunner& r, py::object sym, const std::vector<double>& bp, const std::vector<double>& bq, const std::vector<double>& ap, const std::vector<double>& aq, int64_t ts_ns)
            { r.on_book_snapshot(symId(sym), bp, bq, ap, aq, ts_ns); }, py::arg("symbol"), py::arg("bid_prices"), py::arg("bid_qtys"), py::arg("ask_prices"), py::arg("ask_qtys"), py::arg("ts_ns") = 0)
+      .def("on_book_top", [](PyRunner& r, py::object sym, const std::optional<std::pair<double, double>>& bid, const std::optional<std::pair<double, double>>& ask, int64_t ts_ns)
+           { r.on_book_top(symId(sym), bid, ask, ts_ns); }, py::arg("symbol"), py::arg("bid"), py::arg("ask"), py::arg("ts_ns") = 0, "Inject a touch-only frame. bid / ask are (price, qty) tuples; None means that side of the book is empty")
       .def("on_bar", [](PyRunner& r, py::object sym, double o, double h, double l, double c, double v, double bv, int64_t start_ns, int64_t end_ns, uint8_t bar_type, uint64_t bar_type_param, uint8_t close_reason)
            { r.on_bar(symId(sym), o, h, l, c, v, bv, start_ns, end_ns,
                       bar_type, bar_type_param, close_reason); }, py::arg("symbol"), py::arg("open"), py::arg("high"), py::arg("low"), py::arg("close"), py::arg("volume") = 0.0, py::arg("buy_volume") = 0.0, py::arg("start_time_ns") = 0, py::arg("end_time_ns") = 0, py::arg("bar_type") = 0, py::arg("bar_type_param") = 0, py::arg("close_reason") = 0);

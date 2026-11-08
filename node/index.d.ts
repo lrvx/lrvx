@@ -574,6 +574,15 @@ export class Runner {
     askQtys: Float64Array,
     timestampNs: number | bigint,
   ): void;
+  /** Touch-only frame (`BookUpdateType.TOP_OF_BOOK`): one level per side,
+   *  `null` means that side of the book is empty. Lands in the strategy
+   *  context's touch fields; the depth book ignores it. */
+  onBookTop(
+    symbol: Symbol | number,
+    bid: { price: number; qty: number } | null,
+    ask: { price: number; qty: number } | null,
+    timestampNs: number | bigint,
+  ): void;
   /** The nanosecond fields take a `Number` or a `BigInt`; a bar read out
    *  of `onBar` carries `BigInt`s and can be handed straight back. */
   onBar(

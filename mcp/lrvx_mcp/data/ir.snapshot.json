@@ -7667,6 +7667,49 @@
     },
     {
       "group": "lrvxliveengine_disruptor",
+      "name": "lrvx_live_engine_publish_book_top",
+      "params": [
+        {
+          "name": "engine",
+          "type": "LrvxLiveEngineHandle"
+        },
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        },
+        {
+          "name": "has_bid",
+          "type": "uint8_t"
+        },
+        {
+          "name": "bid_price",
+          "type": "double"
+        },
+        {
+          "name": "bid_qty",
+          "type": "double"
+        },
+        {
+          "name": "has_ask",
+          "type": "uint8_t"
+        },
+        {
+          "name": "ask_price",
+          "type": "double"
+        },
+        {
+          "name": "ask_qty",
+          "type": "double"
+        },
+        {
+          "name": "exchange_ts_ns",
+          "type": "int64_t"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "lrvxliveengine_disruptor",
       "name": "lrvx_live_engine_publish_trade",
       "params": [
         {
@@ -11565,6 +11608,49 @@
         {
           "name": "n_asks",
           "type": "uint32_t"
+        },
+        {
+          "name": "exchange_ts_ns",
+          "type": "int64_t"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "strategyrunner_synchronous",
+      "name": "lrvx_runner_on_book_top",
+      "params": [
+        {
+          "name": "runner",
+          "type": "LrvxRunnerHandle"
+        },
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        },
+        {
+          "name": "has_bid",
+          "type": "uint8_t"
+        },
+        {
+          "name": "bid_price",
+          "type": "double"
+        },
+        {
+          "name": "bid_qty",
+          "type": "double"
+        },
+        {
+          "name": "has_ask",
+          "type": "uint8_t"
+        },
+        {
+          "name": "ask_price",
+          "type": "double"
+        },
+        {
+          "name": "ask_qty",
+          "type": "double"
         },
         {
           "name": "exchange_ts_ns",

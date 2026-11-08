@@ -67,6 +67,7 @@ Runner(registry: cobj, on_signal, threaded: bool = False)
 | `stop()` | Stop and clean up |
 | `on_trade(symbol, price, qty, is_buy, ts_ns)` | Push a trade tick |
 | `on_book_snapshot(symbol, bid_prices, bid_qtys, ask_prices, ask_qtys, ts_ns)` | Push a full L2 snapshot |
+| `on_book_top(symbol, has_bid, bid_price, bid_qty, has_ask, ask_price, ask_qty, ts_ns)` | Push a touch-only frame: moves the strategy's touch without a book callback. A side whose has-flag is false is empty |
 | `on_bar(symbol, open, high, low, close, volume=0.0, buy_volume=0.0, start_time_ns=0, end_time_ns=0, bar_type=0, bar_type_param=0, close_reason=0)` | Push a closed bar |
 | `set_market_data_recorder(recorder_handle)` | Attach a market-data recorder handle so pushed events are also written to a tape |
 

@@ -161,6 +161,7 @@ runner.start();
 checkAcceptsBigint(() => runner.onTrade(sym, 100, 1, true, 0n), "Runner.onTrade accepts bigint ts");
 runner.onTrade(1, 100, 1, false, 0);
 checkAcceptsBigint(() => runner.onBookSnapshot(sym, arr, arr, arr, arr, 0n), "Runner.onBookSnapshot accepts bigint ts and Float64Array levels");
+checkAcceptsBigint(() => runner.onBookTop(sym, { price: 100.02, qty: 4 }, null, 0n), "Runner.onBookTop accepts bigint ts and a null side");
 runner.onBar(sym, { open: 1, high: 2, low: 0.5, close: 1.5 });
 runner.stop();
 

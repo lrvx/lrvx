@@ -479,6 +479,15 @@ void lrvx_runner_on_book_snapshot(LrvxRunnerHandle runner, uint32_t symbol,
                                   uint32_t n_bids,
                                   const double* ask_prices, const double* ask_qtys,
                                   uint32_t n_asks, int64_t exchange_ts_ns);
+
+// Touch-only frame (BookUpdateType::TOP_OF_BOOK): one level per side.
+// has_bid == 0 means the bid side is empty and its price/qty are ignored;
+// same for has_ask. Lands in the strategy's touch fields; the depth book
+// ignores it.
+void lrvx_runner_on_book_top(LrvxRunnerHandle runner, uint32_t symbol,
+                             uint8_t has_bid, double bid_price, double bid_qty,
+                             uint8_t has_ask, double ask_price, double ask_qty,
+                             int64_t exchange_ts_ns);
 ```
 
 ---
@@ -510,6 +519,15 @@ void lrvx_live_engine_publish_book_snapshot(LrvxLiveEngineHandle engine,
                                             const double* ask_prices,
                                             const double* ask_qtys, uint32_t n_asks,
                                             int64_t exchange_ts_ns);
+
+// Touch-only frame (BookUpdateType::TOP_OF_BOOK): one level per side.
+// has_bid == 0 means the bid side is empty and its price/qty are ignored;
+// same for has_ask.
+void lrvx_live_engine_publish_book_top(LrvxLiveEngineHandle engine,
+                                       uint32_t symbol,
+                                       uint8_t has_bid, double bid_price, double bid_qty,
+                                       uint8_t has_ask, double ask_price, double ask_qty,
+                                       int64_t exchange_ts_ns);
 ```
 
 ---

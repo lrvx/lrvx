@@ -367,6 +367,7 @@ lrvx_live_engine_create|LrvxLiveEngineHandle|LrvxRegistryHandle
 lrvx_live_engine_destroy|void|LrvxLiveEngineHandle
 lrvx_live_engine_publish_bar|void|LrvxLiveEngineHandle|uint32_t|uint8_t|uint64_t|double|double|double|double|double|double|int64_t|int64_t|uint8_t
 lrvx_live_engine_publish_book_snapshot|void|LrvxLiveEngineHandle|uint32_t|const double *|const double *|uint32_t|const double *|const double *|uint32_t|int64_t
+lrvx_live_engine_publish_book_top|void|LrvxLiveEngineHandle|uint32_t|uint8_t|double|double|uint8_t|double|double|int64_t
 lrvx_live_engine_publish_trade|void|LrvxLiveEngineHandle|uint32_t|double|double|uint8_t|int64_t
 lrvx_live_engine_set_executor|void|LrvxLiveEngineHandle|LrvxExecutorHandle
 lrvx_live_engine_set_kill_switch|void|LrvxLiveEngineHandle|LrvxKillSwitchHandle
@@ -585,6 +586,7 @@ lrvx_runner_create|LrvxRunnerHandle|LrvxRegistryHandle|LrvxOnSignalCallback|void
 lrvx_runner_destroy|void|LrvxRunnerHandle
 lrvx_runner_on_bar|void|LrvxRunnerHandle|uint32_t|uint8_t|uint64_t|double|double|double|double|double|double|int64_t|int64_t|uint8_t
 lrvx_runner_on_book_snapshot|void|LrvxRunnerHandle|uint32_t|const double *|const double *|uint32_t|const double *|const double *|uint32_t|int64_t
+lrvx_runner_on_book_top|void|LrvxRunnerHandle|uint32_t|uint8_t|double|double|uint8_t|double|double|int64_t
 lrvx_runner_on_trade|void|LrvxRunnerHandle|uint32_t|double|double|uint8_t|int64_t
 lrvx_runner_set_executor|void|LrvxRunnerHandle|LrvxExecutorHandle
 lrvx_runner_set_kill_switch|void|LrvxRunnerHandle|LrvxKillSwitchHandle

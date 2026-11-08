@@ -11000,6 +11000,7 @@ Members:
 - `attach_trace_recorder(self, recorder: typing.Any) -> None`
 - `on_bar(self, symbol: typing.Any, open: typing.SupportsFloat | typing.SupportsIndex, high: typing.SupportsFloat | typing.SupportsIndex, low: typing.SupportsFloat | typing.SupportsIndex, close: typing.SupportsFloat | typing.SupportsIndex, volume: typing.SupportsFloat | typing.SupportsIndex = 0.0, buy_volume: typing.SupportsFloat | typing.SupportsIndex = 0.0, start_time_ns: typing.SupportsInt | typing.SupportsIndex = 0, end_time_ns: typing.SupportsInt | typing.SupportsIndex = 0, bar_type: typing.SupportsInt | typing.SupportsIndex = 0, bar_type_param: typing.SupportsInt | typing.SupportsIndex = 0, close_reason: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `on_book_snapshot(self, symbol: typing.Any, bid_prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], bid_qtys: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ask_prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ask_qtys: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
+- `on_book_top(self, symbol: typing.Any, bid: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ask: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `on_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `replace_strategy(self, index: typing.SupportsInt | typing.SupportsIndex, strategy: Strategy) -> None`
 - `set_executor(self, executor: Executor) -> None`
@@ -12040,6 +12041,7 @@ runner.stop()
 | `stop()` | Stop the runner |
 | `on_trade(symbol, price, qty, is_buy, ts_ns=0)` | Inject a trade event |
 | `on_book_snapshot(symbol, bid_prices, bid_qtys, ask_prices, ask_qtys, ts_ns=0)` | Inject an order book snapshot |
+| `on_book_top(symbol, bid, ask, ts_ns=0)` | Inject a touch-only frame: moves the strategy's touch without a book callback. `bid` / `ask` are `(price, qty)` tuples; `None` means that side of the book is empty |
 | `on_bar(symbol, open, high, low, close, volume=0, buy_volume=0, start_time_ns=0, end_time_ns=0, bar_type=0, bar_type_param=0, close_reason=0)` | Inject a closed OHLC bar |
 
 `symbol` accepts a `Symbol` object or a raw `int`.
@@ -14862,6 +14864,7 @@ In threaded mode, events are published to a lock-free ring buffer and callbacks 
 | `stop()` | Stop and clean up |
 | `onTrade(symbol, price, qty, isBuy, tsNs)` | Inject a trade tick |
 | `onBookSnapshot(symbol, bidPrices, bidQtys, askPrices, askQtys, tsNs)` | Inject an L2 snapshot |
+| `onBookTop(symbol, bid, ask, tsNs)` | Inject a touch-only frame: moves the strategy's touch without a book callback. `bid` / `ask` are `{ price, qty }`; `null` means that side of the book is empty |
 | `onBar(symbol, { open, high, low, close, volume?, ... })` | Inject a closed OHLC bar |
 
 `symbol` accepts a `Symbol` object or a raw number. `tsNs` accepts a number or a `bigint`.
@@ -16622,6 +16625,7 @@ Runner(registry: cobj, on_signal, threaded: bool = False)
 | `stop()` | Stop and clean up |
 | `on_trade(symbol, price, qty, is_buy, ts_ns)` | Push a trade tick |
 | `on_book_snapshot(symbol, bid_prices, bid_qtys, ask_prices, ask_qtys, ts_ns)` | Push a full L2 snapshot |
+| `on_book_top(symbol, has_bid, bid_price, bid_qty, has_ask, ask_price, ask_qty, ts_ns)` | Push a touch-only frame: moves the strategy's touch without a book callback. A side whose has-flag is false is empty |
 | `on_bar(symbol, open, high, low, close, volume=0.0, buy_volume=0.0, start_time_ns=0, end_time_ns=0, bar_type=0, bar_type_param=0, close_reason=0)` | Push a closed bar |
 | `set_market_data_recorder(recorder_handle)` | Attach a market-data recorder handle so pushed events are also written to a tape |
 
@@ -18369,6 +18373,15 @@ void lrvx_runner_on_book_snapshot(LrvxRunnerHandle runner, uint32_t symbol,
                                   uint32_t n_bids,
                                   const double* ask_prices, const double* ask_qtys,
                                   uint32_t n_asks, int64_t exchange_ts_ns);
+
+// Touch-only frame (BookUpdateType::TOP_OF_BOOK): one level per side.
+// has_bid == 0 means the bid side is empty and its price/qty are ignored;
+// same for has_ask. Lands in the strategy's touch fields; the depth book
+// ignores it.
+void lrvx_runner_on_book_top(LrvxRunnerHandle runner, uint32_t symbol,
+                             uint8_t has_bid, double bid_price, double bid_qty,
+                             uint8_t has_ask, double ask_price, double ask_qty,
+                             int64_t exchange_ts_ns);
 ```
 
 ---
@@ -18400,6 +18413,15 @@ void lrvx_live_engine_publish_book_snapshot(LrvxLiveEngineHandle engine,
                                             const double* ask_prices,
                                             const double* ask_qtys, uint32_t n_asks,
                                             int64_t exchange_ts_ns);
+
+// Touch-only frame (BookUpdateType::TOP_OF_BOOK): one level per side.
+// has_bid == 0 means the bid side is empty and its price/qty are ignored;
+// same for has_ask.
+void lrvx_live_engine_publish_book_top(LrvxLiveEngineHandle engine,
+                                       uint32_t symbol,
+                                       uint8_t has_bid, double bid_price, double bid_qty,
+                                       uint8_t has_ask, double ask_price, double ask_qty,
+                                       int64_t exchange_ts_ns);
 ```
 
 ---
