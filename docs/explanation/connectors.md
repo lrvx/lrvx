@@ -15,6 +15,8 @@ The module is gated by `LRVX_BUILD_CONNECTORS` in CMake. It is **off** by defaul
 
 (No position query/stream is implemented in any connector yet — the earlier "Positions" column was aspirational.)
 
+BBO means the connector reports a best bid and ask. For Bybit, Bitget and Polymarket that is the top of the book updates the connector publishes. Hyperliquid also subscribes a dedicated `bbo` channel next to `l2Book` and publishes it as `TOP_OF_BOOK` frames, which the depth book ignores and the strategy's touch follows; [The touch and the book](the-touch.md) has the whole model.
+
 Each adapter sits under `connectors/src/<venue>/` with public headers under `connectors/include/lrvx-connectors/<venue>/`. The header layout uses the `lrvx-connectors/` prefix so consumers' include sites are stable across the repo move.
 
 ### Order-type and flag coverage

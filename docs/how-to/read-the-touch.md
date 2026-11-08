@@ -17,7 +17,7 @@ Every callback's context quotes the touch. The depth book is not what the quotes
 
 ## Tell a touch move from a depth update
 
-Keep the `last_update_ns` you saw in your last book callback. On any later callback, `ctx.last_touch_ns` greater than that value means a top arrived after the last depth frame you were shown, and the quotes in `ctx` are that top's. The example replays a tape of one depth snapshot, three tops and a trade, and prints what each callback sees:
+Keep the `last_update_ns` you saw in your last book callback. On any later callback, `ctx.last_touch_ns` greater than that value means a top arrived after the last depth frame you were shown, and the quotes in `ctx` are that top's. The stamps are the venue's: Hyperliquid stamps in milliseconds, so a top in the same millisecond as the depth frame reads as no move, and a frame sent without a time is stamped 0. Compare the quotes too where that matters. The example replays a tape of one depth snapshot, three tops and a trade, and prints what each callback sees:
 
 ```python
 --8<-- "examples/python_read_the_touch.py"
@@ -76,7 +76,7 @@ Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The 
 
 ## Record tops
 
-A recording made through the Hyperliquid connector with `subscribeBbo` on (the default) carries tops as frame type `6`. `EventTypeStatsAggregator` does not count them, since its per-symbol table has columns for trades, snapshots and deltas only; `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
+A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`. `EventTypeStatsAggregator` does not count them, since its per-symbol table has columns for trades, snapshots and deltas only; `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
 
 ## See also
 

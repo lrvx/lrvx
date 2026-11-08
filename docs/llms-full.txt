@@ -4078,7 +4078,7 @@ Every callback's context quotes the touch. The depth book is not what the quotes
 
 ## Tell a touch move from a depth update
 
-Keep the `last_update_ns` you saw in your last book callback. On any later callback, `ctx.last_touch_ns` greater than that value means a top arrived after the last depth frame you were shown, and the quotes in `ctx` are that top's. The example replays a tape of one depth snapshot, three tops and a trade, and prints what each callback sees:
+Keep the `last_update_ns` you saw in your last book callback. On any later callback, `ctx.last_touch_ns` greater than that value means a top arrived after the last depth frame you were shown, and the quotes in `ctx` are that top's. The stamps are the venue's: Hyperliquid stamps in milliseconds, so a top in the same millisecond as the depth frame reads as no move, and a frame sent without a time is stamped 0. Compare the quotes too where that matters. The example replays a tape of one depth snapshot, three tops and a trade, and prints what each callback sees:
 
 ```python
 --8<-- "examples/python_read_the_touch.py"
@@ -4137,7 +4137,7 @@ Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The 
 
 ## Record tops
 
-A recording made through the Hyperliquid connector with `subscribeBbo` on (the default) carries tops as frame type `6`. `EventTypeStatsAggregator` does not count them, since its per-symbol table has columns for trades, snapshots and deltas only; `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
+A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`. `EventTypeStatsAggregator` does not count them, since its per-symbol table has columns for trades, snapshots and deltas only; `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
 
 ## See also
 
@@ -21771,7 +21771,7 @@ A strategy has two views of the inside market. The book is the depth feed applie
 
 A venue may throttle its depth stream and run a separate best-bid/offer stream next to it. Hyperliquid is the case in the tree: it throttles `l2Book` server-side and offers `bbo` for the top. A strategy fed only `l2Book` sees a touch that is stale by up to one throttle interval; a strategy that merges `bbo` into its depth book corrupts the book.
 
-The engine keeps the two apart with a third kind of book update. `BookUpdateType` has `SNAPSHOT` (replace the book), `DELTA` (apply changes) and `TOP_OF_BOOK`: one level per side, nothing deeper. The Hyperliquid connector subscribes `bbo` next to `l2Book` by default (`subscribeBbo`) and publishes each frame as `TOP_OF_BOOK`. The other connectors in the tree publish depth only. A custom connector can publish the type itself.
+The engine keeps the two apart with a third kind of book update. `BookUpdateType` has `SNAPSHOT` (replace the book), `DELTA` (apply changes) and `TOP_OF_BOOK`: one level per side, nothing deeper. The Hyperliquid connector subscribes `bbo` next to `l2Book` by default (`subscribeBbo`) and publishes each frame as `TOP_OF_BOOK`. The other connectors in the tree publish depth only, and their best bid and ask are the top of that depth. A binding-side feed publishes a top itself: `Runner.on_book_top` in Python, which the ccxt adapter's `bbo` stream drives from `watch_bids_asks`, `onBookTop` in Node, `on_book_top` in Codon, and `lrvx_runner_on_book_top` or `lrvx_live_engine_publish_book_top` in the C API. A custom C++ connector publishes the type directly.
 
 ## The contract of a top-of-book frame
 
@@ -21809,6 +21809,8 @@ Consumers that ignore it:
 A depth frame writes both: it applies the book, refreshes the touch from the book's best levels, and stamps `lastUpdateNs` and `lastTouchNs` with the frame's exchange timestamp. A top writes the touch and `lastTouchNs` only. Trades and bars stamp `lastUpdateNs` and leave the touch alone; order events write neither.
 
 No callback fires for a top. `onSymbolBook` would hand the strategy the previous depth frame's book at touch rate, stamped fresh, so the frame lands in the fields and the strategy reads them on its next trade, bar or depth callback. The stamps are how a strategy tells what happened in between: `lastTouchNs` later than the `lastUpdateNs` it saw on its last book callback means the touch moved since the last depth frame it was shown.
+
+The stamps are the venue's, at the venue's resolution. Hyperliquid stamps `l2Book` and `bbo` in milliseconds, so a top in the same millisecond as a depth frame carries the same stamp and reads as no move, and a frame the venue sends without a time is stamped 0. A strategy that must not miss a touch move at that resolution compares the quotes as well as the stamps.
 
 The bindings read the touch, not the book, wherever they expose a best price:
 
