@@ -653,15 +653,16 @@ def _existing_book_state(out_tape: Path, symbol_id: int) -> Tuple[int, int, dict
         return 0, 0, {}, {}
     try:
         import lrvx
-        import numpy as np
+
+        from ..orderbook import _apply_event
 
         reader = lrvx.DataReader(str(out_tape))
         headers, levels = reader.read_book_updates()
         if headers.size == 0:
             return 0, 0, {}, {}
-        # Walk events for this symbol in order, applying snapshot /
-        # delta semantics so we know the latest ladder for the dedup
-        # baseline.
+        # Walk events for this symbol in order, applying the same
+        # snapshot / delta / top semantics the iterator uses, so the
+        # dedup baseline sees the latest ladder.
         bids: dict[int, int] = {}
         asks: dict[int, int] = {}
         last_seq = 0
@@ -669,29 +670,12 @@ def _existing_book_state(out_tape: Path, symbol_id: int) -> Tuple[int, int, dict
         for h in headers:
             if int(h["symbol_id"]) != symbol_id:
                 continue
-            # DataReader rows carry the record byte (0 snapshot, 1 delta),
-            # not the frame type; == 2 was never true here.
-            is_snapshot = int(h["event_type"]) == 0
-            n_bid = int(h["bid_count"])
-            n_ask = int(h["ask_count"])
-            off = int(h["level_offset"])
-            if is_snapshot:
-                bids.clear()
-                asks.clear()
-            for i in range(n_bid):
-                p = int(levels[off + i]["price_raw"])
-                q = int(levels[off + i]["qty_raw"])
-                if q == 0:
-                    bids.pop(p, None)
-                else:
-                    bids[p] = q
-            for i in range(n_ask):
-                p = int(levels[off + n_bid + i]["price_raw"])
-                q = int(levels[off + n_bid + i]["qty_raw"])
-                if q == 0:
-                    asks.pop(p, None)
-                else:
-                    asks[p] = q
+            _apply_event(bids, asks,
+                         event_type=int(h["event_type"]),
+                         n_bid=int(h["bid_count"]),
+                         n_ask=int(h["ask_count"]),
+                         off=int(h["level_offset"]),
+                         levels=levels)
             seq = int(h["seq"])
             ts = int(h["exchange_ts_ns"])
             if seq > last_seq:
