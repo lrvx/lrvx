@@ -100,6 +100,8 @@ All callbacks are optional.
 | `bestBid` | `number \| null` | Best bid; `null` when the bid side has no level. A book may be quoted at exactly zero, so `0` is a price, never "no quote" |
 | `bestAsk` | `number \| null` | Best ask; `null` when the ask side has no level |
 | `midPrice` | `number \| null` | Mid price; `null` unless both sides have a level |
+| `lastUpdateNs` | `bigint` | Exchange timestamp (ns) of the last dispatched event: trade, depth frame or bar |
+| `lastTouchNs` | `bigint` | Exchange timestamp (ns) of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it without firing `onBookUpdate`, so it can be fresher than `lastUpdateNs` |
 
 ### TradeData (`trade`)
 

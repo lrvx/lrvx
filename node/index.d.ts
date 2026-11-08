@@ -118,6 +118,13 @@ export interface SymbolContext {
   bestAsk: number | null;
   /** Mid price, or `null` unless both sides have a level. */
   midPrice: number | null;
+  /** Exchange timestamp (ns) of the last dispatched event: trade, depth
+   *  frame or bar. An absolute nanosecond clock reading, so a `BigInt`. */
+  lastUpdateNs: bigint;
+  /** Exchange timestamp (ns) of the frame that last wrote the touch. A
+   *  TOP_OF_BOOK frame moves it without firing `onBookUpdate`, so it can
+   *  be fresher than `lastUpdateNs`. */
+  lastTouchNs: bigint;
 }
 
 /** Trade tick passed to `onTrade`. */

@@ -2070,8 +2070,12 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - *property* `best_ask: None`
 - *property* `best_bid: float | None`
 - *property* `best_bid: None`
+- *property* `last_touch_ns: int`
+- *property* `last_touch_ns: None`
 - *property* `last_trade_price: float`
 - *property* `last_trade_price: None`
+- *property* `last_update_ns: int`
+- *property* `last_update_ns: None`
 - *property* `mid_price: float | None`
 - *property* `mid_price: None`
 - *property* `position: float`

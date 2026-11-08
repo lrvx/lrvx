@@ -159,12 +159,15 @@ anything else falls back to `gtc`.
 | `last_trade_price` / `lastTradePrice` | float | Most recent trade price |
 | `best_bid` / `bestBid`, `best_ask` / `bestAsk` | float | Top-of-book |
 | `mid_price` / `midPrice` | float | `(best_bid + best_ask) / 2` |
+| `last_update_ns` (Py) / `last_update_ns()` (Codon) / `lastUpdateNs` (Node, JS) | int, ns | Exchange timestamp of the last dispatched event: trade, depth frame or bar. `bigint` in Node and the embedded JavaScript engine |
+| `last_touch_ns` (Py) / `last_touch_ns()` (Codon) / `lastTouchNs` (Node, JS) | int, ns | Exchange timestamp of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it without a callback, so it can be fresher than `last_update_ns` |
 | `unrealized_pnl` (Py) | float | Unrealized PnL on the current position, `NaN` when no entry price is available |
 | `is_long()` / `is_short()` / `is_flat()` (Py/Codon) | bool | Position state |
 | `book_spread()` (Py/Codon) | float | `best_ask - best_bid` |
 
 Node's `SymbolContext` is the narrower set: `position`, `symbolId`,
-`lastTradePrice`, `bestBid`, `bestAsk`, `midPrice`.
+`lastTradePrice`, `bestBid`, `bestAsk`, `midPrice`, `lastUpdateNs`,
+`lastTouchNs`.
 
 Give every C++ strategy in a process its own `SubscriberId`. Nothing checks it,
 and the id does double duty: the buses route on it, and it is also the

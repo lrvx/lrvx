@@ -58,6 +58,8 @@ class Recorder(Strategy):
     last_trade: TradeData
     last_fill: OrderEventData
     emit_on_trade: bool
+    last_update_ns: int
+    last_touch_ns: int
 
     def __init__(self, symbols: List[int], emit_on_trade: bool = False):
         super().__init__(symbols)
@@ -71,6 +73,10 @@ class Recorder(Strategy):
         self.last_trade = TradeData()
         self.last_fill = OrderEventData()
         self.emit_on_trade = emit_on_trade
+        # -1, not 0: a stamp the context never wrote reads as 0, and the
+        # check below has to tell "read 0" from "never read".
+        self.last_update_ns = -1
+        self.last_touch_ns = -1
 
     def on_start(self):
         self.starts += 1
@@ -85,6 +91,10 @@ class Recorder(Strategy):
     def on_trade(self, ctx: SymbolContext, trade: TradeData):
         self.trades += 1
         self.last_trade = trade
+        # Read off the context, not the trade: these are the two stamps
+        # SymbolContext answers through lrvx_get_symbol_context.
+        self.last_update_ns = ctx.last_update_ns()
+        self.last_touch_ns = ctx.last_touch_ns()
         if self.emit_on_trade and self.trades == 1:
             self.market_buy(0.25)
 
@@ -184,6 +194,14 @@ def check_live_runner(reg: cobj, sym: int):
     check(s.trades == N, f"on_trade called once per trade (got {s.trades}, want {N})")
     check(s.starts == 1, f"on_start called exactly once (got {s.starts})")
     check(s.stops >= 1, f"on_stop called (got {s.stops})")
+
+    # The context's stamps: last_update_ns is the last dispatched event, the
+    # trade at end_ns[N - 1]; no book frame ran, so the touch was never
+    # written and last_touch_ns reads 0, not the trade's stamp.
+    check(s.last_update_ns == end_ns[N - 1],
+          f"ctx.last_update_ns() is the last trade's stamp (got {s.last_update_ns}, want {end_ns[N - 1]})")
+    check(s.last_touch_ns == 0,
+          f"ctx.last_touch_ns() stays 0 without a book frame (got {s.last_touch_ns})")
 
     # An order emitted from inside a callback has to come back out as a
     # signal: that is the round trip the whole binding exists for.

@@ -490,6 +490,11 @@ struct NodeStrategyHost : TsfnHost
                          : Napi::Value(env.Null()));
     o.Set("midPrice", both ? Napi::Value(Napi::Number::New(env, lrvx_price_to_double(ctx->book.mid_raw)))
                            : Napi::Value(env.Null()));
+    // Absolute nanosecond clock readings cross as BigInt. lastTouchNs can be
+    // the fresher of the two: a TOP_OF_BOOK frame writes it without a
+    // dispatch, so no callback sees the frame itself.
+    o.Set("lastUpdateNs", Napi::BigInt::New(env, static_cast<int64_t>(ctx->last_update_ns)));
+    o.Set("lastTouchNs", Napi::BigInt::New(env, static_cast<int64_t>(ctx->last_touch_ns)));
   }
 
   static void callOnTrade(Napi::Env env, Napi::Function, TradeCallData* d)

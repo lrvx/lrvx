@@ -189,6 +189,8 @@ volume / range threshold the aggregator was configured with.
 | `best_ask` | `float \| None` | Best ask price; `None` when the ask side has no level |
 | `mid_price` | `float \| None` | Mid price; `None` unless both sides have a level |
 | `unrealized_pnl` | `float` | Unrealized P&L, or `NaN` when the position manager reports no entry price (see below) |
+| `last_update_ns` | `int` | Exchange timestamp (ns) of the last dispatched event: trade, depth frame or bar |
+| `last_touch_ns` | `int` | Exchange timestamp (ns) of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it without firing `on_book_update`, so it can be fresher than `last_update_ns` |
 | `book_spread()` | `float \| None` | Bid-ask spread; `None` unless both sides have a level |
 | `is_long()` | `bool` | True if long |
 | `is_short()` | `bool` | True if short |
