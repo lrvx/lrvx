@@ -11,7 +11,9 @@ from C import lrvx_last_trade_price_raw(cobj, u32) -> i64
 from C import lrvx_best_bid_raw_opt(cobj, u32, Ptr[i64]) -> u8
 from C import lrvx_best_ask_raw_opt(cobj, u32, Ptr[i64]) -> u8
 from C import lrvx_mid_price_raw_opt(cobj, u32, Ptr[i64]) -> u8
+from C import lrvx_get_symbol_context(cobj, u32, cobj)
 
+from lrvx.layout import _CTX_LAST_TOUCH_NS, _CTX_LAST_UPDATE_NS, _CTX_SIZE
 from lrvx.types import SCALE, Price, Quantity
 
 
@@ -67,6 +69,26 @@ class SymbolContext:
         if lrvx_mid_price_raw_opt(self._handle, self.symbol_id, __ptr__(raw)) == u8(0):
             return None
         return float(raw) / float(SCALE)
+
+    # The two timestamps have no scalar accessor in the C API; they are read
+    # off a copy of LrvxSymbolContext at the offsets the IDL generates into
+    # lrvx/layout.codon. Both fields are int64, so the offsets are multiples
+    # of eight and index the buffer directly.
+    def _stamp_at(self, off: int) -> int:
+        buf = [i64(0)] * (_CTX_SIZE // 8)
+        lrvx_get_symbol_context(self._handle, self.symbol_id, cobj(buf.arr.ptr))
+        return int(buf[off // 8])
+
+    def last_update_ns(self) -> int:
+        """Exchange timestamp (ns) of the last dispatched event: trade,
+        depth frame or bar."""
+        return self._stamp_at(_CTX_LAST_UPDATE_NS)
+
+    def last_touch_ns(self) -> int:
+        """Exchange timestamp (ns) of the frame that last wrote the touch.
+        A TOP_OF_BOOK frame moves it without a dispatch, so it can be fresher
+        than last_update_ns()."""
+        return self._stamp_at(_CTX_LAST_TOUCH_NS)
 
     def book_spread(self) -> Optional[float]:
         """Bid-ask spread, or None unless both sides have a level."""

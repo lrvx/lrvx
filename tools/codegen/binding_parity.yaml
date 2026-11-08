@@ -2196,7 +2196,6 @@ allowlist_functions:
     lrvx_executor_destroy: *no_codon_import
     lrvx_executor_get_capabilities: *no_codon_import
     lrvx_funding_schedule_set_tape: *no_codon_import
-    lrvx_get_symbol_context: *no_codon_import
     lrvx_i256_roundtrip: *no_codon_import
     lrvx_indicator_graph_bar_count: *no_codon_import
     lrvx_indicator_graph_current: *no_codon_import

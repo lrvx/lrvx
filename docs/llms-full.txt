@@ -4010,12 +4010,15 @@ anything else falls back to `gtc`.
 | `last_trade_price` / `lastTradePrice` | float | Most recent trade price |
 | `best_bid` / `bestBid`, `best_ask` / `bestAsk` | float | Top-of-book |
 | `mid_price` / `midPrice` | float | `(best_bid + best_ask) / 2` |
+| `last_update_ns` (Py) / `last_update_ns()` (Codon) / `lastUpdateNs` (Node, JS) | int, ns | Exchange timestamp of the last dispatched event: trade, depth frame or bar. `bigint` in Node and the embedded JavaScript engine |
+| `last_touch_ns` (Py) / `last_touch_ns()` (Codon) / `lastTouchNs` (Node, JS) | int, ns | Exchange timestamp of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it without a callback, so it can be fresher than `last_update_ns` |
 | `unrealized_pnl` (Py) | float | Unrealized PnL on the current position, `NaN` when no entry price is available |
 | `is_long()` / `is_short()` / `is_flat()` (Py/Codon) | bool | Position state |
 | `book_spread()` (Py/Codon) | float | `best_ask - best_bid` |
 
 Node's `SymbolContext` is the narrower set: `position`, `symbolId`,
-`lastTradePrice`, `bestBid`, `bestAsk`, `midPrice`.
+`lastTradePrice`, `bestBid`, `bestAsk`, `midPrice`, `lastUpdateNs`,
+`lastTouchNs`.
 
 Give every C++ strategy in a process its own `SubscriberId`. Nothing checks it,
 and the id does double duty: the buses route on it, and it is also the
@@ -11340,8 +11343,12 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - *property* `best_ask: None`
 - *property* `best_bid: float | None`
 - *property* `best_bid: None`
+- *property* `last_touch_ns: int`
+- *property* `last_touch_ns: None`
 - *property* `last_trade_price: float`
 - *property* `last_trade_price: None`
+- *property* `last_update_ns: int`
+- *property* `last_update_ns: None`
 - *property* `mid_price: float | None`
 - *property* `mid_price: None`
 - *property* `position: float`
@@ -11992,6 +11999,8 @@ volume / range threshold the aggregator was configured with.
 | `best_ask` | `float \| None` | Best ask price; `None` when the ask side has no level |
 | `mid_price` | `float \| None` | Mid price; `None` unless both sides have a level |
 | `unrealized_pnl` | `float` | Unrealized P&L, or `NaN` when the position manager reports no entry price (see below) |
+| `last_update_ns` | `int` | Exchange timestamp (ns) of the last dispatched event: trade, depth frame or bar |
+| `last_touch_ns` | `int` | Exchange timestamp (ns) of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it without firing `on_book_update`, so it can be fresher than `last_update_ns` |
 | `book_spread()` | `float \| None` | Bid-ask spread; `None` unless both sides have a level |
 | `is_long()` | `bool` | True if long |
 | `is_short()` | `bool` | True if short |
@@ -14819,6 +14828,8 @@ All callbacks are optional.
 | `bestBid` | `number \| null` | Best bid; `null` when the bid side has no level. A book may be quoted at exactly zero, so `0` is a price, never "no quote" |
 | `bestAsk` | `number \| null` | Best ask; `null` when the ask side has no level |
 | `midPrice` | `number \| null` | Mid price; `null` unless both sides have a level |
+| `lastUpdateNs` | `bigint` | Exchange timestamp (ns) of the last dispatched event: trade, depth frame or bar |
+| `lastTouchNs` | `bigint` | Exchange timestamp (ns) of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it without firing `onBookUpdate`, so it can be fresher than `lastUpdateNs` |
 
 ### TradeData (`trade`)
 
@@ -15959,7 +15970,13 @@ Current position quantity. If `symbol` is None, uses the first subscribed symbol
 
 #### `ctx(symbol=None) -> SymbolContext`
 
-Get a `SymbolContext` for querying per-symbol state.
+Get a `SymbolContext` for querying per-symbol state. Besides `position()`,
+`last_trade_price()`, `best_bid()`, `best_ask()`, `mid_price()` and
+`book_spread()`, it answers two exchange timestamps in nanoseconds:
+`last_update_ns()`, the last dispatched event (trade, depth frame or bar),
+and `last_touch_ns()`, the frame that last wrote the touch. A `TOP_OF_BOOK`
+frame moves the second without a callback, so it can be fresher than the
+first.
 
 #### `get_order_status(order_id) -> int`
 

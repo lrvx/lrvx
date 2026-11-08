@@ -184,7 +184,13 @@ Current position quantity. If `symbol` is None, uses the first subscribed symbol
 
 #### `ctx(symbol=None) -> SymbolContext`
 
-Get a `SymbolContext` for querying per-symbol state.
+Get a `SymbolContext` for querying per-symbol state. Besides `position()`,
+`last_trade_price()`, `best_bid()`, `best_ask()`, `mid_price()` and
+`book_spread()`, it answers two exchange timestamps in nanoseconds:
+`last_update_ns()`, the last dispatched event (trade, depth frame or bar),
+and `last_touch_ns()`, the frame that last wrote the touch. A `TOP_OF_BOOK`
+frame moves the second without a callback, so it can be fresher than the
+first.
 
 #### `get_order_status(order_id) -> int`
 

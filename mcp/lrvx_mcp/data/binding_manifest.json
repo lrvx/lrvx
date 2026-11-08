@@ -7966,6 +7966,11 @@
         },
         {
           "kind": "method",
+          "name": "_stamp_at",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
           "name": "best_ask",
           "parent": "SymbolContext"
         },
@@ -7996,7 +8001,17 @@
         },
         {
           "kind": "method",
+          "name": "last_touch_ns",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
           "name": "last_trade_price",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
+          "name": "last_update_ns",
           "parent": "SymbolContext"
         },
         {
@@ -32340,7 +32355,17 @@
         },
         {
           "kind": "method",
+          "name": "lastTouchNs",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
           "name": "lastTradePrice",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
+          "name": "lastUpdateNs",
           "parent": "SymbolContext"
         },
         {
@@ -38258,7 +38283,17 @@
         },
         {
           "kind": "method",
+          "name": "last_touch_ns",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
           "name": "last_trade_price",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
+          "name": "last_update_ns",
           "parent": "SymbolContext"
         },
         {
