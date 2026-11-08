@@ -306,6 +306,11 @@ export interface Strategy {
   onStop?(): void;
   onTrade?(ctx: SymbolContext, trade: TradeData, emit: EmitMethods): void;
   onBookUpdate?(ctx: SymbolContext, emit: EmitMethods): void;
+  /** Fires when the touch changes (price or size on either side, or a side
+   *  appears or empties): on a TOP_OF_BOOK frame, and after `onBookUpdate`
+   *  on a depth frame that moved it. `ctx.bestBid` / `ctx.bestAsk` are the
+   *  new touch. */
+  onTouch?(ctx: SymbolContext, emit: EmitMethods): void;
   onBar?(ctx: SymbolContext, bar: BarData, emit: EmitMethods): void;
   /** Fires on every fill the strategy's own orders produce
    *  (status PARTIALLY_FILLED or FILLED). */

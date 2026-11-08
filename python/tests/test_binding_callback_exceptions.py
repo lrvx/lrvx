@@ -599,10 +599,10 @@ def test_gate_error_is_logged_at_error_level(gate, base, method, attach,
         f"{base}.{method} in it\n{outcome.describe()}")
 
 
-# ── 2. Strategy callbacks: nine C function pointers ──────────────────
+# ── 2. Strategy callbacks: ten C function pointers ───────────────────
 #
-# python/strategy_bindings.h:774-:782 registers nine callbacks on the
-# bridge. Each one is a C function pointer; a Python exception raised
+# PyStrategyHost in python/strategy_bindings.h registers ten callbacks on
+# the bridge. Each one is a C function pointer; a Python exception raised
 # inside any of them unwinds through C linkage today. The driver per
 # callback raises on the first invocation, then keeps the engine running
 # so `alive` can show whether the engine survived.
@@ -983,7 +983,7 @@ _CSV = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "lrvx", "templates", "research", "data", "btcusdt_sample.csv")
 
-# One entry per C callback slot registered at strategy_bindings.h:774-:782.
+# One entry per C callback slot PyStrategyHost registers.
 STRATEGY_CALLBACKS = [
     ("on_trade", _runner_case(
         "on_trade", "ctx, trade",
@@ -992,6 +992,9 @@ STRATEGY_CALLBACKS = [
         "on_book_update", "ctx",
         "runner.on_book_snapshot(sym, [100.0, 99.0], [1.0, 2.0], "
         "[101.0, 102.0], [1.0, 2.0], 1_000)")),
+    ("on_touch", _runner_case(
+        "on_touch", "ctx",
+        "runner.on_book_top(sym, (100.0, 1.0), (101.0, 1.0), 1_000)")),
     ("on_bar", _ON_BAR_DRIVER),
     ("on_start", _ON_START_DRIVER),
     ("on_stop", _ON_STOP_DRIVER),
@@ -1002,13 +1005,13 @@ STRATEGY_CALLBACKS = [
      _VENUE_STACK_DRIVER % {"cb": "on_market_position_change", "csv": _CSV}),
 ]
 
-assert len(STRATEGY_CALLBACKS) == 9, "one case per callback slot"
+assert len(STRATEGY_CALLBACKS) == 10, "one case per callback slot"
 
 
 @pytest.mark.parametrize("callback,body", STRATEGY_CALLBACKS,
                          ids=[c[0] for c in STRATEGY_CALLBACKS])
 def test_strategy_callback_that_raises_does_not_cross_the_c_boundary(callback, body):
-    """Each of the nine bridge callbacks must contain its own exception.
+    """Each of the ten bridge callbacks must contain its own exception.
 
     hook_bindings.h:216 states the rule for the sibling header:
     "Exceptions from Python are caught and printed -- propagating them
@@ -1107,7 +1110,7 @@ def test_threaded_callback_runs_holding_the_gil():
 
     What this does *not* prove on its own is that
     PyStrategyHost::dispatch is the frame doing the acquiring. Every one
-    of the nine callbacks reaches Python through PYBIND11_OVERRIDE,
+    of the ten callbacks reaches Python through PYBIND11_OVERRIDE,
     which opens with `pybind11::gil_scoped_acquire gil;`
     (pybind11/pybind11.h:3847), and error_already_set acquires in its
     own destructor, so removing dispatch's acquire leaves no observable

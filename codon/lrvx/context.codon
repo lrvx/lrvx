@@ -86,8 +86,8 @@ class SymbolContext:
 
     def last_touch_ns(self) -> int:
         """Exchange timestamp (ns) of the frame that last wrote the touch.
-        A TOP_OF_BOOK frame moves it without a dispatch, so it can be fresher
-        than last_update_ns()."""
+        A TOP_OF_BOOK frame moves it and leaves last_update_ns() alone, so
+        it can be the fresher of the two."""
         return self._stamp_at(_CTX_LAST_TOUCH_NS)
 
     def book_spread(self) -> Optional[float]:

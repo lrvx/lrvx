@@ -734,6 +734,7 @@ extern "C"
   typedef void (*LrvxOnStopCallback)(void*);
   typedef void (*LrvxOnQueuePositionChangeCallback)(void*, const LrvxSymbolContext*, const LrvxOrderEventData*);
   typedef void (*LrvxOnMarketPositionChangeCallback)(void*, const LrvxSymbolContext*, const LrvxOrderEventData*);
+  typedef void (*LrvxOnTouchCallback)(void*, const LrvxSymbolContext*, const LrvxBookData*);
   typedef const double* (*LrvxGraphNodeFn)(void*, LrvxIndicatorGraphHandle, uint32_t, size_t*);
   typedef void (*LrvxOnSignalCallback)(void*, const LrvxSignal*);
   typedef uint8_t (*LrvxRiskManagerAllowFn)(void*, const LrvxSignal*);
@@ -785,6 +786,7 @@ extern "C"
     LrvxOnQueuePositionChangeCallback on_queue_position_change;
     LrvxOnMarketPositionChangeCallback on_market_position_change;
     void* user_data;
+    LrvxOnTouchCallback on_touch;
   } LrvxStrategyCallbacks;
 
   typedef struct

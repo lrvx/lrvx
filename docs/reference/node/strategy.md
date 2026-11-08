@@ -53,6 +53,7 @@ const strategy = {
 
     onTrade(ctx, trade, emit) { ... },
     onBookUpdate(ctx, emit) { ... },
+    onTouch(ctx, emit) { ... },
     onBar(ctx, bar, emit) { ... },
 
     onFill(ctx, ev, emit) { ... },
@@ -63,6 +64,11 @@ const strategy = {
 ```
 
 All callbacks are optional.
+
+`onTouch` fires when the touch changes (price or size on either side, or a
+side appearing or emptying): on a top-of-book frame, and right after
+`onBookUpdate` on a depth frame that moved it. `ctx.bestBid` / `ctx.bestAsk`
+are the new touch.
 
 ### Order-event callbacks
 

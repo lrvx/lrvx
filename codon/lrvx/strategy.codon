@@ -47,9 +47,10 @@ from lrvx.layout import _LRVXBAR_OPEN_RAW, _LRVXBAR_HIGH_RAW, _LRVXBAR_LOW_RAW
 from lrvx.layout import _LRVXBAR_CLOSE_RAW, _LRVXBAR_VOLUME_RAW
 from lrvx.layout import _LRVXBAR_BUY_VOLUME_RAW
 
-# LrvxStrategyCallbacks: nine function pointers plus user_data, 8 bytes each
-# on every 64-bit target this ships on. codon/lrvx/dispatch.codon fills it.
-_CALLBACKS_BYTES = 80
+# LrvxStrategyCallbacks: nine function pointers, user_data, then on_touch, 8
+# bytes each on every 64-bit target this ships on. codon/lrvx/dispatch.codon
+# fills it.
+_CALLBACKS_BYTES = 88
 
 # Room for an exchange or instrument name coming back from the registry.
 # The C entry point truncates to the length it is given rather than
@@ -107,10 +108,10 @@ class Strategy:
         self._symbol_names = list[str]()
         self._symbol_map = dict[str, int]()
         self._reverse_map = dict[int, str]()
-        # LrvxStrategyCallbacks is a 10-pointer struct on 64-bit
+        # LrvxStrategyCallbacks is an 11-pointer struct on 64-bit
         # (on_trade, on_book, on_bar, on_start, on_stop, on_fill,
         # on_order_update, on_queue_position_change,
-        # on_market_position_change, user_data). Zero-initialise —
+        # on_market_position_change, user_data, on_touch). Zero-initialise —
         # overrides happen on the C++ side via the BridgeStrategy that
         # the runner attaches to this handle.
         self._strategy_id = strategy_id
@@ -186,6 +187,13 @@ class Strategy:
 
     def on_book_update(self, ctx: SymbolContext):
         """Called on each book update. Override in subclass."""
+        pass
+
+    def on_touch(self, ctx: SymbolContext):
+        """Called when the touch changes: price or size on either side, or
+        a side appearing or emptying. Fires on a top-of-book frame, and
+        after on_book_update on a depth frame that moved the touch.
+        ctx.best_bid() / ctx.best_ask() are the new touch."""
         pass
 
     def on_bar(self, ctx: SymbolContext, bar: BarData):

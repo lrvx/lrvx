@@ -25,7 +25,8 @@
 // signature, or an existing code space gains a meaning. 2: LrvxSignal grew
 // range_lower / range_upper / liquidity. 3: LrvxBar grew close_reason.
 // 4: LrvxBookSnapshot grew has_bid / has_ask. 5: LrvxSymbolContext grew
-// last_touch_ns.
+// last_touch_ns, LrvxEventTypeStatsRow grew book_tops and
+// LrvxStrategyCallbacks grew on_touch.
 // lrvx::export_macro(group="abi_version")
 #define LRVX_CAPI_ABI_VERSION 5
 
@@ -118,9 +119,9 @@ extern "C"
   // a flat position, or a manager that keeps none. avg_entry_price_raw is
   // then 0 and means nothing, and bindings surface the unrealized PnL built
   // on it as NaN. The flag sits in padding the struct already had.
-  /* book is the touch, which a TOP_OF_BOOK frame can refresh without a
-   * dispatch. last_update_ns stamps dispatched events; last_touch_ns stamps
-   * the touch itself, so the two can differ. */
+  /* book is the touch, which a TOP_OF_BOOK frame refreshes without an on_book
+   * dispatch. last_update_ns stamps trades, depth frames and bars;
+   * last_touch_ns stamps the touch itself, so the two can differ. */
   typedef struct
   {
     uint32_t symbol_id;
@@ -186,6 +187,8 @@ extern "C"
   typedef void (*LrvxOnMarketPositionChangeCallback)(void* user_data,
                                                      const LrvxSymbolContext* ctx,
                                                      const LrvxOrderEventData* ev);
+  typedef void (*LrvxOnTouchCallback)(void* user_data, const LrvxSymbolContext* ctx,
+                                      const LrvxBookData* book);
 
   typedef struct
   {
@@ -199,6 +202,10 @@ extern "C"
     LrvxOnQueuePositionChangeCallback on_queue_position_change;
     LrvxOnMarketPositionChangeCallback on_market_position_change;
     void* user_data;
+    // The touch changed: a top-of-book frame, or a depth frame after on_book.
+    // book->snapshot is the new touch. After user_data so the slots above
+    // keep their offsets.
+    LrvxOnTouchCallback on_touch;
   } LrvxStrategyCallbacks;
 
   // ============================================================

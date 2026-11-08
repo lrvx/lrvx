@@ -166,6 +166,12 @@ void LrvxJsExecutor::dispatchOne(Event& ev, const LrvxStrategyCallbacks& cb)
         cb.on_book(cb.user_data, &ev.ctx, &ev.book);
       }
       break;
+    case Kind::Touch:
+      if (cb.on_touch)
+      {
+        cb.on_touch(cb.user_data, &ev.ctx, &ev.book);
+      }
+      break;
     case Kind::Bar:
       if (cb.on_bar)
       {
@@ -244,6 +250,7 @@ LrvxStrategyCallbacks LrvxJsExecutor::getCallbacks()
   cb.on_order_update = &LrvxJsExecutor::onOrderUpdate;
   cb.on_queue_position_change = &LrvxJsExecutor::onQueuePositionChange;
   cb.on_market_position_change = &LrvxJsExecutor::onMarketPositionChange;
+  cb.on_touch = (_strategy && _strategy->wantsTouch()) ? &LrvxJsExecutor::onTouch : nullptr;
   cb.user_data = this;
   return cb;
 }
@@ -306,6 +313,16 @@ void LrvxJsExecutor::onBook(void* ud, const LrvxSymbolContext* ctx, const LrvxBo
   auto* self = static_cast<LrvxJsExecutor*>(ud);
   Event ev;
   ev.kind = Kind::Book;
+  ev.ctx = *ctx;
+  ev.book = *book;
+  self->push(std::move(ev));
+}
+
+void LrvxJsExecutor::onTouch(void* ud, const LrvxSymbolContext* ctx, const LrvxBookData* book)
+{
+  auto* self = static_cast<LrvxJsExecutor*>(ud);
+  Event ev;
+  ev.kind = Kind::Touch;
   ev.ctx = *ctx;
   ev.book = *book;
   self->push(std::move(ev));

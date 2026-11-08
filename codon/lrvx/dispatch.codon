@@ -1,7 +1,7 @@
 # lrvx/dispatch.codon -- delivering engine events to a Codon Strategy subclass.
 #
 # The C++ side reaches a strategy through LrvxStrategyCallbacks, a struct of
-# nine function pointers plus a user_data pointer. Codon could not fill it in
+# function pointers plus a user_data pointer. Codon could not fill it in
 # for a long time and did not try: Strategy.__init__ zeroed the struct and
 # left it zeroed, so every override a subclass wrote was dead code. The
 # engine delivered the event, BridgeStrategy found a null pointer, and
@@ -167,7 +167,8 @@ _CB_ON_ORDER_UPDATE = 6
 _CB_ON_QUEUE_POSITION = 7
 _CB_ON_MARKET_POSITION = 8
 _CB_USER_DATA = 9
-_CB_SLOTS = 10
+_CB_ON_TOUCH = 10
+_CB_SLOTS = 11
 
 
 def _i64_at(p: cobj, off: int) -> int:
@@ -285,6 +286,15 @@ def _tramp_on_book(ud: cobj, ctx: cobj, ev: cobj, T: type):
         _report_callback_error("on_book_update", str(e))
 
 
+def _tramp_on_touch(ud: cobj, ctx: cobj, ev: cobj, T: type):
+    _gc_register_thread()
+    s = _as_class(ud, T)
+    try:
+        s.on_touch(_ctx_for(s, ctx, _ctx_symbol(ctx), T))
+    except Exception as e:
+        _report_callback_error("on_touch", str(e))
+
+
 def _tramp_on_bar(ud: cobj, ctx: cobj, ev: cobj, T: type):
     _gc_register_thread()
     s = _as_class(ud, T)
@@ -384,6 +394,7 @@ def bind_callbacks(strategy, T: type):
     slots[_CB_ON_QUEUE_POSITION] = _tramp_on_queue_position(T=T, ...).F.T.__raw__()
     slots[_CB_ON_MARKET_POSITION] = _tramp_on_market_position(T=T, ...).F.T.__raw__()
     slots[_CB_USER_DATA] = strategy.__raw__()
+    slots[_CB_ON_TOUCH] = _tramp_on_touch(T=T, ...).F.T.__raw__()
 
     _attached.append(strategy.__raw__())
 
@@ -412,8 +423,8 @@ def _require_callbacks_installed(strategy):
     here is worse to look at and far better to have.
     """
     slots = Ptr[cobj](strategy._callbacks_buf)
-    for i in range(_CB_SLOTS - 1):
-        if slots[i] != cobj():
+    for i in range(_CB_SLOTS):
+        if i != _CB_USER_DATA and slots[i] != cobj():
             return
     raise ValueError(
         "lrvx: this strategy has no event callbacks installed, so none of its "

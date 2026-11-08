@@ -7,11 +7,11 @@ written for this page; its shape is what a Hyperliquid recording with the
 bbo channel on looks like between two depth snapshots.
 
 A depth frame dispatches ``on_book_update`` and stamps both
-``last_update_ns`` and ``last_touch_ns``. A top-of-book frame dispatches
-nothing: it moves ``best_bid`` / ``best_ask`` / ``mid_price`` and
-``last_touch_ns`` only. The trade that follows is the first callback to see
-what the tops left behind, and its ``last_update_ns`` is the trade's own
-stamp. So "did the touch move since the last book I was shown" is
+``last_update_ns`` and ``last_touch_ns``. A top-of-book frame never reaches
+``on_book_update``: it moves ``best_bid`` / ``best_ask`` / ``mid_price`` and
+``last_touch_ns`` only, and fires ``on_touch``, which this strategy does not
+override. The trade that follows is the first callback here to see what the
+tops left behind, and its ``last_update_ns`` is the trade's own stamp. So "did the touch move since the last book I was shown" is
 ``ctx.last_touch_ns > <last_update_ns seen in on_book_update>``.
 
 Usage:
@@ -45,7 +45,8 @@ class TouchWatcher(lrvx.Strategy):
               f"bid={ctx.best_bid} ask={ctx.best_ask}")
 
     def on_trade(self, ctx, trade):
-        # No callback ran for the tops in between. The context carries them:
+        # This strategy took no callback for the tops in between (it has no
+        # on_touch). The context carries them:
         # the quotes are the last top's, last_touch_ns is its stamp, and
         # last_update_ns is this trade's.
         moved = ctx.last_touch_ns > self.last_book_ns

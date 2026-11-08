@@ -199,12 +199,21 @@ class BridgeStrategy : public Strategy
     }
 
     LrvxSymbolContext fctx = toLrvxContext(c);
-    LrvxBookData fbook{};
-    fbook.symbol = ev.update.symbol;
-    fbook.exchange_ts_ns = ev.update.exchangeTsNs.raw();
-    fbook.snapshot = toBookSnapshot(c);
-
+    LrvxBookData fbook = toLrvxBookData(c, ev);
     cb->on_book(cb->user_data, &fctx, &fbook);
+  }
+
+  void onSymbolTouch(SymbolContext& c, const BookUpdateEvent& ev) override
+  {
+    auto* cb = _cb.load(std::memory_order_acquire);
+    if (!cb || !cb->on_touch)
+    {
+      return;
+    }
+
+    LrvxSymbolContext fctx = toLrvxContext(c);
+    LrvxBookData fbook = toLrvxBookData(c, ev);
+    cb->on_touch(cb->user_data, &fctx, &fbook);
   }
 
   void onSymbolBar(SymbolContext& c, const BarEvent& ev) override
@@ -341,6 +350,15 @@ class BridgeStrategy : public Strategy
       snap.spread_raw = c.touchAsk->price.raw() - c.touchBid->price.raw();
     }
     return snap;
+  }
+
+  static LrvxBookData toLrvxBookData(const SymbolContext& c, const BookUpdateEvent& ev)
+  {
+    LrvxBookData fbook{};
+    fbook.symbol = ev.update.symbol;
+    fbook.exchange_ts_ns = ev.update.exchangeTsNs.raw();
+    fbook.snapshot = toBookSnapshot(c);
+    return fbook;
   }
 
   static LrvxSymbolContext toLrvxContext(const SymbolContext& c)

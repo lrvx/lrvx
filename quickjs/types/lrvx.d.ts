@@ -123,6 +123,10 @@ declare class Strategy {
 
     onTrade(ctx: SymbolContext, trade: TradeData): void;
     onBookUpdate(ctx: SymbolContext, book: BookData): void;
+    /** The touch changed (price or size on either side, or a side appeared
+     *  or emptied): on a top-of-book frame, and after onBookUpdate on a
+     *  depth frame that moved it. book.snapshot is the new touch. */
+    onTouch(ctx: SymbolContext, book: BookData): void;
     onStart(): void;
     onStop(): void;
 

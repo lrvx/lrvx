@@ -2031,6 +2031,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - `on_queue_position_change(self, ctx: SymbolContext, event: OrderEventData) -> None`
 - `on_start(self) -> None`
 - `on_stop(self) -> None`
+- `on_touch(self, ctx: SymbolContext) -> None`
 - `on_trade(self, ctx: SymbolContext, trade: TradeData) -> None`
 - `order_status(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> int`
 - `pos(self, symbol: str | None = None) -> float`

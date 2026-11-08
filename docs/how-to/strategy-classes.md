@@ -106,6 +106,7 @@ All bindings dispatch through the same C++ `BridgeStrategy` callbacks, so behavi
 |---|---|---|
 | `on_trade(ctx, trade)` | Tick-level trade event | All bindings |
 | `on_book_update(ctx)` | L2 book changed (bid/ask, mid) | All bindings |
+| `on_touch(ctx)` | The touch changed: price or size on either side, or a side appeared or emptied | All bindings |
 | `on_bar(ctx, bar)` | Closed OHLC bar | All bindings (since [#123](https://github.com/lrvx/lrvx/pull/123)) |
 | `on_start()` / `on_stop()` | Lifecycle hooks | All bindings |
 | `on_fill(ctx, event)` | Every fill on the strategy's own orders (`PARTIALLY_FILLED` / `FILLED`) | Python, Node.js, Codon |
@@ -115,6 +116,13 @@ All bindings dispatch through the same C++ `BridgeStrategy` callbacks, so behavi
 
 Node spells the last four `onFill`, `onOrderUpdate`,
 `onMarketPositionChange`, `onQueuePositionChange`.
+
+`on_touch` fires on a top-of-book frame that changed the touch, and on a
+depth frame that moved it. On such a depth frame the strategy gets two
+callbacks in a row, `on_book_update` and then `on_touch`, for the same frame:
+count it in one of them, not both. A top that repeats the touch fires
+nothing. Node and embedded JavaScript spell it `onTouch`, C++ `onSymbolTouch`.
+[The touch and the book](../explanation/the-touch.md) has the full model.
 
 ## Order emission helpers
 
@@ -160,7 +168,7 @@ anything else falls back to `gtc`.
 | `best_bid` / `bestBid`, `best_ask` / `bestAsk` | float | Top-of-book |
 | `mid_price` / `midPrice` | float | `(best_bid + best_ask) / 2` |
 | `last_update_ns` (Py) / `last_update_ns()` (Codon) / `lastUpdateNs` (Node, JS) | int, ns | Exchange timestamp of the last dispatched event: trade, depth frame or bar. `bigint` in Node and the embedded JavaScript engine |
-| `last_touch_ns` (Py) / `last_touch_ns()` (Codon) / `lastTouchNs` (Node, JS) | int, ns | Exchange timestamp of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it without a callback, so it can be fresher than `last_update_ns` |
+| `last_touch_ns` (Py) / `last_touch_ns()` (Codon) / `lastTouchNs` (Node, JS) | int, ns | Exchange timestamp of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it and leaves `last_update_ns` alone, so it can be the fresher of the two |
 | `unrealized_pnl` (Py) | float | Unrealized PnL on the current position, `NaN` when no entry price is available |
 | `is_long()` / `is_short()` / `is_flat()` (Py/Codon) | bool | Position state |
 | `book_spread()` (Py/Codon) | float | `best_ask - best_bid` |

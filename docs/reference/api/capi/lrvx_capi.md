@@ -7,7 +7,7 @@
 All language bindings (Python, Node.js, Codon, embedded JS) call into this header. You can use it directly to integrate lrvx into any language with a C FFI, or embed it in a C/C++ project.
 
 !!! warning "This page is a curated subset"
-    The full surface is **729 functions, 58 handles, 59 structs, 43 callback typedefs, 3 enums**
+    The full surface is **729 functions, 58 handles, 59 structs, 44 callback typedefs, 3 enums**
     across 72 groups. This page covers the commonly used core (roughly 150 functions) with prose.
     The complete, machine-generated reference — every function signature, in group order — is
     [`tools/codegen/golden/lrvx_capi.md`](https://github.com/lrvx/lrvx/blob/main/tools/codegen/golden/lrvx_capi.md),
@@ -144,7 +144,7 @@ arrived with ABI version 4.
 | `last_trade_price_raw` | `int64_t` | Last trade price × 1e8 |
 | `last_update_ns` | `int64_t` | Last update timestamp (ns) |
 | `book` | `LrvxBookSnapshot` | Top-of-book snapshot |
-| `last_touch_ns` | `int64_t` | Timestamp (ns) of the frame that last wrote the touch; can be fresher than `last_update_ns`, which stamps dispatched events only |
+| `last_touch_ns` | `int64_t` | Timestamp (ns) of the frame that last wrote the touch; can be fresher than `last_update_ns`, which stamps trades, depth frames and bars only |
 
 ### `LrvxBarData`
 
@@ -172,8 +172,8 @@ Passed to `LrvxOnBarCallback` when a bar closes.
 
 ### `LrvxStrategyCallbacks`
 
-**10 members.** Field order is load-bearing for FFI consumers — allocate the full struct
-(10 pointer-sized slots on a 64-bit target) and zero it before filling. A short allocation
+**11 members.** Field order is load-bearing for FFI consumers — allocate the full struct
+(11 pointer-sized slots on a 64-bit target) and zero it before filling. A short allocation
 corrupts memory when the runtime writes past the end.
 
 | Field | Type | Description |
@@ -188,6 +188,7 @@ corrupts memory when the runtime writes past the end.
 | `on_queue_position_change` | `LrvxOnQueuePositionChangeCallback` | Queue position moved |
 | `on_market_position_change` | `LrvxOnMarketPositionChangeCallback` | Order's position vs best moved |
 | `user_data` | `void*` | Passed to all callbacks |
+| `on_touch` | `LrvxOnTouchCallback` | The touch changed: a top-of-book frame, or a depth frame after `on_book`. `book->snapshot` is the new touch. After `user_data` so the slots above keep their offsets |
 
 Any member may be `NULL`; an unset callback is a no-op.
 
@@ -377,7 +378,7 @@ do the same.
 
 ## Callback types
 
-The header declares 43 callback typedefs. The strategy, gate and progress callbacks are below; the
+The header declares 44 callback typedefs. The strategy, gate and progress callbacks are below; the
 listener, executor, recorder and replay-source function pointers are in the generated reference.
 
 Strategy callbacks — the members of `LrvxStrategyCallbacks`:
@@ -399,6 +400,8 @@ typedef void (*LrvxOnQueuePositionChangeCallback)(void* user_data, const LrvxSym
                                                   const LrvxOrderEventData* ev);
 typedef void (*LrvxOnMarketPositionChangeCallback)(void* user_data, const LrvxSymbolContext* ctx,
                                                    const LrvxOrderEventData* ev);
+typedef void (*LrvxOnTouchCallback)(void* user_data, const LrvxSymbolContext* ctx,
+                                    const LrvxBookData* book);
 ```
 
 Signal sink and pre-trade gates. The gates run in order KillSwitch, OrderValidator, RiskManager;

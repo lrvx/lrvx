@@ -72,6 +72,13 @@ def on_book_update(self, ctx: SymbolContext):
     # strategy logic here
 ```
 
+#### `on_touch(ctx)`
+
+Called when the touch changes: price or size on either side, or a side
+appearing or emptying. Fires on a top-of-book frame, and right after
+`on_book_update` on a depth frame that moved the touch. `ctx.best_bid()` /
+`ctx.best_ask()` are the new touch.
+
 #### `on_bar(ctx, bar)`
 
 Called on each closed OHLC bar.
@@ -187,10 +194,10 @@ Current position quantity. If `symbol` is None, uses the first subscribed symbol
 Get a `SymbolContext` for querying per-symbol state. Besides `position()`,
 `last_trade_price()`, `best_bid()`, `best_ask()`, `mid_price()` and
 `book_spread()`, it answers two exchange timestamps in nanoseconds:
-`last_update_ns()`, the last dispatched event (trade, depth frame or bar),
-and `last_touch_ns()`, the frame that last wrote the touch. A `TOP_OF_BOOK`
-frame moves the second without a callback, so it can be fresher than the
-first.
+`last_update_ns()`, the last trade, depth frame or bar, and
+`last_touch_ns()`, the frame that last wrote the touch. A `TOP_OF_BOOK` frame
+moves the second and not the first (it fires `on_touch`, never
+`on_book_update`), so the second can be the fresher.
 
 #### `get_order_status(order_id) -> int`
 

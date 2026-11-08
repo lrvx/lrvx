@@ -9,7 +9,7 @@ declare const console: { log(...args: unknown[]): void; error(...args: unknown[]
 declare const process: { exit(code: number): never };
 
 import * as lrvx from "..";
-import { compile, onStart, onStop, onTrade, strategy, StrategyBase } from "../authoring/dist";
+import { compile, onStart, onStop, onTouch, onTrade, strategy, StrategyBase } from "../authoring/dist";
 
 let passed = 0;
 let failed = 0;
@@ -65,6 +65,13 @@ check(typeof strat.onTrade === "function", "compile() wires @onTrade");
 check(typeof strat.onStart === "function", "compile() wires @onStart");
 check(typeof strat.onStop === "function", "compile() wires @onStop");
 check(strat.onBar === undefined, "compile() omits handlers that were not decorated");
+
+@strategy({ symbols: [symbolId] })
+class TouchWatcher extends StrategyBase {
+  @onTouch
+  touched(): void {}
+}
+check(typeof compile(new TouchWatcher()).onTouch === "function", "compile() wires @onTouch");
 
 const signals: lrvx.Signal[] = [];
 const runner = new lrvx.Runner(registry, (sig) => signals.push(sig), false);

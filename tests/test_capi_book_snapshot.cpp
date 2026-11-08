@@ -53,6 +53,7 @@ void onBookCapture(void* user, const LrvxSymbolContext* ctx, const LrvxBookData*
 struct TouchCaptured
 {
   int bookCalls = 0;
+  int touchCalls = 0;
   int tradeCalls = 0;
   LrvxBookSnapshot tradeContext{};
   int64_t lastUpdateNs = 0;
@@ -62,6 +63,31 @@ struct TouchCaptured
 void onBookCount(void* user, const LrvxSymbolContext*, const LrvxBookData*)
 {
   ++static_cast<TouchCaptured*>(user)->bookCalls;
+}
+
+void onTouchCount(void* user, const LrvxSymbolContext*, const LrvxBookData*)
+{
+  ++static_cast<TouchCaptured*>(user)->touchCalls;
+}
+
+struct TouchCalls
+{
+  std::vector<char> order;  // 'b' on_book, 't' on_touch
+  LrvxBookData book{};
+  LrvxSymbolContext ctx{};
+};
+
+void onBookOrder(void* user, const LrvxSymbolContext*, const LrvxBookData*)
+{
+  static_cast<TouchCalls*>(user)->order.push_back('b');
+}
+
+void onTouchCapture(void* user, const LrvxSymbolContext* ctx, const LrvxBookData* book)
+{
+  auto* c = static_cast<TouchCalls*>(user);
+  c->order.push_back('t');
+  c->book = *book;
+  c->ctx = *ctx;
 }
 
 void onTradeTouch(void* user, const LrvxSymbolContext* ctx, const LrvxTradeData*)
@@ -207,6 +233,50 @@ TEST(CApiBookSnapshot, TopOfBookRefreshesTheTouchWithoutABookCallback)
   lrvx_get_symbol_context(h, sym, &fctx);
   EXPECT_EQ(fctx.last_update_ns, 1'776'606'962'000'000'000LL);
   EXPECT_EQ(fctx.last_touch_ns, 1'776'606'961'000'000'000LL);
+}
+
+// on_touch carries the new touch in both book->snapshot and ctx->book, with
+// the moving frame's stamp; after a depth frame it comes after on_book, and
+// a top that repeats the touch fires nothing.
+TEST(CApiBookSnapshot, TouchCallbackCarriesTheNewTouch)
+{
+  SymbolRegistry registry;
+  SymbolId sym = addSymbol(registry);
+
+  TouchCalls calls;
+  LrvxStrategyCallbacks cb{};
+  cb.on_book = &onBookOrder;
+  cb.on_touch = &onTouchCapture;
+  cb.user_data = &calls;
+  auto bridge = std::make_unique<BridgeStrategy>(1, std::vector<SymbolId>{sym}, registry, cb);
+
+  BookUpdatePool pool;
+  auto snap = makeSnapshot(pool, sym, {{Price::fromDouble(100.00), Quantity::fromDouble(2.5)}},
+                           {{Price::fromDouble(100.05), Quantity::fromDouble(1.25)}});
+  bridge->onBookUpdate(*snap);
+  EXPECT_EQ(calls.order, (std::vector<char>{'b', 't'}));
+
+  auto top = makeSnapshot(pool, sym, {{Price::fromDouble(100.02), Quantity::fromDouble(4.0)}},
+                          {{Price::fromDouble(100.03), Quantity::fromDouble(3.0)}});
+  top->update.type = BookUpdateType::TOP_OF_BOOK;
+  top->update.exchangeTsNs = UnixNanos{1'776'606'961'000'000'000LL};
+  bridge->onBookUpdate(*top);
+  EXPECT_EQ(calls.order, (std::vector<char>{'b', 't', 't'}));
+  EXPECT_EQ(calls.book.symbol, sym);
+  EXPECT_EQ(calls.book.exchange_ts_ns, 1'776'606'961'000'000'000LL);
+  EXPECT_EQ(calls.book.snapshot.bid_price_raw, Price::fromDouble(100.02).raw());
+  EXPECT_EQ(calls.book.snapshot.bid_qty_raw, Quantity::fromDouble(4.0).raw());
+  EXPECT_EQ(calls.book.snapshot.ask_price_raw, Price::fromDouble(100.03).raw());
+  EXPECT_EQ(calls.book.snapshot.ask_qty_raw, Quantity::fromDouble(3.0).raw());
+  EXPECT_EQ(calls.ctx.book.bid_price_raw, Price::fromDouble(100.02).raw());
+  EXPECT_EQ(calls.ctx.last_touch_ns, 1'776'606'961'000'000'000LL);
+
+  auto again = makeSnapshot(pool, sym, {{Price::fromDouble(100.02), Quantity::fromDouble(4.0)}},
+                            {{Price::fromDouble(100.03), Quantity::fromDouble(3.0)}});
+  again->update.type = BookUpdateType::TOP_OF_BOOK;
+  again->update.exchangeTsNs = UnixNanos{1'776'606'962'000'000'000LL};
+  bridge->onBookUpdate(*again);
+  EXPECT_EQ(calls.order.size(), 3u);
 }
 
 TEST(CApiBookSnapshot, EmptySideReportsZeroPriceAndZeroSize)
@@ -374,6 +444,7 @@ TEST(CApiBookSnapshot, RunnerBookTopMovesTheStrategyTouch)
   TouchCaptured cap;
   LrvxStrategyCallbacks cb{};
   cb.on_book = &onBookCount;
+  cb.on_touch = &onTouchCount;
   cb.user_data = &cap;
   uint32_t syms[] = {sym};
   auto* strat = lrvx_strategy_create(1, syms, 1, reg, cb);
@@ -388,9 +459,11 @@ TEST(CApiBookSnapshot, RunnerBookTopMovesTheStrategyTouch)
   double aq[] = {1.25};
   lrvx_runner_on_book_snapshot(runner, sym, bp, bq, 1, ap, aq, 1, /*ts=*/1'000);
   ASSERT_EQ(cap.bookCalls, 1);
+  ASSERT_EQ(cap.touchCalls, 1);
   lrvx_runner_on_book_top(runner, sym, /*has_bid=*/1, 100.02, 4.0, /*has_ask=*/1, 100.03,
                           3.0, /*ts=*/2'000);
   EXPECT_EQ(cap.bookCalls, 1) << "a top frame must not fire on_book";
+  EXPECT_EQ(cap.touchCalls, 2);
 
   EXPECT_EQ(lrvx_best_bid_raw(strat, sym), Price::fromDouble(100.02).raw());
   EXPECT_EQ(lrvx_best_ask_raw(strat, sym), Price::fromDouble(100.03).raw());

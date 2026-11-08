@@ -31,7 +31,7 @@ struct SymbolContext
 |-------|------|-------------|
 | `book` | `NLevelOrderBook<512>` | Order book with 512 price levels |
 | `touchBid` / `touchAsk` | `std::optional<BookLevel>` | The most recent best bid/ask. Depth frames set it from the applied book; `TOP_OF_BOOK` frames, which the book ignores, update it directly. Empty when that side has no quote |
-| `lastTouchNs` | `int64_t` | Exchange timestamp of the frame that last wrote the touch; `lastUpdateNs` only covers dispatched events |
+| `lastTouchNs` | `int64_t` | Exchange timestamp of the frame that last wrote the touch; `lastUpdateNs` only covers trades, depth frames and bars |
 | `position` | `Quantity` | Net position (positive=long, negative=short) |
 | `avgEntryPrice` | `std::optional<Price>` | Volume-weighted average entry price, empty when the attached position manager reports none |
 | `lastTradePrice` | `Price` | Most recent trade price |
@@ -75,7 +75,7 @@ The no-argument form marks at the depth-book `mid()`, not `touchMid()`: marking
 at a one-level touch is a separate decision. Pass a mark price to choose.
 
 Unrealized PnL against the average entry price, which the engine reads from the
-attached `IPositionManager` before every handler call. Empty when there is no
+attached `IPositionManager` once per market-data event, before its handlers run. Empty when there is no
 entry price to measure against, either because the manager keeps no cost basis
 or because the no-argument form has no mid to mark at. A flat position returns
 `0.0`, not an empty optional.

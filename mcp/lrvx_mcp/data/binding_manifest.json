@@ -7856,6 +7856,11 @@
         },
         {
           "kind": "method",
+          "name": "on_touch",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "on_trade",
           "parent": "Strategy"
         },
@@ -15386,6 +15391,11 @@
         },
         {
           "kind": "method",
+          "name": "onSymbolTouch",
+          "parent": "BridgeStrategy"
+        },
+        {
+          "kind": "method",
           "name": "onSymbolTrade",
           "parent": "BridgeStrategy"
         },
@@ -15502,6 +15512,11 @@
         {
           "kind": "method",
           "name": "toBookSnapshot",
+          "parent": "BridgeStrategy"
+        },
+        {
+          "kind": "method",
+          "name": "toLrvxBookData",
           "parent": "BridgeStrategy"
         },
         {
@@ -24881,6 +24896,11 @@
         },
         {
           "kind": "method",
+          "name": "onSymbolTouch",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "onSymbolTrade",
           "parent": "Strategy"
         },
@@ -24902,6 +24922,11 @@
         {
           "kind": "method",
           "name": "refreshTouchFromBook",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
+          "name": "sameLevel",
           "parent": "Strategy"
         },
         {
@@ -32244,6 +32269,11 @@
         },
         {
           "kind": "method",
+          "name": "onTouch",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "onTrade",
           "parent": "Strategy"
         },
@@ -38183,6 +38213,11 @@
         {
           "kind": "method",
           "name": "on_stop",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
+          "name": "on_touch",
           "parent": "Strategy"
         },
         {

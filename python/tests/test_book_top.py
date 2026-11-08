@@ -2,7 +2,8 @@
 
 ``Runner.on_book_top`` pushes a touch-only frame
 (``BookUpdateType.TOP_OF_BOOK``): it moves the strategy's pull accessors
-without firing ``on_book_update`` -- the depth book ignores the frame.
+and fires ``on_touch``, not ``on_book_update`` -- the depth book ignores
+the frame.
 ``SimulatedExecutor.on_top_of_book`` moves the simulated venue's touch
 while the depth behind it survives, and ``on_best_levels`` lands on the
 same path.
@@ -19,9 +20,14 @@ class BookCounter(lrvx.Strategy):
     def __init__(self, symbols):
         super().__init__(symbols)
         self.book_calls = 0
+        self.calls = []
 
     def on_book_update(self, ctx):
         self.book_calls += 1
+        self.calls.append("book")
+
+    def on_touch(self, ctx):
+        self.calls.append(("touch", ctx.best_bid, ctx.best_ask))
 
 
 class RunnerBookTop(unittest.TestCase):
@@ -50,6 +56,16 @@ class RunnerBookTop(unittest.TestCase):
         self.runner.on_book_top(self.sym, (100.02, 4.0), None)
         self.assertEqual(self.strategy.best_bid(), 100.02)
         self.assertIsNone(self.strategy.best_ask())
+
+    def test_on_touch_fires_when_the_touch_changes(self):
+        self.runner.on_book_snapshot(self.sym, [100.00], [2.5], [100.05], [1.25])
+        self.runner.on_book_top(self.sym, (100.02, 4.0), (100.03, 3.0))
+        self.runner.on_book_top(self.sym, (100.02, 4.0), (100.03, 3.0))
+        self.assertEqual(self.strategy.calls, [
+            "book",
+            ("touch", 100.00, 100.05),
+            ("touch", 100.02, 100.03),
+        ])
 
 
 class ExecutorTopOfBook(unittest.TestCase):

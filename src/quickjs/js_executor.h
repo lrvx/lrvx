@@ -93,6 +93,7 @@ class LrvxJsExecutor
   {
     Trade,
     Book,
+    Touch,
     Bar,
     Fill,
     OrderUpdate,
@@ -134,6 +135,7 @@ class LrvxJsExecutor
 
   static void onTrade(void*, const LrvxSymbolContext*, const LrvxTradeData*);
   static void onBook(void*, const LrvxSymbolContext*, const LrvxBookData*);
+  static void onTouch(void*, const LrvxSymbolContext*, const LrvxBookData*);
   static void onBar(void*, const LrvxSymbolContext*, const LrvxBarData*);
   static void onFill(void*, const LrvxSymbolContext*, const LrvxOrderEventData*);
   static void onOrderUpdate(void*, const LrvxSymbolContext*, const LrvxOrderEventData*);

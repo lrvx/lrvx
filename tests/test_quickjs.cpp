@@ -3559,3 +3559,100 @@ TEST(JsIntegrationTest, SimulatedExecutorTakesTopOfBook)
   EXPECT_EQ(num("badSideThrew"), 1.0)
       << "a bare number where a side object belongs must throw";
 }
+
+namespace
+{
+const char* const kTouchStrategyScript = R"(
+    var touchCount = 0;
+    var touchSymbol = "";
+    var touchBid = 0;
+    var touchAsk = 0;
+    class TouchStrat extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+      onTouch(ctx, book) {
+        touchCount++;
+        touchSymbol = book.symbol;
+        touchBid = book.snapshot.bidPrice;
+        touchAsk = book.snapshot.askPrice === null ? -1 : book.snapshot.askPrice;
+      }
+    }
+    lrvx.register(new TouchStrat());
+  )";
+
+LrvxBookData touchFrame(uint32_t sym, double bid)
+{
+  LrvxBookData fbook{};
+  fbook.symbol = sym;
+  fbook.snapshot.has_bid = 1;
+  fbook.snapshot.bid_price_raw = lrvx_price_from_double(bid);
+  return fbook;
+}
+}  // namespace
+
+TEST(JsIntegrationTest, OnTouchReceivesTheTouch)
+{
+  TempJsFile script(kTouchStrategyScript);
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+  ASSERT_NE(callbacks.on_touch, nullptr);
+
+  LrvxSymbolContext fctx{};
+  fctx.symbol_id = symIds[0];
+  LrvxBookData fbook = touchFrame(symIds[0], 100.02);
+  callbacks.on_touch(callbacks.user_data, &fctx, &fbook);
+
+  auto* ctx = jsStrat.engine().context();
+  EXPECT_EQ(readGlobalInt32(jsStrat, "touchCount"), 1);
+  JSValue sym = jsStrat.engine().getGlobalProperty("touchSymbol");
+  const char* symStr = JS_ToCString(ctx, sym);
+  EXPECT_STREQ(symStr, "BTCUSDT");
+  JS_FreeCString(ctx, symStr);
+  JS_FreeValue(ctx, sym);
+  JSValue bid = jsStrat.engine().getGlobalProperty("touchBid");
+  double bidVal = 0;
+  JS_ToFloat64(ctx, &bidVal, bid);
+  EXPECT_NEAR(bidVal, 100.02, 1e-9);
+  JS_FreeValue(ctx, bid);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "touchAsk"), -1) << "an empty ask side is null";
+}
+
+TEST(JsExecutorThreadingTest, ExecutorForwardsTouch)
+{
+  TempJsFile script(kTouchStrategyScript);
+  SymbolRegistry registry;
+  LrvxJsExecutor executor(script.path(), registry);
+  auto symIds = executor.symbolIds();
+  ASSERT_FALSE(symIds.empty());
+  auto callbacks = executor.getCallbacks();
+  ASSERT_NE(callbacks.on_touch, nullptr);
+
+  LrvxSymbolContext fctx{};
+  fctx.symbol_id = symIds[0];
+  for (int i = 0; i < 3; ++i)
+  {
+    LrvxBookData fbook = touchFrame(symIds[0], 100.0 + i);
+    callbacks.on_touch(callbacks.user_data, &fctx, &fbook);
+  }
+  executor.waitIdle();
+  EXPECT_EQ(executor.getGlobalInt32("touchCount"), 3);
+}
+
+TEST(JsIntegrationTest, NoOnTouchMeansNoTouchSlot)
+{
+  TempJsFile script(R"(
+    class Plain extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+      onTrade(ctx, trade) {}
+    }
+    lrvx.register(new Plain());
+  )");
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  EXPECT_EQ(jsStrat.getCallbacks().on_touch, nullptr)
+      << "a strategy without onTouch pays nothing for a touch move";
+
+  LrvxJsExecutor executor(script.path(), registry);
+  EXPECT_EQ(executor.getCallbacks().on_touch, nullptr);
+}
