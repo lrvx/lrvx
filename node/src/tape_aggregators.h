@@ -159,6 +159,7 @@ class EventTypeStatsAggregatorWrap
       o.Set("trades", Napi::BigInt::New(env, rows[i].trades));
       o.Set("bookSnapshots", Napi::BigInt::New(env, rows[i].book_snapshots));
       o.Set("bookDeltas", Napi::BigInt::New(env, rows[i].book_deltas));
+      o.Set("bookTops", Napi::BigInt::New(env, rows[i].book_tops));
       arr.Set(i, o);
     }
     return arr;

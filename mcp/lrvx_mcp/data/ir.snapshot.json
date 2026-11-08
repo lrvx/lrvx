@@ -15485,6 +15485,10 @@
         {
           "name": "book_deltas",
           "type": "uint64_t"
+        },
+        {
+          "name": "book_tops",
+          "type": "uint64_t"
         }
       ],
       "name": "LrvxEventTypeStatsRow"

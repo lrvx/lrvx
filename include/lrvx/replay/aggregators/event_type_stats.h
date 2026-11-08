@@ -23,7 +23,7 @@ namespace lrvx::replay
 // reference impl for the IAggregator contract.
 //
 // Result shape: `result()` returns a flat vector of (symbol_id, trades,
-// book_snapshots, book_deltas) rows in symbol-id order. Bindings convert
+// book_snapshots, book_deltas, book_tops) rows in symbol-id order. Bindings convert
 // this to whatever the host language considers idiomatic (a Python dict
 // keyed by symbol_id, etc) without further computation.
 class EventTypeStatsAggregator final : public IAggregator
@@ -35,6 +35,7 @@ class EventTypeStatsAggregator final : public IAggregator
     uint64_t trades{0};
     uint64_t book_snapshots{0};
     uint64_t book_deltas{0};
+    uint64_t book_tops{0};
   };
 
   // `symbol_filter` empty = all symbols. `event_filter` controls which

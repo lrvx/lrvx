@@ -6,7 +6,7 @@ The seven native aggregators:
 
 | Aggregator | Per-cell value | Typical use |
 |---|---|---|
-| `EventTypeStatsAggregator` | Counter of trades, book snapshots, book deltas | Quick overview of a tape's contents |
+| `EventTypeStatsAggregator` | Counter of trades, book snapshots, book deltas, book tops | Quick overview of a tape's contents |
 | `BinCountAggregator` | Event count per time bucket | Trades per minute, per second, etc. |
 | `VolumeBinAggregator` | Sum of trade `qty_raw` per time bucket | Volume profile over time |
 | `OHLCBinAggregator` | Open / high / low / close of trade `price_raw` per bucket | Price-time series for returns and candle reconstruction |

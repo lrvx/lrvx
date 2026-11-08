@@ -11158,6 +11158,7 @@ extern "C" uint32_t lrvx_event_type_stats_read_result(LrvxAggregatorHandle h,
     rows_out[i].trades = rows[i].trades;
     rows_out[i].book_snapshots = rows[i].book_snapshots;
     rows_out[i].book_deltas = rows[i].book_deltas;
+    rows_out[i].book_tops = rows[i].book_tops;
   }
   return n;
   LRVX_CAPI_LEAVE;

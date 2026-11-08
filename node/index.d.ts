@@ -2127,6 +2127,7 @@ export interface EventTypeStatsRow {
   trades: bigint;
   bookSnapshots: bigint;
   bookDeltas: bigint;
+  bookTops: bigint;
 }
 export class EventTypeStatsAggregator {
   constructor(eventFilter?: AggregatorEventFilter, symbolFilter?: number[]);

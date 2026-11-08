@@ -840,6 +840,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 | `trades` | `uint64_t` |
 | `book_snapshots` | `uint64_t` |
 | `book_deltas` | `uint64_t` |
+| `book_tops` | `uint64_t` |
 
 ### `LrvxBinCountRow`
 
