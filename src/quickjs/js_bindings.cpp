@@ -3379,6 +3379,17 @@ static JSValue js_executor_on_best_levels(JSContext* ctx, JSValueConst, int,
                                          toDouble(ctx, argv[5]));
   return JS_UNDEFINED;
 }
+static JSValue js_executor_on_top_of_book(JSContext* ctx, JSValueConst, int,
+                                          JSValueConst* argv)
+{
+  lrvx_simulated_executor_on_top_of_book(static_cast<LrvxSimulatedExecutorHandle>(getHandle(ctx, argv[0])),
+                                         toUint32(ctx, argv[1]),
+                                         static_cast<uint8_t>(toUint32(ctx, argv[2])),
+                                         toDouble(ctx, argv[3]), toDouble(ctx, argv[4]),
+                                         static_cast<uint8_t>(toUint32(ctx, argv[5])),
+                                         toDouble(ctx, argv[6]), toDouble(ctx, argv[7]));
+  return JS_UNDEFINED;
+}
 
 static JSValue js_backtest_result_create(JSContext* ctx, JSValueConst, int,
                                          JSValueConst* argv)
@@ -7458,6 +7469,7 @@ bool registerLrvxBindings(JSContext* ctx)
   addGlobalFunc(ctx, "__lrvx_funding_schedule_tick", js_funding_schedule_tick, 5);
   addGlobalFunc(ctx, "__lrvx_simulated_executor_on_trade_qty", js_executor_on_trade_qty, 5);
   addGlobalFunc(ctx, "__lrvx_simulated_executor_on_best_levels", js_executor_on_best_levels, 6);
+  addGlobalFunc(ctx, "__lrvx_simulated_executor_on_top_of_book", js_executor_on_top_of_book, 8);
 
   // Backtest result
   addGlobalFunc(ctx, "__lrvx_backtest_result_create", js_backtest_result_create, 6);

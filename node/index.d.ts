@@ -1219,6 +1219,13 @@ export class SimulatedExecutor {
    *  reports that run and not the sum of every run. */
   reset(): void;
   onTrade(symbol: number, price: number, isBuy: boolean): void;
+  /** Touch-only frame: moves the touch; deeper depth the executor already
+   *  holds survives. `null` means that side of the book is empty. */
+  onTopOfBook(
+    symbol: number,
+    bid: { price: number; qty: number } | null,
+    ask: { price: number; qty: number } | null,
+  ): void;
   advanceClock(timestampNs: number | bigint): void;
   setDefaultSlippage(
     model: SlippageModel | number,

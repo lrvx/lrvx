@@ -3521,3 +3521,41 @@ TEST(JsEngineTest, MatchedAbiRegistersTheSurface)
   EXPECT_TRUE(JS_IsFunction(engine.context(), fn));
   JS_FreeValue(engine.context(), fn);
 }
+
+// The QuickJS executor takes a touch-only frame: the touch it carries is
+// what a market order matches against, and a null side has nothing to
+// match.
+TEST(JsIntegrationTest, SimulatedExecutorTakesTopOfBook)
+{
+  TempJsFile script(R"(
+    var ex = new SimulatedExecutor();
+    ex.onTopOfBook(1, { price: 99.5, qty: 5.0 }, { price: 100.5, qty: 2.0 });
+    ex.submitOrder(1, "buy", 0.0, 1.0, 0, 1);
+    var fillsAfterTop = ex.fillCount;
+    ex.onTopOfBook(1, null, { price: 100.5, qty: 2.0 });
+    ex.submitOrder(2, "sell", 0.0, 1.0, 0, 1);
+    var fillsAfterNullBid = ex.fillCount;
+    var badSideThrew = false;
+    try { ex.onTopOfBook(1, 99.5, null); } catch (e) { badSideThrew = e instanceof TypeError; }
+    ex.destroy();
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto* ctx = jsStrat.engine().context();
+
+  auto num = [&](const char* name)
+  {
+    JSValue v = jsStrat.engine().getGlobalProperty(name);
+    double d = 0;
+    JS_ToFloat64(ctx, &d, v);
+    JS_FreeValue(ctx, v);
+    return d;
+  };
+
+  EXPECT_EQ(num("fillsAfterTop"), 1.0) << "a market buy matches the fed ask touch";
+  EXPECT_EQ(num("fillsAfterNullBid"), 1.0)
+      << "no bid side, nothing for a market sell to match";
+  EXPECT_EQ(num("badSideThrew"), 1.0)
+      << "a bare number where a side object belongs must throw";
+}

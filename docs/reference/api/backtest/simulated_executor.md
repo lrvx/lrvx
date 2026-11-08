@@ -300,6 +300,12 @@ SELL trailing: trigger follows price up (never down). BUY trailing: trigger foll
 A bar reports no depth, so a bar step drops the symbol's ladder: on bar data any size trades at the
 step price, and a stale book from an earlier update is not walked at prices the bar has left behind.
 
+The binding-level one-level feeds — the C API's `lrvx_simulated_executor_on_best_levels`, Python's
+`on_best_levels`, QuickJS's `onBestLevels` — land on `onTopOfBook`, not `onBookUpdate`: depth from
+the last snapshot survives a one-level quote instead of being replaced by it. Callers that mixed
+`on_best_levels` with snapshot feeds and relied on the quote wiping the ladder get the touch
+semantics instead.
+
 ### Bar data and look-ahead
 
 A bar reaches the strategy only after the simulator has walked it, which means the whole bar — open,

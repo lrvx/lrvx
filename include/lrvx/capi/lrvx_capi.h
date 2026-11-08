@@ -1161,6 +1161,9 @@ extern "C"
                                                 const double* bid_qtys, uint32_t n_bids,
                                                 const double* ask_prices, const double* ask_qtys,
                                                 uint32_t n_asks);
+  void lrvx_simulated_executor_on_top_of_book(LrvxSimulatedExecutorHandle executor, uint32_t symbol,
+                                              uint8_t has_bid, double bid_price, double bid_qty,
+                                              uint8_t has_ask, double ask_price, double ask_qty);
   LrvxBacktestResultHandle lrvx_backtest_result_create(double initial_capital, double fee_rate,
                                                        uint8_t use_percentage_fee,
                                                        double fixed_fee_per_trade,

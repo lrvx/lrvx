@@ -2800,11 +2800,15 @@ class SimulatedExecutor:
         """
     def on_best_levels(self, symbol: typing.SupportsInt | typing.SupportsIndex, bid_price: typing.SupportsFloat | typing.SupportsIndex, bid_qty: typing.SupportsFloat | typing.SupportsIndex, ask_price: typing.SupportsFloat | typing.SupportsIndex, ask_qty: typing.SupportsFloat | typing.SupportsIndex) -> None:
         """
-        Feed a top-of-book snapshot (both best bid and best ask in one call)
+        Feed both best levels in one call. Routed to the touch path: depth from the last on_book_snapshot survives instead of being replaced by a one-level book
         """
     def on_book_snapshot(self, symbol: typing.SupportsInt | typing.SupportsIndex, bid_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ask_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]]) -> None:
         """
         Feed a full L2 snapshot. bid_levels and ask_levels are lists of (price, qty) tuples
+        """
+    def on_top_of_book(self, symbol: typing.SupportsInt | typing.SupportsIndex, bid: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ask: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None) -> None:
+        """
+        Feed a touch-only frame: moves the touch, keeps deeper depth from the last snapshot. bid / ask are (price, qty) tuples; None means that side of the book is empty
         """
     def on_trade(self, symbol: typing.SupportsInt | typing.SupportsIndex, price: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool) -> None:
         """

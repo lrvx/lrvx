@@ -16,7 +16,9 @@
 
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace py = pybind11;
@@ -339,15 +341,29 @@ class PySimulatedExecutor
     _executor.onTrade(symbol, Price::fromDouble(price), Quantity::fromDouble(qty), isBuy);
   }
 
+  // Routed to the touch path for the same reason as the C API's
+  // on_best_levels: a one-level book here would replace the ladder.
   void onBestLevels(uint32_t symbol, double bidPrice, double bidQty, double askPrice,
                     double askQty)
   {
-    std::pmr::monotonic_buffer_resource pool(512);
+    onTopOfBook(symbol, std::make_pair(bidPrice, bidQty), std::make_pair(askPrice, askQty));
+  }
+
+  void onTopOfBook(uint32_t symbol, const std::optional<std::pair<double, double>>& bid,
+                   const std::optional<std::pair<double, double>>& ask)
+  {
+    std::pmr::monotonic_buffer_resource pool(256);
     std::pmr::vector<BookLevel> bids(&pool);
     std::pmr::vector<BookLevel> asks(&pool);
-    bids.emplace_back(Price::fromDouble(bidPrice), Quantity::fromDouble(bidQty));
-    asks.emplace_back(Price::fromDouble(askPrice), Quantity::fromDouble(askQty));
-    _executor.onBookUpdate(symbol, bids, asks);
+    if (bid)
+    {
+      bids.emplace_back(Price::fromDouble(bid->first), Quantity::fromDouble(bid->second));
+    }
+    if (ask)
+    {
+      asks.emplace_back(Price::fromDouble(ask->first), Quantity::fromDouble(ask->second));
+    }
+    _executor.onTopOfBook(symbol, bids, asks);
   }
 
   void onBookSnapshot(uint32_t symbol,
@@ -799,12 +815,18 @@ inline void bindBacktest(py::module_& m)
            "Feed a trade with quantity (enables queue-fill simulation)",
            py::arg("symbol"), py::arg("price"), py::arg("quantity"), py::arg("is_buy"))
       .def("on_best_levels", &PySimulatedExecutor::onBestLevels,
-           "Feed a top-of-book snapshot (both best bid and best ask in one call)",
+           "Feed both best levels in one call. Routed to the touch path: depth from the "
+           "last on_book_snapshot survives instead of being replaced by a one-level book",
            py::arg("symbol"), py::arg("bid_price"), py::arg("bid_qty"),
            py::arg("ask_price"), py::arg("ask_qty"))
       .def("on_book_snapshot", &PySimulatedExecutor::onBookSnapshot,
            "Feed a full L2 snapshot. bid_levels and ask_levels are lists of (price, qty) tuples",
            py::arg("symbol"), py::arg("bid_levels"), py::arg("ask_levels"))
+      .def("on_top_of_book", &PySimulatedExecutor::onTopOfBook,
+           "Feed a touch-only frame: moves the touch, keeps deeper depth from the last "
+           "snapshot. bid / ask are (price, qty) tuples; None means that side of the "
+           "book is empty",
+           py::arg("symbol"), py::arg("bid"), py::arg("ask"))
       .def("advance_clock", &PySimulatedExecutor::advanceClock,
            "Advance simulation clock to timestamp",
            py::arg("timestamp_ns"))

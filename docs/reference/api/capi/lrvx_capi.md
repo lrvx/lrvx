@@ -649,6 +649,9 @@ void lrvx_simulated_executor_on_trade(LrvxSimulatedExecutorHandle executor, uint
                             double price, uint8_t is_buy);
 void lrvx_simulated_executor_on_trade_qty(LrvxSimulatedExecutorHandle executor, uint32_t symbol,
                                 double price, double quantity, uint8_t is_buy);
+// Routed to the touch path (lrvx_simulated_executor_on_top_of_book with
+// both sides present): depth from the last snapshot survives instead of
+// being replaced by a one-level book.
 void lrvx_simulated_executor_on_best_levels(LrvxSimulatedExecutorHandle executor, uint32_t symbol,
                                   double bid_price, double bid_qty,
                                   double ask_price, double ask_qty);
@@ -657,6 +660,12 @@ void lrvx_simulated_executor_on_book_snapshot(LrvxSimulatedExecutorHandle execut
                                     uint32_t n_bids,
                                     const double* ask_prices, const double* ask_qtys,
                                     uint32_t n_asks);
+// Touch-only frame: moves the touch, keeps deeper depth from the last
+// snapshot. has_bid == 0 means the bid side is empty and its price/qty
+// are ignored; same for has_ask.
+void lrvx_simulated_executor_on_top_of_book(LrvxSimulatedExecutorHandle executor, uint32_t symbol,
+                                  uint8_t has_bid, double bid_price, double bid_qty,
+                                  uint8_t has_ask, double ask_price, double ask_qty);
 void lrvx_simulated_executor_advance_clock(LrvxSimulatedExecutorHandle executor, int64_t timestamp_ns);
 
 // Fills

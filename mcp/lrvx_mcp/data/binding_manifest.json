@@ -3173,6 +3173,11 @@
           "name": "lrvx_simulated_executor_on_book_snapshot"
         },
         {
+          "group": "backtest_slippage",
+          "kind": "function",
+          "name": "lrvx_simulated_executor_on_top_of_book"
+        },
+        {
           "group": "simulated_executor",
           "kind": "function",
           "name": "lrvx_simulated_executor_on_trade"
@@ -10859,6 +10864,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_simulated_executor_on_book_snapshot"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_simulated_executor_on_top_of_book"
         },
         {
           "kind": "c_import",
@@ -31940,6 +31949,11 @@
         },
         {
           "kind": "method",
+          "name": "onTopOfBook",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "onTrade",
           "parent": "SimulatedExecutor"
         },
@@ -37578,6 +37592,11 @@
         },
         {
           "kind": "method",
+          "name": "on_top_of_book",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "on_trade",
           "parent": "SimulatedExecutor"
         },
@@ -40704,6 +40723,10 @@
         },
         {
           "kind": "global",
+          "name": "__lrvx_simulated_executor_on_top_of_book"
+        },
+        {
+          "kind": "global",
           "name": "__lrvx_simulated_executor_on_trade"
         },
         {
@@ -41272,6 +41295,7 @@
         "lrvx_simulated_executor_fok_mode",
         "lrvx_simulated_executor_on_best_levels",
         "lrvx_simulated_executor_on_book_snapshot",
+        "lrvx_simulated_executor_on_top_of_book",
         "lrvx_simulated_executor_on_trade_qty",
         "lrvx_simulated_executor_set_cancel_ack_latency",
         "lrvx_simulated_executor_set_cancel_ack_latency_distribution",
@@ -41335,6 +41359,7 @@
           "__lrvx_simulated_executor_apply_latency_profile",
           "__lrvx_simulated_executor_fok_mode",
           "__lrvx_simulated_executor_on_best_levels",
+          "__lrvx_simulated_executor_on_top_of_book",
           "__lrvx_simulated_executor_on_trade_qty",
           "__lrvx_simulated_executor_set_cancel_ack",
           "__lrvx_simulated_executor_set_cancel_ack_latency_distribution",
