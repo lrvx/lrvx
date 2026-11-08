@@ -201,7 +201,7 @@ namespace
 {
 
 // Mixed-symbol mixed-event tape fixture. Three symbols, each gets a
-// distinct mix of trades / snapshots / deltas so the per-symbol +
+// distinct mix of trades / snapshots / deltas / tops so the per-symbol +
 // per-event-kind counters can be verified independently.
 void writeMixedTape(const std::filesystem::path& dir)
 {
@@ -225,6 +225,20 @@ void writeMixedTape(const std::filesystem::path& dir)
     hdr.exchange_ts_ns = 2'000'000'000LL + i * 1'000LL;
     hdr.symbol_id = 1;
     hdr.type = 0;  // snapshot
+    hdr.bid_count = 1;
+    hdr.ask_count = 1;
+    std::vector<BookLevel> bids = {{1, 1}};
+    std::vector<BookLevel> asks = {{2, 1}};
+    writer.writeBook(hdr, bids, asks);
+  }
+
+  // symbol 1 again: 3 tops (record byte 2)
+  for (int i = 0; i < 3; ++i)
+  {
+    BookRecordHeader hdr{};
+    hdr.exchange_ts_ns = 2'500'000'000LL + i * 1'000LL;
+    hdr.symbol_id = 1;
+    hdr.type = 2;  // top
     hdr.bid_count = 1;
     hdr.ask_count = 1;
     std::vector<BookLevel> bids = {{1, 1}};
@@ -323,12 +337,14 @@ TEST_F(AggregatorFrameworkTest, EventTypeStatsCountsPerSymbol)
   EXPECT_EQ(s1->trades, 10u);
   EXPECT_EQ(s1->book_snapshots, 4u);
   EXPECT_EQ(s1->book_deltas, 0u);
+  EXPECT_EQ(s1->book_tops, 3u);
 
   const auto* s2 = findRow(rows, 2);
   ASSERT_NE(s2, nullptr);
   EXPECT_EQ(s2->trades, 5u);
   EXPECT_EQ(s2->book_snapshots, 0u);
   EXPECT_EQ(s2->book_deltas, 7u);
+  EXPECT_EQ(s2->book_tops, 0u);
 
   const auto* s3 = findRow(rows, 3);
   ASSERT_NE(s3, nullptr);
@@ -354,6 +370,7 @@ TEST_F(AggregatorFrameworkTest, EventTypeStatsEventFilterTradesOnly)
   {
     EXPECT_EQ(r.book_snapshots, 0u);
     EXPECT_EQ(r.book_deltas, 0u);
+    EXPECT_EQ(r.book_tops, 0u);
   }
   EXPECT_EQ(findRow(rows, 1)->trades, 10u);
   EXPECT_EQ(findRow(rows, 2)->trades, 5u);
@@ -372,14 +389,16 @@ TEST_F(AggregatorFrameworkTest, EventTypeStatsEventFilterBooksOnly)
   ASSERT_TRUE(reader.run(aggregators));
 
   const auto& rows = stats.result();
-  // Only symbols with book events appear. Symbol 1: 4 snapshots, symbol
-  // 2: 7 deltas, symbol 3: 1 + 1. All three have books, so 3 rows.
+  // Only symbols with book events appear. Symbol 1: 4 snapshots + 3
+  // tops, symbol 2: 7 deltas, symbol 3: 1 + 1. All three have books, so
+  // 3 rows.
   ASSERT_EQ(rows.size(), 3u);
   for (const auto& r : rows)
   {
     EXPECT_EQ(r.trades, 0u);
   }
   EXPECT_EQ(findRow(rows, 1)->book_snapshots, 4u);
+  EXPECT_EQ(findRow(rows, 1)->book_tops, 3u);
   EXPECT_EQ(findRow(rows, 2)->book_deltas, 7u);
   EXPECT_EQ(findRow(rows, 3)->book_snapshots, 1u);
   EXPECT_EQ(findRow(rows, 3)->book_deltas, 1u);

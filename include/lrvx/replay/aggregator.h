@@ -24,7 +24,7 @@ namespace lrvx::replay
 enum class AggregatorEventFilter : uint8_t
 {
   Trades = 1,     // TradeRecord events only
-  BooksOnly = 2,  // BookSnapshot + BookDelta events only
+  BooksOnly = 2,  // book events only: BookSnapshot / BookDelta / BookTop
   Both = 3,       // both kinds
 };
 

@@ -279,7 +279,7 @@ inline void bindTapeAggregators(py::module_& m)
   // returned by .result() use these dtypes so consumers can do
   // `arr["count"]` / `arr["symbol_id"]` directly.
   PYBIND11_NUMPY_DTYPE(lrvx::replay::EventTypeStatsAggregator::PerSymbolRow,
-                       symbol_id, trades, book_snapshots, book_deltas);
+                       symbol_id, trades, book_snapshots, book_deltas, book_tops);
   PYBIND11_NUMPY_DTYPE(lrvx::replay::BinCountAggregator::Row, bucket_ts_ns,
                        symbol_id, side, count);
   PYBIND11_NUMPY_DTYPE(lrvx::replay::VolumeBinAggregator::Row, bucket_ts_ns,
@@ -292,7 +292,7 @@ inline void bindTapeAggregators(py::module_& m)
 
   py::enum_<lrvx::replay::AggregatorEventFilter>(m, "AggregatorEventFilter",
                                                  "Which event kinds an aggregator counts. Trades = TradeRecord only, "
-                                                 "BooksOnly = BookSnapshot + BookDelta only, Both = every event.")
+                                                 "BooksOnly = book events only (snapshot / delta / top), Both = every event.")
       .value("Trades", lrvx::replay::AggregatorEventFilter::Trades)
       .value("BooksOnly", lrvx::replay::AggregatorEventFilter::BooksOnly)
       .value("Both", lrvx::replay::AggregatorEventFilter::Both);
@@ -304,14 +304,15 @@ inline void bindTapeAggregators(py::module_& m)
 
   py::class_<PyEventTypeStatsAggregator, IPyAggregator>(m, "EventTypeStatsAggregator",
                                                         "Per-symbol counters split by event kind (trade / book_snapshot / "
-                                                        "book_delta). Cheapest of the native aggregators; useful as the "
+                                                        "book_delta / book_top). Cheapest of the native aggregators; useful as the "
                                                         "'what's in this tape' overview.")
       .def(py::init<lrvx::replay::AggregatorEventFilter, std::vector<uint32_t>>(),
            py::arg("event_filter") = lrvx::replay::AggregatorEventFilter::Both,
            py::arg("symbol_filter") = std::vector<uint32_t>{})
       .def("result", &PyEventTypeStatsAggregator::result,
            "Structured numpy array with fields "
-           "(symbol_id u4, trades u8, book_snapshots u8, book_deltas u8). "
+           "(symbol_id u4, trades u8, book_snapshots u8, book_deltas u8, "
+           "book_tops u8). "
            "Sorted by symbol_id ascending. Empty until DataReader.run() has "
            "called finalize().");
 

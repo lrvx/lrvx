@@ -125,7 +125,7 @@ class AdlRanking:
         ...
 class AggregatorEventFilter:
     """
-    Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = BookSnapshot + BookDelta only, Both = every event.
+    Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = book events only (snapshot / delta / top), Both = every event.
     
     Members:
     
@@ -765,7 +765,7 @@ class EventTypeStatsAggregator(_AggregatorHandle):
         ...
     def result(self) -> numpy.ndarray[typing.Any, numpy.dtype[numpy.void]]:
         """
-        Structured numpy array with fields (symbol_id u4, trades u8, book_snapshots u8, book_deltas u8). Sorted by symbol_id ascending. Empty until DataReader.run() has called finalize().
+        Structured numpy array with fields (symbol_id u4, trades u8, book_snapshots u8, book_deltas u8, book_tops u8). Sorted by symbol_id ascending. Empty until DataReader.run() has called finalize().
         """
 class ExchangeCapabilities:
     batch_submit: bool

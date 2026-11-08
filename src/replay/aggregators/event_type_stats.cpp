@@ -41,6 +41,7 @@ void EventTypeStatsAggregator::onEvent(const ReplayEvent& ev)
   bool is_trade = false;
   bool is_snapshot = false;
   bool is_delta = false;
+  bool is_top = false;
 
   switch (ev.type)
   {
@@ -52,8 +53,6 @@ void EventTypeStatsAggregator::onEvent(const ReplayEvent& ev)
       symbol_id = ev.trade.symbol_id;
       is_trade = true;
       break;
-    // BookTop lands in default: the overview promises the three original
-    // kinds, and a new column is a C-struct change for every binding.
     case EventType::BookSnapshot:
       if (_event_filter == AggregatorEventFilter::Trades)
       {
@@ -69,6 +68,14 @@ void EventTypeStatsAggregator::onEvent(const ReplayEvent& ev)
       }
       symbol_id = ev.book_header.symbol_id;
       is_delta = true;
+      break;
+    case EventType::BookTop:
+      if (_event_filter == AggregatorEventFilter::Trades)
+      {
+        return;
+      }
+      symbol_id = ev.book_header.symbol_id;
+      is_top = true;
       break;
     default:
       return;
@@ -92,6 +99,10 @@ void EventTypeStatsAggregator::onEvent(const ReplayEvent& ev)
   else if (is_delta)
   {
     ++row.book_deltas;
+  }
+  else if (is_top)
+  {
+    ++row.book_tops;
   }
 }
 
@@ -128,6 +139,7 @@ void EventTypeStatsAggregator::merge(const IAggregator& other)
     mine.trades += row.trades;
     mine.book_snapshots += row.book_snapshots;
     mine.book_deltas += row.book_deltas;
+    mine.book_tops += row.book_tops;
   }
 }
 

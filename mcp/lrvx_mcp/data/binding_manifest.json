@@ -28969,6 +28969,11 @@
         },
         {
           "kind": "method",
+          "name": "bookTops",
+          "parent": "EventTypeStatsRow"
+        },
+        {
+          "kind": "method",
           "name": "symbolId",
           "parent": "EventTypeStatsRow"
         },

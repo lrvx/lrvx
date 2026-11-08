@@ -216,7 +216,7 @@ Members:
 
 ### `class AggregatorEventFilter`
 
-Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = BookSnapshot + BookDelta only, Both = every event.
+Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = book events only (snapshot / delta / top), Both = every event.
 
 **Constructor**
 

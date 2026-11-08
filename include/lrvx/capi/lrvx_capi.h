@@ -24,8 +24,9 @@
  * rather than a failed load -- compare LRVX_CAPI_ABI_VERSION against
  * lrvx_capi_abi_version() once at startup and refuse the mismatch.
  * 3: LrvxBar grew close_reason. 4: LrvxBookSnapshot grew has_bid and
- * has_ask. 5: LrvxSymbolContext grew last_touch_ns; the recorder
- * on_book_update byte gained 2 (top). */
+ * has_ask. 5: LrvxSymbolContext grew last_touch_ns and
+ * LrvxEventTypeStatsRow grew book_tops; the recorder on_book_update
+ * byte gained 2 (top). */
 #define LRVX_CAPI_ABI_VERSION 5
 
 /* Declared by a header that carries lrvx_best_bid_raw_opt and its two
@@ -771,6 +772,7 @@ extern "C"
     uint64_t trades;
     uint64_t book_snapshots;
     uint64_t book_deltas;
+    uint64_t book_tops;
   } LrvxEventTypeStatsRow;
 
   typedef struct

@@ -4308,6 +4308,7 @@ extern "C"
     uint64_t trades;
     uint64_t book_snapshots;
     uint64_t book_deltas;
+    uint64_t book_tops;
   } LrvxEventTypeStatsRow;
 
   typedef struct
