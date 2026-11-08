@@ -169,6 +169,10 @@ Node's `SymbolContext` is the narrower set: `position`, `symbolId`,
 `lastTradePrice`, `bestBid`, `bestAsk`, `midPrice`, `lastUpdateNs`,
 `lastTouchNs`.
 
+The best bid and ask follow the touch, which a venue's one-level top-of-book
+frames move between depth updates; [Read the touch from a strategy](read-the-touch.md)
+says how to tell such a move from a depth update.
+
 Give every C++ strategy in a process its own `SubscriberId`. Nothing checks it,
 and the id does double duty: the buses route on it, and it is also the
 namespace for that strategy's order ids, which number from 1 within each

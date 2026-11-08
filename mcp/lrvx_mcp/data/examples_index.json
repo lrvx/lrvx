@@ -254,6 +254,13 @@
     },
     {
       "language": "python",
+      "path": "docs/examples/python_read_the_touch.py",
+      "sha256": "94e621662a59049278f60bf6dd1e2d9115e6582f1eab54ad2e4deeae772aed75",
+      "size_bytes": 3175,
+      "topic": "strategy"
+    },
+    {
+      "language": "python",
       "path": "docs/examples/python_realistic_backtest.py",
       "sha256": "c3c2350e83fc6797281cddea6a49b5527912d9d6f8414b7d8c2ec6b40975e4ba",
       "size_bytes": 2242,

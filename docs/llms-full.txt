@@ -3821,6 +3821,7 @@ Solve specific problems. Assumes you know the basics.
 | [Multi-symbol indicators](multi-symbol-indicators.md) | One indicator across many symbols |
 | [Cross-symbol indicators](cross-symbol-indicators.md) | Indicators over two synchronised symbol streams — correlation, hedge ratios, benchmark regime filters |
 | [Read multi-timeframe context from a strategy](multi-tf-context.md) | `last_closed_bar(symbol, tf)` + `last_n_closed_bars(...)` ring helpers |
+| [Read the touch from a strategy](read-the-touch.md) | Best bid / ask that follow top-of-book frames, and the two stamps that tell a touch move from a depth update |
 | [Compose multi-symbol multi-TF entry conditions declaratively](composite-conditions.md) | `when(self, btc, H4).ema(50) > when(self, btc, H4).ema(200)` composable DSL |
 | [Submit a multi-leg order group](multi-leg-order-group.md) | Bundle pair-trade / basket legs under one `parent_signal_id` with status + cancel |
 | [Wait for multiple feeds with a known staleness budget](multi-feed-clock.md) | `MultiFeedClock` with WaitForAll / FireOnAny / LeaderFollower policies |
@@ -4020,6 +4021,10 @@ Node's `SymbolContext` is the narrower set: `position`, `symbolId`,
 `lastTradePrice`, `bestBid`, `bestAsk`, `midPrice`, `lastUpdateNs`,
 `lastTouchNs`.
 
+The best bid and ask follow the touch, which a venue's one-level top-of-book
+frames move between depth updates; [Read the touch from a strategy](read-the-touch.md)
+says how to tell such a move from a depth update.
+
 Give every C++ strategy in a process its own `SubscriberId`. Nothing checks it,
 and the id does double duty: the buses route on it, and it is also the
 namespace for that strategy's order ids, which number from 1 within each
@@ -4048,6 +4053,97 @@ For the canonical reference of every callback and emit helper, see the per-langu
 - [Node.js reference](../reference/node/strategy.md)
 - [Codon reference](../reference/codon/strategy.md)
 - [C++ Strategy](../reference/api/strategy/strategy.md)
+
+------------------------------------------------------------------------------
+# Source: docs/how-to/read-the-touch.md
+# URL: https://docs.lrvx.dev/how-to/read-the-touch/
+------------------------------------------------------------------------------
+
+# Read the touch from a strategy
+
+The best bid and ask a strategy callback receives follow the touch, which a venue's one-level top-of-book frames move between depth updates. This page is the working side of [The touch and the book](../explanation/the-touch.md): where the values are in each binding, how to tell a touch move from a depth update, and how to replay a tape that carries tops.
+
+## Where the touch is
+
+Every callback's context quotes the touch. The depth book is not what the quotes read.
+
+| Binding | Best bid / ask, mid | Stamps |
+|---|---|---|
+| Python | `ctx.best_bid`, `ctx.best_ask`, `ctx.mid_price` | `ctx.last_touch_ns`, `ctx.last_update_ns` |
+| Node | `ctx.bestBid`, `ctx.bestAsk`, `ctx.midPrice` | `ctx.lastTouchNs`, `ctx.lastUpdateNs` (`BigInt`) |
+| Codon | `ctx.best_bid()`, `ctx.best_ask()`, `ctx.mid_price()` | `ctx.last_touch_ns()`, `ctx.last_update_ns()` |
+| C++ | `c.touchBid`, `c.touchAsk`, `c.touchMid()` | `c.lastTouchNs`, `c.lastUpdateNs` |
+
+`last_update_ns` is the exchange timestamp of the event the callback is for: a trade, a depth frame or a bar. `last_touch_ns` is the exchange timestamp of the frame that last wrote the touch. A depth frame writes both; a top-of-book frame writes `last_touch_ns` only and fires no callback.
+
+## Tell a touch move from a depth update
+
+Keep the `last_update_ns` you saw in your last book callback. On any later callback, `ctx.last_touch_ns` greater than that value means a top arrived after the last depth frame you were shown, and the quotes in `ctx` are that top's. The stamps are the venue's: Hyperliquid stamps in milliseconds, so a top in the same millisecond as the depth frame reads as no move, and a frame sent without a time is stamped 0. Compare the quotes too where that matters. The example replays a tape of one depth snapshot, three tops and a trade, and prints what each callback sees:
+
+```python
+--8<-- "examples/python_read_the_touch.py"
+```
+
+The tape under `docs/examples/data/touch_tape` is synthetic, written for this page. Its shape is what a Hyperliquid recording with the `bbo` channel on looks like between two depth snapshots.
+
+## Mark against the touch
+
+`mid()` on the C++ context is the depth book's mid and last moved on a depth frame. `touchMid()` also moves on top-of-book frames, so between depth frames it is the fresher mark. A strategy that quotes off the mid wants the second one, and the same bookkeeping as above to know whether it moved:
+
+```cpp
+#include "lrvx/strategy/strategy.h"
+
+using namespace lrvx;
+
+class QuoteOffTheTouch : public lrvx::Strategy
+{
+ public:
+  using Strategy::Strategy;
+
+ protected:
+  void onSymbolBook(SymbolContext& c, const BookUpdateEvent&) override
+  {
+    // A depth frame: the book and the touch were both written just now.
+    _lastBookNs = c.lastUpdateNs;
+  }
+
+  void onSymbolTrade(SymbolContext& c, const TradeEvent& ev) override
+  {
+    // c.mid() last moved on a depth frame. c.touchMid() also moves on
+    // TOP_OF_BOOK frames, which the depth book ignores.
+    auto mark = c.touchMid();
+    if (!mark)
+    {
+      return;  // one side of the touch is empty
+    }
+    // A top arrived after the last depth frame this strategy was shown.
+    const bool touchMoved = c.lastTouchNs > _lastBookNs;
+    if (touchMoved && c.position.raw() == 0)
+    {
+      emitLimitBuy(ev.trade.symbol, *mark, lrvx::Quantity::fromDouble(0.01));
+    }
+  }
+
+ private:
+  int64_t _lastBookNs{0};
+};
+```
+
+In Python, Node and Codon the context's mid already is the touch mid, so the comparison is the only extra step.
+
+## Replay a tape that carries tops
+
+Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The strategy's touch and `last_touch_ns` move, no callback fires, and the simulated venue moves its own touch while keeping the depth from the last snapshot, so a market order fills at the touch the strategy saw rather than at the stale depth frame.
+
+## Record tops
+
+A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`. `EventTypeStatsAggregator` does not count them, since its per-symbol table has columns for trades, snapshots and deltas only; `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
+
+## See also
+
+- [The touch and the book](../explanation/the-touch.md)
+- [Strategy classes](strategy-classes.md), for the full context table
+- [Record and replay tapes](tape-record.md)
 
 ------------------------------------------------------------------------------
 # Source: docs/how-to/backtest.md
@@ -19177,6 +19273,7 @@ Understand concepts and design decisions behind lrvx. These pages are language-a
 | [The reference backtest](reference-backtest.md) | One strategy, one file, pinned numbers, and the execution rules they follow |
 | [Bar-close ordering](bar-close-ordering.md) | Which aggregator fires first when several bars close on the same instant |
 | [Connectors](connectors.md) | The native exchange connectors module and the interfaces it implements |
+| [The touch and the book](the-touch.md) | Where the best bid and ask come from, who reads the one-level top-of-book frame and who ignores it, and how it travels through the backtester and the tape |
 | [MCP control plane](mcp-control-plane.md) | Why the AI-agent control surface is shaped the way it is |
 | [Venue-stack reproducibility](venue-stack-reproducibility.md) | What makes a backtest result reproducible across machines |
 | [Build feature flags](../build/feature-flags.md) | Every CMake option, what it costs, and what it depends on |
@@ -21660,3 +21757,89 @@ The effect:
 
 - [The Disruptor Pattern](disruptor.md) — How the ring buffer works
 - [Optimize Performance](../how-to/optimize-performance.md) — Tune for latency
+
+------------------------------------------------------------------------------
+# Source: docs/explanation/the-touch.md
+# URL: https://docs.lrvx.dev/explanation/the-touch/
+------------------------------------------------------------------------------
+
+# The touch and the book
+
+A strategy has two views of the inside market. The book is the depth feed applied level by level, and it is only as fresh as the venue's last depth frame. The touch is the best bid and ask as last reported by any frame, including the one-level frames a venue sends between depth updates. This page says where the two come from, who reads which, and how the one-level frame travels through the engine, the backtester and the tape.
+
+## Two feeds, one price
+
+A venue may throttle its depth stream and run a separate best-bid/offer stream next to it. Hyperliquid is the case in the tree: it throttles `l2Book` server-side and offers `bbo` for the top. A strategy fed only `l2Book` sees a touch that is stale by up to one throttle interval; a strategy that merges `bbo` into its depth book corrupts the book.
+
+The engine keeps the two apart with a third kind of book update. `BookUpdateType` has `SNAPSHOT` (replace the book), `DELTA` (apply changes) and `TOP_OF_BOOK`: one level per side, nothing deeper. The Hyperliquid connector subscribes `bbo` next to `l2Book` by default (`subscribeBbo`) and publishes each frame as `TOP_OF_BOOK`. The other connectors in the tree publish depth only, and their best bid and ask are the top of that depth. A binding-side feed publishes a top itself: `Runner.on_book_top` in Python, which the ccxt adapter's `bbo` stream drives from `watch_bids_asks`, `onBookTop` in Node, `on_book_top` in Codon, and `lrvx_runner_on_book_top` or `lrvx_live_engine_publish_book_top` in the C API. A custom C++ connector publishes the type directly.
+
+## The contract of a top-of-book frame
+
+A `TOP_OF_BOOK` frame is the venue's complete word on the touch and nothing else:
+
+- it carries at most one level per side;
+- an empty side means that side of the book is empty, not "unchanged" (that is the difference from a `DELTA`, which only carries the sides that changed);
+- it says nothing about levels behind the touch.
+
+A depth book cannot apply such a frame. Merging it as a delta leaves a stale better level in place when the top moves away; replacing the book with it as a snapshot throws the depth away. So consumers split into two groups.
+
+Consumers that read it as a snapshot of the touch:
+
+- `CompositeBookMatrix`, the cross-venue matrix: a top replaces both sides of that venue's touch, like a snapshot would.
+- `SymbolContext`, the per-symbol state every strategy callback receives: a top writes the touch fields and nothing else (next section).
+- `SimulatedExecutor`, the backtest venue: a top moves the touch, drops its own levels that are more aggressive than it, keeps the deeper levels from the last depth frame, then runs the same matching pass as a depth update. The backtest runner routes top frames there. A strategy that sees a fresher touch than the last depth frame therefore fills at that touch, not at the depth frame's best.
+
+Consumers that ignore it:
+
+- `NLevelOrderBook`, the depth book inside `SymbolContext` and anywhere else it is used.
+- `BookSnapshotBinAggregator`, which reconstructs depth from snapshots and deltas.
+- `EventTypeStatsAggregator`, the per-symbol count of trades, snapshots and deltas: a top is in none of its three columns, so a tape that is all tops reads as having no book events there. `BinCountAggregator` and the writer's `total_book_updates` count them.
+
+## What the strategy sees
+
+`SymbolContext` carries both views.
+
+| | The book | The touch |
+|---|---|---|
+| State | `book` (an `NLevelOrderBook`) | `touchBid`, `touchAsk` (each an optional `BookLevel`) |
+| Mid | `mid()` | `touchMid()` |
+| Written by | depth frames | depth frames and `TOP_OF_BOOK` frames |
+| Stamp | `lastUpdateNs` | `lastTouchNs` |
+
+A depth frame writes both: it applies the book, refreshes the touch from the book's best levels, and stamps `lastUpdateNs` and `lastTouchNs` with the frame's exchange timestamp. A top writes the touch and `lastTouchNs` only. Trades and bars stamp `lastUpdateNs` and leave the touch alone; order events write neither.
+
+No callback fires for a top. `onSymbolBook` would hand the strategy the previous depth frame's book at touch rate, stamped fresh, so the frame lands in the fields and the strategy reads them on its next trade, bar or depth callback. The stamps are how a strategy tells what happened in between: `lastTouchNs` later than the `lastUpdateNs` it saw on its last book callback means the touch moved since the last depth frame it was shown.
+
+The stamps are the venue's, at the venue's resolution. Hyperliquid stamps `l2Book` and `bbo` in milliseconds, so a top in the same millisecond as a depth frame carries the same stamp and reads as no move, and a frame the venue sends without a time is stamped 0. A strategy that must not miss a touch move at that resolution compares the quotes as well as the stamps.
+
+The bindings read the touch, not the book, wherever they expose a best price:
+
+| | Best bid, best ask, mid | Stamps |
+|---|---|---|
+| C++ | `touchBid`, `touchAsk`, `touchMid()`; the depth book stays `book`, `mid()` | `lastTouchNs`, `lastUpdateNs` |
+| C API | `LrvxSymbolContext.book` (an `LrvxBookSnapshot` with `has_bid` / `has_ask`), `lrvx_best_bid_raw_opt` and its siblings | `last_touch_ns`, `last_update_ns` |
+| Python | `best_bid`, `best_ask`, `mid_price` | `last_touch_ns`, `last_update_ns` |
+| Node | `bestBid`, `bestAsk`, `midPrice` | `lastTouchNs`, `lastUpdateNs` (`BigInt`) |
+| Codon | `best_bid()`, `best_ask()`, `mid_price()` | `last_touch_ns()`, `last_update_ns()` |
+| Embedded JavaScript | `ctx.book` | `ctx.lastTouchNs`, `ctx.lastUpdateNs` (`BigInt`) |
+
+`None` / `null` on a side means that side of the touch is empty. A price of exactly zero is a price, never the empty marker.
+
+## On the tape
+
+The recorder keeps the frame as its own kind. A top is frame type `6` (`BookTop`) after `2` snapshot and `3` delta, with the same payload shape as a depth frame: a `BookRecordHeader` whose `type` byte is `2`, followed by up to one level per side. The frame is additive in the sense the format spec gives the word: a reader that predates it skips the frame by its size and goes on.
+
+Two byte spaces meet here and the readers say which they speak. The record byte is `0` snapshot, `1` delta, `2` top, and that is what `event_type` carries on the rows of `DataReader.read_book_updates()` and `read_bbo()` and on their C API, Node and Codon equivalents. The frame type is `2`, `3`, `6`, and that is what `event_type` carries on the rows of `MergedTapeReader.read_books()`. A consumer that reconstructs depth from either must treat the top value as a touch, or skip it; applying it as a delta is the stranded-level failure above.
+
+The recorder hook's book callback carries a third value as well. Its `is_snapshot` argument is a byte: `1` snapshot, `0` delta, `2` top. The two boolean values predate the third and keep their meaning. Surfaces whose shape is a bool skip tops the way an old reader skips the frame: the custom recorder hooks in Python and Node, `MergedTapeReader.stream_events`, `replay_tapes`, and `DataWriter.write_book`, which can write snapshots and deltas only. `metadata.json` carries `has_book_tops` next to `has_book_snapshots` and `has_book_deltas`.
+
+A backtest from such a tape replays the frame the way live delivered it: the strategy's touch moves, the depth book does not, and the simulated venue fills at the touch the strategy saw.
+
+## See also
+
+- [Read the touch from a strategy](../how-to/read-the-touch.md), with a runnable example
+- [BookUpdate](../reference/api/book/book_update.md) and [NLevelOrderBook](../reference/api/book/nlevel_order_book.md)
+- [SymbolContext](../reference/api/strategy/symbol_context.md)
+- [CompositeBookMatrix](../reference/api/cex/composite_book_matrix.md)
+- [The `.lrvx` format](../spec/lrvx.md)
+- [Connectors](connectors.md), for the Hyperliquid `bbo` channel

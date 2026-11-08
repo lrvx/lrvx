@@ -119,6 +119,7 @@ nav:
           - Capture a strategy run automatically: how-to/lrvxrun-auto-capture.md
           - Inspect a tape and run in the replay viewer: how-to/replay-viewer.md
           - Read multi-timeframe context from a strategy: how-to/multi-tf-context.md
+          - Read the touch from a strategy: how-to/read-the-touch.md
           - Compose multi-symbol multi-TF entry conditions: how-to/composite-conditions.md
           - Submit a multi-leg order group: how-to/multi-leg-order-group.md
           - Wait for multiple feeds with staleness budget: how-to/multi-feed-clock.md
@@ -238,6 +239,7 @@ nav:
       - Disruptor Pattern: explanation/disruptor.md
       - Memory Model: explanation/memory-model.md
       - Per-symbol strategy state: explanation/strategy-state-ownership.md
+      - The touch and the book: explanation/the-touch.md
       - Integration Flow: explanation/integration-flow.md
       - MCP control plane: explanation/mcp-control-plane.md
       - Indicators: explanation/indicators.md

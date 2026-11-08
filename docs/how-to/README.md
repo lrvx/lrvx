@@ -105,6 +105,7 @@ Solve specific problems. Assumes you know the basics.
 | [Multi-symbol indicators](multi-symbol-indicators.md) | One indicator across many symbols |
 | [Cross-symbol indicators](cross-symbol-indicators.md) | Indicators over two synchronised symbol streams — correlation, hedge ratios, benchmark regime filters |
 | [Read multi-timeframe context from a strategy](multi-tf-context.md) | `last_closed_bar(symbol, tf)` + `last_n_closed_bars(...)` ring helpers |
+| [Read the touch from a strategy](read-the-touch.md) | Best bid / ask that follow top-of-book frames, and the two stamps that tell a touch move from a depth update |
 | [Compose multi-symbol multi-TF entry conditions declaratively](composite-conditions.md) | `when(self, btc, H4).ema(50) > when(self, btc, H4).ema(200)` composable DSL |
 | [Submit a multi-leg order group](multi-leg-order-group.md) | Bundle pair-trade / basket legs under one `parent_signal_id` with status + cancel |
 | [Wait for multiple feeds with a known staleness budget](multi-feed-clock.md) | `MultiFeedClock` with WaitForAll / FireOnAny / LeaderFollower policies |
