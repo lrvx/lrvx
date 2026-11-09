@@ -4148,7 +4148,7 @@ Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The 
 
 ## Record tops
 
-A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`. `EventTypeStatsAggregator` counts them in its `book_tops` column, and `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
+A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), through Bybit or Bitget with their `subscribeBbo` on (off by default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`. `EventTypeStatsAggregator` counts them in its `book_tops` column, and `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
 
 ## See also
 
@@ -21837,7 +21837,7 @@ A strategy has two views of the inside market. The book is the depth feed applie
 
 A venue may throttle its depth stream and run a separate best-bid/offer stream next to it. Hyperliquid is the case in the tree: it throttles `l2Book` server-side and offers `bbo` for the top. A strategy fed only `l2Book` sees a touch that is stale by up to one throttle interval; a strategy that merges `bbo` into its depth book corrupts the book.
 
-The engine keeps the two apart with a third kind of book update. `BookUpdateType` has `SNAPSHOT` (replace the book), `DELTA` (apply changes) and `TOP_OF_BOOK`: one level per side, nothing deeper. The Hyperliquid connector subscribes `bbo` next to `l2Book` by default (`subscribeBbo`) and publishes each frame as `TOP_OF_BOOK`. The other connectors in the tree publish depth only, and their best bid and ask are the top of that depth. A binding-side feed publishes a top itself: `Runner.on_book_top` in Python, which the ccxt adapter's `bbo` stream drives from `watch_bids_asks`, `onBookTop` in Node, `on_book_top` in Codon, and `lrvx_runner_on_book_top` or `lrvx_live_engine_publish_book_top` in the C API. A custom C++ connector publishes the type directly.
+The engine keeps the two apart with a third kind of book update. `BookUpdateType` has `SNAPSHOT` (replace the book), `DELTA` (apply changes) and `TOP_OF_BOOK`: one level per side, nothing deeper. The Hyperliquid connector subscribes `bbo` next to `l2Book` by default (`subscribeBbo`) and publishes each frame as `TOP_OF_BOOK`. Bybit (`orderbook.1`) and Bitget (`books1`) do the same when their config's `subscribeBbo` is set, off by default since their depth streams are not throttled. Polymarket publishes depth only, and its best bid and ask are the top of that depth. A binding-side feed publishes a top itself: `Runner.on_book_top` in Python, which the ccxt adapter's `bbo` stream drives from `watch_bids_asks`, `onBookTop` in Node, `on_book_top` in Codon, and `lrvx_runner_on_book_top` or `lrvx_live_engine_publish_book_top` in the C API. A custom C++ connector publishes the type directly.
 
 ## The contract of a top-of-book frame
 

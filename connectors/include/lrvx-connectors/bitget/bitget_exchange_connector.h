@@ -21,12 +21,14 @@
 #include <lrvx/net/abstract_websocket_client.h>
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -66,6 +68,14 @@ struct BitgetConfig
   std::string apiSecret;
   std::string passphrase;
   bool enablePrivate = false;
+  // Subscribe books1 next to each symbol's depth channel and publish it as
+  // BookUpdateType::TOP_OF_BOOK: one level per side, a snapshot on every
+  // change, no seq continuity and no checksum of its own. The depth book
+  // ignores the frames, the strategy's touch and the cross-venue matrix follow
+  // them. Off by default: it is an extra event per tick per symbol. A symbol
+  // configured with BookDepth::Depth1 already takes its depth from books1 and
+  // gets no second subscription.
+  bool subscribeBbo{false};
 };
 
 class BitgetExchangeConnector : public IExchangeConnector
@@ -88,6 +98,17 @@ class BitgetExchangeConnector : public IExchangeConnector
   std::string exchangeId() const override { return "bitget"; }
 
   SymbolId resolveSymbolId(std::string_view symbol);
+
+  // The subscribe args start() sends, one JSON object each, in send order:
+  // each symbol's depth channel and trade, then books1 for the symbols
+  // subscribeBbo covers. Static and public so a test can pin them -- the WS
+  // client is built in the constructor, so start() itself is not observable
+  // offline.
+  static std::vector<std::string> subscriptionArgs(const BitgetConfig& config);
+
+  // Whether books1 is subscribed as the touch for this symbol, next to its
+  // depth channel (see BitgetConfig::subscribeBbo).
+  static bool takesBooks1AsTop(const BitgetConfig& config, const BitgetConfig::SymbolEntry& entry);
 
   // Public so the public-feed protocol handling (book snapshots and deltas,
   // trades) is testable offline by feeding raw frames without a live socket.
@@ -159,6 +180,19 @@ class BitgetExchangeConnector : public IExchangeConnector
   std::unordered_map<SymbolId, BookSeqState> _bookSeq;
   std::atomic<uint64_t> _bookGapCount{0};
   std::atomic<uint64_t> _bookChecksumFailureCount{0};
+
+  // Symbols whose books1 frames are the touch (TOP_OF_BOOK), filled from the
+  // config in the constructor and read on the message thread. Keyed by the
+  // venue's instId, which the frame's arg carries.
+  struct TransparentStringHash
+  {
+    using is_transparent = void;
+    size_t operator()(std::string_view s) const noexcept
+    {
+      return std::hash<std::string_view>{}(s);
+    }
+  };
+  std::unordered_set<std::string, TransparentStringHash, std::equal_to<>> _bboSymbols;
 
   void resubscribeBook(std::string_view symbolName);
 

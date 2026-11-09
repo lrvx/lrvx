@@ -180,7 +180,49 @@ BitgetExchangeConnector::BitgetExchangeConnector(const BitgetConfig& cfg, BookUp
     _exchangeId = _registry->registerExchange("bitget");
   }
 
+  for (const auto& entry : _config.symbols)
+  {
+    if (takesBooks1AsTop(_config, entry))
+    {
+      _bboSymbols.insert(entry.name);
+    }
+  }
+
   _wsClient = makePublicClient();
+}
+
+bool BitgetExchangeConnector::takesBooks1AsTop(const BitgetConfig& config,
+                                               const BitgetConfig::SymbolEntry& entry)
+{
+  return config.subscribeBbo && entry.depth != BitgetConfig::BookDepth::Depth1;
+}
+
+std::vector<std::string> BitgetExchangeConnector::subscriptionArgs(const BitgetConfig& config)
+{
+  auto arg = [](const BitgetConfig::SymbolEntry& s, std::string_view channel)
+  {
+    std::string a{R"({"instType":")"};
+    a += bitgetWsInstType(s.type);
+    a += R"(","channel":")";
+    a += channel;
+    a += R"(","instId":")";
+    a += s.name;
+    a += R"("})";
+    return a;
+  };
+
+  std::vector<std::string> args;
+  args.reserve(config.symbols.size() * 3);
+  for (const auto& s : config.symbols)
+  {
+    args.push_back(arg(s, bitgetBookChannel(s.depth)));
+    args.push_back(arg(s, "trade"));
+    if (takesBooks1AsTop(config, s))
+    {
+      args.push_back(arg(s, "books1"));
+    }
+  }
+  return args;
 }
 
 std::unique_ptr<IWebSocketClient> BitgetExchangeConnector::makePublicClient() const
@@ -213,48 +255,31 @@ void BitgetExchangeConnector::start()
   _wsClient->onOpen(
       [this]()
       {
-        constexpr size_t BATCH_SIZE = 10;
+        // Twenty args per frame, which is what ten symbols used to send
+        // before books1 could make it three per symbol.
+        constexpr size_t BATCH_SIZE = 20;
 
-        for (size_t batchStart = 0; batchStart < _config.symbols.size(); batchStart += BATCH_SIZE)
+        const std::vector<std::string> args = subscriptionArgs(_config);
+        for (size_t batchStart = 0; batchStart < args.size(); batchStart += BATCH_SIZE)
         {
           std::string sub;
-          sub.reserve(64 + BATCH_SIZE * 200);
+          sub.reserve(64 + BATCH_SIZE * 100);
           sub += R"({"op":"subscribe","args":[)";
 
-          bool first = true;
-          size_t batchEnd = std::min(batchStart + BATCH_SIZE, _config.symbols.size());
-
+          size_t batchEnd = std::min(batchStart + BATCH_SIZE, args.size());
           for (size_t i = batchStart; i < batchEnd; ++i)
           {
-            const auto& s = _config.symbols[i];
-
-            if (!first)
+            if (i != batchStart)
             {
               sub += ',';
             }
-            first = false;
-
-            sub += R"({"instType":")";
-            sub += bitgetWsInstType(s.type);
-            sub += R"(","channel":")";
-            sub += bitgetBookChannel(s.depth);
-            sub += R"(","instId":")";
-            sub += s.name;
-            sub += R"("})";
-
-            sub += ",";
-
-            sub += R"({"instType":")";
-            sub += bitgetWsInstType(s.type);
-            sub += R"(","channel":"trade","instId":")";
-            sub += s.name;
-            sub += R"("})";
+            sub += args[i];
           }
           sub += "]}";
 
           _logger->info(std::string("[Bitget] subscribe batch ") +
                         std::to_string(batchStart / BATCH_SIZE + 1) + ": " +
-                        std::to_string(batchEnd - batchStart) + " symbols");
+                        std::to_string(batchEnd - batchStart) + " args");
 
           _wsClient->send(sub);
         }
@@ -581,7 +606,11 @@ void BitgetExchangeConnector::handleMessage(std::string_view payload)
         updateType = BookUpdateType::DELTA;
       }
 
-      ev->update.type = updateType;
+      // books1 subscribed next to the depth channel is the touch, not the
+      // book (BitgetConfig::subscribeBbo). A symbol configured with Depth1
+      // takes its depth from books1 and is not in _bboSymbols.
+      const bool isTop = channel == "books1" && _bboSymbols.contains(inst);
+      ev->update.type = isTop ? BookUpdateType::TOP_OF_BOOK : updateType;
 
       if (_registry)
       {
@@ -590,6 +619,7 @@ void BitgetExchangeConnector::handleMessage(std::string_view payload)
           ev->update.instrument = info->type;
         }
       }
+      bool badLevel = false;
 
       // The venue's own price/size strings, kept alongside the parsed levels
       // because the checksum is defined over the text, not over the values.
@@ -616,6 +646,7 @@ void BitgetExchangeConnector::handleMessage(std::string_view payload)
             if (!priceOpt || !qtyOpt)
             {
               _logger->warn("[Bitget] Invalid bid price/qty in book update");
+              badLevel = true;
               continue;
             }
             rawBids.emplace_back(p, q);
@@ -638,6 +669,7 @@ void BitgetExchangeConnector::handleMessage(std::string_view payload)
             if (!priceOpt || !qtyOpt)
             {
               _logger->warn("[Bitget] Invalid ask price/qty in book update");
+              badLevel = true;
               continue;
             }
             rawAsks.emplace_back(p, q);
@@ -698,6 +730,31 @@ void BitgetExchangeConnector::handleMessage(std::string_view payload)
             venueChecksum = static_cast<uint32_t>(static_cast<int32_t>(v));
           }
         }
+      }
+
+      // The touch stream has no continuity to verify: books1 is a snapshot
+      // on every change with its own seq, and checking it against the depth
+      // channel's would break the depth book's baseline. An empty side is
+      // the venue saying that side is gone, so the frame is published even
+      // with both sides empty (see BookUpdateType::TOP_OF_BOOK). A side that
+      // failed to parse drops the whole frame: publishing the other side
+      // would empty this one downstream, indistinguishable from a real empty.
+      if (isTop)
+      {
+        if (badLevel)
+        {
+          return;
+        }
+        ev->seq = seq;
+        ev->publishTsNs = nowMonoNanos();
+        auto [res, _] = _bookUpdateBus->tryPublish(std::move(ev));
+        if (res != BookUpdateBus::PublishResult::SUCCESS)
+        {
+          _logger->error(
+              "[Bitget] Book update dropped: EventBus full. Increase EventBus capacity or reduce "
+              "number of subscriptions.");
+        }
+        return;
       }
 
       if (!verifyBookIntegrity(sid, inst, updateType, seq, venueChecksum, rawBids, rawAsks))

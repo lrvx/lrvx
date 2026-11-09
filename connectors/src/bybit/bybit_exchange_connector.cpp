@@ -268,7 +268,39 @@ BybitExchangeConnector::BybitExchangeConnector(const BybitConfig& config,
     _exchangeId = _registry->registerExchange("bybit");
   }
 
+  for (const auto& entry : _config.symbols)
+  {
+    if (takesLevelOneAsTop(_config, entry))
+    {
+      _bboSymbols.insert(entry.name);
+    }
+  }
+
   _wsClient = makePublicClient();
+}
+
+bool BybitExchangeConnector::takesLevelOneAsTop(const BybitConfig& config,
+                                                const BybitConfig::SymbolEntry& entry)
+{
+  return config.subscribeBbo && entry.depth != BybitConfig::BookDepth::Top1 &&
+         entry.type != InstrumentType::Option;
+}
+
+std::vector<std::string> BybitExchangeConnector::subscriptionTopics(const BybitConfig& config)
+{
+  std::vector<std::string> topics;
+  topics.reserve(config.symbols.size() * 3);
+  for (const auto& entry : config.symbols)
+  {
+    topics.push_back("orderbook." + std::to_string(static_cast<int>(entry.depth)) + "." +
+                     entry.name);
+    topics.push_back("publicTrade." + entry.name);
+    if (takesLevelOneAsTop(config, entry))
+    {
+      topics.push_back("orderbook.1." + entry.name);
+    }
+  }
+  return topics;
 }
 
 std::unique_ptr<IWebSocketClient> BybitExchangeConnector::makePublicClient() const
@@ -303,15 +335,7 @@ void BybitExchangeConnector::start()
       {
         constexpr size_t BATCH_SIZE = 10;
 
-        std::vector<std::string> topics;
-        topics.reserve(_config.symbols.size() * 2);
-
-        for (const auto& entry : _config.symbols)
-        {
-          topics.push_back("orderbook." + std::to_string(static_cast<int>(entry.depth)) + "." +
-                           entry.name);
-          topics.push_back("publicTrade." + entry.name);
-        }
+        const std::vector<std::string> topics = subscriptionTopics(_config);
 
         // Send in batches
         for (size_t i = 0; i < topics.size(); i += BATCH_SIZE)
@@ -587,6 +611,15 @@ void BybitExchangeConnector::handleMessage(std::string_view payload)
       ev->update.symbol = sym;
       markFeedActivity(sym, MonoNanos::fromRaw(recvNs));
 
+      // orderbook.1 subscribed next to the depth topic is the touch, not the
+      // book (BybitConfig::subscribeBbo). A symbol configured with Top1 takes
+      // its depth from this very topic and is not in _bboSymbols.
+      const bool isTop = topic.starts_with("orderbook.1.") && _bboSymbols.contains(ssv);
+      if (isTop)
+      {
+        ev->update.type = BookUpdateType::TOP_OF_BOOK;
+      }
+
       if (_registry)
       {
         if (const auto info = _registry->getSymbolInfo(sym))
@@ -600,6 +633,7 @@ void BybitExchangeConnector::handleMessage(std::string_view payload)
 
       ev->update.bids.clear();
       ev->update.asks.clear();
+      bool badLevel = false;
 
       auto bf = data_obj.find_field_unordered("b");
       for (auto lvl : bf.get_array().value())
@@ -615,6 +649,7 @@ void BybitExchangeConnector::handleMessage(std::string_view payload)
         if (!priceOpt || !qtyOpt)
         {
           _logger->warn("[Bybit] Invalid bid price/qty in book update");
+          badLevel = true;
           continue;
         }
         ev->update.bids.emplace_back(*priceOpt, *qtyOpt);
@@ -634,9 +669,36 @@ void BybitExchangeConnector::handleMessage(std::string_view payload)
         if (!priceOpt || !qtyOpt)
         {
           _logger->warn("[Bybit] Invalid ask price/qty in book update");
+          badLevel = true;
           continue;
         }
         ev->update.asks.emplace_back(*priceOpt, *qtyOpt);
+      }
+
+      // Level 1 is its own stream with its own update id: every frame is a
+      // snapshot, and the id repeats when nothing changed for three seconds,
+      // so it never enters the depth topic's continuity check below. An empty
+      // side is the venue saying that side is gone, so the frame is published
+      // even with both sides empty (see BookUpdateType::TOP_OF_BOOK). A side
+      // that failed to parse drops the whole frame: publishing the other side
+      // would empty this one downstream, indistinguishable from a real empty.
+      if (isTop)
+      {
+        if (badLevel)
+        {
+          return;
+        }
+        ev->seq = data_obj.find_field_unordered("u").get_int64().value();
+        ev->prevSeq = 0;
+        ev->publishTsNs = nowMonoNanos();
+        auto [res, _] = _bookUpdateBus->tryPublish(std::move(ev));
+        if (res != BookUpdateBus::PublishResult::SUCCESS)
+        {
+          _logger->error(
+              "[Bybit] Book update dropped: EventBus full. Increase EventBus capacity or reduce "
+              "number of subscriptions.");
+        }
+        return;
       }
 
       // Continuity check (read after b/a to keep simdjson field access forward-
