@@ -101,8 +101,10 @@ class DataWriterWrap : public Napi::ObjectWrap<DataWriterWrap>
     uint8_t isSnap = info[4].As<Napi::Boolean>().Value() ? 1u : 0u;
     if (info.Length() > 7 && !info[7].IsUndefined())
     {
-      const int32_t updateType = info[7].IsNumber() ? info[7].As<Napi::Number>().Int32Value() : -1;
-      if (updateType < 0 || updateType > 2)
+      // Exactly 0, 1 or 2: no truncation of 1.9, no NaN read as 0.
+      const double raw = info[7].IsNumber() ? info[7].As<Napi::Number>().DoubleValue() : -1.0;
+      const int32_t updateType = (raw == 0.0 || raw == 1.0 || raw == 2.0) ? static_cast<int32_t>(raw) : -1;
+      if (updateType < 0)
       {
         Napi::RangeError::New(info.Env(),
                               "writeBook: updateType takes 0 snapshot, 1 delta or 2 top")

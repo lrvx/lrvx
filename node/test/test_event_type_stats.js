@@ -35,6 +35,9 @@ try {
   // updateType is the record byte (0, 1, 2); isSnapshot true with a
   // non-snapshot updateType is a contradiction.
   assert.throws(() => w.writeBook(ts, ts, 0n, 7, false, level(99.7), level(100.3), 3), RangeError);
+  // Not truncated: 1.9 is no delta and NaN is no snapshot.
+  assert.throws(() => w.writeBook(ts, ts, 0n, 7, false, level(99.7), level(100.3), 1.9), RangeError);
+  assert.throws(() => w.writeBook(ts, ts, 0n, 7, false, level(99.7), level(100.3), NaN), RangeError);
   assert.throws(() => w.writeBook(ts, ts, 0n, 7, true, level(99.7), level(100.3), 2), RangeError);
   w.close();
 
