@@ -264,6 +264,15 @@ runner.stop()
 | `set_market_data_recorder(recorder)` | Attach a `MarketDataRecorderHook` or `BinaryLogRecorderHook` |
 | `set_executor(executor)` | Replace the executor |
 
+A `MarketDataRecorderHook` subclass overrides any of `on_trade(trade)`,
+`on_book_update(symbol, is_snapshot, bids, asks, ts_ns)`,
+`on_book_top(symbol, bid, ask, ts_ns)`, `on_start()` and `on_stop()`.
+`on_book_update` receives snapshots and deltas, with `bids` / `asks` lists of
+`(price, qty)`. A top-of-book frame goes to `on_book_top` instead: `bid` /
+`ask` are one `(price, qty)` each, or `None` for an empty side. Defining
+`on_book_top` does not change `on_book_update`, which keeps receiving every
+snapshot and delta. A hook that does not define it is not called for tops.
+
 ### Trace recording
 
 | Method | Description |

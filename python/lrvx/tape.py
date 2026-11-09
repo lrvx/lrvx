@@ -224,6 +224,7 @@ def replay_tapes(
     *,
     on_trade: Optional[Any] = None,
     on_book: Optional[Any] = None,
+    on_book_top: Optional[Any] = None,
     from_ns: Optional[int] = None,
     to_ns: Optional[int] = None,
     symbols: Optional[List[int]] = None,
@@ -239,6 +240,10 @@ def replay_tapes(
       ``on_trade(ts_ns, global_symbol_id, price, qty, side)``
       ``on_book(ts_ns, global_symbol_id, is_snapshot, bids, asks)``
         — ``bids`` / ``asks`` are lists of ``(price, qty)`` tuples.
+        Snapshots and deltas only.
+      ``on_book_top(ts_ns, global_symbol_id, bid, ask)``
+        — a top-of-book frame; ``bid`` / ``ask`` are ``(price, qty)``, or
+        ``None`` for an empty side. Tops are skipped when it is ``None``.
     """
     import lrvx
 
@@ -263,13 +268,27 @@ def replay_tapes(
                 int(row["side"]),
             )
 
-    if on_book is not None and headers.size:
+    def _level(i: int):
+        return (float(levels[i]["price_raw"]) / 1e8,
+                float(levels[i]["qty_raw"]) / 1e8)
+
+    if (on_book is not None or on_book_top is not None) and headers.size:
         for h in headers:
             offset = int(h["level_offset"])
             n_bid = int(h["bid_count"])
             n_ask = int(h["ask_count"])
             if int(h["event_type"]) == 6:
-                # A top-of-book frame; on_book is bool-shaped.
+                # A top-of-book frame: on_book takes a bool, so it goes to
+                # on_book_top, one level or None per side.
+                if on_book_top is not None:
+                    on_book_top(
+                        int(h["exchange_ts_ns"]),
+                        int(h["symbol_id"]),
+                        _level(offset) if n_bid else None,
+                        _level(offset + n_bid) if n_ask else None,
+                    )
+                continue
+            if on_book is None:
                 continue
             bids = [
                 (float(levels[offset + i]["price_raw"]) / 1e8,

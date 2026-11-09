@@ -1118,6 +1118,7 @@ Members:
 **Members**
 
 - `on_book_update(self, symbol: typing.SupportsInt | typing.SupportsIndex, is_snapshot: bool, bids: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], asks: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ts_ns: typing.SupportsInt | typing.SupportsIndex) -> None`
+- `on_book_top(self, symbol: typing.SupportsInt | typing.SupportsIndex, bid: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ask: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ts_ns: typing.SupportsInt | typing.SupportsIndex) -> None`
 - `on_start(self) -> None`
 - `on_stop(self) -> None`
 - `on_trade(self, arg0: TradeData) -> None`
@@ -1159,7 +1160,7 @@ Market Profile (TPO) aggregator. Tracks price activity across time periods.
 - `read_books(self) -> tuple`
 - `read_trades(self) -> numpy.ndarray`
 - `run(self, aggregators: list) -> bool`
-- `stream_events(self, on_trade: typing.Any = None, on_book: typing.Any = None) -> None`
+- `stream_events(self, on_trade: typing.Any = None, on_book: typing.Any = None, on_book_top: typing.Any = None) -> None`
 - `summary(self) -> dict`
 - `symbol_table(self) -> list`
 - `time_range(self) -> tuple`

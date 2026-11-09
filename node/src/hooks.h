@@ -442,6 +442,7 @@ struct MarketDataRecorderHookHost
 {
   Napi::FunctionReference on_trade_fn;
   Napi::FunctionReference on_book_fn;
+  Napi::FunctionReference on_book_top_fn;
   Napi::FunctionReference on_start_fn;
   Napi::FunctionReference on_stop_fn;
   LrvxMarketDataRecorderHandle handle{nullptr};
@@ -450,6 +451,7 @@ struct MarketDataRecorderHookHost
   MarketDataRecorderHookHost(Napi::Env env_, Napi::Object obj)
       : on_trade_fn(takeFn(obj, "onTrade")),
         on_book_fn(takeFn(obj, "onBookUpdate")),
+        on_book_top_fn(takeFn(obj, "onBookTop")),
         on_start_fn(takeFn(obj, "onStart")),
         on_stop_fn(takeFn(obj, "onStop")),
         env(env_)
@@ -487,14 +489,35 @@ struct MarketDataRecorderHookHost
                            int64_t ts)
   {
     auto* self = static_cast<MarketDataRecorderHookHost*>(ud);
-    if (self->on_book_fn.IsEmpty())
+    // The byte is 1 snapshot, 0 delta, 2 top-of-book. onBookUpdate's JS
+    // signature is a bool, so a top goes to onBookTop instead; a hook
+    // without it skips tops the way an old reader skips the frame.
+    if (is_snap == 2)
     {
+      if (self->on_book_top_fn.IsEmpty())
+      {
+        return;
+      }
+      auto level = [&](const LrvxBookLevel* l, uint32_t n) -> Napi::Value
+      {
+        if (n == 0)
+        {
+          return self->env.Null();
+        }
+        Napi::Object o = Napi::Object::New(self->env);
+        o.Set("price", Napi::Number::New(self->env, static_cast<double>(l[0].price_raw) / 1e8));
+        o.Set("qty", Napi::Number::New(self->env, static_cast<double>(l[0].quantity_raw) / 1e8));
+        return o;
+      };
+      self->on_book_top_fn.Call({
+          Napi::Number::New(self->env, symbol),
+          level(bids, n_bids),
+          level(asks, n_asks),
+          Napi::BigInt::New(self->env, ts),
+      });
       return;
     }
-    // The byte is 1 snapshot, 0 delta, 2 top-of-book. This hook's JS
-    // signature is a bool, so tops are skipped the way an old reader skips
-    // the frame.
-    if (is_snap == 2)
+    if (self->on_book_fn.IsEmpty())
     {
       return;
     }

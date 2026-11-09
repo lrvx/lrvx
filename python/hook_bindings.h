@@ -528,8 +528,19 @@ class PyMarketDataRecorderHook
                               const std::vector<std::pair<double, double>>& /*bids*/,
                               const std::vector<std::pair<double, double>>& /*asks*/,
                               int64_t /*ts_ns*/) {}
+  // A top-of-book frame: one (price, qty) or None per side, None meaning
+  // that side is empty. Snapshots and deltas keep going to on_book_update.
+  virtual void on_book_top(uint32_t /*symbol*/,
+                           const std::optional<std::pair<double, double>>& /*bid*/,
+                           const std::optional<std::pair<double, double>>& /*ask*/,
+                           int64_t /*ts_ns*/) {}
   virtual void on_start() {}
   virtual void on_stop() {}
+
+  // Set when the hook is attached: whether a subclass defines on_book_top.
+  // A hook that does not is not called for tops at all, so it pays no GIL
+  // round trip per top.
+  bool wants_book_top{false};
 };
 
 class PyMarketDataRecorderHookTrampoline : public PyMarketDataRecorderHook
@@ -547,6 +558,11 @@ class PyMarketDataRecorderHookTrampoline : public PyMarketDataRecorderHook
   {
     PYBIND11_OVERRIDE(void, PyMarketDataRecorderHook, on_book_update,
                       symbol, is_snapshot, bids, asks, ts);
+  }
+  void on_book_top(uint32_t symbol, const std::optional<std::pair<double, double>>& bid,
+                   const std::optional<std::pair<double, double>>& ask, int64_t ts) override
+  {
+    PYBIND11_OVERRIDE(void, PyMarketDataRecorderHook, on_book_top, symbol, bid, ask, ts);
   }
   void on_start() override
   {
@@ -578,6 +594,31 @@ inline void recOnBookBridge(void* ud, uint32_t symbol, uint8_t is_snap,
                             int64_t ts)
 {
   auto* py_obj = static_cast<PyMarketDataRecorderHook*>(ud);
+  // The byte is 1 snapshot, 0 delta, 2 top-of-book. on_book_update's
+  // signature is a bool, so a top goes to on_book_top instead, and only
+  // when the hook defines it; one that does not skips tops the way an old
+  // reader skips the frame.
+  if (is_snap == 2)
+  {
+    if (!py_obj->wants_book_top)
+    {
+      return;
+    }
+    invokeUnderGil([&]
+                   {
+      auto level = [](const LrvxBookLevel* l, uint32_t n) -> std::optional<std::pair<double, double>>
+      {
+        if (n == 0)
+        {
+          return std::nullopt;
+        }
+        return std::make_pair(static_cast<double>(l[0].price_raw) / 1e8,
+                              static_cast<double>(l[0].quantity_raw) / 1e8);
+      };
+      py_obj->on_book_top(symbol, level(bids, n_bids), level(asks, n_asks), ts); },
+                   "MarketDataRecorderHook.on_book_top");
+    return;
+  }
   invokeUnderGil([&]
                  {
     std::vector<std::pair<double, double>> b, a;
@@ -591,13 +632,6 @@ inline void recOnBookBridge(void* ud, uint32_t symbol, uint8_t is_snap,
       a.emplace_back(static_cast<double>(asks[i].price_raw) / 1e8,
                      static_cast<double>(asks[i].quantity_raw) / 1e8);
 }
-    // The byte is 1 snapshot, 0 delta, 2 top-of-book. This hook's signature
-    // is a bool, so tops are skipped the way an old reader skips the frame;
-    // a recorder that wants them uses the typed surfaces.
-    if (is_snap == 2)
-    {
-      return;
-    }
     py_obj->on_book_update(symbol, is_snap != 0, b, a, ts); });
 }
 
@@ -620,6 +654,8 @@ class PyMarketDataRecorderHookOwner
   explicit PyMarketDataRecorderHookOwner(std::shared_ptr<PyMarketDataRecorderHook> delegate)
       : _delegate(std::move(delegate))
   {
+    // Called from Python (set_market_data_recorder), so the GIL is held.
+    _delegate->wants_book_top = static_cast<bool>(py::get_override(_delegate.get(), "on_book_top"));
     LrvxMarketDataRecorderCallbacks cb{};
     cb.on_trade = recOnTradeBridge;
     cb.on_book_update = recOnBookBridge;

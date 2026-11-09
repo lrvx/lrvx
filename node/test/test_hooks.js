@@ -165,6 +165,46 @@ function testMarketDataRecorder() {
   check(books[0]?.bids?.length === 4, `bids has 4 int64s (2 levels)`);
 }
 
+// A top goes to onBookTop, one level or null per side; snapshots keep going
+// to onBookUpdate. A hook without onBookTop skips tops.
+function testMarketDataRecorderBookTop() {
+  console.log('testMarketDataRecorderBookTop');
+  const reg = new lrvx.SymbolRegistry();
+  const sym = reg.addSymbol('test', 'BTC', 0.01);
+  const snapshot = (runner, ts) => runner.onBookSnapshot(Number(sym),
+    new Float64Array([100]), new Float64Array([1]),
+    new Float64Array([102]), new Float64Array([1]), ts);
+
+  const runner = new lrvx.Runner(reg, () => {}, false);
+  runner.addStrategy({ symbols: [sym] });
+  const books = [];
+  const tops = [];
+  runner.setMarketDataRecorder({
+    onBookUpdate(s, snap) { books.push(snap); },
+    onBookTop(s, bid, ask, ts) { tops.push({ s, bid, ask, ts }); },
+  });
+  runner.start();
+  snapshot(runner, 6000);
+  runner.onBookTop(Number(sym), { price: 100.5, qty: 2 }, null, 7000);
+  runner.stop();
+  check(books.length === 1 && books[0] === true, `the snapshot still reaches onBookUpdate`);
+  check(tops.length === 1, `onBookTop fired once (got ${tops.length})`);
+  check(tops[0]?.s === Number(sym), `onBookTop symbol`);
+  check(tops[0]?.bid?.price === 100.5 && tops[0]?.bid?.qty === 2, `onBookTop bid`);
+  check(tops[0]?.ask === null, `an empty ask side is null`);
+  check(tops[0]?.ts === 7000n, `onBookTop timestamp is a bigint`);
+
+  const old = new lrvx.Runner(reg, () => {}, false);
+  old.addStrategy({ symbols: [sym] });
+  const oldBooks = [];
+  old.setMarketDataRecorder({ onBookUpdate(s, snap) { oldBooks.push(snap); } });
+  old.start();
+  snapshot(old, 6000);
+  old.onBookTop(Number(sym), { price: 100.5, qty: 2 }, null, 7000);
+  old.stop();
+  check(oldBooks.length === 1, `a hook without onBookTop skips the top`);
+}
+
 // ── ExecutionListener (BacktestRunner) ──────────────────────────────
 
 function testExecutionListenerBacktest() {
@@ -303,6 +343,7 @@ testKillSwitchDrops();
 testOrderValidatorDrops();
 testExecutor();
 testMarketDataRecorder();
+testMarketDataRecorderBookTop();
 testExecutionListenerBacktest();
 testExecutorBacktest();
 testLpSignalFields();
