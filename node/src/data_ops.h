@@ -96,7 +96,29 @@ class DataWriterWrap : public Napi::ObjectWrap<DataWriterWrap>
     int64_t recvTs = toInt64Ns(info[1]);
     int64_t seq = toInt64Ns(info[2]);
     uint32_t symId = info[3].As<Napi::Number>().Uint32Value();
+    // The C writer takes the recorder's byte (1 snapshot, 0 delta, 2 top);
+    // updateType is the record byte the readers return (0, 1, 2).
     uint8_t isSnap = info[4].As<Napi::Boolean>().Value() ? 1u : 0u;
+    if (info.Length() > 7 && !info[7].IsUndefined())
+    {
+      const int32_t updateType = info[7].IsNumber() ? info[7].As<Napi::Number>().Int32Value() : -1;
+      if (updateType < 0 || updateType > 2)
+      {
+        Napi::RangeError::New(info.Env(),
+                              "writeBook: updateType takes 0 snapshot, 1 delta or 2 top")
+            .ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+      }
+      if (isSnap == 1u && updateType != 0)
+      {
+        Napi::RangeError::New(info.Env(), "writeBook: isSnapshot true contradicts updateType " +
+                                              std::to_string(updateType))
+            .ThrowAsJavaScriptException();
+        return info.Env().Undefined();
+      }
+      static constexpr uint8_t kRecorderByte[] = {1u, 0u, 2u};
+      isSnap = kRecorderByte[updateType];
+    }
     auto bidsArr = info[5].As<Napi::BigInt64Array>();
     auto asksArr = info[6].As<Napi::BigInt64Array>();
     const LrvxBookLevel* bids =

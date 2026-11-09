@@ -270,6 +270,7 @@ every bar this batch path returns closed on its own threshold, so `0` here).
 ```codon
 writer = DataWriter("./data", max_segment_mb=256, exchange_id=0)
 writer.write_trade(exchange_ts_ns, recv_ts_ns, price, qty, trade_id, symbol_id, side)
+writer.write_book(exchange_ts_ns, recv_ts_ns, seq, symbol_id, False, bids, asks, update_type=2)
 writer.flush()
 writer.close()
 ```
@@ -277,9 +278,12 @@ writer.close()
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `write_trade(exchange_ts_ns, recv_ts_ns, price, qty, trade_id, symbol_id, side)` | `bool` | Write a trade record |
+| `write_book(exchange_ts_ns, recv_ts_ns, seq, symbol_id, is_snapshot, bids, asks, update_type=None)` | `bool` | Write a book update; `bids` / `asks` are `(price_raw, qty_raw)` tuples |
 | `flush()` | `None` | Flush to disk |
 | `close()` | `None` | Close and finalize |
 | `stats()` | `WriterStats` | Write statistics |
+
+`update_type` is the record byte `read_book_updates()` returns in `event_type`: `0` snapshot, `1` delta, `2` top-of-book. When given it decides the type; `is_snapshot` is the older two-way form, and `True` with an `update_type` other than `0` raises `ValueError`.
 
 `WriterStats` fields: `bytes_written`, `events_written`, `segments_created`, `trades_written`.
 

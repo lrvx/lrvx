@@ -315,9 +315,14 @@ count = writer.write_trades(
 )
 ```
 
-#### `write_book(exchange_ts_ns, recv_ts_ns, seq, symbol_id, is_snapshot, bids, asks) -> bool`
+#### `write_book(exchange_ts_ns, recv_ts_ns, seq, symbol_id, is_snapshot=False, bids=None, asks=None, update_type=None) -> bool`
 
-Write a single book update. `bids` and `asks` are `PyLevel` structured arrays.
+Write a single book update. `bids` and `asks` are `PyLevel` structured arrays;
+`None` writes no levels on that side. `update_type` is the record byte that
+`read_book_updates()` returns in `event_type`: `0` snapshot, `1` delta, `2`
+top-of-book. When given it decides the type; `is_snapshot` is the older
+two-way form, and `is_snapshot=True` with an `update_type` other than `0`
+raises `ValueError`.
 
 ```python
 writer.write_book(
@@ -329,13 +334,26 @@ writer.write_book(
     bids=bid_levels,
     asks=ask_levels,
 )
+
+writer.write_book(
+    exchange_ts_ns=1704067200_002_000_000,
+    recv_ts_ns=1704067200_002_000_000,
+    seq=43,
+    symbol_id=1,
+    bids=best_bid,
+    asks=best_ask,
+    update_type=2,  # a top: one level per side
+)
 ```
 
 #### `write_books(headers, levels) -> int`
 
 Batched book writer. Takes the same `(headers, levels)` pair that
 `DataReader.read_book_updates()` returns, so a read/write round-trip is
-lossless.
+lossless: `event_type` is the record byte, `0` snapshot, `1` delta, `2` top.
+Rows from `MergedTapeReader.read_books()` carry frame types (`2`, `3`, `6`) in
+the same field and need mapping first. A row with `event_type` above `2`
+raises `ValueError` before anything is written.
 
 #### `write_option_quotes(exchange_ts_ns, recv_ts_ns, mark_prices, index_prices, ivs, open_interest, symbol_ids, bid_prices=None, ask_prices=None, underlying_prices=None, bid_sizes=None, ask_sizes=None, bid_ivs=None, ask_ivs=None) -> int`
 

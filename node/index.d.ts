@@ -2063,7 +2063,10 @@ export class DataWriter {
     side: Side,
   ): boolean;
   /** `bids` / `asks` are flat `BigInt64Array`s of interleaved raw int64
-   *  `[price, qty, price, qty, ...]` (Price/Quantity scale = 1e8). */
+   *  `[price, qty, price, qty, ...]` (Price/Quantity scale = 1e8).
+   *  `updateType` is the record byte a `BookUpdateRecord` carries in
+   *  `eventType` (0 = snapshot, 1 = delta, 2 = top-of-book) and decides
+   *  when given; `isSnapshot` is the older two-way form. */
   writeBook(
     exchangeTsNs: bigint,
     recvTsNs: bigint,
@@ -2072,6 +2075,7 @@ export class DataWriter {
     isSnapshot: boolean,
     bids: BigInt64Array,
     asks: BigInt64Array,
+    updateType?: 0 | 1 | 2,
   ): boolean;
   flush(): void;
   close(): void;

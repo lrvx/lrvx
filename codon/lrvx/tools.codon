@@ -834,7 +834,20 @@ class DataWriter:
     def write_book(self, exchange_ts_ns: int, recv_ts_ns: int, seq: int,
                    symbol_id: int, is_snapshot: bool,
                    bids: List[Tuple[int, int]],
-                   asks: List[Tuple[int, int]]) -> bool:
+                   asks: List[Tuple[int, int]],
+                   update_type: Optional[int] = None) -> bool:
+        """update_type is the record byte the readers return in event_type
+        (0 snapshot, 1 delta, 2 top) and decides when given; is_snapshot is
+        the older two-way form."""
+        # The C writer takes the recorder's byte: 1 snapshot, 0 delta, 2 top.
+        kind = u8(1) if is_snapshot else u8(0)
+        if update_type is not None:
+            t: int = update_type
+            if t < 0 or t > 2:
+                raise ValueError("write_book: update_type takes 0 snapshot, 1 delta or 2 top")
+            if is_snapshot and t != 0:
+                raise ValueError("write_book: is_snapshot=True contradicts update_type=" + str(t))
+            kind = u8(1) if t == 0 else (u8(0) if t == 1 else u8(2))
         # LrvxBookLevel: { i64 price_raw; i64 quantity_raw; } — 16 bytes per level.
         n_bids = len(bids)
         n_asks = len(asks)
@@ -850,7 +863,7 @@ class DataWriter:
             ask_buf[i * 2 + 1] = i64(q)
         return lrvx_data_writer_write_book(
             self._h, i64(exchange_ts_ns), i64(recv_ts_ns), i64(seq),
-            u32(symbol_id), u8(1) if is_snapshot else u8(0),
+            u32(symbol_id), kind,
             Ptr[byte](bid_buf.arr.ptr), u32(n_bids),
             Ptr[byte](ask_buf.arr.ptr), u32(n_asks)) != u8(0)
 

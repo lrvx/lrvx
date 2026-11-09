@@ -902,14 +902,34 @@ class PyDataWriter
   }
 
   // Single book write. `bids`/`asks` are structured arrays with PyLevel
-  // dtype (price_raw, qty_raw, side). `side` is ignored on write — bid/
-  // ask is determined by which array a level is in. Returns True iff the
-  // write succeeded.
+  // dtype (price_raw, qty_raw, side); None is no levels. `side` is
+  // ignored on write — bid/ask is determined by which array a level is
+  // in. `updateType` is the record byte (0 snapshot, 1 delta, 2 top) and
+  // decides when given; `isSnapshot` is the older two-way form. Returns
+  // True iff the write succeeded.
+  using LevelArray = py::array_t<PyLevel, py::array::c_style | py::array::forcecast>;
   bool writeBook(int64_t exchangeTsNs, int64_t recvTsNs, int64_t seq,
                  uint32_t symbolId, bool isSnapshot,
-                 py::array_t<PyLevel, py::array::c_style | py::array::forcecast> bids,
-                 py::array_t<PyLevel, py::array::c_style | py::array::forcecast> asks)
+                 std::optional<LevelArray> bidsArg, std::optional<LevelArray> asksArg,
+                 std::optional<int> updateType)
   {
+    uint8_t type = isSnapshot ? 0 : 1;
+    if (updateType)
+    {
+      if (*updateType < 0 || *updateType > 2)
+      {
+        throw py::value_error("write_book: update_type is " + std::to_string(*updateType) +
+                              "; it takes 0 snapshot, 1 delta or 2 top");
+      }
+      if (isSnapshot && *updateType != 0)
+      {
+        throw py::value_error("write_book: is_snapshot=True contradicts update_type=" +
+                              std::to_string(*updateType));
+      }
+      type = static_cast<uint8_t>(*updateType);
+    }
+    const LevelArray bids = bidsArg ? *bidsArg : LevelArray(0);
+    const LevelArray asks = asksArg ? *asksArg : LevelArray(0);
     auto n_bids = static_cast<uint32_t>(bids.size());
     auto n_asks = static_cast<uint32_t>(asks.size());
 
@@ -920,7 +940,7 @@ class PyDataWriter
     header.symbol_id = symbolId;
     header.bid_count = static_cast<uint16_t>(n_bids);
     header.ask_count = static_cast<uint16_t>(n_asks);
-    header.type = isSnapshot ? 0 : 1;
+    header.type = type;
 
     // PyLevel includes a `side` byte; copy into contiguous BookLevel.
     std::vector<lrvx::replay::BookLevel> bid_levels;
@@ -943,13 +963,26 @@ class PyDataWriter
   // Batched book writer. `headers` is a structured array with
   // PyBookUpdateHeader dtype; `levels` is a flat PyLevel array sliced
   // per event by header.level_offset / bid_count / ask_count. Round-trip
-  // with DataReader.read_book_updates(). Returns count successfully written.
+  // with DataReader.read_book_updates(): event_type is its record byte
+  // (0 snapshot, 1 delta, 2 top). Returns count successfully written.
   uint64_t writeBooks(py::array_t<PyBookUpdateHeader, py::array::c_style | py::array::forcecast> headers,
                       py::array_t<PyLevel, py::array::c_style | py::array::forcecast> levels)
   {
     const auto n_events = static_cast<uint64_t>(headers.size());
     const auto* h = headers.data();
     const auto* lv = levels.data();
+    // Checked up front so a bad row writes nothing. MergedTapeReader rows
+    // carry frame types (2, 3, 6) in the same field; 3 and 6 stop here,
+    // and the docstring says to map them.
+    for (uint64_t i = 0; i < n_events; ++i)
+    {
+      if (h[i].event_type > 2)
+      {
+        throw py::value_error("write_books: headers[" + std::to_string(i) + "].event_type is " +
+                              std::to_string(h[i].event_type) +
+                              "; it takes the record byte, 0 snapshot, 1 delta or 2 top");
+      }
+    }
     std::vector<lrvx::replay::BookLevel> scratch;
     uint64_t written = 0;
     {
@@ -973,7 +1006,7 @@ class PyDataWriter
         rh.symbol_id = fh.symbol_id;
         rh.bid_count = fh.bid_count;
         rh.ask_count = fh.ask_count;
-        rh.type = (fh.event_type == 2) ? 0 : 1;
+        rh.type = fh.event_type;
 
         std::span<const lrvx::replay::BookLevel> bid_span(scratch.data(), fh.bid_count);
         std::span<const lrvx::replay::BookLevel> ask_span(scratch.data() + fh.bid_count, fh.ask_count);
@@ -1430,12 +1463,19 @@ inline void bindReplay(py::module_& m)
            py::arg("price"), py::arg("qty"),
            py::arg("trade_id"), py::arg("symbol_id"), py::arg("side"))
       .def("write_book", &PyDataWriter::writeBook,
-           "Write a single book update. bids/asks are PyLevel structured arrays.",
+           "Write a single book update. bids/asks are PyLevel structured arrays. "
+           "update_type is the record byte read_book_updates returns (0 snapshot, "
+           "1 delta, 2 top) and decides when given; is_snapshot is the older "
+           "two-way form.",
            py::arg("exchange_ts_ns"), py::arg("recv_ts_ns"),
-           py::arg("seq"), py::arg("symbol_id"), py::arg("is_snapshot"),
-           py::arg("bids"), py::arg("asks"))
+           py::arg("seq"), py::arg("symbol_id"), py::arg("is_snapshot") = false,
+           py::arg("bids") = py::none(), py::arg("asks") = py::none(),
+           py::arg("update_type") = py::none())
       .def("write_books", &PyDataWriter::writeBooks,
-           "Batched book writer. Round-trip with DataReader.read_book_updates.",
+           "Batched book writer. Round-trip with DataReader.read_book_updates: "
+           "event_type is its record byte (0 snapshot, 1 delta, 2 top). "
+           "MergedTapeReader.read_books rows carry frame types (2, 3, 6) and "
+           "need mapping first.",
            py::arg("headers"), py::arg("levels"))
       .def("write_trades", &PyDataWriter::writeTrades,
            "Write trades from numpy arrays (vectorized). Returns number of trades written.",
