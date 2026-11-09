@@ -365,9 +365,9 @@ MergedTapeReader::readBooks()
           p.row.tape_index = static_cast<uint32_t>(i);
           p.row.bid_count = ev.book_header.bid_count;
           p.row.ask_count = ev.book_header.ask_count;
-          // Map writer's type byte (0=snap, 1=delta) onto reader's event
-          // type convention (2=snap, 3=delta) to match
-          // BinaryLogReader.read_book_updates output.
+          // The frame type (2 snapshot, 3 delta, 6 top), not the record
+          // byte (0, 1, 2) that DataReader.read_book_updates returns.
+          // Rows from here need mapping before DataWriter.write_books.
           p.row.event_type = (ev.type == EventType::BookSnapshot) ? 2
                              : (ev.type == EventType::BookTop)    ? 6
                                                                   : 3;

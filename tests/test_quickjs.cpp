@@ -3618,6 +3618,55 @@ TEST(JsIntegrationTest, OnTouchReceivesTheTouch)
   EXPECT_EQ(readGlobalInt32(jsStrat, "touchAsk"), -1) << "an empty ask side is null";
 }
 
+// updateType is the record byte (0 snapshot, 1 delta, 2 top); the prelude
+// maps it to the C writer's byte, and a bad or contradicting one throws.
+TEST(JsIntegrationTest, DataWriterWritesEachUpdateType)
+{
+  const auto dir = std::filesystem::temp_directory_path() / "lrvx_test_qjs_write_book";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  const std::string script = "var tapeDir = '" + dir.string() + "';" + R"(
+    var badType = false;
+    var contradiction = false;
+    (function () {
+      var w = new DataWriter(tapeDir, 4, 0);
+      var lv = function (p) { return BigInt64Array.from([BigInt(p) * 100000000n, 100000000n]); };
+      w.writeBook(1n, 1n, 0n, 7, true, lv(99), lv(101));
+      w.writeBook(2n, 2n, 1n, 7, false, lv(100), lv(101), 2);
+      w.writeBook(3n, 3n, 2n, 7, false, lv(98), lv(102), 1);
+      try { w.writeBook(4n, 4n, 3n, 7, false, lv(98), lv(102), 3); } catch (e) { badType = e instanceof RangeError; }
+      try { w.writeBook(4n, 4n, 3n, 7, true, lv(98), lv(102), 2); } catch (e) { contradiction = e instanceof RangeError; }
+      w.close();
+      w.destroy();
+    })();
+    class S extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+    }
+    lrvx.register(new S());
+  )";
+  TempJsFile file(script);
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(file.path(), registry);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "badType"), 1);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "contradiction"), 1);
+
+  LrvxDataReaderHandle r = lrvx_data_reader_create(dir.string().c_str());
+  ASSERT_NE(r, nullptr);
+  uint64_t total_levels = 0;
+  const uint64_t n = lrvx_data_reader_count_book_updates(r, &total_levels);
+  std::vector<LrvxBookUpdateHeader> headers(n);
+  std::vector<LrvxLevel> levels(total_levels);
+  lrvx_data_reader_read_book_updates(r, headers.data(), n, levels.data(), total_levels);
+  lrvx_data_reader_destroy(r);
+  std::vector<int> types;
+  for (const auto& h : headers)
+  {
+    types.push_back(h.event_type);
+  }
+  EXPECT_EQ(types, (std::vector<int>{0, 2, 1}));
+  std::filesystem::remove_all(dir);
+}
+
 TEST(JsExecutorThreadingTest, ExecutorForwardsTouch)
 {
   TempJsFile script(kTouchStrategyScript);

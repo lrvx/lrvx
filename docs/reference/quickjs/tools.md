@@ -191,13 +191,15 @@ Record shapes:
 - **BBO**: `{ exchangeTsNs, recvTsNs, seq, symbolId, eventType, bidPrice, bidQty, askPrice, askQty }`
 - **Book update**: `{ exchangeTsNs, recvTsNs, seq, symbolId, eventType, bids: [{price, qty}, ...], asks: [{price, qty}, ...] }`
 
-`eventType` is `2` for a snapshot, `3` for a delta.
+`eventType` is the record byte: `0` snapshot, `1` delta, `2` top-of-book.
 
 ```javascript
 const writer = new DataWriter('./out', maxSegmentMb, exchangeId);
 writer.writeTrade(exchangeTsNs, recvTsNs, price, qty, tradeId, symbolId, side);
 // Raw int64 book levels — flat BigInt64Array as [price_raw, qty_raw, ...]
 writer.writeBook(exchangeTsNs, recvTsNs, seqNs, symbolId, isSnapshot, bidsBuf, asksBuf);
+// updateType, optional, is the record byte above (0, 1, 2) and decides when given
+writer.writeBook(exchangeTsNs, recvTsNs, seqNs, symbolId, false, bidsBuf, asksBuf, 2);
 writer.flush();
 writer.close();
 writer.stats();          // { bytesWritten, eventsWritten, segmentsCreated, tradesWritten }

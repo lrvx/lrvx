@@ -20,7 +20,7 @@ from C import lrvx_runner_set_market_data_recorder(cobj, cobj)
 
 from C import lrvx_binary_log_recorder_hook_as_recorder(cobj) -> cobj
 
-from lrvx.tools import MergedTapeReader, BinaryLogRecorderHook
+from lrvx.tools import MergedTapeReader, BinaryLogRecorderHook, DataWriter, DataReader
 
 
 def check(label: str, ok: bool):
@@ -137,5 +137,38 @@ total_tape_trades = sum(s.trades for s in stats)
 check("per_tape_stats total trades == 8", total_tape_trades == 8)
 
 reader.close()
+
+# ── DataWriter.write_book update_type ────────────────────────────────────
+# update_type is the record byte the reader hands back in event_type
+# (0 snapshot, 1 delta, 2 top); a bad or contradicting one raises.
+
+wb = root + "/write_book"
+os.system("mkdir -p " + wb)
+w = DataWriter(wb, 4, 0)
+w.write_book(base_ns, base_ns, 0, 7, True, [(99 * 100_000_000, 100_000_000)],
+             [(101 * 100_000_000, 100_000_000)])
+w.write_book(base_ns + 1, base_ns + 1, 1, 7, False, [(100 * 100_000_000, 100_000_000)],
+             [(101 * 100_000_000, 100_000_000)], update_type=2)
+w.write_book(base_ns + 2, base_ns + 2, 2, 7, False, [(98 * 100_000_000, 100_000_000)],
+             List[Tuple[int, int]](), update_type=1)
+bad_type = False
+try:
+    w.write_book(base_ns + 3, base_ns + 3, 3, 7, False, List[Tuple[int, int]](),
+                 List[Tuple[int, int]](), update_type=3)
+except ValueError:
+    bad_type = True
+check("write_book rejects update_type 3", bad_type)
+contradiction = False
+try:
+    w.write_book(base_ns + 3, base_ns + 3, 3, 7, True, List[Tuple[int, int]](),
+                 List[Tuple[int, int]](), update_type=2)
+except ValueError:
+    contradiction = True
+check("write_book rejects is_snapshot=True with update_type 2", contradiction)
+w.close()
+
+written = DataReader(wb).read_book_updates()
+check("write_book update_type round-trips 0, 2, 1",
+      [u.event_type for u in written] == [0, 2, 1])
 
 print("done")

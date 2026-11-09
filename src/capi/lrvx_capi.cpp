@@ -3521,6 +3521,12 @@ uint64_t lrvx_data_writer_write_books(LrvxDataWriterHandle h,
   for (uint64_t i = 0; i < n_events; ++i)
   {
     const auto& fh = headers[i];
+    // The record byte read_book_updates returns: 0 snapshot, 1 delta,
+    // 2 top. Anything else is no record type and is not written.
+    if (fh.event_type > 2)
+    {
+      continue;
+    }
     const uint64_t total = static_cast<uint64_t>(fh.bid_count) + fh.ask_count;
     scratch.clear();
     scratch.reserve(total);
@@ -3537,7 +3543,7 @@ uint64_t lrvx_data_writer_write_books(LrvxDataWriterHandle h,
     rh.symbol_id = fh.symbol_id;
     rh.bid_count = fh.bid_count;
     rh.ask_count = fh.ask_count;
-    rh.type = (fh.event_type == 2) ? 0 : 1;
+    rh.type = fh.event_type;
 
     std::span<const replay::BookLevel> bid_span(scratch.data(), fh.bid_count);
     std::span<const replay::BookLevel> ask_span(scratch.data() + fh.bid_count, fh.ask_count);

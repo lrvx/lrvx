@@ -651,13 +651,13 @@ class DataWriter:
         """
         Return writer statistics as a dict
         """
-    def write_book(self, exchange_ts_ns: typing.SupportsInt | typing.SupportsIndex, recv_ts_ns: typing.SupportsInt | typing.SupportsIndex, seq: typing.SupportsInt | typing.SupportsIndex, symbol_id: typing.SupportsInt | typing.SupportsIndex, is_snapshot: bool, bids: typing.Annotated[numpy.typing.ArrayLike, ...], asks: typing.Annotated[numpy.typing.ArrayLike, ...]) -> bool:
+    def write_book(self, exchange_ts_ns: typing.SupportsInt | typing.SupportsIndex, recv_ts_ns: typing.SupportsInt | typing.SupportsIndex, seq: typing.SupportsInt | typing.SupportsIndex, symbol_id: typing.SupportsInt | typing.SupportsIndex, is_snapshot: bool = False, bids: typing.Annotated[numpy.typing.ArrayLike, ...] | None = None, asks: typing.Annotated[numpy.typing.ArrayLike, ...] | None = None, update_type: typing.SupportsInt | typing.SupportsIndex | None = None) -> bool:
         """
-        Write a single book update. bids/asks are PyLevel structured arrays.
+        Write a single book update. bids/asks are PyLevel structured arrays. update_type is the record byte read_book_updates returns (0 snapshot, 1 delta, 2 top) and decides when given; is_snapshot is the older two-way form.
         """
     def write_books(self, headers: typing.Annotated[numpy.typing.ArrayLike, ...], levels: typing.Annotated[numpy.typing.ArrayLike, ...]) -> int:
         """
-        Batched book writer. Round-trip with DataReader.read_book_updates.
+        Batched book writer. Round-trip with DataReader.read_book_updates: event_type is its record byte (0 snapshot, 1 delta, 2 top). MergedTapeReader.read_books rows carry frame types (2, 3, 6) and need mapping first.
         """
     def write_option_quotes(self, exchange_ts_ns: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], recv_ts_ns: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], mark_prices: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], index_prices: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], ivs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], open_interest: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol_ids: typing.Annotated[numpy.typing.ArrayLike, numpy.uint32], bid_prices: typing.Any = None, ask_prices: typing.Any = None, underlying_prices: typing.Any = None, bid_sizes: typing.Any = None, ask_sizes: typing.Any = None, bid_ivs: typing.Any = None, ask_ivs: typing.Any = None) -> int:
         """

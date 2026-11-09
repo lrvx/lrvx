@@ -606,27 +606,27 @@ def _materialize_merged_tape(paths: list[Path], out_dir: Path) -> None:
         )
 
     # Books: write_book takes raw int64 directly, lossless round-trip.
+    # The merged reader gives frame types; write_book takes the record byte.
+    frame_to_record = {2: 0, 3: 1, 6: 2}
+    written_types = set()
     headers, levels = reader.read_books()
-    if headers.size:
-        for h in headers:
-            offset = int(h["level_offset"])
-            n_bid = int(h["bid_count"])
-            n_ask = int(h["ask_count"])
-            if int(h["event_type"]) == 6:
-                # A top-of-book frame; write_book is bool-shaped and a
-                # one-level "delta" would strand stale better levels.
-                continue
-            bids = levels[offset:offset + n_bid]
-            asks = levels[offset + n_bid:offset + n_bid + n_ask]
-            writer.write_book(
-                exchange_ts_ns=int(h["exchange_ts_ns"]),
-                recv_ts_ns=int(h["recv_ts_ns"]),
-                seq=int(h["seq"]),
-                symbol_id=int(h["symbol_id"]),
-                is_snapshot=int(h["event_type"]) == 2,
-                bids=bids,
-                asks=asks,
-            )
+    for h in headers:
+        update_type = frame_to_record.get(int(h["event_type"]))
+        if update_type is None:
+            continue
+        offset = int(h["level_offset"])
+        n_bid = int(h["bid_count"])
+        n_ask = int(h["ask_count"])
+        writer.write_book(
+            exchange_ts_ns=int(h["exchange_ts_ns"]),
+            recv_ts_ns=int(h["recv_ts_ns"]),
+            seq=int(h["seq"]),
+            symbol_id=int(h["symbol_id"]),
+            bids=levels[offset:offset + n_bid],
+            asks=levels[offset + n_bid:offset + n_bid + n_ask],
+            update_type=update_type,
+        )
+        written_types.add(update_type)
     writer.close()
 
     # Synthesize a metadata.json that maps the global symbol IDs back to
@@ -649,9 +649,9 @@ def _materialize_merged_tape(paths: list[Path], out_dir: Path) -> None:
             for s in sym_table
         ],
         "has_trades": True,
-        "has_book_snapshots": bool(headers.size),
-        "has_book_deltas": False,
-        "has_book_tops": False,
+        "has_book_snapshots": 0 in written_types,
+        "has_book_deltas": 1 in written_types,
+        "has_book_tops": 2 in written_types,
         "price_scale": 100000000,
         "qty_scale": 100000000,
         "description": (

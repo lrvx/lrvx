@@ -1057,7 +1057,9 @@ uint8_t lrvx_data_writer_write_trade(LrvxDataWriterHandle writer,
                                      uint64_t trade_id, uint32_t symbol_id, uint8_t side);
 
 // Raw int64 book levels (scale 1e8). bids/asks may be NULL when the
-// matching count is 0. Returns 1 on success, 0 on failure.
+// matching count is 0. is_snapshot is a byte, as in the recorder's
+// on_book_update: 1 snapshot, 0 delta, 2 top-of-book. Returns 1 on
+// success, 0 on failure.
 uint8_t lrvx_data_writer_write_book(LrvxDataWriterHandle writer,
                                     int64_t exchange_ts_ns, int64_t recv_ts_ns,
                                     int64_t seq, uint32_t symbol_id,
@@ -1067,7 +1069,10 @@ uint8_t lrvx_data_writer_write_book(LrvxDataWriterHandle writer,
 
 // Batched book writer. headers + flat levels array, sliced per event
 // via header.level_offset / bid_count / ask_count. Same struct layout
-// as lrvx_data_reader_read_book_updates — round-trip works.
+// as lrvx_data_reader_read_book_updates — round-trip works. event_type
+// is that reader's record byte (0 snapshot, 1 delta, 2 top); a row with
+// any other value is not written. Rows from the merged tape reader carry
+// frame types (2, 3, 6) and need mapping first.
 uint64_t lrvx_data_writer_write_books(LrvxDataWriterHandle writer,
                                       const LrvxBookUpdateHeader* headers,
                                       uint64_t n_events,
@@ -1124,7 +1129,7 @@ uint64_t lrvx_data_reader_read_book_updates(LrvxDataReaderHandle reader,
 
 `LrvxBBO` fields (size: 64 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `bid_price_raw`, `bid_qty_raw`, `ask_price_raw`, `ask_qty_raw`, `symbol_id`, `event_type` (0=snapshot, 1=delta, 2=top-of-book — the record byte, not the frame type).
 
-`LrvxBookUpdateHeader` fields (size: 48 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `level_offset`, `symbol_id`, `bid_count`, `ask_count`, `event_type`.
+`LrvxBookUpdateHeader` fields (size: 48 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `level_offset`, `symbol_id`, `bid_count`, `ask_count`, `event_type` (the record byte from the data reader, 0=snapshot, 1=delta, 2=top-of-book; the frame type from the merged tape reader, 2=snapshot, 3=delta, 6=top).
 
 `LrvxLevel` fields (size: 24 B): `price_raw`, `qty_raw`, `side` (0=bid, 1=ask).
 

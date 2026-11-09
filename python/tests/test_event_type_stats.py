@@ -54,6 +54,10 @@ class EventTypeStatsRow(unittest.TestCase):
                 ts += 1
                 w.write_book(exchange_ts_ns=ts, recv_ts_ns=ts, seq=10 + i, symbol_id=7,
                              is_snapshot=False, bids=_level(99.5), asks=_level(100.5))
+            for i in range(4):
+                ts += 1
+                w.write_book(exchange_ts_ns=ts, recv_ts_ns=ts, seq=20 + i, symbol_id=7,
+                             bids=_level(99.7), asks=_level(100.3), update_type=2)
         finally:
             w.close()
 
@@ -63,7 +67,7 @@ class EventTypeStatsRow(unittest.TestCase):
         self.assertEqual(rows.dtype.names,
                          ("symbol_id", "trades", "book_snapshots", "book_deltas", "book_tops"))
         self.assertEqual(len(rows), 1)
-        self.assertEqual(tuple(int(v) for v in rows[0]), (7, 3, 2, 5, 0))
+        self.assertEqual(tuple(int(v) for v in rows[0]), (7, 3, 2, 5, 4))
 
 
 if __name__ == "__main__":

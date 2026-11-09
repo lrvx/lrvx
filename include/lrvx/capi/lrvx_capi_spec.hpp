@@ -1372,7 +1372,8 @@ extern "C"
   // Single book-update writer. Levels are raw int64 (Price/Quantity
   // scale = 1e8); no double conversion in the hot path. Returns 1 on
   // success, 0 on failure (e.g. writer closed). bids/asks may be NULL
-  // when the matching count is 0.
+  // when the matching count is 0. is_snapshot is a byte, as in the
+  // recorder's on_book_update: 1 snapshot, 0 delta, 2 top-of-book.
   LRVX_EXPORT(group = "data_writer")
   uint8_t lrvx_data_writer_write_book(LrvxDataWriterHandle writer,
                                       int64_t exchange_ts_ns,
@@ -2078,11 +2079,14 @@ extern "C"
     int64_t ask_price_raw;
     int64_t ask_qty_raw;
     uint32_t symbol_id;
-    uint8_t event_type;  // 2=snapshot, 3=delta
+    uint8_t event_type;  // record byte: 0=snapshot, 1=delta, 2=top
   } LrvxBBO;
 
   // Per-event header for read_book_updates(). Levels live in a separate
   // flat array; level_offset/bid_count/ask_count slice it for this event.
+  // event_type is the record byte from the data reader (0=snapshot,
+  // 1=delta, 2=top) and the frame type from the merged tape reader
+  // (2=snapshot, 3=delta, 6=top).
   typedef struct
   {
     int64_t exchange_ts_ns;
@@ -2092,7 +2096,7 @@ extern "C"
     uint32_t symbol_id;
     uint16_t bid_count;
     uint16_t ask_count;
-    uint8_t event_type;  // 2=snapshot, 3=delta
+    uint8_t event_type;
   } LrvxBookUpdateHeader;
 
   typedef struct
@@ -2265,7 +2269,10 @@ extern "C"
   // Batched book writer. headers + flat levels array, sliced per event
   // via header.level_offset / bid_count / ask_count. Same struct layout
   // as lrvx_data_reader_read_book_updates, so round-trip works.
-  // event_type 2=snapshot, 3=delta. LrvxLevel.side is ignored on write
+  // event_type is the record byte that reader returns: 0=snapshot,
+  // 1=delta, 2=top; a row with any other value is not written. Rows from
+  // the merged tape reader carry frame types and need mapping first (its
+  // snapshot, 2, would land as a top). LrvxLevel.side is ignored on write
   // (bid vs ask is derived from the bid_count/ask_count split). Returns
   // count successfully written.
   LRVX_EXPORT(group = "datawriter")

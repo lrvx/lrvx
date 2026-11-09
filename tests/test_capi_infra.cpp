@@ -388,6 +388,93 @@ TEST(CapiReplayTest, ReadBboAndBookUpdates)
   std::filesystem::remove_all(dir);
 }
 
+namespace
+{
+std::vector<uint8_t> readEventTypes(const std::filesystem::path& dir,
+                                    std::vector<LrvxBookUpdateHeader>* headers_out = nullptr,
+                                    std::vector<LrvxLevel>* levels_out = nullptr)
+{
+  LrvxDataReaderHandle r = lrvx_data_reader_create(dir.string().c_str());
+  EXPECT_NE(r, nullptr);
+  uint64_t total_levels = 0;
+  const uint64_t n = lrvx_data_reader_count_book_updates(r, &total_levels);
+  std::vector<LrvxBookUpdateHeader> headers(n);
+  std::vector<LrvxLevel> levels(total_levels);
+  lrvx_data_reader_read_book_updates(r, headers.data(), n, levels.data(), total_levels);
+  lrvx_data_reader_destroy(r);
+  std::vector<uint8_t> types;
+  for (const auto& h : headers)
+  {
+    types.push_back(h.event_type);
+  }
+  if (headers_out)
+  {
+    *headers_out = headers;
+  }
+  if (levels_out)
+  {
+    *levels_out = levels;
+  }
+  return types;
+}
+}  // namespace
+
+// The single writer takes the recorder's byte (1 snapshot, 0 delta, 2 top);
+// the reader returns the record byte (0, 1, 2) and the batched writer takes
+// that back, so a read and a write_books keep every row's type.
+TEST(CapiReplayTest, WriteBooksKeepsTheRecordByte)
+{
+  const auto base = std::filesystem::temp_directory_path() / "lrvx_test_capi_write_books";
+  const auto src = base / "src";
+  const auto dst = base / "dst";
+  std::filesystem::remove_all(base);
+  std::filesystem::create_directories(src);
+  std::filesystem::create_directories(dst);
+
+  {
+    LrvxDataWriterHandle w = lrvx_data_writer_create(src.string().c_str(), 4, 0);
+    ASSERT_NE(w, nullptr);
+    const uint8_t kinds[] = {1, 2, 2, 0};
+    for (int i = 0; i < 4; ++i)
+    {
+      const LrvxBookLevel bid{(100 - i) * 100000000LL, 100000000LL};
+      const LrvxBookLevel ask{(101 + i) * 100000000LL, 200000000LL};
+      const int64_t ts = 1000000000LL + i;
+      EXPECT_EQ(lrvx_data_writer_write_book(w, ts, ts, i, 7, kinds[i], &bid, 1, &ask, 1), 1);
+    }
+    lrvx_data_writer_close(w);
+    lrvx_data_writer_destroy(w);
+  }
+
+  std::vector<LrvxBookUpdateHeader> headers;
+  std::vector<LrvxLevel> levels;
+  EXPECT_EQ(readEventTypes(src, &headers, &levels), (std::vector<uint8_t>{0, 2, 2, 1}));
+
+  // A frame type is not a record byte: the row is not written.
+  auto extra = headers.back();
+  extra.event_type = 3;
+  headers.push_back(extra);
+
+  {
+    LrvxDataWriterHandle w = lrvx_data_writer_create(dst.string().c_str(), 4, 0);
+    ASSERT_NE(w, nullptr);
+    EXPECT_EQ(lrvx_data_writer_write_books(w, headers.data(), headers.size(), levels.data(),
+                                           levels.size()),
+              4u);
+    lrvx_data_writer_close(w);
+    lrvx_data_writer_destroy(w);
+  }
+
+  std::vector<LrvxBookUpdateHeader> copied;
+  std::vector<LrvxLevel> copied_levels;
+  EXPECT_EQ(readEventTypes(dst, &copied, &copied_levels), (std::vector<uint8_t>{0, 2, 2, 1}));
+  ASSERT_EQ(copied_levels.size(), 8u);
+  EXPECT_EQ(copied_levels[2].price_raw, 99 * 100000000LL);
+  EXPECT_EQ(copied_levels[3].qty_raw, 200000000LL);
+
+  std::filesystem::remove_all(base);
+}
+
 // ============================================================
 // IndicatorGraph (batch)
 // ============================================================

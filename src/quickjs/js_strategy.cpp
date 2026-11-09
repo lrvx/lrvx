@@ -426,11 +426,21 @@ void LrvxJsStrategy::loadStdlib()
                               symbolId, isBuy ? 0 : 1);
       }
       // bidsBuf / asksBuf are BigInt64Array buffers laid out [price_raw, qty_raw, ...].
-      writeBook(timestampNs, exchangeNs, seqNs, symbolId, isSnapshot, bidsBuf, asksBuf) {
+      // updateType is the record byte (0 snapshot, 1 delta, 2 top) and decides
+      // when given; the C writer takes the recorder's byte (1, 0, 2).
+      writeBook(timestampNs, exchangeNs, seqNs, symbolId, isSnapshot, bidsBuf, asksBuf, updateType) {
+        var kind = isSnapshot ? 1 : 0;
+        if (updateType !== undefined) {
+          if (updateType !== 0 && updateType !== 1 && updateType !== 2)
+            throw new RangeError("writeBook: updateType takes 0 snapshot, 1 delta or 2 top");
+          if (isSnapshot && updateType !== 0)
+            throw new RangeError("writeBook: isSnapshot true contradicts updateType " + updateType);
+          kind = updateType === 0 ? 1 : updateType === 1 ? 0 : 2;
+        }
         var nBids = bidsBuf ? (bidsBuf.length >> 1) : 0;
         var nAsks = asksBuf ? (asksBuf.length >> 1) : 0;
         return __lrvx_dw_write_book(this._h, timestampNs, exchangeNs, seqNs || 0,
-                                    symbolId, isSnapshot ? 1 : 0,
+                                    symbolId, kind,
                                     bidsBuf || null, nBids,
                                     asksBuf || null, nAsks);
       }

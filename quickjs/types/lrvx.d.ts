@@ -618,10 +618,12 @@ declare class DataWriter {
                price: number, qty: number,
                tradeId: number, symbolId: number, isBuy: boolean): boolean;
     // bidsBuf / asksBuf carry raw int64 levels laid out [price_raw, qty_raw, ...].
+    // updateType is the record byte (0 snapshot, 1 delta, 2 top) and decides
+    // when given; isSnapshot is the older two-way form.
     writeBook(timestampNs: bigint | number, exchangeNs: bigint | number,
               seqNs: bigint | number, symbolId: number,
               isSnapshot: boolean, bidsBuf: BigInt64Array | null,
-              asksBuf: BigInt64Array | null): boolean;
+              asksBuf: BigInt64Array | null, updateType?: 0 | 1 | 2): boolean;
     flush(): void;
     close(): void;
     stats(): WriterStats;

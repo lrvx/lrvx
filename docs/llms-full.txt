@@ -4148,7 +4148,7 @@ Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The 
 
 ## Record tops
 
-A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), through Bybit or Bitget with their `subscribeBbo` on (off by default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`. `EventTypeStatsAggregator` counts them in its `book_tops` column, and `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
+A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), through Bybit or Bitget with their `subscribeBbo` on (off by default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`; so does a `DataWriter` given `update_type=2`. `EventTypeStatsAggregator` counts them in its `book_tops` column, and `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
 
 ## See also
 
@@ -9895,7 +9895,7 @@ Returns the same nanoseconds every call. Useful as a baseline.
 - `current_segment_path(self) -> str`
 - `flush(self) -> None`
 - `stats(self) -> dict`
-- `write_book(self, exchange_ts_ns: typing.SupportsInt | typing.SupportsIndex, recv_ts_ns: typing.SupportsInt | typing.SupportsIndex, seq: typing.SupportsInt | typing.SupportsIndex, symbol_id: typing.SupportsInt | typing.SupportsIndex, is_snapshot: bool, bids: typing.Annotated[numpy.typing.ArrayLike, ...], asks: typing.Annotated[numpy.typing.ArrayLike, ...]) -> bool`
+- `write_book(self, exchange_ts_ns: typing.SupportsInt | typing.SupportsIndex, recv_ts_ns: typing.SupportsInt | typing.SupportsIndex, seq: typing.SupportsInt | typing.SupportsIndex, symbol_id: typing.SupportsInt | typing.SupportsIndex, is_snapshot: bool = False, bids: typing.Annotated[numpy.typing.ArrayLike, ...] | None = None, asks: typing.Annotated[numpy.typing.ArrayLike, ...] | None = None, update_type: typing.SupportsInt | typing.SupportsIndex | None = None) -> bool`
 - `write_books(self, headers: typing.Annotated[numpy.typing.ArrayLike, ...], levels: typing.Annotated[numpy.typing.ArrayLike, ...]) -> int`
 - `write_option_quotes(self, exchange_ts_ns: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], recv_ts_ns: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], mark_prices: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], index_prices: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], ivs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], open_interest: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol_ids: typing.Annotated[numpy.typing.ArrayLike, numpy.uint32], bid_prices: typing.Any = None, ask_prices: typing.Any = None, underlying_prices: typing.Any = None, bid_sizes: typing.Any = None, ask_sizes: typing.Any = None, bid_ivs: typing.Any = None, ask_ivs: typing.Any = None) -> int`
 - `write_trade(self, exchange_ts_ns: typing.SupportsInt | typing.SupportsIndex, recv_ts_ns: typing.SupportsInt | typing.SupportsIndex, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, trade_id: typing.SupportsInt | typing.SupportsIndex, symbol_id: typing.SupportsInt | typing.SupportsIndex, side: typing.SupportsInt | typing.SupportsIndex) -> bool`
@@ -13941,9 +13941,14 @@ count = writer.write_trades(
 )
 ```
 
-#### `write_book(exchange_ts_ns, recv_ts_ns, seq, symbol_id, is_snapshot, bids, asks) -> bool`
+#### `write_book(exchange_ts_ns, recv_ts_ns, seq, symbol_id, is_snapshot=False, bids=None, asks=None, update_type=None) -> bool`
 
-Write a single book update. `bids` and `asks` are `PyLevel` structured arrays.
+Write a single book update. `bids` and `asks` are `PyLevel` structured arrays;
+`None` writes no levels on that side. `update_type` is the record byte that
+`read_book_updates()` returns in `event_type`: `0` snapshot, `1` delta, `2`
+top-of-book. When given it decides the type; `is_snapshot` is the older
+two-way form, and `is_snapshot=True` with an `update_type` other than `0`
+raises `ValueError`.
 
 ```python
 writer.write_book(
@@ -13955,13 +13960,26 @@ writer.write_book(
     bids=bid_levels,
     asks=ask_levels,
 )
+
+writer.write_book(
+    exchange_ts_ns=1704067200_002_000_000,
+    recv_ts_ns=1704067200_002_000_000,
+    seq=43,
+    symbol_id=1,
+    bids=best_bid,
+    asks=best_ask,
+    update_type=2,  # a top: one level per side
+)
 ```
 
 #### `write_books(headers, levels) -> int`
 
 Batched book writer. Takes the same `(headers, levels)` pair that
 `DataReader.read_book_updates()` returns, so a read/write round-trip is
-lossless.
+lossless: `event_type` is the record byte, `0` snapshot, `1` delta, `2` top.
+Rows from `MergedTapeReader.read_books()` carry frame types (`2`, `3`, `6`) in
+the same field and need mapping first. A row with `event_type` above `2`
+raises `ValueError` before anything is written.
 
 #### `write_option_quotes(exchange_ts_ns, recv_ts_ns, mark_prices, index_prices, ivs, open_interest, symbol_ids, bid_prices=None, ask_prices=None, underlying_prices=None, bid_sizes=None, ask_sizes=None, bid_ivs=None, ask_ivs=None) -> int`
 
@@ -15725,7 +15743,7 @@ writer.close();
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `writeTrade(exchangeTsNs, recvTsNs, price, qty, tradeId, symbolId, side)` | `boolean` | Write a trade record |
-| `writeBook(exchangeTsNs, recvTsNs, seq, symbolId, isSnapshot, bids, asks)` | `boolean` | Write a book update |
+| `writeBook(exchangeTsNs, recvTsNs, seq, symbolId, isSnapshot, bids, asks, updateType?)` | `boolean` | Write a book update |
 | `flush()` | `void` | Flush to disk |
 | `close()` | `void` | Close and finalize |
 | `stats()` | `{ bytesWritten, eventsWritten, segmentsCreated, tradesWritten }` | Write statistics |
@@ -15733,6 +15751,10 @@ writer.close();
 `writeBook`'s `exchangeTsNs`, `recvTsNs` and `seq` are `bigint`. `bids` and
 `asks` are flat `BigInt64Array`s of interleaved raw int64
 `[price, qty, price, qty, ...]` at the 1e8 price/quantity scale.
+`updateType` is the record byte a book-update record carries in `eventType`:
+`0` snapshot, `1` delta, `2` top-of-book. When given it decides the type;
+`isSnapshot` is the older two-way form, and `true` with an `updateType` other
+than `0` throws a `RangeError`.
 
 ---
 
@@ -15779,7 +15801,7 @@ Record shapes:
 - **BBO**: `{ exchangeTsNs, recvTsNs, seq, symbolId, eventType, bidPrice, bidQty, askPrice, askQty }`
 - **Book update**: `{ exchangeTsNs, recvTsNs, seq, symbolId, eventType, bids: [{price, qty}, ...], asks: [{price, qty}, ...] }`
 
-`eventType` is `2` for a snapshot, `3` for a delta.
+`eventType` is the record byte: `0` snapshot, `1` delta, `2` top-of-book.
 
 `startTsNs`, `fromNs`, `toNs` accept either a `number` or a `bigint`. Pass
 `bigint` for real nanosecond timestamps — JS `number` is float64 and silently
@@ -17365,6 +17387,7 @@ every bar this batch path returns closed on its own threshold, so `0` here).
 ```codon
 writer = DataWriter("./data", max_segment_mb=256, exchange_id=0)
 writer.write_trade(exchange_ts_ns, recv_ts_ns, price, qty, trade_id, symbol_id, side)
+writer.write_book(exchange_ts_ns, recv_ts_ns, seq, symbol_id, False, bids, asks, update_type=2)
 writer.flush()
 writer.close()
 ```
@@ -17372,9 +17395,12 @@ writer.close()
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `write_trade(exchange_ts_ns, recv_ts_ns, price, qty, trade_id, symbol_id, side)` | `bool` | Write a trade record |
+| `write_book(exchange_ts_ns, recv_ts_ns, seq, symbol_id, is_snapshot, bids, asks, update_type=None)` | `bool` | Write a book update; `bids` / `asks` are `(price_raw, qty_raw)` tuples |
 | `flush()` | `None` | Flush to disk |
 | `close()` | `None` | Close and finalize |
 | `stats()` | `WriterStats` | Write statistics |
+
+`update_type` is the record byte `read_book_updates()` returns in `event_type`: `0` snapshot, `1` delta, `2` top-of-book. When given it decides the type; `is_snapshot` is the older two-way form, and `True` with an `update_type` other than `0` raises `ValueError`.
 
 `WriterStats` fields: `bytes_written`, `events_written`, `segments_created`, `trades_written`.
 
@@ -17976,13 +18002,15 @@ Record shapes:
 - **BBO**: `{ exchangeTsNs, recvTsNs, seq, symbolId, eventType, bidPrice, bidQty, askPrice, askQty }`
 - **Book update**: `{ exchangeTsNs, recvTsNs, seq, symbolId, eventType, bids: [{price, qty}, ...], asks: [{price, qty}, ...] }`
 
-`eventType` is `2` for a snapshot, `3` for a delta.
+`eventType` is the record byte: `0` snapshot, `1` delta, `2` top-of-book.
 
 ```javascript
 const writer = new DataWriter('./out', maxSegmentMb, exchangeId);
 writer.writeTrade(exchangeTsNs, recvTsNs, price, qty, tradeId, symbolId, side);
 // Raw int64 book levels — flat BigInt64Array as [price_raw, qty_raw, ...]
 writer.writeBook(exchangeTsNs, recvTsNs, seqNs, symbolId, isSnapshot, bidsBuf, asksBuf);
+// updateType, optional, is the record byte above (0, 1, 2) and decides when given
+writer.writeBook(exchangeTsNs, recvTsNs, seqNs, symbolId, false, bidsBuf, asksBuf, 2);
 writer.flush();
 writer.close();
 writer.stats();          // { bytesWritten, eventsWritten, segmentsCreated, tradesWritten }
@@ -19118,7 +19146,9 @@ uint8_t lrvx_data_writer_write_trade(LrvxDataWriterHandle writer,
                                      uint64_t trade_id, uint32_t symbol_id, uint8_t side);
 
 // Raw int64 book levels (scale 1e8). bids/asks may be NULL when the
-// matching count is 0. Returns 1 on success, 0 on failure.
+// matching count is 0. is_snapshot is a byte, as in the recorder's
+// on_book_update: 1 snapshot, 0 delta, 2 top-of-book. Returns 1 on
+// success, 0 on failure.
 uint8_t lrvx_data_writer_write_book(LrvxDataWriterHandle writer,
                                     int64_t exchange_ts_ns, int64_t recv_ts_ns,
                                     int64_t seq, uint32_t symbol_id,
@@ -19128,7 +19158,10 @@ uint8_t lrvx_data_writer_write_book(LrvxDataWriterHandle writer,
 
 // Batched book writer. headers + flat levels array, sliced per event
 // via header.level_offset / bid_count / ask_count. Same struct layout
-// as lrvx_data_reader_read_book_updates — round-trip works.
+// as lrvx_data_reader_read_book_updates — round-trip works. event_type
+// is that reader's record byte (0 snapshot, 1 delta, 2 top); a row with
+// any other value is not written. Rows from the merged tape reader carry
+// frame types (2, 3, 6) and need mapping first.
 uint64_t lrvx_data_writer_write_books(LrvxDataWriterHandle writer,
                                       const LrvxBookUpdateHeader* headers,
                                       uint64_t n_events,
@@ -19185,7 +19218,7 @@ uint64_t lrvx_data_reader_read_book_updates(LrvxDataReaderHandle reader,
 
 `LrvxBBO` fields (size: 64 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `bid_price_raw`, `bid_qty_raw`, `ask_price_raw`, `ask_qty_raw`, `symbol_id`, `event_type` (0=snapshot, 1=delta, 2=top-of-book — the record byte, not the frame type).
 
-`LrvxBookUpdateHeader` fields (size: 48 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `level_offset`, `symbol_id`, `bid_count`, `ask_count`, `event_type`.
+`LrvxBookUpdateHeader` fields (size: 48 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `level_offset`, `symbol_id`, `bid_count`, `ask_count`, `event_type` (the record byte from the data reader, 0=snapshot, 1=delta, 2=top-of-book; the frame type from the merged tape reader, 2=snapshot, 3=delta, 6=top).
 
 `LrvxLevel` fields (size: 24 B): `price_raw`, `qty_raw`, `side` (0=bid, 1=ask).
 
@@ -21898,7 +21931,7 @@ The recorder keeps the frame as its own kind. A top is frame type `6` (`BookTop`
 
 Two byte spaces meet here and the readers say which they speak. The record byte is `0` snapshot, `1` delta, `2` top, and that is what `event_type` carries on the rows of `DataReader.read_book_updates()` and `read_bbo()` and on their C API, Node and Codon equivalents. The frame type is `2`, `3`, `6`, and that is what `event_type` carries on the rows of `MergedTapeReader.read_books()`. A consumer that reconstructs depth from either must treat the top value as a touch, or skip it; applying it as a delta is the stranded-level failure above.
 
-The recorder hook's book callback carries a third value as well. Its `is_snapshot` argument is a byte: `1` snapshot, `0` delta, `2` top. The two boolean values predate the third and keep their meaning. Surfaces whose shape is a bool skip tops the way an old reader skips the frame: the custom recorder hooks in Python and Node, `MergedTapeReader.stream_events`, `replay_tapes`, and `DataWriter.write_book`, which can write snapshots and deltas only. `metadata.json` carries `has_book_tops` next to `has_book_snapshots` and `has_book_deltas`, and `EventTypeStatsAggregator` counts tops in a `book_tops` column next to its snapshot and delta columns.
+The recorder hook's book callback carries a third value as well. Its `is_snapshot` argument is a byte: `1` snapshot, `0` delta, `2` top. The two boolean values predate the third and keep their meaning. Surfaces whose shape is a bool skip tops the way an old reader skips the frame: the custom recorder hooks in Python and Node, `MergedTapeReader.stream_events` and `replay_tapes`. `DataWriter.write_book` writes a top when given `update_type=2` (`updateType` in Node and embedded JavaScript), the record byte, and the batched `write_books` takes the same byte, so rows read back from `read_book_updates()` write back as they were. `metadata.json` carries `has_book_tops` next to `has_book_snapshots` and `has_book_deltas`, and `EventTypeStatsAggregator` counts tops in a `book_tops` column next to its snapshot and delta columns.
 
 A backtest from such a tape replays the frame the way live delivered it: the strategy's touch moves and `onSymbolTouch` fires, the depth book stays put, and the simulated venue fills at the touch the strategy saw.
 

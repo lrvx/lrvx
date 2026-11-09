@@ -16,7 +16,7 @@ writer.close();
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `writeTrade(exchangeTsNs, recvTsNs, price, qty, tradeId, symbolId, side)` | `boolean` | Write a trade record |
-| `writeBook(exchangeTsNs, recvTsNs, seq, symbolId, isSnapshot, bids, asks)` | `boolean` | Write a book update |
+| `writeBook(exchangeTsNs, recvTsNs, seq, symbolId, isSnapshot, bids, asks, updateType?)` | `boolean` | Write a book update |
 | `flush()` | `void` | Flush to disk |
 | `close()` | `void` | Close and finalize |
 | `stats()` | `{ bytesWritten, eventsWritten, segmentsCreated, tradesWritten }` | Write statistics |
@@ -24,6 +24,10 @@ writer.close();
 `writeBook`'s `exchangeTsNs`, `recvTsNs` and `seq` are `bigint`. `bids` and
 `asks` are flat `BigInt64Array`s of interleaved raw int64
 `[price, qty, price, qty, ...]` at the 1e8 price/quantity scale.
+`updateType` is the record byte a book-update record carries in `eventType`:
+`0` snapshot, `1` delta, `2` top-of-book. When given it decides the type;
+`isSnapshot` is the older two-way form, and `true` with an `updateType` other
+than `0` throws a `RangeError`.
 
 ---
 
@@ -70,7 +74,7 @@ Record shapes:
 - **BBO**: `{ exchangeTsNs, recvTsNs, seq, symbolId, eventType, bidPrice, bidQty, askPrice, askQty }`
 - **Book update**: `{ exchangeTsNs, recvTsNs, seq, symbolId, eventType, bids: [{price, qty}, ...], asks: [{price, qty}, ...] }`
 
-`eventType` is `2` for a snapshot, `3` for a delta.
+`eventType` is the record byte: `0` snapshot, `1` delta, `2` top-of-book.
 
 `startTsNs`, `fromNs`, `toNs` accept either a `number` or a `bigint`. Pass
 `bigint` for real nanosecond timestamps — JS `number` is float64 and silently
