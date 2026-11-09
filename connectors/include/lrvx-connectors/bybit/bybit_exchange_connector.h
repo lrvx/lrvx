@@ -21,8 +21,11 @@
 #include <lrvx/net/abstract_websocket_client.h>
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <unordered_set>
 #include <vector>
 
 namespace lrvx
@@ -62,6 +65,16 @@ struct BybitConfig
   std::string apiKey;
   std::string apiSecret;
   bool enablePrivate = false;
+  // Subscribe orderbook.1 next to each symbol's depth topic and publish it as
+  // BookUpdateType::TOP_OF_BOOK. Bybit pushes level 1 every 10 ms and the
+  // depth topics every 20 to 200 ms, so between depth frames the touch is as
+  // fresh as this stream; the depth book ignores the frames, the strategy's
+  // touch and the cross-venue matrix follow them. Off by default: it is an
+  // extra event per tick per symbol, and Bybit's depth is not throttled the
+  // way Hyperliquid's l2Book is. A symbol configured with BookDepth::Top1
+  // already takes its depth from that topic and gets no second subscription;
+  // options have no level-1 topic and are skipped.
+  bool subscribeBbo{false};
 };
 
 class BybitExchangeConnector : public IExchangeConnector
@@ -83,6 +96,16 @@ class BybitExchangeConnector : public IExchangeConnector
   std::string exchangeId() const override { return "bybit"; }
 
   SymbolId resolveSymbolId(std::string_view symbol);
+
+  // The topics start() subscribes, in send order: each symbol's depth topic
+  // and publicTrade, then orderbook.1 for the symbols subscribeBbo covers.
+  // Static and public so a test can pin them -- the WS client is built in
+  // the constructor, so start() itself is not observable offline.
+  static std::vector<std::string> subscriptionTopics(const BybitConfig& config);
+
+  // Whether orderbook.1 is subscribed as the touch for this symbol, next to
+  // its depth topic (see BybitConfig::subscribeBbo).
+  static bool takesLevelOneAsTop(const BybitConfig& config, const BybitConfig::SymbolEntry& entry);
 
   // Public so protocol behaviour (sequencing, gap resync) is testable offline
   // by feeding raw frames without a live socket.
@@ -150,6 +173,19 @@ class BybitExchangeConnector : public IExchangeConnector
   };
   std::unordered_map<SymbolId, BookSeqState> _bookSeq;
   std::atomic<uint64_t> _bookGapCount{0};
+
+  // Symbols whose orderbook.1 frames are the touch (TOP_OF_BOOK), filled from
+  // the config in the constructor and read on the message thread. Keyed by
+  // the venue's symbol name, which both the topic and the frame carry.
+  struct TransparentStringHash
+  {
+    using is_transparent = void;
+    size_t operator()(std::string_view s) const noexcept
+    {
+      return std::hash<std::string_view>{}(s);
+    }
+  };
+  std::unordered_set<std::string, TransparentStringHash, std::equal_to<>> _bboSymbols;
 
   // Cross-topic fill de-duplication and cumulative-to-delta conversion.
   //
