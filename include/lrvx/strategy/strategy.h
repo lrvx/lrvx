@@ -145,30 +145,45 @@ class Strategy : public IStrategy
       return;
     }
 
-    // A TOP_OF_BOOK frame lands in the touch fields and nothing else: the
-    // depth book ignores it (see BookUpdateType), and dispatching it would
-    // hand the strategy the previous depth frame's book at touch rate,
-    // stamped fresh.
+    // A TOP_OF_BOOK frame lands in the touch fields and reaches the strategy
+    // through onSymbolTouch only: the depth book ignores it (see
+    // BookUpdateType), and onSymbolBook would hand the strategy the previous
+    // depth frame's book at touch rate, stamped fresh.
     if (ev.update.type == BookUpdateType::TOP_OF_BOOK)
     {
       std::lock_guard<SymbolLock> owned(lockFor(sym));
       auto& c = _contexts[sym];
-      c.touchBid = ev.update.bids.empty() ? std::nullopt
-                                          : std::optional<BookLevel>(ev.update.bids.front());
-      c.touchAsk = ev.update.asks.empty() ? std::nullopt
-                                          : std::optional<BookLevel>(ev.update.asks.front());
+      const auto bid = ev.update.bids.empty() ? std::nullopt
+                                              : std::optional<BookLevel>(ev.update.bids.front());
+      const auto ask = ev.update.asks.empty() ? std::nullopt
+                                              : std::optional<BookLevel>(ev.update.asks.front());
+      const bool moved = !sameLevel(c.touchBid, bid) || !sameLevel(c.touchAsk, ask);
+      c.touchBid = bid;
+      c.touchAsk = ask;
       c.lastTouchNs = ev.update.exchangeTsNs.raw();
+      if (moved)
+      {
+        refreshPosition(c, sym);
+        onSymbolTouch(c, ev);
+      }
       return;
     }
 
     std::lock_guard<SymbolLock> owned(lockFor(sym));
     auto& c = _contexts[sym];
+    const auto prevBid = c.touchBid;
+    const auto prevAsk = c.touchAsk;
     c.book.applyBookUpdate(ev);
     c.lastUpdateNs = ev.update.exchangeTsNs.raw();
     refreshTouchFromBook(c, ev.update.exchangeTsNs.raw());
     refreshPosition(c, sym);
+    const bool moved = !sameLevel(prevBid, c.touchBid) || !sameLevel(prevAsk, c.touchAsk);
 
     onSymbolBook(c, ev);
+    if (moved)
+    {
+      onSymbolTouch(c, ev);
+    }
   }
 
   void onBar(const BarEvent& ev) final
@@ -237,6 +252,12 @@ class Strategy : public IStrategy
   virtual void onSymbolTrade(SymbolContext& ctx, const TradeEvent& ev) {}
   virtual void onSymbolBook(SymbolContext& ctx, const BookUpdateEvent& ev) {}
   virtual void onSymbolBar(SymbolContext& ctx, const BarEvent& ev) {}
+
+  // The touch changed: price or size on either side, or a side appeared or
+  // emptied. ev is the frame that moved it, a TOP_OF_BOOK frame or a depth
+  // frame; after a depth frame this fires once onSymbolBook has returned.
+  // A frame that leaves the touch as it was does not fire it.
+  virtual void onSymbolTouch(SymbolContext& ctx, const BookUpdateEvent& ev) {}
 
   // Order-event hooks. The runner forwards every executor event for an
   // order this strategy emitted (FILLED, PARTIALLY_FILLED, CANCELED,
@@ -570,6 +591,16 @@ class Strategy : public IStrategy
     c.touchAsk = ask ? std::optional<BookLevel>(BookLevel(*ask, c.book.askAtPrice(*ask)))
                      : std::nullopt;
     c.lastTouchNs = exchangeTsNs;
+  }
+
+  static bool sameLevel(const std::optional<BookLevel>& a,
+                        const std::optional<BookLevel>& b) noexcept
+  {
+    if (a.has_value() != b.has_value())
+    {
+      return false;
+    }
+    return !a || (a->price == b->price && a->quantity == b->quantity);
   }
 
   // One lock per flat slot, padded to its own cache line so that locking

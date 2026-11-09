@@ -74,8 +74,8 @@ w.writeBook(SNAP_NS, SNAP_NS, 1n, Number(sym), true,
 // 100.4 / 100.6 while the depth book keeps the snapshot.
 w.writeBook(TOP_NS, TOP_NS, 2n, Number(sym), false,
             levels([[100.4, 3.0]]), levels([[100.6, 2.0]]));
-// A trade after the top is the only way a callback sees the context: the
-// top itself never dispatches.
+// This strategy has no onTouch, so a trade after the top is the first
+// callback to see the context the top left behind.
 w.writeTrade(TRADE_NS, TRADE_NS, 100.5, 0.1, 1, Number(sym), 'buy');
 w.close();
 assert.strictEqual(rewriteLastDeltaAsTop(dir), 1, 'the fixture rewrote one delta frame');
@@ -96,7 +96,7 @@ assert.ok(bt.runTape(dir), 'the tape ran');
 
 // The depth frame dispatched once and stamped both timestamps.
 assert.deepStrictEqual(atBook, [[SNAP_NS, SNAP_NS, 100.0]]);
-// The top never dispatched. At the trade, lastUpdateNs is the trade's stamp,
+// The top never reached onBookUpdate. At the trade, lastUpdateNs is the trade's stamp,
 // lastTouchNs is still the top's, and the quotes are the top's.
 assert.deepStrictEqual(atTrade, [[TRADE_NS, TOP_NS, 100.4, 100.6]]);
 assert.strictEqual(typeof atTrade[0][0], 'bigint', 'nanosecond stamps cross as BigInt');

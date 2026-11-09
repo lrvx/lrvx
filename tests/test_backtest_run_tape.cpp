@@ -27,6 +27,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <string>
 #include <vector>
 
 using namespace lrvx;
@@ -109,18 +110,23 @@ class BookWatcher : public Strategy
  public:
   using Strategy::ctx;
   using Strategy::Strategy;
-  size_t books_seen{0};
+  std::vector<std::string> calls;
 
  protected:
   void onSymbolBook(SymbolContext& /*c*/, const BookUpdateEvent& /*ev*/) override
   {
-    ++books_seen;
+    calls.push_back("book");
+  }
+
+  void onSymbolTouch(SymbolContext& /*c*/, const BookUpdateEvent& /*ev*/) override
+  {
+    calls.push_back("touch");
   }
 };
 
 }  // namespace
 
-TEST(BacktestRunTape, TopOfBookRecordsMoveTheTouchWithoutDispatch)
+TEST(BacktestRunTape, TopOfBookRecordsMoveTheTouchNotTheBook)
 {
   auto td = std::filesystem::temp_directory_path() / "lrvx_run_tape_top_test";
   std::filesystem::remove_all(td);
@@ -165,8 +171,9 @@ TEST(BacktestRunTape, TopOfBookRecordsMoveTheTouchWithoutDispatch)
   runner.setStrategy(&strat);
   runner.runTape(td);
 
-  // Only the snapshot dispatched; the top moved the touch and nothing else.
-  EXPECT_EQ(strat.books_seen, 1u);
+  // The snapshot fires the book and then the touch it set; the top fires the
+  // touch alone and leaves the depth book where the snapshot put it.
+  EXPECT_EQ(strat.calls, (std::vector<std::string>{"book", "touch", "touch"}));
   const auto& c = strat.ctx(sym);
   EXPECT_EQ(c.book.bestBid(), Price::fromDouble(100.0));
   ASSERT_TRUE(c.touchBid.has_value());

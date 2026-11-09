@@ -134,6 +134,7 @@ struct NodeStrategyHost : TsfnHost
   Napi::Env env;
   Napi::FunctionReference on_trade_fn;
   Napi::FunctionReference on_book_fn;
+  Napi::FunctionReference on_touch_fn;
   Napi::FunctionReference on_bar_fn;
   Napi::FunctionReference on_start_fn;
   Napi::FunctionReference on_stop_fn;
@@ -158,7 +159,7 @@ struct NodeStrategyHost : TsfnHost
   //
   // The bus thread used to answer that question by calling IsEmpty() on the
   // FunctionReference itself, while replaceStrategy move-assigned the same
-  // nine references from the JS thread. Move-assignment deletes the old
+  // references from the JS thread. Move-assignment deletes the old
   // reference, so the bus thread was reading a handle being freed underneath
   // it. A bitmask keeps the question answerable from the bus thread and
   // leaves every FunctionReference to the JS thread, which is the only thread
@@ -179,6 +180,7 @@ struct NodeStrategyHost : TsfnHost
     kHandlerOrderUpdate = 1u << 6,
     kHandlerQueuePosition = 1u << 7,
     kHandlerMarketPosition = 1u << 8,
+    kHandlerTouch = 1u << 9,
   };
   std::atomic<uint16_t> _handlers{0};
 
@@ -259,6 +261,7 @@ struct NodeStrategyHost : TsfnHost
     bit(on_order_update_fn, kHandlerOrderUpdate);
     bit(on_queue_position_change_fn, kHandlerQueuePosition);
     bit(on_market_position_change_fn, kHandlerMarketPosition);
+    bit(on_touch_fn, kHandlerTouch);
     _handlers.store(mask, std::memory_order_release);
   }
 
@@ -266,7 +269,7 @@ struct NodeStrategyHost : TsfnHost
   // object. Bridge subscriptions, in-flight orders, and connector
   // sessions stay intact.
   //
-  // Must run on the V8 thread, which is where every read of these nine
+  // Must run on the V8 thread, which is where every read of these
   // references also happens: the bus thread decides whether a callback exists
   // from the handler bitmask instead of touching the references themselves.
   void replaceStrategy(Napi::Object new_strategy_obj)
@@ -294,6 +297,7 @@ struct NodeStrategyHost : TsfnHost
     on_order_update_fn = get("onOrderUpdate");
     on_queue_position_change_fn = get("onQueuePositionChange");
     on_market_position_change_fn = get("onMarketPositionChange");
+    on_touch_fn = get("onTouch");
     publishHandlerMask();
     if (on_start_fn)
     {
@@ -324,6 +328,7 @@ struct NodeStrategyHost : TsfnHost
     on_order_update_fn = get("onOrderUpdate");
     on_queue_position_change_fn = get("onQueuePositionChange");
     on_market_position_change_fn = get("onMarketPositionChange");
+    on_touch_fn = get("onTouch");
     publishHandlerMask();
 
     LrvxStrategyCallbacks cbs{};
@@ -337,6 +342,7 @@ struct NodeStrategyHost : TsfnHost
     cbs.on_order_update = &NodeStrategyHost::onOrderUpdate;
     cbs.on_queue_position_change = &NodeStrategyHost::onQueuePositionChange;
     cbs.on_market_position_change = &NodeStrategyHost::onMarketPositionChange;
+    cbs.on_touch = &NodeStrategyHost::onTouch;
 
     bridge = std::make_unique<BridgeStrategy>(
         static_cast<SubscriberId>(id), syms, *reg, cbs);
@@ -491,8 +497,8 @@ struct NodeStrategyHost : TsfnHost
     o.Set("midPrice", both ? Napi::Value(Napi::Number::New(env, lrvx_price_to_double(ctx->book.mid_raw)))
                            : Napi::Value(env.Null()));
     // Absolute nanosecond clock readings cross as BigInt. lastTouchNs can be
-    // the fresher of the two: a TOP_OF_BOOK frame writes it without a
-    // dispatch, so no callback sees the frame itself.
+    // the fresher of the two: a TOP_OF_BOOK frame writes it and leaves
+    // lastUpdateNs alone.
     o.Set("lastUpdateNs", Napi::BigInt::New(env, static_cast<int64_t>(ctx->last_update_ns)));
     o.Set("lastTouchNs", Napi::BigInt::New(env, static_cast<int64_t>(ctx->last_touch_ns)));
   }
@@ -541,6 +547,22 @@ struct NodeStrategyHost : TsfnHost
       auto ctxObj = Napi::Object::New(env);
       buildCtxObj(env, ctxObj, &d->ctx);
       self->on_book_fn.Call({ctxObj, self->emitter.Value()});
+    }
+  }
+
+  static void callOnTouch(Napi::Env env, Napi::Function, BookCallData* d)
+  {
+    std::unique_ptr<BookCallData> guard(d);
+    if (d->owner->retired())
+    {
+      return;
+    }
+    auto* self = d->host;
+    if (!self->on_touch_fn.IsEmpty())
+    {
+      auto ctxObj = Napi::Object::New(env);
+      buildCtxObj(env, ctxObj, &d->ctx);
+      self->on_touch_fn.Call({ctxObj, self->emitter.Value()});
     }
   }
 
@@ -631,6 +653,29 @@ struct NodeStrategyHost : TsfnHost
       auto ctxObj = Napi::Object::New(env);
       buildCtxObj(env, ctxObj, ctx);
       self->on_book_fn.Call({ctxObj, self->emitter.Value()});
+    }
+  }
+
+  static void onTouch(void* ud, const LrvxSymbolContext* ctx,
+                      const LrvxBookData* /*book*/)
+  {
+    auto* self = static_cast<NodeStrategyHost*>(ud);
+    if (!self->hasHandler(kHandlerTouch))
+    {
+      return;
+    }
+
+    if (self->_threaded.load(std::memory_order_acquire))
+    {
+      auto* d = new BookCallData{*ctx, self, self->owner()};
+      self->post(d, &NodeStrategyHost::callOnTouch);
+    }
+    else
+    {
+      auto env = self->env;
+      auto ctxObj = Napi::Object::New(env);
+      buildCtxObj(env, ctxObj, ctx);
+      self->on_touch_fn.Call({ctxObj, self->emitter.Value()});
     }
   }
 

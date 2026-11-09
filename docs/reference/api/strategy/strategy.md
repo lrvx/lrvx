@@ -83,6 +83,10 @@ protected:
   // Called on book updates for subscribed symbols
   virtual void onSymbolBook(SymbolContext& ctx, const BookUpdateEvent& ev) {}
 
+  // Called when the touch changed: on a TOP_OF_BOOK frame, and after
+  // onSymbolBook on a depth frame that moved it
+  virtual void onSymbolTouch(SymbolContext& ctx, const BookUpdateEvent& ev) {}
+
   // Called when a bar closes for a subscribed symbol
   virtual void onSymbolBar(SymbolContext& ctx, const BarEvent& ev) {}
 
@@ -101,6 +105,10 @@ protected:
 `onTrade`, `onBookUpdate` and `onBar` are **`final`** on `Strategy` — do not try to override them.
 They filter by subscription, update `SymbolContext`, push into the bar ring, and then dispatch to the
 `onSymbol*` hooks above.
+
+`onBookUpdate` sends a `TOP_OF_BOOK` frame to `onSymbolTouch` only, and only when it changed the
+touch. A depth frame goes to `onSymbolBook`, then to `onSymbolTouch` if it moved the touch, so one
+frame can reach both hooks.
 
 `onOrderEvent` routes by status: `FILLED` / `PARTIALLY_FILLED` to `onSymbolFill`,
 `QUEUE_POSITION_UPDATED` to `onSymbolQueuePositionChange`, `MARKET_POSITION_CHANGED` to

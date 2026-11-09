@@ -10,6 +10,7 @@ class MyStrategy extends Strategy {
 
     onTrade(ctx, trade) { ... }
     onBookUpdate(ctx, book) { ... }
+    onTouch(ctx, book) { ... }
     onBar(ctx, bar) { ... }
     onStart() { ... }
     onStop() { ... }
@@ -58,6 +59,13 @@ super({ symbols: ['Binance:BTCUSDT', 'Bybit:ETHUSDT'] })
 | `trade.side` | `string` | `"buy"` or `"sell"` |
 | `trade.isBuy` | `boolean` | |
 | `trade.timestampNs` | `number` | Nanosecond timestamp |
+
+### `onTouch(ctx, book)`
+
+Fires when the touch changes (price or size on either side, or a side
+appearing or emptying): on a top-of-book frame, and right after `onBookUpdate`
+on a depth frame that moved it. `book.snapshot` and `ctx.book` are the new
+touch; `book.timestampNs` is the stamp of the frame that moved it.
 
 ### `onBar(ctx, bar)`
 

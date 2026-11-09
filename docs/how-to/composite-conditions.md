@@ -32,7 +32,7 @@ class TrendFollow(Strategy):
             self.emit_market_buy(ctx.symbol_id, 0.01)
 ```
 
-There is no `setup()` hook. The strategy hooks are `on_start`, `on_stop`, `on_trade`, `on_bar`, `on_book_update`, `on_fill`, `on_order_update`, `on_queue_position_change`, `on_market_position_change`. Building the tree inside `on_bar` works too — the nodes are lazy, so rebuilding per bar costs only the tree allocation.
+There is no `setup()` hook. The strategy hooks are `on_start`, `on_stop`, `on_trade`, `on_bar`, `on_book_update`, `on_touch`, `on_fill`, `on_order_update`, `on_queue_position_change`, `on_market_position_change`. Building the tree inside `on_bar` works too — the nodes are lazy, so rebuilding per bar costs only the tree allocation.
 
 ## Building blocks
 

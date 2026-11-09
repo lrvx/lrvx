@@ -28,7 +28,8 @@ type HandlerName =
   | "onStop"
   | "onTrade"
   | "onBar"
-  | "onBookUpdate";
+  | "onBookUpdate"
+  | "onTouch";
 
 interface HandlerMap {
   onStart?: () => void;
@@ -36,6 +37,7 @@ interface HandlerMap {
   onTrade?: (ctx: SymbolContext, trade: TradeData, emit: EmitMethods) => void;
   onBar?: (ctx: SymbolContext, bar: BarData, emit: EmitMethods) => void;
   onBookUpdate?: (ctx: SymbolContext, emit: EmitMethods) => void;
+  onTouch?: (ctx: SymbolContext, emit: EmitMethods) => void;
 }
 
 interface HandlerCarrier {
@@ -76,6 +78,9 @@ export const onBar = methodDecorator("onBar");
 
 /** Wire the decorated method as the strategy's `onBookUpdate` callback. */
 export const onBookUpdate = methodDecorator("onBookUpdate");
+
+/** Wire the decorated method as the strategy's `onTouch` callback. */
+export const onTouch = methodDecorator("onTouch");
 
 /** Wire the decorated method as the strategy's `onStart` callback. */
 export const onStart = methodDecorator("onStart");
@@ -129,5 +134,6 @@ export function compile(instance: object): Strategy {
   if (map.onTrade) out.onTrade = map.onTrade;
   if (map.onBar) out.onBar = map.onBar;
   if (map.onBookUpdate) out.onBookUpdate = map.onBookUpdate;
+  if (map.onTouch) out.onTouch = map.onTouch;
   return out;
 }

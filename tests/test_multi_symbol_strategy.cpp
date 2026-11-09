@@ -21,6 +21,8 @@
 #include <cmath>
 #include <memory>
 #include <memory_resource>
+#include <optional>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -453,7 +455,7 @@ TEST_F(MultiSymbolStrategyTest, SpreadCalculation)
   EXPECT_NEAR(spreadOpt->toDouble(), 50.0, 0.5);
 }
 
-TEST_F(MultiSymbolStrategyTest, TopOfBookFramesDoNotReachTheStrategy)
+TEST_F(MultiSymbolStrategyTest, TopOfBookFramesDoNotReachOnSymbolBook)
 {
   SymbolRegistry registry;
   populateRegistry(registry, {1});
@@ -468,9 +470,9 @@ TEST_F(MultiSymbolStrategyTest, TopOfBookFramesDoNotReachTheStrategy)
   strategy.onBookUpdate(snap);
   ASSERT_EQ(strategy.bookCount, 1);
 
-  // The context's depth book ignores TOP_OF_BOOK, so the strategy must not
-  // be called either: onSymbolBook would see the previous snapshot's top,
-  // and lastUpdateNs would claim that stale top is as fresh as the touch.
+  // The context's depth book ignores TOP_OF_BOOK, so onSymbolBook must not
+  // be called either: it would see the previous snapshot's top, and
+  // lastUpdateNs would claim that stale top is as fresh as the touch.
   BookUpdateEvent top(&_resource);
   top.update.symbol = 1;
   top.update.type = BookUpdateType::TOP_OF_BOOK;
@@ -542,6 +544,111 @@ TEST_F(MultiSymbolStrategyTest, TouchFollowsEveryFrameKind)
   ASSERT_TRUE(c.touchAsk.has_value());
   EXPECT_EQ(c.touchAsk->price, Price::fromDouble(100.7));
   EXPECT_FALSE(c.touchMid().has_value());
+}
+
+class TouchRecorder : public Strategy
+{
+ public:
+  TouchRecorder(std::vector<SymbolId> syms, const SymbolRegistry& registry)
+      : Strategy(1, std::move(syms), registry)
+  {
+  }
+
+  void start() override {}
+  void stop() override {}
+
+  using Strategy::ctx;
+
+  std::vector<std::string> calls;
+  std::optional<Price> bookBidSeenByTouch;
+
+ protected:
+  void onSymbolBook(SymbolContext&, const BookUpdateEvent&) override { calls.push_back("book"); }
+
+  void onSymbolTouch(SymbolContext& c, const BookUpdateEvent&) override
+  {
+    calls.push_back("touch");
+    bookBidSeenByTouch = c.book.bestBid();
+  }
+};
+
+TEST_F(MultiSymbolStrategyTest, DepthFrameFiresTouchAfterBookWhenTheTouchMoved)
+{
+  SymbolRegistry registry;
+  populateRegistry(registry, {1});
+  TouchRecorder strategy({1}, registry);
+  using Calls = std::vector<std::string>;
+
+  BookUpdateEvent snap(&_resource);
+  snap.update.symbol = 1;
+  snap.update.type = BookUpdateType::SNAPSHOT;
+  snap.update.bids.emplace_back(Price::fromDouble(100.0), Quantity::fromDouble(2.0));
+  snap.update.bids.emplace_back(Price::fromDouble(99.0), Quantity::fromDouble(1.0));
+  snap.update.asks.emplace_back(Price::fromDouble(101.0), Quantity::fromDouble(1.0));
+  strategy.onBookUpdate(snap);
+  EXPECT_EQ(strategy.calls, (Calls{"book", "touch"}));
+  EXPECT_EQ(strategy.bookBidSeenByTouch, Price::fromDouble(100.0));
+
+  // Behind the touch: the book changes, the touch does not.
+  BookUpdateEvent behind(&_resource);
+  behind.update.symbol = 1;
+  behind.update.type = BookUpdateType::DELTA;
+  behind.update.bids.emplace_back(Price::fromDouble(99.0), Quantity::fromDouble(3.0));
+  strategy.onBookUpdate(behind);
+  EXPECT_EQ(strategy.calls, (Calls{"book", "touch", "book"}));
+
+  // A new size at the touch price moves the touch.
+  BookUpdateEvent size(&_resource);
+  size.update.symbol = 1;
+  size.update.type = BookUpdateType::DELTA;
+  size.update.bids.emplace_back(Price::fromDouble(100.0), Quantity::fromDouble(2.5));
+  strategy.onBookUpdate(size);
+  EXPECT_EQ(strategy.calls, (Calls{"book", "touch", "book", "book", "touch"}));
+}
+
+TEST_F(MultiSymbolStrategyTest, TopOfBookFiresTouchOnlyWhenTheTouchChanged)
+{
+  SymbolRegistry registry;
+  populateRegistry(registry, {1});
+  TouchRecorder strategy({1}, registry);
+
+  auto pushTop = [&](std::optional<BookLevel> bid, std::optional<BookLevel> ask, int64_t ts)
+  {
+    BookUpdateEvent top(&_resource);
+    top.update.symbol = 1;
+    top.update.type = BookUpdateType::TOP_OF_BOOK;
+    top.update.exchangeTsNs = UnixNanos::fromRaw(ts);
+    if (bid)
+    {
+      top.update.bids.push_back(*bid);
+    }
+    if (ask)
+    {
+      top.update.asks.push_back(*ask);
+    }
+    strategy.onBookUpdate(top);
+  };
+  const BookLevel bid{Price::fromDouble(100.4), Quantity::fromDouble(5.0)};
+  const BookLevel ask{Price::fromDouble(100.6), Quantity::fromDouble(4.0)};
+
+  pushTop(bid, ask, 1'000);
+  EXPECT_EQ(strategy.calls.size(), 1u);
+
+  // The same quote again only restamps the touch.
+  pushTop(bid, ask, 2'000);
+  EXPECT_EQ(strategy.calls.size(), 1u);
+  EXPECT_EQ(strategy.ctx(1).lastTouchNs, 2'000);
+
+  pushTop(BookLevel{bid.price, Quantity::fromDouble(6.0)}, ask, 3'000);
+  EXPECT_EQ(strategy.calls.size(), 2u);
+
+  // A side emptying is a change; the same empty side again is not.
+  pushTop(std::nullopt, ask, 4'000);
+  EXPECT_EQ(strategy.calls.size(), 3u);
+  pushTop(std::nullopt, ask, 5'000);
+  EXPECT_EQ(strategy.calls.size(), 3u);
+
+  EXPECT_EQ(strategy.calls, std::vector<std::string>(3, "touch"));
 }
 
 class PositionTrackerTest : public ::testing::Test

@@ -30,7 +30,7 @@ struct SymbolContext
   std::optional<BookLevel> touchBid{};
   std::optional<BookLevel> touchAsk{};
   // Exchange timestamp of the frame that last wrote the touch. lastUpdateNs
-  // only covers events the strategy was dispatched for.
+  // only covers trades, depth frames and bars.
   int64_t lastTouchNs{0};
 
   Quantity position{};

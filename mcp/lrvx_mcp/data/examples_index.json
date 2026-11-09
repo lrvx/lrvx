@@ -255,8 +255,8 @@
     {
       "language": "python",
       "path": "docs/examples/python_read_the_touch.py",
-      "sha256": "94e621662a59049278f60bf6dd1e2d9115e6582f1eab54ad2e4deeae772aed75",
-      "size_bytes": 3175,
+      "sha256": "a38bb280f1542dcb5e8119524d773540bf908619fdb4410f83d7efd53977388f",
+      "size_bytes": 3303,
       "topic": "strategy"
     },
     {

@@ -59,6 +59,7 @@ runner.stop();
 | `@onStop`        | Method             | `(): void`                                             |
 | `@onTrade`       | Method             | `(ctx, trade, emit): void`                             |
 | `@onBookUpdate`  | Method             | `(ctx, emit): void`                                    |
+| `@onTouch`       | Method             | `(ctx, emit): void`                                    |
 | `@onBar`         | Method             | `(ctx, bar, emit): void`                               |
 
 The method decorator binds the function to the instance at construction time and stores it on a hidden symbol-keyed map. `compile()` reads that map and copies the bound functions onto the returned Strategy. Method names do not have to match the callback names; only the decorator matters.

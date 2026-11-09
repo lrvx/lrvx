@@ -13,11 +13,13 @@ Every callback's context quotes the touch. The depth book is not what the quotes
 | Codon | `ctx.best_bid()`, `ctx.best_ask()`, `ctx.mid_price()` | `ctx.last_touch_ns()`, `ctx.last_update_ns()` |
 | C++ | `c.touchBid`, `c.touchAsk`, `c.touchMid()` | `c.lastTouchNs`, `c.lastUpdateNs` |
 
-`last_update_ns` is the exchange timestamp of the event the callback is for: a trade, a depth frame or a bar. `last_touch_ns` is the exchange timestamp of the frame that last wrote the touch. A depth frame writes both; a top-of-book frame writes `last_touch_ns` only and fires no callback.
+`last_update_ns` is the exchange timestamp of the last trade, depth frame or bar. `last_touch_ns` is the exchange timestamp of the frame that last wrote the touch. A depth frame writes both; a top-of-book frame writes `last_touch_ns` only, and never fires `on_book_update`.
 
 ## Tell a touch move from a depth update
 
-Keep the `last_update_ns` you saw in your last book callback. On any later callback, `ctx.last_touch_ns` greater than that value means a top arrived after the last depth frame you were shown, and the quotes in `ctx` are that top's. The stamps are the venue's: Hyperliquid stamps in milliseconds, so a top in the same millisecond as the depth frame reads as no move, and a frame sent without a time is stamped 0. Compare the quotes too where that matters. The example replays a tape of one depth snapshot, three tops and a trade, and prints what each callback sees:
+The direct way is `on_touch` (`onTouch` in Node and embedded JavaScript, `onSymbolTouch` in C++). It fires when the touch changes, price or size on either side: on a top-of-book frame, and on a depth frame that moved it, right after `on_book_update` for that frame. A top that repeats the touch fires nothing; a depth frame that leaves the touch where it was fires `on_book_update` alone.
+
+Inside the other callbacks the stamps answer the same question. Keep the `last_update_ns` you saw in your last book callback. On any later callback, `ctx.last_touch_ns` greater than that value means a top arrived after the last depth frame you were shown, and the quotes in `ctx` are that top's. The stamps are the venue's: Hyperliquid stamps in milliseconds, so a top in the same millisecond as the depth frame reads as no move, and a frame sent without a time is stamped 0. `on_touch` compares the quotes, so it does not miss those. The example replays a tape of one depth snapshot, three tops and a trade, and prints what each callback sees:
 
 ```python
 --8<-- "examples/python_read_the_touch.py"
@@ -68,11 +70,11 @@ class QuoteOffTheTouch : public lrvx::Strategy
 };
 ```
 
-In Python, Node and Codon the context's mid already is the touch mid, so the comparison is the only extra step.
+In Python, Node and Codon the context's mid already is the touch mid, so the comparison is the only extra step. A strategy that should requote on the move itself, not on its next trade, does the same work in `onSymbolTouch` and needs no stamp bookkeeping.
 
 ## Replay a tape that carries tops
 
-Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The strategy's touch and `last_touch_ns` move, no callback fires, and the simulated venue moves its own touch while keeping the depth from the last snapshot, so a market order fills at the touch the strategy saw rather than at the stale depth frame.
+Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The strategy's touch and `last_touch_ns` move, `on_touch` fires if the touch changed, and the simulated venue moves its own touch while keeping the depth from the last snapshot, so a market order fills at the touch the strategy saw rather than at the stale depth frame.
 
 ## Record tops
 

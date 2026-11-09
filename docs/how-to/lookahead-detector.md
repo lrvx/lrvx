@@ -63,7 +63,7 @@ future_window = close[i:i+3]
 
 ### `open_upper_slice_in_callback`
 
-Inside a per-bar callback (a function named `on_trade`, `on_bar`, `on_book`, `on_book_update`, `on_tick`, `on_quote`, `signal`, `should_enter`, `should_exit`, `compute` or `update`), an open-upper slice whose lower bound is a bare name spans every future row.
+Inside a per-bar callback (a function named `on_trade`, `on_bar`, `on_book`, `on_book_update`, `on_touch`, `on_tick`, `on_quote`, `signal`, `should_enter`, `should_exit`, `compute` or `update`), an open-upper slice whose lower bound is a bare name spans every future row.
 
 ```python
 # bug

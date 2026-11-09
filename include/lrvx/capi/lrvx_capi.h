@@ -24,9 +24,9 @@
  * rather than a failed load -- compare LRVX_CAPI_ABI_VERSION against
  * lrvx_capi_abi_version() once at startup and refuse the mismatch.
  * 3: LrvxBar grew close_reason. 4: LrvxBookSnapshot grew has_bid and
- * has_ask. 5: LrvxSymbolContext grew last_touch_ns and
- * LrvxEventTypeStatsRow grew book_tops; the recorder on_book_update
- * byte gained 2 (top). */
+ * has_ask. 5: LrvxSymbolContext grew last_touch_ns, LrvxEventTypeStatsRow
+ * grew book_tops and LrvxStrategyCallbacks grew on_touch; the recorder
+ * on_book_update byte gained 2 (top). */
 #define LRVX_CAPI_ABI_VERSION 5
 
 /* Declared by a header that carries lrvx_best_bid_raw_opt and its two
@@ -236,9 +236,9 @@ extern "C"
    * then 0 and means nothing, and bindings surface the unrealized PnL built
    * on it as NaN rather than as the position's whole notional. The flag sits
    * in padding the struct already had, so the layout does not move. */
-  /* book is the touch, which a TOP_OF_BOOK frame can refresh without a
-   * dispatch. last_update_ns stamps dispatched events; last_touch_ns stamps
-   * the touch itself, so the two can differ. */
+  /* book is the touch, which a TOP_OF_BOOK frame refreshes without an on_book
+   * dispatch. last_update_ns stamps trades, depth frames and bars;
+   * last_touch_ns stamps the touch itself, so the two can differ. */
   typedef struct
   {
     uint32_t symbol_id;
@@ -840,6 +840,7 @@ extern "C"
   typedef void (*LrvxOnStopCallback)(void*);
   typedef void (*LrvxOnQueuePositionChangeCallback)(void*, const LrvxSymbolContext*, const LrvxOrderEventData*);
   typedef void (*LrvxOnMarketPositionChangeCallback)(void*, const LrvxSymbolContext*, const LrvxOrderEventData*);
+  typedef void (*LrvxOnTouchCallback)(void*, const LrvxSymbolContext*, const LrvxBookData*);
   typedef const double* (*LrvxGraphNodeFn)(void*, LrvxIndicatorGraphHandle, uint32_t, size_t*);
   typedef void (*LrvxOnSignalCallback)(void*, const LrvxSignal*);
   typedef uint8_t (*LrvxRiskManagerAllowFn)(void*, const LrvxSignal*);
@@ -891,6 +892,10 @@ extern "C"
     LrvxOnQueuePositionChangeCallback on_queue_position_change;
     LrvxOnMarketPositionChangeCallback on_market_position_change;
     void* user_data;
+    /* The touch changed: a top-of-book frame, or a depth frame after on_book.
+     * book->snapshot is the new touch. After user_data so the slots above
+     * keep their offsets. */
+    LrvxOnTouchCallback on_touch;
   } LrvxStrategyCallbacks;
 
   typedef struct

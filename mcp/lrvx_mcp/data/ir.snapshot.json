@@ -578,6 +578,24 @@
       "return_type": "void"
     },
     {
+      "name": "LrvxOnTouchCallback",
+      "params": [
+        {
+          "name": "",
+          "type": "void *"
+        },
+        {
+          "name": "",
+          "type": "const LrvxSymbolContext *"
+        },
+        {
+          "name": "",
+          "type": "const LrvxBookData *"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
       "name": "LrvxOnTradeCallback",
       "params": [
         {
@@ -16691,6 +16709,10 @@
         {
           "name": "user_data",
           "type": "void *"
+        },
+        {
+          "name": "on_touch",
+          "type": "LrvxOnTouchCallback"
         }
       ],
       "name": "LrvxStrategyCallbacks"

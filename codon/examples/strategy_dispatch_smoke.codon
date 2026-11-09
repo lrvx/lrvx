@@ -214,6 +214,51 @@ def check_live_runner(reg: cobj, sym: int):
         check(sig.symbol == sym, f"signal.symbol (got {sig.symbol})")
 
 
+class TouchRecorder(Strategy):
+    """Counts book and touch callbacks and keeps the bid on_touch saw."""
+
+    books: int
+    touches: int
+    touch_bid: float
+
+    def __init__(self, symbols: List[int]):
+        super().__init__(symbols)
+        self.books = 0
+        self.touches = 0
+        self.touch_bid = -1.0
+
+    def on_book_update(self, ctx: SymbolContext):
+        self.books += 1
+
+    def on_touch(self, ctx: SymbolContext):
+        self.touches += 1
+        bid = ctx.best_bid()
+        if bid is not None:
+            self.touch_bid = bid
+
+
+def check_touch(reg: cobj, sym: int):
+    print("== on_touch ==")
+
+    def on_signal(sig: Signal):
+        pass
+
+    s = TouchRecorder([sym])
+    runner = Runner(reg, on_signal)
+    runner.add_strategy(s)
+    runner.start()
+    runner.on_book_snapshot(sym, [100.0], [2.0], [100.5], [1.0], 1_000)
+    runner.on_book_top(sym, True, 100.2, 3.0, True, 100.4, 1.0, 2_000)
+    runner.on_book_top(sym, True, 100.2, 3.0, True, 100.4, 1.0, 3_000)
+    runner.stop()
+
+    check(s.books == 1, f"on_book_update fires for the snapshot only (got {s.books})")
+    check(s.touches == 2,
+          f"on_touch fires for the snapshot and the moved top, not the repeat (got {s.touches})")
+    check(close_to(s.touch_bid, 100.2),
+          f"ctx.best_bid() inside on_touch is the new touch (got {s.touch_bid})")
+
+
 def check_unattached_strategy_is_loud(reg: cobj, sym: int):
     print("== an unattached strategy refuses to look healthy ==")
     s = Recorder([sym])
@@ -234,6 +279,7 @@ def run():
     check_run_bars(registry, sym)
     check_run_ohlcv(registry, sym)
     check_live_runner(registry, sym)
+    check_touch(registry, sym)
     check_unattached_strategy_is_loud(registry, sym)
 
     lrvx_registry_destroy(registry)

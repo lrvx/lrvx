@@ -86,9 +86,9 @@ struct PySymbolCtx
   std::optional<double> mid_price;
   double unrealized_pnl;
   // Exchange timestamps in nanoseconds. last_update_ns stamps the last
-  // dispatched event (trade, depth frame, bar); last_touch_ns stamps the
-  // frame that last wrote the touch, which a TOP_OF_BOOK frame does without
-  // a dispatch, so it can be the fresher of the two.
+  // trade, depth frame or bar; last_touch_ns stamps the frame that last
+  // wrote the touch, which a TOP_OF_BOOK frame does without touching
+  // last_update_ns, so it can be the fresher of the two.
   int64_t last_update_ns;
   int64_t last_touch_ns;
 
@@ -177,6 +177,7 @@ class PyStrategyBase
 
   virtual void on_trade(const PySymbolCtx& ctx, const PyTradeData& trade) {}
   virtual void on_book_update(const PySymbolCtx& ctx) {}
+  virtual void on_touch(const PySymbolCtx& ctx) {}
   virtual void on_bar(const PySymbolCtx& ctx, const PyBarData& bar) {}
   virtual void on_fill(const PySymbolCtx& ctx, const PyOrderEventData& ev) {}
   virtual void on_order_update(const PySymbolCtx& ctx, const PyOrderEventData& ev) {}
@@ -721,6 +722,11 @@ class PyStrategyTrampoline : public PyStrategyBase
     PYBIND11_OVERRIDE(void, PyStrategyBase, on_book_update, ctx);
   }
 
+  void on_touch(const PySymbolCtx& ctx) override
+  {
+    PYBIND11_OVERRIDE(void, PyStrategyBase, on_touch, ctx);
+  }
+
   void on_bar(const PySymbolCtx& ctx, const PyBarData& bar) override
   {
     PYBIND11_OVERRIDE(void, PyStrategyBase, on_bar, ctx, bar);
@@ -766,8 +772,19 @@ struct PyStrategyHost
   std::atomic<PyStrategyBase*> strategy;
   std::unique_ptr<BridgeStrategy> bridge;
   bool with_gil;
+  // Whether the strategy overrides on_touch. Most depth deltas change the
+  // size at the touch, so without this a strategy that never asked for
+  // on_touch would cross into Python twice per book frame, and on a live
+  // host take the GIL on the bus thread for each top. Set where a strategy
+  // is attached, which holds the GIL.
+  std::atomic<bool> wants_touch{false};
 
-  // Every one of the nine bridge callbacks goes through here. The
+  static bool overridesTouch(const PyStrategyBase* s)
+  {
+    return static_cast<bool>(py::get_override(s, "on_touch"));
+  }
+
+  // Every one of the ten bridge callbacks goes through here. The
   // engine is C code in the middle of delivering an event, so a Python
   // exception must not unwind past this frame: on the live path it
   // would kill the bus consumer and the strategy would stop receiving
@@ -817,12 +834,13 @@ struct PyStrategyHost
     fire_lifecycle(old, false);
     new_strat->_initBridge(bridge.get());
     strategy.store(new_strat, std::memory_order_release);
+    wants_touch.store(overridesTouch(new_strat), std::memory_order_release);
     fire_lifecycle(new_strat, true);
   }
 
   PyStrategyHost(PyStrategyBase* strat, SymbolRegistry* reg,
                  uint32_t id, bool with_gil_)
-      : strategy(strat), with_gil(with_gil_)
+      : strategy(strat), with_gil(with_gil_), wants_touch(overridesTouch(strat))
   {
     LrvxStrategyCallbacks cbs{};
     cbs.user_data = this;
@@ -835,6 +853,7 @@ struct PyStrategyHost
     cbs.on_order_update = &PyStrategyHost::onOrderUpdate;
     cbs.on_queue_position_change = &PyStrategyHost::onQueuePositionChange;
     cbs.on_market_position_change = &PyStrategyHost::onMarketPositionChange;
+    cbs.on_touch = &PyStrategyHost::onTouch;
 
     const auto& syms = strat->symbols();
     bridge = std::make_unique<BridgeStrategy>(
@@ -885,6 +904,27 @@ struct PyStrategyHost
       self->strategy.load(std::memory_order_acquire)->on_book_update(pc);
     };
     dispatch(self, "Strategy.on_book_update", call);
+  }
+
+  static void onTouch(void* ud, const LrvxSymbolContext* ctx,
+                      const LrvxBookData* /*book*/)
+  {
+    auto* self = static_cast<PyStrategyHost*>(ud);
+    if (!self->wants_touch.load(std::memory_order_acquire))
+    {
+      return;
+    }
+    auto call = [self, ctx]()
+    {
+      PySymbolCtx pc{};
+      pc.symbol_id = ctx->symbol_id;
+      pc.position = lrvx_quantity_to_double(ctx->position_raw);
+      pc.last_trade_price = lrvx_price_to_double(ctx->last_trade_price_raw);
+      fillQuotes(pc, ctx->book);
+      fillStamps(pc, *ctx);
+      self->strategy.load(std::memory_order_acquire)->on_touch(pc);
+    };
+    dispatch(self, "Strategy.on_touch", call);
   }
 
   static void onBar(void* ud, const LrvxSymbolContext* ctx,
@@ -2680,6 +2720,7 @@ inline void bindStrategy(py::module_& m)
            py::arg("symbols"))
       .def("on_trade", &PyStrategyBase::on_trade, py::arg("ctx"), py::arg("trade"))
       .def("on_book_update", &PyStrategyBase::on_book_update, py::arg("ctx"))
+      .def("on_touch", &PyStrategyBase::on_touch, py::arg("ctx"))
       .def("on_bar", &PyStrategyBase::on_bar, py::arg("ctx"), py::arg("bar"))
       .def("on_fill", &PyStrategyBase::on_fill, py::arg("ctx"), py::arg("event"))
       .def("on_order_update", &PyStrategyBase::on_order_update, py::arg("ctx"), py::arg("event"))

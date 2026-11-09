@@ -15,7 +15,9 @@ from typing import Iterable
 
 
 _FORBIDDEN_NAMES = {"eval", "exec", "compile", "__import__", "globals", "open"}
-_KNOWN_HOOKS = {"on_trade", "on_bar", "on_book", "on_book_update", "on_start", "on_stop"}
+_KNOWN_HOOKS = {
+    "on_trade", "on_bar", "on_book", "on_book_update", "on_touch", "on_start", "on_stop",
+}
 
 
 def _flatten_attrs(node: ast.AST) -> list[str]:
@@ -76,7 +78,7 @@ def validate_strategy(code: str) -> str:
     if not hooks:
         findings.append(
             "WARN: no recognized hook (on_trade / on_bar / on_book / "
-            "on_book_update / on_start / on_stop) defined. Strategies "
+            "on_book_update / on_touch / on_start / on_stop) defined. Strategies "
             "need at least one entry point."
         )
     else:

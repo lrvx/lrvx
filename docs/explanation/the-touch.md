@@ -21,7 +21,7 @@ A depth book cannot apply such a frame. Merging it as a delta leaves a stale bet
 Consumers that read it as a snapshot of the touch:
 
 - `CompositeBookMatrix`, the cross-venue matrix: a top replaces both sides of that venue's touch, like a snapshot would.
-- `SymbolContext`, the per-symbol state every strategy callback receives: a top writes the touch fields and nothing else (next section).
+- `SymbolContext`, the per-symbol state every strategy callback receives: a top writes the touch fields and fires `onSymbolTouch` when they changed (next section).
 - `SimulatedExecutor`, the backtest venue: a top moves the touch, drops its own levels that are more aggressive than it, keeps the deeper levels from the last depth frame, then runs the same matching pass as a depth update. The backtest runner routes top frames there, and a hand-driven executor takes one through `on_top_of_book` in Python, `onTopOfBook` in Node and embedded JavaScript, and `lrvx_simulated_executor_on_top_of_book` in the C API. The one-level `on_best_levels` feed goes the same way. A strategy that sees a fresher touch than the last depth frame therefore fills at that touch, not at the depth frame's best.
 
 Consumers that ignore it:
@@ -42,9 +42,9 @@ Consumers that ignore it:
 
 A depth frame writes both: it applies the book, refreshes the touch from the book's best levels, and stamps `lastUpdateNs` and `lastTouchNs` with the frame's exchange timestamp. A top writes the touch and `lastTouchNs` only. Trades and bars stamp `lastUpdateNs` and leave the touch alone; order events write neither.
 
-No callback fires for a top. `onSymbolBook` would hand the strategy the previous depth frame's book at touch rate, stamped fresh, so the frame lands in the fields and the strategy reads them on its next trade, bar or depth callback. The stamps are how a strategy tells what happened in between: `lastTouchNs` later than the `lastUpdateNs` it saw on its last book callback means the touch moved since the last depth frame it was shown.
+A top fires `onSymbolTouch`, never `onSymbolBook`: the depth book did not move, and `onSymbolBook` would hand the strategy the previous depth frame's book at touch rate, stamped fresh. `onSymbolTouch` fires whenever the touch changes, price or size on either side or a side appearing or emptying, whichever frame moved it. On a depth frame that moves the touch it fires after `onSymbolBook`, so the strategy gets two callbacks for that one frame. A top that repeats the touch fires nothing and only restamps `lastTouchNs`; a depth frame that leaves the touch where it was fires `onSymbolBook` alone.
 
-The stamps are the venue's, at the venue's resolution. Hyperliquid stamps `l2Book` and `bbo` in milliseconds, so a top in the same millisecond as a depth frame carries the same stamp and reads as no move, and a frame the venue sends without a time is stamped 0. A strategy that must not miss a touch move at that resolution compares the quotes as well as the stamps.
+In the other callbacks the stamps tell what happened in between: `lastTouchNs` later than the `lastUpdateNs` a strategy saw on its last book callback means a top arrived since the last depth frame it was shown. The stamps are the venue's, at the venue's resolution. Hyperliquid stamps `l2Book` and `bbo` in milliseconds, so a top in the same millisecond as a depth frame carries the same stamp and reads as no move, and a frame the venue sends without a time is stamped 0. `onSymbolTouch` compares the quotes, not the stamps, so it sees those moves too.
 
 The bindings read the touch, not the book, wherever they expose a best price:
 
@@ -59,6 +59,8 @@ The bindings read the touch, not the book, wherever they expose a best price:
 
 `None` / `null` on a side means that side of the touch is empty. A price of exactly zero is a price, never the empty marker.
 
+The callback is `onSymbolTouch` in C++, `on_touch` in the C API's `LrvxStrategyCallbacks`, in Python and in Codon, and `onTouch` in Node and embedded JavaScript.
+
 ## On the tape
 
 The recorder keeps the frame as its own kind. A top is frame type `6` (`BookTop`) after `2` snapshot and `3` delta, with the same payload shape as a depth frame: a `BookRecordHeader` whose `type` byte is `2`, followed by up to one level per side. The frame is additive in the sense the format spec gives the word: a reader that predates it skips the frame by its size and goes on.
@@ -67,7 +69,7 @@ Two byte spaces meet here and the readers say which they speak. The record byte 
 
 The recorder hook's book callback carries a third value as well. Its `is_snapshot` argument is a byte: `1` snapshot, `0` delta, `2` top. The two boolean values predate the third and keep their meaning. Surfaces whose shape is a bool skip tops the way an old reader skips the frame: the custom recorder hooks in Python and Node, `MergedTapeReader.stream_events`, `replay_tapes`, and `DataWriter.write_book`, which can write snapshots and deltas only. `metadata.json` carries `has_book_tops` next to `has_book_snapshots` and `has_book_deltas`, and `EventTypeStatsAggregator` counts tops in a `book_tops` column next to its snapshot and delta columns.
 
-A backtest from such a tape replays the frame the way live delivered it: the strategy's touch moves, the depth book does not, and the simulated venue fills at the touch the strategy saw.
+A backtest from such a tape replays the frame the way live delivered it: the strategy's touch moves and `onSymbolTouch` fires, the depth book stays put, and the simulated venue fills at the touch the strategy saw.
 
 ## See also
 

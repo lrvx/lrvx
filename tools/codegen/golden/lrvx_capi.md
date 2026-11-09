@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 749 functions, 58 handles, 59 structs, 43 callback typedefs, 3 enums, 16 macro constants, 73 groups.
+**Surface:** 749 functions, 58 handles, 59 structs, 44 callback typedefs, 3 enums, 16 macro constants, 73 groups.
 
 ## Opaque handles
 
@@ -128,6 +128,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `typedef void (*LrvxOnStopCallback)(void *);`
 - `typedef void (*LrvxOnQueuePositionChangeCallback)(void *, const LrvxSymbolContext *, const LrvxOrderEventData *);`
 - `typedef void (*LrvxOnMarketPositionChangeCallback)(void *, const LrvxSymbolContext *, const LrvxOrderEventData *);`
+- `typedef void (*LrvxOnTouchCallback)(void *, const LrvxSymbolContext *, const LrvxBookData *);`
 - `typedef const double * (*LrvxGraphNodeFn)(void *, LrvxIndicatorGraphHandle, uint32_t, size_t *);`
 - `typedef void (*LrvxOnSignalCallback)(void *, const LrvxSignal *);`
 - `typedef uint8_t (*LrvxRiskManagerAllowFn)(void *, const LrvxSignal *);`
@@ -278,6 +279,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 | `on_queue_position_change` | `LrvxOnQueuePositionChangeCallback` |
 | `on_market_position_change` | `LrvxOnMarketPositionChangeCallback` |
 | `user_data` | `void *` |
+| `on_touch` | `LrvxOnTouchCallback` |
 
 ### `LrvxBar`
 

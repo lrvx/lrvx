@@ -43,7 +43,7 @@ from typing import Iterator, List, Optional, Sequence
 # Function names that are entered when scanning hot-path callbacks.
 # Any reference to a future row inside one of these is a finding.
 _PER_BAR_CALLBACKS = frozenset({
-    "on_trade", "on_bar", "on_book", "on_book_update",
+    "on_trade", "on_bar", "on_book", "on_book_update", "on_touch",
     "on_tick", "on_quote", "signal", "should_enter", "should_exit",
     "compute", "update",
 })

@@ -56,6 +56,13 @@ def on_trade(self, ctx, trade):
 
 Called on each order book update.
 
+#### `on_touch(ctx: SymbolContext)`
+
+Called when the touch changes: price or size on either side, or a side
+appearing or emptying. Fires on a top-of-book frame, and right after
+`on_book_update` on a depth frame that moved the touch. `ctx.best_bid` /
+`ctx.best_ask` are the new touch. A top that repeats the touch fires nothing.
+
 #### `on_bar(ctx: SymbolContext, bar: BarData)`
 
 Called on each closed OHLC bar. `bar` exposes `open`, `high`, `low`, `close`,

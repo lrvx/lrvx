@@ -90,8 +90,8 @@ def _write_tape(tape_dir: Path, symbol_id: int) -> None:
                      is_snapshot=False,
                      bids=_levels([(100.4, 3.0)]),
                      asks=_levels([(100.6, 2.0)]))
-        # A trade after the top is the only way a callback sees the context
-        # the top left behind: the top itself never dispatches.
+        # This strategy has no on_touch, so a trade after the top is the
+        # first callback to see the context the top left behind.
         w.write_trade(exchange_ts_ns=TRADE_NS, recv_ts_ns=TRADE_NS, price=100.5, qty=0.1,
                       trade_id=1, symbol_id=symbol_id, side=0)
     finally:

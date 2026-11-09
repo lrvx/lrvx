@@ -406,7 +406,7 @@ One strategy class runs backtest, paper, and live. See [Connect lrvx to a CCXT e
 
 ### When a callback raises
 
-Every Python callable the engine calls back into — the nine `Strategy` callbacks, the extension hooks (`PnLTracker`, `StorageSink`, `Executor`, `ExecutionListener`, `MarketDataRecorderHook`), and the three pre-trade gates — runs inside a C call. An exception is never allowed to unwind out of there: out of a frame with C linkage that is undefined behaviour, and on `threaded=True` it kills the bus consumer delivering the event, so the strategy would stop receiving events for the rest of the run. One rule applies to all of them:
+Every Python callable the engine calls back into — the ten `Strategy` callbacks, the extension hooks (`PnLTracker`, `StorageSink`, `Executor`, `ExecutionListener`, `MarketDataRecorderHook`), and the three pre-trade gates — runs inside a C call. An exception is never allowed to unwind out of there: out of a frame with C linkage that is undefined behaviour, and on `threaded=True` it kills the bus consumer delivering the event, so the strategy would stop receiving events for the rest of the run. One rule applies to all of them:
 
 1. **The exception stops at the bridge.** The engine carries on with the next event, and the call that drove it — `Runner.on_trade`, `BacktestRunner.run_bars`, `runner.start()` — returns normally.
 2. **A pre-trade gate that did not answer denies.** `RiskManager.allow`, `KillSwitch.check` and `OrderValidator.validate` drop the signal when the callable raises, or returns something that is not a bool. That is the C ABI's own rule — "a call that was stopped this way returns its failure value" (`include/lrvx/capi/lrvx_capi.h`) — read against what a gate's return values mean: "Returning 0 (deny) drops the signal entirely" (`include/lrvx/capi/lrvx_capi_spec.hpp`). A broken gate is a closed gate, never an open one.
@@ -2221,13 +2221,14 @@ Write a simple trading strategy that reacts to market data. After your [language
 
 ## The model
 
-Every Strategy subclass gets nine callbacks. You override the ones you need; the rest stay no-ops.
+Every Strategy subclass gets ten callbacks. You override the ones you need; the rest stay no-ops.
 
 | Callback (Python) | Node.js | Fires when |
 |---|---|---|
 | `on_trade(ctx, trade)` | `onTrade(ctx, trade, emit)` | A trade tick arrives |
-| `on_book_update(ctx)` | `onBookUpdate(ctx, emit)` | Top-of-book moves (bid/ask change) |
+| `on_book_update(ctx)` | `onBookUpdate(ctx, emit)` | A depth frame (snapshot or delta) is applied |
 | `on_bar(ctx, bar)` | `onBar(ctx, bar, emit)` | A closed OHLC bar is dispatched |
+| `on_touch(ctx)` | `onTouch(ctx, emit)` | The touch (best bid / ask, price or size) changed |
 | `on_fill(ctx, event)` | `onFill(ctx, ev, emit)` | One of your orders partially or fully fills |
 | `on_order_update(ctx, event)` | `onOrderUpdate(ctx, ev, emit)` | Any order-lifecycle status change (fills included) |
 | `on_queue_position_change(ctx, event)` | `onQueuePositionChange(ctx, ev, emit)` | A resting limit order's queue position moved (backtest only) |
@@ -3958,6 +3959,7 @@ All bindings dispatch through the same C++ `BridgeStrategy` callbacks, so behavi
 |---|---|---|
 | `on_trade(ctx, trade)` | Tick-level trade event | All bindings |
 | `on_book_update(ctx)` | L2 book changed (bid/ask, mid) | All bindings |
+| `on_touch(ctx)` | The touch changed: price or size on either side, or a side appeared or emptied | All bindings |
 | `on_bar(ctx, bar)` | Closed OHLC bar | All bindings (since [#123](https://github.com/lrvx/lrvx/pull/123)) |
 | `on_start()` / `on_stop()` | Lifecycle hooks | All bindings |
 | `on_fill(ctx, event)` | Every fill on the strategy's own orders (`PARTIALLY_FILLED` / `FILLED`) | Python, Node.js, Codon |
@@ -3967,6 +3969,13 @@ All bindings dispatch through the same C++ `BridgeStrategy` callbacks, so behavi
 
 Node spells the last four `onFill`, `onOrderUpdate`,
 `onMarketPositionChange`, `onQueuePositionChange`.
+
+`on_touch` fires on a top-of-book frame that changed the touch, and on a
+depth frame that moved it. On such a depth frame the strategy gets two
+callbacks in a row, `on_book_update` and then `on_touch`, for the same frame:
+count it in one of them, not both. A top that repeats the touch fires
+nothing. Node and embedded JavaScript spell it `onTouch`, C++ `onSymbolTouch`.
+[The touch and the book](../explanation/the-touch.md) has the full model.
 
 ## Order emission helpers
 
@@ -4012,7 +4021,7 @@ anything else falls back to `gtc`.
 | `best_bid` / `bestBid`, `best_ask` / `bestAsk` | float | Top-of-book |
 | `mid_price` / `midPrice` | float | `(best_bid + best_ask) / 2` |
 | `last_update_ns` (Py) / `last_update_ns()` (Codon) / `lastUpdateNs` (Node, JS) | int, ns | Exchange timestamp of the last dispatched event: trade, depth frame or bar. `bigint` in Node and the embedded JavaScript engine |
-| `last_touch_ns` (Py) / `last_touch_ns()` (Codon) / `lastTouchNs` (Node, JS) | int, ns | Exchange timestamp of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it without a callback, so it can be fresher than `last_update_ns` |
+| `last_touch_ns` (Py) / `last_touch_ns()` (Codon) / `lastTouchNs` (Node, JS) | int, ns | Exchange timestamp of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it and leaves `last_update_ns` alone, so it can be the fresher of the two |
 | `unrealized_pnl` (Py) | float | Unrealized PnL on the current position, `NaN` when no entry price is available |
 | `is_long()` / `is_short()` / `is_flat()` (Py/Codon) | bool | Position state |
 | `book_spread()` (Py/Codon) | float | `best_ask - best_bid` |
@@ -4074,11 +4083,13 @@ Every callback's context quotes the touch. The depth book is not what the quotes
 | Codon | `ctx.best_bid()`, `ctx.best_ask()`, `ctx.mid_price()` | `ctx.last_touch_ns()`, `ctx.last_update_ns()` |
 | C++ | `c.touchBid`, `c.touchAsk`, `c.touchMid()` | `c.lastTouchNs`, `c.lastUpdateNs` |
 
-`last_update_ns` is the exchange timestamp of the event the callback is for: a trade, a depth frame or a bar. `last_touch_ns` is the exchange timestamp of the frame that last wrote the touch. A depth frame writes both; a top-of-book frame writes `last_touch_ns` only and fires no callback.
+`last_update_ns` is the exchange timestamp of the last trade, depth frame or bar. `last_touch_ns` is the exchange timestamp of the frame that last wrote the touch. A depth frame writes both; a top-of-book frame writes `last_touch_ns` only, and never fires `on_book_update`.
 
 ## Tell a touch move from a depth update
 
-Keep the `last_update_ns` you saw in your last book callback. On any later callback, `ctx.last_touch_ns` greater than that value means a top arrived after the last depth frame you were shown, and the quotes in `ctx` are that top's. The stamps are the venue's: Hyperliquid stamps in milliseconds, so a top in the same millisecond as the depth frame reads as no move, and a frame sent without a time is stamped 0. Compare the quotes too where that matters. The example replays a tape of one depth snapshot, three tops and a trade, and prints what each callback sees:
+The direct way is `on_touch` (`onTouch` in Node and embedded JavaScript, `onSymbolTouch` in C++). It fires when the touch changes, price or size on either side: on a top-of-book frame, and on a depth frame that moved it, right after `on_book_update` for that frame. A top that repeats the touch fires nothing; a depth frame that leaves the touch where it was fires `on_book_update` alone.
+
+Inside the other callbacks the stamps answer the same question. Keep the `last_update_ns` you saw in your last book callback. On any later callback, `ctx.last_touch_ns` greater than that value means a top arrived after the last depth frame you were shown, and the quotes in `ctx` are that top's. The stamps are the venue's: Hyperliquid stamps in milliseconds, so a top in the same millisecond as the depth frame reads as no move, and a frame sent without a time is stamped 0. `on_touch` compares the quotes, so it does not miss those. The example replays a tape of one depth snapshot, three tops and a trade, and prints what each callback sees:
 
 ```python
 --8<-- "examples/python_read_the_touch.py"
@@ -4129,11 +4140,11 @@ class QuoteOffTheTouch : public lrvx::Strategy
 };
 ```
 
-In Python, Node and Codon the context's mid already is the touch mid, so the comparison is the only extra step.
+In Python, Node and Codon the context's mid already is the touch mid, so the comparison is the only extra step. A strategy that should requote on the move itself, not on its next trade, does the same work in `onSymbolTouch` and needs no stamp bookkeeping.
 
 ## Replay a tape that carries tops
 
-Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The strategy's touch and `last_touch_ns` move, no callback fires, and the simulated venue moves its own touch while keeping the depth from the last snapshot, so a market order fills at the touch the strategy saw rather than at the stale depth frame.
+Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The strategy's touch and `last_touch_ns` move, `on_touch` fires if the touch changed, and the simulated venue moves its own touch while keeping the depth from the last snapshot, so a market order fills at the touch the strategy saw rather than at the stale depth frame.
 
 ## Record tops
 
@@ -11399,6 +11410,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - `on_queue_position_change(self, ctx: SymbolContext, event: OrderEventData) -> None`
 - `on_start(self) -> None`
 - `on_stop(self) -> None`
+- `on_touch(self, ctx: SymbolContext) -> None`
 - `on_trade(self, ctx: SymbolContext, trade: TradeData) -> None`
 - `order_status(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> int`
 - `pos(self, symbol: str | None = None) -> float`
@@ -11962,6 +11974,13 @@ def on_trade(self, ctx, trade):
 #### `on_book_update(ctx: SymbolContext)`
 
 Called on each order book update.
+
+#### `on_touch(ctx: SymbolContext)`
+
+Called when the touch changes: price or size on either side, or a side
+appearing or emptying. Fires on a top-of-book frame, and right after
+`on_book_update` on a depth frame that moved the touch. `ctx.best_bid` /
+`ctx.best_ask` are the new touch. A top that repeats the touch fires nothing.
 
 #### `on_bar(ctx: SymbolContext, bar: BarData)`
 
@@ -14890,6 +14909,7 @@ const strategy = {
 
     onTrade(ctx, trade, emit) { ... },
     onBookUpdate(ctx, emit) { ... },
+    onTouch(ctx, emit) { ... },
     onBar(ctx, bar, emit) { ... },
 
     onFill(ctx, ev, emit) { ... },
@@ -14900,6 +14920,11 @@ const strategy = {
 ```
 
 All callbacks are optional.
+
+`onTouch` fires when the touch changes (price or size on either side, or a
+side appearing or emptying): on a top-of-book frame, and right after
+`onBookUpdate` on a depth frame that moved it. `ctx.bestBid` / `ctx.bestAsk`
+are the new touch.
 
 ### Order-event callbacks
 
@@ -15968,6 +15993,13 @@ def on_book_update(self, ctx: SymbolContext):
     # strategy logic here
 ```
 
+#### `on_touch(ctx)`
+
+Called when the touch changes: price or size on either side, or a side
+appearing or emptying. Fires on a top-of-book frame, and right after
+`on_book_update` on a depth frame that moved the touch. `ctx.best_bid()` /
+`ctx.best_ask()` are the new touch.
+
 #### `on_bar(ctx, bar)`
 
 Called on each closed OHLC bar.
@@ -16083,10 +16115,10 @@ Current position quantity. If `symbol` is None, uses the first subscribed symbol
 Get a `SymbolContext` for querying per-symbol state. Besides `position()`,
 `last_trade_price()`, `best_bid()`, `best_ask()`, `mid_price()` and
 `book_spread()`, it answers two exchange timestamps in nanoseconds:
-`last_update_ns()`, the last dispatched event (trade, depth frame or bar),
-and `last_touch_ns()`, the frame that last wrote the touch. A `TOP_OF_BOOK`
-frame moves the second without a callback, so it can be fresher than the
-first.
+`last_update_ns()`, the last trade, depth frame or bar, and
+`last_touch_ns()`, the frame that last wrote the touch. A `TOP_OF_BOOK` frame
+moves the second and not the first (it fires `on_touch`, never
+`on_book_update`), so the second can be the fresher.
 
 #### `get_order_status(order_id) -> int`
 
@@ -17488,6 +17520,7 @@ class MyStrategy extends Strategy {
 
     onTrade(ctx, trade) { ... }
     onBookUpdate(ctx, book) { ... }
+    onTouch(ctx, book) { ... }
     onBar(ctx, bar) { ... }
     onStart() { ... }
     onStop() { ... }
@@ -17536,6 +17569,13 @@ super({ symbols: ['Binance:BTCUSDT', 'Bybit:ETHUSDT'] })
 | `trade.side` | `string` | `"buy"` or `"sell"` |
 | `trade.isBuy` | `boolean` | |
 | `trade.timestampNs` | `number` | Nanosecond timestamp |
+
+### `onTouch(ctx, book)`
+
+Fires when the touch changes (price or size on either side, or a side
+appearing or emptying): on a top-of-book frame, and right after `onBookUpdate`
+on a depth frame that moved it. `book.snapshot` and `ctx.book` are the new
+touch; `book.timestampNs` is the stamp of the frame that moved it.
 
 ### `onBar(ctx, bar)`
 
@@ -18028,7 +18068,7 @@ Copy `quickjs/types/lrvx.d.ts` and `quickjs/jsconfig.json` into your project dir
 All language bindings (Python, Node.js, Codon, embedded JS) call into this header. You can use it directly to integrate lrvx into any language with a C FFI, or embed it in a C/C++ project.
 
 !!! warning "This page is a curated subset"
-    The full surface is **729 functions, 58 handles, 59 structs, 43 callback typedefs, 3 enums**
+    The full surface is **729 functions, 58 handles, 59 structs, 44 callback typedefs, 3 enums**
     across 72 groups. This page covers the commonly used core (roughly 150 functions) with prose.
     The complete, machine-generated reference — every function signature, in group order — is
     [`tools/codegen/golden/lrvx_capi.md`](https://github.com/lrvx/lrvx/blob/main/tools/codegen/golden/lrvx_capi.md),
@@ -18165,7 +18205,7 @@ arrived with ABI version 4.
 | `last_trade_price_raw` | `int64_t` | Last trade price × 1e8 |
 | `last_update_ns` | `int64_t` | Last update timestamp (ns) |
 | `book` | `LrvxBookSnapshot` | Top-of-book snapshot |
-| `last_touch_ns` | `int64_t` | Timestamp (ns) of the frame that last wrote the touch; can be fresher than `last_update_ns`, which stamps dispatched events only |
+| `last_touch_ns` | `int64_t` | Timestamp (ns) of the frame that last wrote the touch; can be fresher than `last_update_ns`, which stamps trades, depth frames and bars only |
 
 ### `LrvxBarData`
 
@@ -18193,8 +18233,8 @@ Passed to `LrvxOnBarCallback` when a bar closes.
 
 ### `LrvxStrategyCallbacks`
 
-**10 members.** Field order is load-bearing for FFI consumers — allocate the full struct
-(10 pointer-sized slots on a 64-bit target) and zero it before filling. A short allocation
+**11 members.** Field order is load-bearing for FFI consumers — allocate the full struct
+(11 pointer-sized slots on a 64-bit target) and zero it before filling. A short allocation
 corrupts memory when the runtime writes past the end.
 
 | Field | Type | Description |
@@ -18209,6 +18249,7 @@ corrupts memory when the runtime writes past the end.
 | `on_queue_position_change` | `LrvxOnQueuePositionChangeCallback` | Queue position moved |
 | `on_market_position_change` | `LrvxOnMarketPositionChangeCallback` | Order's position vs best moved |
 | `user_data` | `void*` | Passed to all callbacks |
+| `on_touch` | `LrvxOnTouchCallback` | The touch changed: a top-of-book frame, or a depth frame after `on_book`. `book->snapshot` is the new touch. After `user_data` so the slots above keep their offsets |
 
 Any member may be `NULL`; an unset callback is a no-op.
 
@@ -18398,7 +18439,7 @@ do the same.
 
 ## Callback types
 
-The header declares 43 callback typedefs. The strategy, gate and progress callbacks are below; the
+The header declares 44 callback typedefs. The strategy, gate and progress callbacks are below; the
 listener, executor, recorder and replay-source function pointers are in the generated reference.
 
 Strategy callbacks — the members of `LrvxStrategyCallbacks`:
@@ -18420,6 +18461,8 @@ typedef void (*LrvxOnQueuePositionChangeCallback)(void* user_data, const LrvxSym
                                                   const LrvxOrderEventData* ev);
 typedef void (*LrvxOnMarketPositionChangeCallback)(void* user_data, const LrvxSymbolContext* ctx,
                                                    const LrvxOrderEventData* ev);
+typedef void (*LrvxOnTouchCallback)(void* user_data, const LrvxSymbolContext* ctx,
+                                    const LrvxBookData* book);
 ```
 
 Signal sink and pre-trade gates. The gates run in order KillSwitch, OrderValidator, RiskManager;
@@ -21809,7 +21852,7 @@ A depth book cannot apply such a frame. Merging it as a delta leaves a stale bet
 Consumers that read it as a snapshot of the touch:
 
 - `CompositeBookMatrix`, the cross-venue matrix: a top replaces both sides of that venue's touch, like a snapshot would.
-- `SymbolContext`, the per-symbol state every strategy callback receives: a top writes the touch fields and nothing else (next section).
+- `SymbolContext`, the per-symbol state every strategy callback receives: a top writes the touch fields and fires `onSymbolTouch` when they changed (next section).
 - `SimulatedExecutor`, the backtest venue: a top moves the touch, drops its own levels that are more aggressive than it, keeps the deeper levels from the last depth frame, then runs the same matching pass as a depth update. The backtest runner routes top frames there, and a hand-driven executor takes one through `on_top_of_book` in Python, `onTopOfBook` in Node and embedded JavaScript, and `lrvx_simulated_executor_on_top_of_book` in the C API. The one-level `on_best_levels` feed goes the same way. A strategy that sees a fresher touch than the last depth frame therefore fills at that touch, not at the depth frame's best.
 
 Consumers that ignore it:
@@ -21830,9 +21873,9 @@ Consumers that ignore it:
 
 A depth frame writes both: it applies the book, refreshes the touch from the book's best levels, and stamps `lastUpdateNs` and `lastTouchNs` with the frame's exchange timestamp. A top writes the touch and `lastTouchNs` only. Trades and bars stamp `lastUpdateNs` and leave the touch alone; order events write neither.
 
-No callback fires for a top. `onSymbolBook` would hand the strategy the previous depth frame's book at touch rate, stamped fresh, so the frame lands in the fields and the strategy reads them on its next trade, bar or depth callback. The stamps are how a strategy tells what happened in between: `lastTouchNs` later than the `lastUpdateNs` it saw on its last book callback means the touch moved since the last depth frame it was shown.
+A top fires `onSymbolTouch`, never `onSymbolBook`: the depth book did not move, and `onSymbolBook` would hand the strategy the previous depth frame's book at touch rate, stamped fresh. `onSymbolTouch` fires whenever the touch changes, price or size on either side or a side appearing or emptying, whichever frame moved it. On a depth frame that moves the touch it fires after `onSymbolBook`, so the strategy gets two callbacks for that one frame. A top that repeats the touch fires nothing and only restamps `lastTouchNs`; a depth frame that leaves the touch where it was fires `onSymbolBook` alone.
 
-The stamps are the venue's, at the venue's resolution. Hyperliquid stamps `l2Book` and `bbo` in milliseconds, so a top in the same millisecond as a depth frame carries the same stamp and reads as no move, and a frame the venue sends without a time is stamped 0. A strategy that must not miss a touch move at that resolution compares the quotes as well as the stamps.
+In the other callbacks the stamps tell what happened in between: `lastTouchNs` later than the `lastUpdateNs` a strategy saw on its last book callback means a top arrived since the last depth frame it was shown. The stamps are the venue's, at the venue's resolution. Hyperliquid stamps `l2Book` and `bbo` in milliseconds, so a top in the same millisecond as a depth frame carries the same stamp and reads as no move, and a frame the venue sends without a time is stamped 0. `onSymbolTouch` compares the quotes, not the stamps, so it sees those moves too.
 
 The bindings read the touch, not the book, wherever they expose a best price:
 
@@ -21847,6 +21890,8 @@ The bindings read the touch, not the book, wherever they expose a best price:
 
 `None` / `null` on a side means that side of the touch is empty. A price of exactly zero is a price, never the empty marker.
 
+The callback is `onSymbolTouch` in C++, `on_touch` in the C API's `LrvxStrategyCallbacks`, in Python and in Codon, and `onTouch` in Node and embedded JavaScript.
+
 ## On the tape
 
 The recorder keeps the frame as its own kind. A top is frame type `6` (`BookTop`) after `2` snapshot and `3` delta, with the same payload shape as a depth frame: a `BookRecordHeader` whose `type` byte is `2`, followed by up to one level per side. The frame is additive in the sense the format spec gives the word: a reader that predates it skips the frame by its size and goes on.
@@ -21855,7 +21900,7 @@ Two byte spaces meet here and the readers say which they speak. The record byte 
 
 The recorder hook's book callback carries a third value as well. Its `is_snapshot` argument is a byte: `1` snapshot, `0` delta, `2` top. The two boolean values predate the third and keep their meaning. Surfaces whose shape is a bool skip tops the way an old reader skips the frame: the custom recorder hooks in Python and Node, `MergedTapeReader.stream_events`, `replay_tapes`, and `DataWriter.write_book`, which can write snapshots and deltas only. `metadata.json` carries `has_book_tops` next to `has_book_snapshots` and `has_book_deltas`, and `EventTypeStatsAggregator` counts tops in a `book_tops` column next to its snapshot and delta columns.
 
-A backtest from such a tape replays the frame the way live delivered it: the strategy's touch moves, the depth book does not, and the simulated venue fills at the touch the strategy saw.
+A backtest from such a tape replays the frame the way live delivered it: the strategy's touch moves and `onSymbolTouch` fires, the depth book stays put, and the simulated venue fills at the touch the strategy saw.
 
 ## See also
 

@@ -97,6 +97,8 @@ class CountingStrategy : public Strategy
 
   void onSymbolBook(SymbolContext& ctx, const BookUpdateEvent&) override { record(ctx); }
 
+  void onSymbolTouch(SymbolContext& ctx, const BookUpdateEvent&) override { record(ctx); }
+
  private:
   void record(const SymbolContext& ctx)
   {
@@ -211,6 +213,52 @@ TEST(StrategyPositionRefresh, ATickAsksThePositionManagerAtMostOnce)
          "getAverageEntryPrice() are asked separately, so every market-data "
          "tick takes the tracker's mutex twice and walks the lot deque twice, "
          "on the thread the execution path contends with";
+}
+
+// A top reaches the strategy through onSymbolTouch, so it refreshes the
+// position like any other dispatching tick, and asks once like them: a depth
+// frame that fires onSymbolBook and onSymbolTouch is still one tick.
+TEST(StrategyPositionRefresh, ATouchMoveIsOneTickWithAFreshPosition)
+{
+  SymbolRegistry reg;
+  const SymbolId sym = addSymbol(reg, "BTCUSDT");
+
+  CountingPositionManager pm;
+  CountingStrategy strat(1, std::vector<SymbolId>{sym}, reg);
+  strat.setPositionManager(&pm);
+
+  pm.queries = 0;
+  strat.onTrade(makeTrade(sym, 100.0, 1));
+  const int perTick = pm.queries;
+
+  std::pmr::monotonic_buffer_resource res{4096};
+  BookUpdateEvent snap(&res);
+  snap.update.symbol = sym;
+  snap.update.type = BookUpdateType::SNAPSHOT;
+  snap.update.bids.emplace_back(Price::fromDouble(100.0), Quantity::fromDouble(1.0));
+  snap.update.asks.emplace_back(Price::fromDouble(101.0), Quantity::fromDouble(1.0));
+  pm.queries = 0;
+  strat.onBookUpdate(snap);
+  EXPECT_EQ(strat.positionsSeen.size(), 3u) << "the trade, then the book and the touch it moved";
+  EXPECT_EQ(pm.queries, perTick);
+
+  pm.setFill(Quantity::fromDouble(0.5), Price::fromDouble(100.0));
+  BookUpdateEvent top(&res);
+  top.update.symbol = sym;
+  top.update.type = BookUpdateType::TOP_OF_BOOK;
+  top.update.bids.emplace_back(Price::fromDouble(100.4), Quantity::fromDouble(1.0));
+  top.update.asks.emplace_back(Price::fromDouble(100.6), Quantity::fromDouble(1.0));
+  pm.queries = 0;
+  strat.onBookUpdate(top);
+  ASSERT_EQ(strat.positionsSeen.size(), 4u);
+  EXPECT_DOUBLE_EQ(strat.positionsSeen[3], 0.5) << "onSymbolTouch sees the fill made since";
+  EXPECT_EQ(pm.queries, perTick);
+
+  // A top that leaves the touch alone dispatches nothing and asks nothing.
+  pm.queries = 0;
+  strat.onBookUpdate(top);
+  EXPECT_EQ(strat.positionsSeen.size(), 4u);
+  EXPECT_EQ(pm.queries, 0);
 }
 
 // ------------------------------------------- the other shipped tracker

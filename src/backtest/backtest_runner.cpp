@@ -111,7 +111,7 @@ void BacktestRunner::setStrategy(IStrategy* strategy)
   // Without this wire `ctx.position` / `ctx.is_long()` / `ctx.is_flat()`
   // never reflect fills the executor dispatches. Strategy::onTrade /
   // onBar / onBookUpdate refresh the per-symbol context from this
-  // tracker before each handler call.
+  // tracker once per event, before its handlers.
   strategy->setPositionManager(&_positionTracker);
 }
 

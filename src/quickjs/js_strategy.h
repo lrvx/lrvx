@@ -21,6 +21,10 @@ class LrvxJsStrategy
 
   LrvxStrategyCallbacks getCallbacks();
   const std::vector<uint32_t>& symbolIds() const { return _symbolIds; }
+  // Whether the registered strategy has its own onTouch. Without one it gets
+  // no on_touch slot: most depth deltas move the touch, and each call would
+  // build a context and a book object for the base class's empty method.
+  bool wantsTouch() const { return _wantsTouch; }
   LrvxJsEngine& engine() { return _engine; }
   void injectHandle(LrvxStrategyHandle handle);
 
@@ -42,6 +46,7 @@ class LrvxJsStrategy
   // C callbacks dispatched from BridgeStrategy
   static void onTrade(void* userData, const LrvxSymbolContext* ctx, const LrvxTradeData* trade);
   static void onBook(void* userData, const LrvxSymbolContext* ctx, const LrvxBookData* book);
+  static void onTouch(void* userData, const LrvxSymbolContext* ctx, const LrvxBookData* book);
   static void onBar(void* userData, const LrvxSymbolContext* ctx, const LrvxBarData* bar);
   static void onFill(void* userData, const LrvxSymbolContext* ctx,
                      const LrvxOrderEventData* ev);
@@ -66,6 +71,7 @@ class LrvxJsStrategy
   JSValue _strategyObj = JS_UNDEFINED;
   std::vector<uint32_t> _symbolIds;
   std::vector<std::string> _symbolNames;
+  bool _wantsTouch = false;
 };
 
 }  // namespace lrvx

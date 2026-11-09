@@ -963,6 +963,15 @@ void LrvxJsStrategy::loadScript(const std::string& path)
   if (!JS_IsNull(_strategyObj) && !JS_IsUndefined(_strategyObj))
   {
     resolveSymbols();
+    if (_engine.eval("var __lrvx_wants_touch = typeof __lrvx_registered_strategy.onTouch === "
+                     "'function' && __lrvx_registered_strategy.onTouch !== "
+                     "Strategy.prototype.onTouch;",
+                     "<lrvx_touch_probe>"))
+    {
+      JSValue v = _engine.getGlobalProperty("__lrvx_wants_touch");
+      _wantsTouch = JS_ToBool(_engine.context(), v) == 1;
+      JS_FreeValue(_engine.context(), v);
+    }
   }
 }
 
@@ -1068,6 +1077,7 @@ LrvxStrategyCallbacks LrvxJsStrategy::getCallbacks()
   cb.on_order_update = LrvxJsStrategy::onOrderUpdate;
   cb.on_queue_position_change = LrvxJsStrategy::onQueuePositionChange;
   cb.on_market_position_change = LrvxJsStrategy::onMarketPositionChange;
+  cb.on_touch = _wantsTouch ? LrvxJsStrategy::onTouch : nullptr;
   cb.user_data = this;
   return cb;
 }
@@ -1133,6 +1143,14 @@ void LrvxJsStrategy::onBook(void* userData, const LrvxSymbolContext* ctx,
   auto* self = static_cast<LrvxJsStrategy*>(userData);
   JSValue args[2] = {self->makeCtxObject(ctx), self->makeBookObject(book)};
   self->invokeMethod("_dispatchBook", 2, args, "onBookUpdate");
+}
+
+void LrvxJsStrategy::onTouch(void* userData, const LrvxSymbolContext* ctx,
+                             const LrvxBookData* book)
+{
+  auto* self = static_cast<LrvxJsStrategy*>(userData);
+  JSValue args[2] = {self->makeCtxObject(ctx), self->makeBookObject(book)};
+  self->invokeMethod("_dispatchTouch", 2, args, "onTouch");
 }
 
 void LrvxJsStrategy::onBar(void* userData, const LrvxSymbolContext* ctx,

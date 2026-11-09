@@ -4,13 +4,14 @@ Write a simple trading strategy that reacts to market data. After your [language
 
 ## The model
 
-Every Strategy subclass gets nine callbacks. You override the ones you need; the rest stay no-ops.
+Every Strategy subclass gets ten callbacks. You override the ones you need; the rest stay no-ops.
 
 | Callback (Python) | Node.js | Fires when |
 |---|---|---|
 | `on_trade(ctx, trade)` | `onTrade(ctx, trade, emit)` | A trade tick arrives |
-| `on_book_update(ctx)` | `onBookUpdate(ctx, emit)` | Top-of-book moves (bid/ask change) |
+| `on_book_update(ctx)` | `onBookUpdate(ctx, emit)` | A depth frame (snapshot or delta) is applied |
 | `on_bar(ctx, bar)` | `onBar(ctx, bar, emit)` | A closed OHLC bar is dispatched |
+| `on_touch(ctx)` | `onTouch(ctx, emit)` | The touch (best bid / ask, price or size) changed |
 | `on_fill(ctx, event)` | `onFill(ctx, ev, emit)` | One of your orders partially or fully fills |
 | `on_order_update(ctx, event)` | `onOrderUpdate(ctx, ev, emit)` | Any order-lifecycle status change (fills included) |
 | `on_queue_position_change(ctx, event)` | `onQueuePositionChange(ctx, ev, emit)` | A resting limit order's queue position moved (backtest only) |
