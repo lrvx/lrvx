@@ -9,7 +9,7 @@ It is a static HTML build with no backend, no auth, and no live data path. The w
 Six views on one page:
 
 - **Price chart with trades and signals.** Top banner. Trade-line (price over time) plus per-trade dots colored by side, vertical dashed bands at signal timestamps with names, triangles where fills landed, and a vertical cursor line. Hover a point to see a tooltip with the nearest trade's timestamp, side, price, and qty. Click anywhere on the chart to seek the cursor to that timestamp.
-- **Order book heatmap.** Bid / ask depth at the cursor, reconstructed from the latest snapshot plus deltas. Reads `.lrvx` book frames.
+- **Order book heatmap.** Bid / ask depth at the cursor, reconstructed from the latest snapshot plus deltas. Reads `.lrvx` book frames. A top-of-book frame (frame type `6`) is not depth and stays out of the ladder; when one arrived after the last depth frame, the touch it carries is drawn as a line between the asks and the bids. A symbol with tops and no depth yet shows that line alone.
 - **Trades.** Tail of the most recent trades up to the cursor. Reads `.lrvx` trade frames.
 - **Strategy signals.** Cards listing each `SignalRecord` from the run trace, with name, symbol ids, and payload. Reads `.lrvxrun`.
 - **Orders timeline.** Order events plus rolling fill totals per order. Reads `.lrvxrun`.

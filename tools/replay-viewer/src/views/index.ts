@@ -175,6 +175,8 @@ export function renderSymbolLegend(state: ViewerState) {
 
 // Reconstruct {bids, asks} for one symbol from a tape slice, finding
 // the most recent snapshot before cursor and applying deltas after it.
+// Tops are not depth and stay out of it: applying one as a delta would
+// leave a stale better level behind when the touch moves away.
 function reconstructBook(bookEvents: Array<{type: string, bids: any[], asks: any[]}>,
                           sid: number): { bids: Map<number, number>, asks: Map<number, number>, hasSnapshot: boolean } {
   const filtered = bookEvents.filter(
@@ -205,6 +207,22 @@ function reconstructBook(bookEvents: Array<{type: string, bids: any[], asks: any
   return { bids, asks, hasSnapshot: true };
 }
 
+type Touch = { bid: { price: number, qty: number } | null,
+               ask: { price: number, qty: number } | null };
+
+// The latest top-of-book frame for one symbol, if one arrived after the
+// last depth frame: then it is the venue's freshest word on the touch and
+// the depth ladder below it is older. A depth frame after it wins.
+function touchAfterDepth(bookEvents: Array<any>, sid: number): Touch | null {
+  for (let i = bookEvents.length - 1; i >= 0; i--) {
+    const ev = bookEvents[i];
+    if (ev.symbol_id !== sid) continue;
+    if (ev.type !== 'book_top') return null;
+    return { bid: ev.bids[0] ?? null, ask: ev.asks[0] ?? null };
+  }
+  return null;
+}
+
 // Paint one venue's order book into a canvas rectangle. Layout:
 //
 //   [PRICE QTY ▮▮▮▮ ]  ← bids (left of centre, text starts hard-left)
@@ -217,6 +235,7 @@ function reconstructBook(bookEvents: Array<{type: string, bids: any[], asks: any
 function paintOneBook(ctx: CanvasRenderingContext2D, state: ViewerState,
                        sid: number,
                        bids: Map<number, number>, asks: Map<number, number>,
+                       touch: Touch | null,
                        rectX: number, rectY: number, rectW: number, rectH: number) {
   const narrow = rectW < 200;
   const font = narrow ? '10px ui-monospace, monospace' : '11px ui-monospace, monospace';
@@ -230,13 +249,15 @@ function paintOneBook(ctx: CanvasRenderingContext2D, state: ViewerState,
   const headerH = 24;
   const usableH = rectH - headerH;
   const minRowH = narrow ? 12 : 14;
-  const N = Math.max(4, Math.min(15, Math.floor((usableH - 4) / (2 * minRowH))));
+  // A fresher touch takes one row between the asks and the bids.
+  const touchRows = touch ? 1 : 0;
+  const N = Math.max(4, Math.min(15, Math.floor((usableH - 4 - touchRows * minRowH) / (2 * minRowH))));
   const bidList = [...bids.entries()].sort((a, b) => b[0] - a[0]).slice(0, N);
   const askList = [...asks.entries()].sort((a, b) => a[0] - b[0]).slice(0, N);
   const maxQty = Math.max(
     1, ...bidList.map(([, q]) => q), ...askList.map(([, q]) => q),
   );
-  const rowH = Math.max(minRowH, Math.min(20, usableH / (N * 2)));
+  const rowH = Math.max(minRowH, Math.min(20, usableH / (N * 2 + touchRows)));
 
   // Split each row: left half = "price qty" text, right half = bar.
   // For asks the layout flips (bar left, text right) so the spread —
@@ -256,8 +277,23 @@ function paintOneBook(ctx: CanvasRenderingContext2D, state: ViewerState,
     ctx.fillText(`${price.toFixed(2)}  ${qty.toFixed(4)}`,
                   rectX + padX + 4, y + rowH / 2);
   });
+  if (touch) {
+    // The touch line: the latest top, newer than the depth around it.
+    const y = rectY + headerH + askList.length * rowH;
+    const side = (l: { price: number, qty: number } | null) =>
+      l ? `${l.price.toFixed(2)} ${l.qty.toFixed(4)}` : 'empty';
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(rectX + padX, y + rowH / 2, rectW - 2 * padX, 1);
+    ctx.fillStyle = '#ffffff';
+    const text = narrow ? `${side(touch.bid)} | ${side(touch.ask)}`
+                        : `touch  ${side(touch.bid)}  |  ${side(touch.ask)}`;
+    const tw = ctx.measureText(text).width;
+    ctx.fillRect(rectX + padX, y + 1, tw + 10, rowH - 2);
+    ctx.fillStyle = '#2563eb';
+    ctx.fillText(text, rectX + padX + 5, y + rowH / 2);
+  }
   bidList.forEach(([price, qty], idx) => {
-    const y = rectY + headerH + (askList.length + idx) * rowH;
+    const y = rectY + headerH + (askList.length + touchRows + idx) * rowH;
     const barW = (qty / maxQty) * barAreaW;
     ctx.fillStyle = 'rgba(33, 161, 101, 0.18)';
     ctx.fillRect(barAreaX, y, barW, rowH - 2);
@@ -280,10 +316,11 @@ export function renderOrderbook(state: ViewerState) {
   ctx.clearRect(0, 0, w, h);
 
   const tape = tapeSlice(state);
-  const allBookEvents = tape.filter((e) => e.type === 'book_snapshot' || e.type === 'book_delta');
+  const allBookEvents = tape.filter((e) => e.type === 'book_snapshot' || e.type === 'book_delta'
+                                          || e.type === 'book_top');
   const eventsBySym = new Map<number, number>();
   for (const ev of allBookEvents) {
-    if (ev.type === 'book_snapshot' || ev.type === 'book_delta') {
+    if (ev.type === 'book_snapshot' || ev.type === 'book_delta' || ev.type === 'book_top') {
       eventsBySym.set(ev.symbol_id, (eventsBySym.get(ev.symbol_id) ?? 0) + 1);
     }
   }
@@ -308,14 +345,16 @@ export function renderOrderbook(state: ViewerState) {
   const paneW = w / showVenues.length;
   showVenues.forEach((sid, paneIdx) => {
     const { bids, asks, hasSnapshot } = reconstructBook(allBookEvents as any, sid);
-    if (!hasSnapshot) {
+    // With tops only so far, the touch is all there is to show.
+    const touch = touchAfterDepth(allBookEvents, sid);
+    if (!hasSnapshot && !touch) {
       ctx.fillStyle = '#9ca3af';
       ctx.font = '11px sans-serif';
       ctx.fillText('waiting for first snapshot…',
                     paneIdx * paneW + 16, 30);
       return;
     }
-    paintOneBook(ctx, state, sid, bids, asks, paneIdx * paneW, 0, paneW, h);
+    paintOneBook(ctx, state, sid, bids, asks, touch, paneIdx * paneW, 0, paneW, h);
     if (paneIdx > 0) {
       // Visual divider between panes.
       ctx.strokeStyle = '#e5e7eb';

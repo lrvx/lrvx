@@ -1,7 +1,9 @@
 // Parser for .lrvx segment files (uncompressed only in MVP).
 //
 // Format: SegmentHeader(64) + stream of (FrameHeader(12) + payload).
-// Frame types: 1 = Trade, 2 = BookSnapshot, 3 = BookDelta.
+// Frame types: 1 = Trade, 2 = BookSnapshot, 3 = BookDelta, 6 = BookTop.
+// A top is the touch alone (at most one level per side, an empty side
+// means empty) and has the same payload shape as a depth frame.
 // See docs/spec/lrvx.md for the full layout.
 
 const MAGIC_SEGMENT = 0x584f4c46; // "FLOX"
@@ -50,7 +52,7 @@ export interface Trade {
 }
 
 export interface BookEvent {
-  type: 'book_snapshot' | 'book_delta';
+  type: 'book_snapshot' | 'book_delta' | 'book_top';
   ts_ns: bigint;
   recv_ts_ns: bigint;
   symbol_id: number;
@@ -154,11 +156,11 @@ function parseFrameStream(frameBuf: Uint8Array): LrvxEvent[] {
         symbol_id: readU32(view, payloadOff + 40),
         side: view.getUint8(payloadOff + 44) === 0 ? 'buy' : 'sell',
       });
-    } else if ((type === 2 || type === 3) && size >= 40) {
+    } else if ((type === 2 || type === 3 || type === 6) && size >= 40) {
       const bid_count = readU16(view, payloadOff + 28);
       const ask_count = readU16(view, payloadOff + 30);
       const ev: BookEvent = {
-        type: type === 2 ? 'book_snapshot' : 'book_delta',
+        type: type === 2 ? 'book_snapshot' : type === 3 ? 'book_delta' : 'book_top',
         ts_ns: readI64(view, payloadOff + 0),
         recv_ts_ns: readI64(view, payloadOff + 8),
         symbol_id: readU32(view, payloadOff + 24),
