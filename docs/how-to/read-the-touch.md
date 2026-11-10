@@ -78,7 +78,7 @@ Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The 
 
 ## Record tops
 
-A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), through Bybit or Bitget with their `subscribeBbo` on (off by default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`; so does a `DataWriter` given `update_type=2`. `EventTypeStatsAggregator` counts them in its `book_tops` column, and `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas through their bool-shaped book callback and tops through `on_book_top` (`onBookTop` in Node), one `(price, qty)` or `None` per side; a hook that does not define it skips tops. A C recorder hook receives the byte `2`.
+A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), through Bybit or Bitget with their `subscribeBbo` on (off by default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`; so does a `DataWriter` given `update_type=2`. `EventTypeStatsAggregator` counts them in its `book_tops` column, and `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas through their bool-shaped book callback and tops through `on_book_top`, one `(price, qty)` or `None` per side (`onBookTop` in Node, one `{ price, qty }` or `null` per side); a hook that does not define it skips tops. A C recorder hook receives the byte `2`.
 
 ## See also
 

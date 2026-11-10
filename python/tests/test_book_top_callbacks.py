@@ -87,15 +87,18 @@ class RecorderHookBookTop(unittest.TestCase):
             def __init__(self):
                 super().__init__()
                 self.books = 0
+                self.tops = 0
 
             def on_book_update(self, symbol, is_snapshot, bids, asks, ts_ns):
                 self.books += 1
 
             def on_book_top(self, symbol, bid, ask, ts_ns):
+                self.tops += 1
                 raise RuntimeError("boom")
 
         hook = Hook()
         self._run(hook)
+        self.assertEqual(hook.tops, 1)
         self.assertEqual(hook.books, 2, "the snapshot after the failing top still arrives")
 
 
