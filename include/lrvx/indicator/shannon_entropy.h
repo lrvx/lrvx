@@ -34,6 +34,18 @@ class ShannonEntropyKernel
     }
     const auto w = _win.window();
 
+    // A non-finite input has no bin: converting NaN or an infinity to an
+    // index is undefined, and gave a different bin on arm64 and x86. Such a
+    // value poisons the windows that hold it and nothing else, the same
+    // contract SMA has.
+    for (double v : w)
+    {
+      if (!std::isfinite(v))
+      {
+        return std::nan("");
+      }
+    }
+
     double lo = w[0], hi = w[0];
     for (size_t j = 1; j < _period; ++j)
     {

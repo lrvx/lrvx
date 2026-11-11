@@ -28,8 +28,10 @@
 #include "lrvx/error/lrvx_error.h"
 
 #include <gtest/gtest.h>
+
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -1274,6 +1276,30 @@ TEST(ShannonEntropy, ZeroEntropy)
   std::vector<double> input = {5, 5, 5, 5, 5};
   auto result = ent.compute(input);
   EXPECT_DOUBLE_EQ(result[4], 0.0);
+}
+
+// A non-finite value used to be converted to a bin index, which is
+// undefined: NaN landed in the first bin on arm64 and the last on x86. It
+// now poisons exactly the windows that hold it.
+TEST(ShannonEntropy, NonFiniteInputPoisonsOnlyItsWindows)
+{
+  const double nan = std::nan("");
+  const double inf = std::numeric_limits<double>::infinity();
+  for (double bad : {nan, inf, -inf})
+  {
+    std::vector<double> in = {1, 2, 3, 4, 5, bad, 7, 8, 9, 10, 11, 12};
+    ShannonEntropy ent(4, 4);
+    const auto out = ent.compute(in);
+    ASSERT_EQ(out.size(), in.size());
+    EXPECT_TRUE(std::isfinite(out[3]));
+    EXPECT_TRUE(std::isfinite(out[4]));
+    for (size_t i = 5; i <= 8; ++i)
+    {
+      EXPECT_TRUE(std::isnan(out[i])) << "window ending at " << i << " holds the bad value";
+    }
+    EXPECT_TRUE(std::isfinite(out[9]));
+    EXPECT_TRUE(std::isfinite(out[11]));
+  }
 }
 
 TEST(ShannonEntropy, MaxEntropy)
