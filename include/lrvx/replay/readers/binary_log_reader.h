@@ -27,6 +27,7 @@ namespace lrvx::replay
 {
 
 class IAggregator;
+class BinaryLogIterator;
 
 struct TimeRange
 {
@@ -125,6 +126,13 @@ struct ReaderConfig
   // throws LrvxError E_DATA_002 on the first late event, with the
   // symbol, event type, file and offset in the message.
   bool strict_ordering{false};
+
+  // With from_ns or to_ns set, segments whose recorded time bounds prove
+  // they hold no event in [from_ns, to_ns] are not decoded, and Sorted
+  // segments are entered at the index entry nearest from_ns and left at the
+  // first event past to_ns. The result is identical either way; false
+  // restores the full walk (benchmarks, equivalence tests).
+  bool skip_segments_by_time{true};
 };
 
 struct DatasetSummary
@@ -163,7 +171,11 @@ struct DatasetSummary
 
 struct ReaderStats
 {
+  // Segments whose frames were decoded, wholly or in part.
   uint64_t files_read{0};
+  // Segments not decoded at all because their time bounds lie outside the
+  // reader's [from_ns, to_ns] (see ReaderConfig::skip_segments_by_time).
+  uint64_t segments_skipped{0};
   uint64_t events_read{0};
   uint64_t trades_read{0};
   uint64_t book_updates_read{0};
@@ -223,6 +235,10 @@ struct SegmentInfo
   uint32_t event_count{0};
   bool has_index{false};
   uint64_t index_offset{0};
+  // Header flags. Whether first/last_event_ns are bounds depends on both:
+  // see BinaryLogReader::segmentOutsideRange.
+  bool sorted{false};
+  bool compressed{false};
 };
 
 class BinaryLogReader
@@ -341,6 +357,16 @@ class BinaryLogReader
                               EventCallback& callback, ReaderStats& stats);
   bool passesFilter(const ReplayEvent& event) const;
 
+  bool rangeSkipActive() const;
+  // True when the scanned header alone proves the segment holds no event in
+  // the configured range. Only an uncompressed Sorted segment qualifies.
+  bool segmentOutsideRange(const SegmentInfo& segment) const;
+  // For a Sorted segment just opened: positions `iter` at the index entry
+  // nearest from_ns and sets `stop_past_to` when the segment is monotonic, so
+  // the walk may end at the first event past to_ns. Returns false when the
+  // segment's index proves it holds nothing in range.
+  bool narrowToRange(BinaryLogIterator& iter, bool& stop_past_to) const;
+
   ReaderConfig _config;
   ReaderStats _stats;
   std::vector<SegmentInfo> _segments;
@@ -376,6 +402,11 @@ class BinaryLogIterator
   // `if (hasIndex()) seek(...)` branch in the readers unreachable.
   bool hasIndex() const { return _header.hasIndex(); }
   bool indexLoaded() const { return !_index_entries.empty(); }
+  std::span<const IndexEntry> indexEntries() const { return _index_entries; }
+
+  // Moves to a frame (uncompressed) or block (compressed) boundary taken
+  // from the index and drops any decompressed block held.
+  bool seekToFileOffset(uint64_t file_offset);
 
   // Block-level positioning for intra-segment parallel workers. The
   // caller is responsible for picking valid block boundaries (use

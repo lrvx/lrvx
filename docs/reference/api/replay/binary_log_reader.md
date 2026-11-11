@@ -11,6 +11,8 @@ struct ReaderConfig
   std::set<uint32_t> symbols;
   bool verify_crc{true};
   int64_t reorder_window_ns{10'000'000'000};  // 10s
+  bool strict_ordering{false};
+  bool skip_segments_by_time{true};
 };
 
 class BinaryLogReader
@@ -65,6 +67,7 @@ public:
 | symbols    | `set<uint32_t>`         | Symbol IDs to include (empty = all)      |
 | verify_crc | `bool`                  | Verify CRC32 checksums (default: true)   |
 | reorder_window_ns | `int64_t`        | Bounded reorder buffer, default 10 s. Events arriving more than this far behind the emit cursor cannot be placed in order any more, so the reader throws `LrvxError` with the observed delta. The default covers exchange-WS jitter and the 99th percentile of reconnect-induced cross-block inversions on real tapes. Memory bound is roughly `reorder_window_ns x peak_event_rate x sizeof(ReplayEvent)` — about 36 MB at 10 s and a 10k ev/s burst |
+| skip_segments_by_time | `bool`           | With `from_ns` or `to_ns` set, do not decode segments that provably hold nothing in range (default: true). See [Time-ranged reads](#time-ranged-reads). The events returned are the same either way |
 
 ## Core Methods
 
@@ -149,7 +152,8 @@ Read the symbol through `symbolId()` rather than reaching into a per-type record
 ```cpp
 struct ReaderStats
 {
-  uint64_t files_read{0};
+  uint64_t files_read{0};        // segments decoded, wholly or in part
+  uint64_t segments_skipped{0};  // segments not decoded: outside [from_ns, to_ns]
   uint64_t events_read{0};
   uint64_t trades_read{0};
   uint64_t book_updates_read{0};
@@ -169,8 +173,39 @@ struct SegmentInfo
   uint32_t event_count{0};
   bool has_index{false};
   uint64_t index_offset{0};
+  bool sorted{false};      // SegmentFlags::Sorted
+  bool compressed{false};  // SegmentFlags::Compressed
 };
 ```
+
+## Time-ranged reads
+
+With `from_ns` or `to_ns` set, `forEach`, `streamForEach` and `run` leave out
+segments whose recorded time bounds lie outside the range (the `*From` variants
+apply the header check of the first case below only).
+Only bounds the writer guarantees are used, so the result is exactly the full
+read filtered to the range:
+
+* **Uncompressed segment flagged `Sorted`.** Written in non-decreasing
+  `exchange_ts_ns` order, so the header's `first_event_ns` / `last_event_ns`
+  are its minimum and maximum. A segment outside the range is not opened. (The
+  writer records `first_event_ns` from the first non-zero timestamp, so a
+  segment opening with events stamped 0 is still read when 0 is in range.)
+* **Compressed segment flagged `Sorted`.** The header records the first and
+  last events in arrival order, which the writer re-sorts inside each block, so
+  it is not a bound. The block index is: each entry holds its block's minimum
+  and the blocks do not overlap. A segment whose first block starts after
+  `to_ns` is not decoded; one that ends before `from_ns` costs its last block,
+  since a block's maximum is not on disk. Not used when the first block's
+  minimum is `<= 0`, where the writer does not check block order.
+* **Any other segment** (no `Sorted` flag, still being written, no usable
+  index) is read in full, as before.
+
+Inside a `Sorted` segment the reader also starts at the last index entry
+strictly below `from_ns` and stops at the first event past `to_ns`. Bounds and
+the range filter are both on `exchange_ts_ns`. `stats().segments_skipped`
+counts the segments left out; `skip_segments_by_time = false` restores the full
+walk.
 
 ## Usage
 

@@ -14796,6 +14796,11 @@
         },
         {
           "kind": "method",
+          "name": "indexEntries",
+          "parent": "BinaryLogIterator"
+        },
+        {
+          "kind": "method",
           "name": "indexLoaded",
           "parent": "BinaryLogIterator"
         },
@@ -14847,6 +14852,11 @@
         {
           "kind": "method",
           "name": "seekToBlockOffset",
+          "parent": "BinaryLogIterator"
+        },
+        {
+          "kind": "method",
+          "name": "seekToFileOffset",
           "parent": "BinaryLogIterator"
         },
         {
@@ -14906,7 +14916,17 @@
         },
         {
           "kind": "method",
+          "name": "narrowToRange",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
           "name": "passesFilter",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
+          "name": "rangeSkipActive",
           "parent": "BinaryLogReader"
         },
         {
@@ -14942,6 +14962,11 @@
         {
           "kind": "method",
           "name": "segmentFiles",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
+          "name": "segmentOutsideRange",
           "parent": "BinaryLogReader"
         },
         {
