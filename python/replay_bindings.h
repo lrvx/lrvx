@@ -616,6 +616,7 @@ class PyDataReader
     auto s = _reader.stats();
     py::dict d;
     d["files_read"] = s.files_read;
+    d["segments_skipped"] = s.segments_skipped;
     d["events_read"] = s.events_read;
     d["trades_read"] = s.trades_read;
     d["book_updates_read"] = s.book_updates_read;

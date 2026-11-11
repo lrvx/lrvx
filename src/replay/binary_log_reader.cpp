@@ -21,6 +21,8 @@
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
+#include <span>
 #include <string>
 #include <thread>
 #include <vector>
@@ -590,6 +592,69 @@ void recoverCompressedSegmentMeta(std::FILE* f, const SegmentHeader& hdr,
   }
 }
 
+// Byte window [start, end) of a Sorted segment that can hold events in
+// [from, to], read off its index.
+//
+// In a Sorted segment every event before an indexed offset is <= that entry's
+// timestamp and every event at or after it is >= it. For an uncompressed
+// segment the entries are frames of a non-decreasing stream. For a compressed
+// one they are blocks: the writer sorts each block and indexes its minimum,
+// and Sorted says no block starts below the previous block's maximum. The
+// writer only makes that cross-block comparison once a block maximum is
+// positive, so a compressed segment whose first block minimum is <= 0 is not
+// trusted. Nothing is read from an index whose entries are not ascending or
+// that does not start at the first frame.
+struct IndexWindow
+{
+  uint64_t start;
+  uint64_t end;
+  bool empty() const { return end <= start; }
+};
+
+std::optional<IndexWindow> indexWindow(std::span<const IndexEntry> idx,
+                                       const SegmentHeader& hdr, int64_t from, int64_t to)
+{
+  if (idx.empty() || idx.front().file_offset != sizeof(SegmentHeader))
+  {
+    return std::nullopt;
+  }
+  if (hdr.isCompressed() && idx.front().timestamp_ns <= 0)
+  {
+    return std::nullopt;
+  }
+  for (size_t i = 0; i < idx.size(); ++i)
+  {
+    if (idx[i].file_offset >= hdr.index_offset)
+    {
+      return std::nullopt;
+    }
+    if (i > 0 && (idx[i].file_offset <= idx[i - 1].file_offset ||
+                  idx[i].timestamp_ns < idx[i - 1].timestamp_ns))
+    {
+      return std::nullopt;
+    }
+  }
+
+  IndexWindow w{sizeof(SegmentHeader), std::numeric_limits<uint64_t>::max()};
+  // Last entry strictly below `from`: everything before it is below `from`.
+  auto lo = std::lower_bound(idx.begin(), idx.end(), from,
+                             [](const IndexEntry& e, int64_t ts)
+                             { return e.timestamp_ns < ts; });
+  if (lo != idx.begin())
+  {
+    w.start = std::prev(lo)->file_offset;
+  }
+  // First entry strictly above `to`: everything from it on is above `to`.
+  auto hi = std::upper_bound(idx.begin(), idx.end(), to,
+                             [](int64_t ts, const IndexEntry& e)
+                             { return ts < e.timestamp_ns; });
+  if (hi != idx.end())
+  {
+    w.end = hi->file_offset;
+  }
+  return w;
+}
+
 // Min-heap comparator for ReplayEvent. Greater-than yields a min-heap
 // when paired with std::push_heap / std::pop_heap. Defined in this
 // anon namespace so both `streamSegmentWithStats` (single-thread per-
@@ -889,6 +954,8 @@ bool BinaryLogReader::scanSegments()
       info.event_count = header.event_count;
       info.has_index = header.hasIndex();
       info.index_offset = header.index_offset;
+      info.sorted = header.isSorted();
+      info.compressed = header.isCompressed();
 
       if (header.event_count == 0)
       {
@@ -942,12 +1009,91 @@ bool BinaryLogReader::passesFilter(const ReplayEvent& event) const
   return true;
 }
 
+bool BinaryLogReader::rangeSkipActive() const
+{
+  return _config.skip_segments_by_time && (_config.from_ns || _config.to_ns);
+}
+
+bool BinaryLogReader::segmentOutsideRange(const SegmentInfo& segment) const
+{
+  // Only an uncompressed Sorted segment has header bounds: it was written in
+  // non-decreasing exchange_ts_ns order, so the first and last events written
+  // are its minimum and maximum. A compressed Sorted segment records the first
+  // and last events in arrival order, which the writer then re-sorted inside
+  // each block (narrowToRange bounds it from the index instead), and a segment
+  // without the flag records arrival order with no ordering promise at all.
+  if (!rangeSkipActive() || !segment.sorted || segment.compressed)
+  {
+    return false;
+  }
+  const int64_t from = _config.from_ns.value_or(std::numeric_limits<int64_t>::min());
+  const int64_t to = _config.to_ns.value_or(std::numeric_limits<int64_t>::max());
+
+  if (segment.last_event_ns < from)
+  {
+    return true;
+  }
+  // The writer leaves first_event_ns at 0 until it sees a non-zero
+  // timestamp, so a segment that opens with events stamped 0 records the
+  // first non-zero one. Those events are never negative in a Sorted segment,
+  // so first_event_ns bounds everything except a stretch of zeros, which only
+  // matters when 0 itself is in range.
+  const bool zero_in_range = from <= 0 && to >= 0;
+  return segment.first_event_ns != 0 && segment.first_event_ns > to && !zero_in_range;
+}
+
+bool BinaryLogReader::narrowToRange(BinaryLogIterator& iter, bool& stop_past_to) const
+{
+  stop_past_to = false;
+  const SegmentHeader& hdr = iter.header();
+  if (!rangeSkipActive() || !hdr.isSorted())
+  {
+    return true;
+  }
+  const int64_t from = _config.from_ns.value_or(std::numeric_limits<int64_t>::min());
+  const int64_t to = _config.to_ns.value_or(std::numeric_limits<int64_t>::max());
+
+  std::optional<IndexWindow> window;
+  if (hdr.hasIndex() && (iter.indexLoaded() || iter.loadIndex()))
+  {
+    window = indexWindow(iter.indexEntries(), hdr, from, to);
+  }
+  // Without a usable index a compressed segment's monotonicity across blocks
+  // is not established (see indexWindow), so it is walked as before.
+  if (hdr.isCompressed() && !window)
+  {
+    return true;
+  }
+  if (window)
+  {
+    if (window->empty())
+    {
+      return false;
+    }
+    if (window->start > sizeof(SegmentHeader) && !iter.seekToFileOffset(window->start))
+    {
+      // Back to the first frame and the full walk.
+      iter.seekToFileOffset(sizeof(SegmentHeader));
+      return true;
+    }
+  }
+  stop_past_to = _config.to_ns.has_value();
+  return true;
+}
+
 bool BinaryLogReader::readSegment(const std::filesystem::path& path, EventCallback& callback)
 {
   BinaryLogIterator iter(path);
   if (!iter.isValid())
   {
     return false;
+  }
+
+  bool stop_past_to = false;
+  if (!narrowToRange(iter, stop_past_to))
+  {
+    ++_stats.segments_skipped;
+    return true;
   }
 
   ++_stats.files_read;
@@ -958,6 +1104,10 @@ bool BinaryLogReader::readSegment(const std::filesystem::path& path, EventCallba
     ReplayEvent event;
     while (iter.next(event))
     {
+      if (stop_past_to && event.timestamp_ns > *_config.to_ns)
+      {
+        break;
+      }
       if (!passesFilter(event))
       {
         continue;
@@ -1099,6 +1249,11 @@ bool BinaryLogReader::forEach(EventCallback callback)
 
   for (const auto& segment : _segments)
   {
+    if (segmentOutsideRange(segment))
+    {
+      ++_stats.segments_skipped;
+      continue;
+    }
     if (!readSegment(segment.path, callback))
     {
       return false;
@@ -1320,11 +1475,42 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
 
   for (const auto& segment : _segments)
   {
+    if (segmentOutsideRange(segment))
+    {
+      ++_stats.segments_skipped;
+      continue;
+    }
+
     std::vector<BlockMeta> blocks;
     SegmentHeader seg_hdr;
     if (!scanBlockOffsetsForSegment(segment.path, seg_hdr, blocks))
     {
       return false;
+    }
+
+    // Partition only the blocks the index leaves in range (the same window
+    // narrowToRange applies on the single-thread path).
+    if (rangeSkipActive() && seg_hdr.isSorted() && seg_hdr.isCompressed() && !blocks.empty())
+    {
+      BinaryLogIterator probe(segment.path);
+      std::optional<IndexWindow> window;
+      if (probe.isValid() && probe.loadIndex())
+      {
+        window = indexWindow(
+            probe.indexEntries(), seg_hdr,
+            _config.from_ns.value_or(std::numeric_limits<int64_t>::min()),
+            _config.to_ns.value_or(std::numeric_limits<int64_t>::max()));
+      }
+      if (window)
+      {
+        std::erase_if(blocks, [&](const BlockMeta& b)
+                      { return b.file_offset < window->start || b.file_offset >= window->end; });
+        if (blocks.empty())
+        {
+          ++_stats.segments_skipped;
+          continue;
+        }
+      }
     }
 
     const std::size_t workers_for_segment =
@@ -1435,6 +1621,7 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
     for (const auto& s : local_stats)
     {
       _stats.files_read += s.files_read;
+      _stats.segments_skipped += s.segments_skipped;
       _stats.events_read += s.events_read;
       _stats.trades_read += s.trades_read;
       _stats.book_updates_read += s.book_updates_read;
@@ -1464,6 +1651,11 @@ bool BinaryLogReader::streamForEach(EventCallback callback)
 
   for (const auto& segment : _segments)
   {
+    if (segmentOutsideRange(segment))
+    {
+      ++_stats.segments_skipped;
+      continue;
+    }
     if (!readSegmentStreaming(segment.path, callback))
     {
       return false;
@@ -1488,7 +1680,11 @@ bool BinaryLogReader::streamForEachFrom(int64_t start_ts_ns, EventCallback callb
 
   for (; it != _segments.end(); ++it)
   {
-    if (!readSegmentStreamingFrom(*it, start_ts_ns, callback))
+    if (segmentOutsideRange(*it))
+    {
+      ++_stats.segments_skipped;
+    }
+    else if (!readSegmentStreamingFrom(*it, start_ts_ns, callback))
     {
       return false;
     }
@@ -1515,6 +1711,13 @@ bool BinaryLogReader::streamSegmentWithStats(const std::filesystem::path& path,
     return false;
   }
 
+  bool stop_past_to = false;
+  if (!narrowToRange(iter, stop_past_to))
+  {
+    ++stats.segments_skipped;
+    return true;
+  }
+
   ++stats.files_read;
 
   // Sorted segments: stream straight through. The writer guaranteed
@@ -1534,6 +1737,10 @@ bool BinaryLogReader::streamSegmentWithStats(const std::filesystem::path& path,
     ReplayEvent event;
     while (iter.next(event))
     {
+      if (stop_past_to && event.timestamp_ns > *_config.to_ns)
+      {
+        break;
+      }
       if (!passesFilter(event))
       {
         continue;
@@ -1658,7 +1865,11 @@ bool BinaryLogReader::forEachFrom(int64_t start_ts_ns, EventCallback callback)
 
   for (; it != _segments.end(); ++it)
   {
-    if (!readSegmentFrom(*it, start_ts_ns, callback))
+    if (segmentOutsideRange(*it))
+    {
+      ++_stats.segments_skipped;
+    }
+    else if (!readSegmentFrom(*it, start_ts_ns, callback))
     {
       return false;
     }
@@ -2282,6 +2493,16 @@ bool BinaryLogIterator::seekToBlockOffset(uint64_t file_offset)
   // fires whenever `_block_events_remaining == 0`).
   discardBlockState();
   return loadNextBlock();
+}
+
+bool BinaryLogIterator::seekToFileOffset(uint64_t file_offset)
+{
+  if (!_file || std::fseek(_file, static_cast<long>(file_offset), SEEK_SET) != 0)
+  {
+    return false;
+  }
+  discardBlockState();
+  return true;
 }
 
 bool BinaryLogIterator::loadIndex()

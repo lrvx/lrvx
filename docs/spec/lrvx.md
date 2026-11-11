@@ -1,6 +1,6 @@
 # `.lrvx` binary tape format specification
 
-**Version 1, last revised 2026-07-22.** This is the on-disk format lrvx uses for deterministic event capture and replay. The format is published so third-party tooling can read and write tapes without depending on lrvx itself.
+**Version 1, last revised 2026-11-12.** This is the on-disk format lrvx uses for deterministic event capture and replay. The format is published so third-party tooling can read and write tapes without depending on lrvx itself.
 
 ## At a glance
 
@@ -56,8 +56,8 @@ A segment is a `SegmentHeader` followed by a stream of frames. If `Compressed` i
 | 6  | 1 | `flags` | Bitfield. See below. |
 | 7  | 1 | `exchange_id` | Numeric exchange tag; `0` if not used. |
 | 8  | 8 | `created_ns` | Wall-clock nanoseconds when the segment was opened. |
-| 16 | 8 | `first_event_ns` | Earliest event timestamp in segment. |
-| 24 | 8 | `last_event_ns` | Latest event timestamp. |
+| 16 | 8 | `first_event_ns` | `exchange_ts_ns` of the first event written, in arrival order; `0` until a non-zero timestamp is written. |
+| 24 | 8 | `last_event_ns` | `exchange_ts_ns` of the last event written, in arrival order. |
 | 32 | 4 | `event_count` | Total events written. |
 | 36 | 4 | `symbol_count` | Distinct symbols seen. |
 | 40 | 8 | `index_offset` | Byte offset of the index trailer; `0` if absent. |
@@ -74,6 +74,8 @@ A segment is a `SegmentHeader` followed by a stream of frames. If `Compressed` i
 | `0x08` | `Sorted` | Writer guarantees `exchange_ts_ns` is monotonically non-decreasing across all events in the segment. |
 
 A reader that sees an unknown flag set must reject the segment with a clear error. New flags need a new minor version of the format.
+
+`first_event_ns` / `last_event_ns` are the segment's minimum (apart from a leading run of events stamped `0`) and maximum only on an uncompressed segment flagged `Sorted`. The writer sorts each compressed block before writing it, so on a compressed segment the two fields name events that may sit inside their blocks, and on a segment without `Sorted` they bound nothing. Both are written at close (a compressed segment's header is also refreshed after every block), so a segment still being written may carry zeros.
 
 `Sorted` is set at close on any segment -- compressed or not -- whose events all reached the writer in non-decreasing `exchange_ts_ns` order. It is a per-segment promise and says nothing about the segments around it: a reader may stream a `Sorted` segment as it stands, and must not drop its leading events because an earlier segment of the same dataset ended later in time. Segments whose time ranges overlap are a recording fault the validator reports; they are not licence to discard recorded frames.
 
@@ -187,7 +189,7 @@ Followed by `entry_count` `IndexEntry` rows.
 | 0 | 8 | `timestamp_ns` |
 | 8 | 8 | `file_offset` |
 
-`file_offset` points at the start of a `FrameHeader` (or, for compressed segments, the start of a `CompressedBlock`). Indexes are sparse: a reader that wants timestamp `T` finds the largest indexed entry with `timestamp_ns <= T`, seeks there, and scans forward.
+`file_offset` points at the start of a `FrameHeader` (or, for compressed segments, the start of a `CompressedBlock`). On a compressed segment the writer adds one entry per block and `timestamp_ns` is that block's minimum after the block was sorted. Indexes are sparse: a reader that wants timestamp `T` from a `Sorted` segment finds the largest indexed entry with `timestamp_ns < T`, seeks there, and scans forward. Strictly below: when several events share timestamp `T`, an entry equal to `T` can have some of them before it.
 
 ## Manifest
 

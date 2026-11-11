@@ -13776,6 +13776,7 @@ Reader statistics.
 | Key | Type | Description |
 |-----|------|-------------|
 | `files_read` | `int` | Segment files read |
+| `segments_skipped` | `int` | Segments not decoded because their recorded time bounds lie outside `from_ns`/`to_ns` |
 | `events_read` | `int` | Total events processed |
 | `trades_read` | `int` | Trade events |
 | `book_updates_read` | `int` | Book update events |
