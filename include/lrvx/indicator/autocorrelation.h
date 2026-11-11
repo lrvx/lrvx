@@ -10,6 +10,70 @@
 namespace lrvx::indicator
 {
 
+namespace detail
+{
+
+// Pearson correlation of x[t] with x[t - lag] over the last `window` pairs.
+// O(window) per step: the sums are recomputed over the ring (the last
+// window + lag inputs) each step. Zero denominator gives NaN.
+class AutoCorrelationKernel
+{
+ public:
+  AutoCorrelationKernel(size_t window, size_t lag)
+      : _window(window), _lag(lag), _firstValid(window + lag - 1), _win(window + lag)
+  {
+  }
+
+  LRVX_INDICATOR_STEP double step(double v)
+  {
+    _win.push(v);
+    const size_t t = _index++;
+    if (t < _firstValid)
+    {
+      return std::nan("");
+    }
+    // w[k] = x[t - window - lag + 1 + k]
+    const auto w = _win.window();
+    const double n = static_cast<double>(_window);
+
+    double sx = 0, sy = 0, sxy = 0, sx2 = 0, sy2 = 0;
+    LRVX_INDICATOR_NO_UNROLL
+    for (size_t i = 0; i < _window; ++i)
+    {
+      double xi = w[_lag + i];
+      double yi = w[i];
+      sx += xi;
+      sy += yi;
+      sxy += xi * yi;
+      sx2 += xi * xi;
+      sy2 += yi * yi;
+    }
+
+    double num = n * sxy - sx * sy;
+    double den = std::sqrt((n * sx2 - sx * sx) * (n * sy2 - sy * sy));
+    if (den == 0.0)
+    {
+      return std::nan("");
+    }
+    return num / den;
+  }
+
+  void reset()
+  {
+    _win.clear();
+    _index = 0;
+  }
+
+ private:
+  size_t _window;
+  size_t _lag;
+  size_t _firstValid;
+  Ring _win;
+  size_t _index = 0;
+};
+
+}  // namespace detail
+
 // AutoCorrelation(window, lag): Pearson correlation between x[t] and x[t-lag]
 // over a trailing window of `window` paired observations. Equivalent to
 // Correlation(window) applied to (x[lag..], x[..-lag]) but explicit about the
@@ -19,10 +83,11 @@ namespace lrvx::indicator
 //
 // Reuses Pearson's standard closed form so output matches Correlation when
 // the same data is paired manually.
-class AutoCorrelation : public StreamingSingle<AutoCorrelation>
+class AutoCorrelation : public StreamingSingle<AutoCorrelation, detail::AutoCorrelationKernel>
 {
  public:
-  AutoCorrelation(size_t window, size_t lag) noexcept : _window(window), _lag(lag)
+  AutoCorrelation(size_t window, size_t lag)
+      : StreamingSingle(detail::AutoCorrelationKernel(window, lag)), _window(window), _lag(lag)
   {
     assert(window >= 2);
     assert(lag >= 1);
@@ -31,54 +96,14 @@ class AutoCorrelation : public StreamingSingle<AutoCorrelation>
   std::vector<double> compute(std::span<const double> x) const
   {
     std::vector<double> out(x.size(), std::nan(""));
-    if (!x.empty())
-    {
-      compute(x, out);
-    }
+    compute(x, out);
     return out;
   }
 
   void compute(std::span<const double> x, std::span<double> output) const
   {
-    const size_t n = x.size();
-    assert(output.size() >= n);
-
-    for (size_t i = 0; i < n; ++i)
-    {
-      output[i] = std::nan("");
-    }
-
-    const size_t firstValid = _window + _lag - 1;
-    if (n <= firstValid)
-    {
-      return;
-    }
-
-    const double w = static_cast<double>(_window);
-
-    for (size_t t = firstValid; t < n; ++t)
-    {
-      double sx = 0, sy = 0, sxy = 0, sx2 = 0, sy2 = 0;
-      for (size_t i = 0; i < _window; ++i)
-      {
-        double xi = x[t - _window + 1 + i];
-        double yi = x[t - _window + 1 + i - _lag];
-        sx += xi;
-        sy += yi;
-        sxy += xi * yi;
-        sx2 += xi * xi;
-        sy2 += yi * yi;
-      }
-
-      double num = w * sxy - sx * sy;
-      double den = std::sqrt((w * sx2 - sx * sx) * (w * sy2 - sy * sy));
-      if (den == 0.0)
-      {
-        output[t] = std::nan("");
-        continue;
-      }
-      output[t] = num / den;
-    }
+    assert(output.size() >= x.size());
+    fold(detail::AutoCorrelationKernel(_window, _lag), x, output);
   }
 
   size_t period() const noexcept { return _window + _lag - 1; }

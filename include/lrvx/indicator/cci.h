@@ -12,50 +12,56 @@
 namespace lrvx::indicator
 {
 
-class CCI : public StreamingBar<CCI>
+namespace detail
+{
+
+// CCI step: typical price tp = (h + l + c) / 3, its SMA, and the mean
+// absolute deviation of tp from that SMA over the window. O(period) per step
+// (the deviation depends on the current SMA, so it is summed afresh over the
+// window). A NaN anywhere in the window gives NaN for that window, through
+// the SMA's NaN contract. A zero period has no well-defined window and never
+// produces a value.
+class CciKernel
 {
  public:
-  explicit CCI(size_t period = 20) noexcept : _period(period) {}
+  explicit CciKernel(size_t period) : _period(period), _sma(period) {}
+
+  LRVX_INDICATOR_STEP double step(double high, double low, double close)
+  {
+    const double tp = (high + low + close) / 3.0;
+    const double mean = _sma.step(tp);
+    if (_period == 0 || std::isnan(mean))
+    {
+      return std::nan("");
+    }
+    double md = 0.0;
+    for (double v : _sma.window())
+    {
+      md += std::abs(v - mean);
+    }
+    md /= static_cast<double>(_period);
+    return md > 0 ? (tp - mean) / (0.015 * md) : 0.0;
+  }
+
+  void reset() { _sma.reset(); }
+
+ private:
+  size_t _period;
+  SmaKernel _sma;
+};
+
+}  // namespace detail
+
+class CCI : public StreamingBar<CCI, detail::CciKernel>
+{
+ public:
+  explicit CCI(size_t period = 20) : StreamingBar(detail::CciKernel(period)), _period(period) {}
 
   std::vector<double> compute(std::span<const double> high, std::span<const double> low,
                               std::span<const double> close) const
   {
-    const size_t n = high.size();
-    std::vector<double> out(n, std::nan(""));
-
-    // A zero period has no well-defined window; the nested SMA(0) below is
-    // now safe on its own (it returns all-NaN), but guard here too so the
-    // "not enough data" contract is explicit rather than incidental.
-    if (_period == 0 || n < _period)
-    {
-      return out;
-    }
-
-    std::vector<double> tp(n);
-    for (size_t i = 0; i < n; ++i)
-    {
-      tp[i] = (high[i] + low[i] + close[i]) / 3.0;
-    }
-
-    SMA sma(_period);
-    std::vector<double> tpSma(n, std::nan(""));
-    sma.compute(std::span<const double>(tp), tpSma);
-
-    for (size_t i = _period - 1; i < n; ++i)
-    {
-      if (std::isnan(tpSma[i]))
-      {
-        continue;
-      }
-      double md = 0.0;
-      for (size_t j = i - _period + 1; j <= i; ++j)
-      {
-        md += std::abs(tp[j] - tpSma[i]);
-      }
-      md /= static_cast<double>(_period);
-      out[i] = md > 0 ? (tp[i] - tpSma[i]) / (0.015 * md) : 0.0;
-    }
-
+    std::vector<double> out(high.size(), std::nan(""));
+    fold(detail::CciKernel(_period), high, low, close, out);
     return out;
   }
 

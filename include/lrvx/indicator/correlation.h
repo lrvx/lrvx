@@ -10,20 +10,76 @@
 namespace lrvx::indicator
 {
 
-class Correlation : public StreamingPair<Correlation>
+namespace detail
+{
+
+// Pearson correlation of the last `period` (x, y) pairs. O(period) per step:
+// the sums are recomputed over the two rings each step. Zero denominator
+// gives NaN.
+class CorrelationKernel
 {
  public:
-  explicit Correlation(size_t period) noexcept : _period(period) { assert(period >= 2); }
+  explicit CorrelationKernel(size_t period) : _period(period), _x(period), _y(period) {}
+
+  LRVX_INDICATOR_STEP double step(double xv, double yv)
+  {
+    _x.push(xv);
+    _y.push(yv);
+    if (_period == 0 || !_x.full())
+    {
+      return std::nan("");
+    }
+    const auto x = _x.window();
+    const auto y = _y.window();
+    const double p = static_cast<double>(_period);
+
+    double sx = 0, sy = 0, sxy = 0, sx2 = 0, sy2 = 0;
+    LRVX_INDICATOR_NO_UNROLL
+    for (size_t j = 0; j < _period; ++j)
+    {
+      sx += x[j];
+      sy += y[j];
+      sxy += x[j] * y[j];
+      sx2 += x[j] * x[j];
+      sy2 += y[j] * y[j];
+    }
+
+    double num = p * sxy - sx * sy;
+    double den = std::sqrt((p * sx2 - sx * sx) * (p * sy2 - sy * sy));
+
+    if (den == 0.0)
+    {
+      return std::nan("");
+    }
+    return num / den;
+  }
+
+  void reset()
+  {
+    _x.clear();
+    _y.clear();
+  }
+
+ private:
+  size_t _period;
+  Ring _x, _y;
+};
+
+}  // namespace detail
+
+class Correlation : public StreamingPair<Correlation, detail::CorrelationKernel>
+{
+ public:
+  explicit Correlation(size_t period) : StreamingPair(detail::CorrelationKernel(period)), _period(period)
+  {
+    assert(period >= 2);
+  }
 
   std::vector<double> compute(std::span<const double> x, std::span<const double> y) const
   {
     assert(x.size() == y.size());
-    const size_t n = x.size();
-    std::vector<double> out(n, std::nan(""));
-    if (n > 0)
-    {
-      compute(x, y, out);
-    }
+    std::vector<double> out(x.size(), std::nan(""));
+    compute(x, y, out);
     return out;
   }
 
@@ -32,43 +88,7 @@ class Correlation : public StreamingPair<Correlation>
   {
     assert(x.size() == y.size());
     assert(output.size() >= x.size());
-    const size_t n = x.size();
-
-    for (size_t i = 0; i < n; ++i)
-    {
-      output[i] = std::nan("");
-    }
-
-    if (n < _period)
-    {
-      return;
-    }
-
-    const double p = static_cast<double>(_period);
-
-    for (size_t i = _period - 1; i < n; ++i)
-    {
-      double sx = 0, sy = 0, sxy = 0, sx2 = 0, sy2 = 0;
-      for (size_t j = i - _period + 1; j <= i; ++j)
-      {
-        sx += x[j];
-        sy += y[j];
-        sxy += x[j] * y[j];
-        sx2 += x[j] * x[j];
-        sy2 += y[j] * y[j];
-      }
-
-      double num = p * sxy - sx * sy;
-      double den = std::sqrt((p * sx2 - sx * sx) * (p * sy2 - sy * sy));
-
-      if (den == 0.0)
-      {
-        output[i] = std::nan("");
-        continue;
-      }
-
-      output[i] = num / den;
-    }
+    fold(detail::CorrelationKernel(_period), x, y, output);
   }
 
   size_t period() const noexcept { return _period; }

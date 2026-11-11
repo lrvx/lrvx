@@ -18,7 +18,7 @@ A bar strategy implements `on_bar(ctx, bar)` and reads `bar.open`, `bar.high`, `
 
 Two exits that look alike are not: `market_sell(qty)` is a plain sell of `qty`, which reduces a long by that much and goes short past it; `close_position()` sells exactly the open position, reduce-only, and submits nothing when flat.
 
-Keep the work per bar small. The streaming indicators (`lrvx.SMA`, `lrvx.EMA`, `lrvx.ATR` and the rest) update in place with no per-bar allocation, and a strategy that keeps only its indicators and its state costs the same on bar 3000 as on bar 40.
+Keep the work per bar small. The streaming indicators (`lrvx.SMA`, `lrvx.EMA`, `lrvx.ATR` and the rest) keep no history: `update()` advances a fixed-size state by one step without allocating, at a cost set by the indicator's period (O(1) for the moving averages, RSI and ATR, O(period) for the rolling statistics) and independent of how many bars came before. A strategy that keeps only its indicators and its state costs the same on bar 3000 as on bar 40.
 
 ## The sweep
 

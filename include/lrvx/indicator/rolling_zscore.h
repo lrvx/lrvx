@@ -10,63 +10,81 @@
 namespace lrvx::indicator
 {
 
-class RollingZScore : public StreamingSingle<RollingZScore>
+namespace detail
+{
+
+// (x - mean) / stdev over the last `period` inputs (sample stdev). O(period)
+// per step: mean and stdev are recomputed exactly over the ring each step
+// rather than kept as running sums, which would lose precision on long,
+// trending series. A NaN in the window gives NaN for that window; a
+// zero-stdev window gives NaN.
+class RollingZScoreKernel
 {
  public:
-  explicit RollingZScore(size_t period) noexcept : _period(period) { assert(period >= 2); }
+  explicit RollingZScoreKernel(size_t period) : _period(period), _win(period) {}
+
+  LRVX_INDICATOR_STEP double step(double x)
+  {
+    _win.push(x);
+    if (_period == 0 || !_win.full())
+    {
+      return std::nan("");
+    }
+    const auto w = _win.window();
+    const double p = static_cast<double>(_period);
+
+    double mean = 0;
+    for (double v : w)
+    {
+      mean += v;
+    }
+    mean /= p;
+
+    double sumSq = 0;
+    LRVX_INDICATOR_NO_UNROLL
+    for (double v : w)
+    {
+      double d = v - mean;
+      sumSq += d * d;
+    }
+
+    double std = std::sqrt(sumSq / (p - 1.0));
+    if (std == 0.0)
+    {
+      return std::nan("");
+    }
+    return (x - mean) / std;
+  }
+
+  void reset() { _win.clear(); }
+
+ private:
+  size_t _period;
+  Ring _win;
+};
+
+}  // namespace detail
+
+class RollingZScore : public StreamingSingle<RollingZScore, detail::RollingZScoreKernel>
+{
+ public:
+  explicit RollingZScore(size_t period)
+      : StreamingSingle(detail::RollingZScoreKernel(period)), _period(period)
+  {
+    assert(period >= 2);
+  }
 
   std::vector<double> compute(std::span<const double> input) const
   {
     std::vector<double> out(input.size(), std::nan(""));
-    if (!input.empty())
-    {
-      compute(input, out);
-    }
+    compute(input, out);
     return out;
   }
 
   void compute(std::span<const double> input, std::span<double> output) const
   {
     assert(output.size() >= input.size());
-    const size_t n = input.size();
-
-    for (size_t i = 0; i < n; ++i)
-    {
-      output[i] = std::nan("");
-    }
-
-    if (n < _period)
-    {
-      return;
-    }
-
-    const double p = static_cast<double>(_period);
-
-    for (size_t i = _period - 1; i < n; ++i)
-    {
-      double mean = 0;
-      for (size_t j = i - _period + 1; j <= i; ++j)
-      {
-        mean += input[j];
-      }
-      mean /= p;
-
-      double sumSq = 0;
-      for (size_t j = i - _period + 1; j <= i; ++j)
-      {
-        double d = input[j] - mean;
-        sumSq += d * d;
-      }
-
-      double std = std::sqrt(sumSq / (p - 1.0));
-      if (std == 0.0)
-      {
-        output[i] = std::nan("");
-        continue;
-      }
-
-      output[i] = (input[i] - mean) / std;
-    }
+    fold(detail::RollingZScoreKernel(_period), input, output);
   }
 
   size_t period() const noexcept { return _period; }

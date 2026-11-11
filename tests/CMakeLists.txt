@@ -285,6 +285,7 @@ endif()
 
 add_lrvx_test(test_indicators)
 add_lrvx_test(test_streaming_parity)
+add_lrvx_test(test_indicator_streaming_cost)
 add_lrvx_test(test_targets)
 add_lrvx_test(test_adf)
 add_lrvx_test(test_autocorrelation)
