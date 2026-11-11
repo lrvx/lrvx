@@ -47,7 +47,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, List, Optional, Sequence, Tuple, Union
 
-from . import _cache
+from . import _cache, _dedup
 
 
 _BASE_URL = "https://history.deribit.com"
@@ -268,25 +268,6 @@ def _write_metadata(out_tape: Path, *,
     meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True))
 
 
-def _existing_max_trade_id(out_tape: Path, symbol_id: int) -> int:
-    if not out_tape.exists():
-        return 0
-    try:
-        import lrvx
-        import numpy as np
-
-        reader = lrvx.DataReader(str(out_tape))
-        trades = reader.read_trades()
-        if trades.size == 0:
-            return 0
-        ids = np.asarray(trades["trade_id"])
-        syms = np.asarray(trades["symbol_id"])
-        mask = syms == symbol_id
-        return int(ids[mask].max()) if mask.any() else 0
-    except Exception:
-        return 0
-
-
 def trades_to_lrvx(
     csv_path: Union[str, Path],
     out_tape: Union[str, Path],
@@ -320,17 +301,12 @@ def trades_to_lrvx(
             stem = stem[:-11]   # strip "-YYYY-MM-DD"
         symbol_name = stem
 
-    last_id = _existing_max_trade_id(out_tape, symbol_id) if append else 0
-
-    rows: List[Tuple[int, float, float, int, int, float, float, float]] = []
-    rows_read = 0
+    rows: List[Tuple[int, float, float, int, int, float, float, float]] = list(_iter_rows(csv_path))
+    rows_read = len(rows)
+    last_seen_id = max((r[0] for r in rows), default=0)
     rows_skipped = 0
-    for r in _iter_rows(csv_path):
-        rows_read += 1
-        if r[0] <= last_id and r[0] != 0:
-            rows_skipped += 1
-            continue
-        rows.append(r)
+    if append:
+        rows, rows_skipped = _dedup.drop_trades_on_tape(rows, out_tape, symbol_id)
 
     if not rows:
         if write_metadata and rows_read:
@@ -342,7 +318,7 @@ def trades_to_lrvx(
         return ConvertStats(rows_read=rows_read,
                             rows_skipped=rows_skipped,
                             files_processed=1,
-                            last_trade_id=last_id)
+                            last_trade_id=last_seen_id)
 
     rows.sort(key=lambda t: t[3])
 
