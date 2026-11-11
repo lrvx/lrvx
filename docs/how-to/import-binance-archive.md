@@ -79,13 +79,12 @@ The tape's `metadata.json` is created (or merged into) on every successful conve
 
 ## What is and is not in the archive
 
-aggTrades only carries print events. There is no book information. The book archives have their own converters in `lrvx.archives.binance`:
+aggTrades only carries print events. There is no book information. The bookTicker archive (best bid / ask, um-futures and cm-futures) has its own converters in `lrvx.archives.binance`:
 
 | Function | Archive |
 |---|---|
 | `t1_to_lrvx(csv_path, out_tape, ...)` | `T1` / `bookTicker` — top of book |
-| `depth20_to_lrvx(csv_path, out_tape, *, levels=20, ...)` | `depth20` / `bookDepth` — L2 ladder |
-| `range_book_to_lrvx(symbol, market, book_type, date_from, date_to, out_tape, ...)` | multi-day book range, downloads and converts in one call |
+| `range_book_to_lrvx(symbol, market, book_type, date_from, date_to, out_tape, ...)` | multi-day bookTicker range, downloads and converts in one call |
 
 They write into the same tape directory, so a single lrvx can carry both trades and book updates. See [Import Binance book archives](import-binance-book-archive.md).
 

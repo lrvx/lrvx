@@ -14,7 +14,7 @@ Adding a new venue is a self-contained module under `lrvx/archives/` that implem
 
 All five trade importers append by default and dedup the same way: a row is skipped when its trade id is already on the tape for the same symbol within the incoming file's time range. A trade keeps its exchange timestamp, so only that range can hold a copy of it, and the dedup read covers that range instead of the whole tape. Re-importing a day adds nothing, a new day lands in full, an overlapping range keeps each trade once, and days may be imported in any order (a later day first, or a day that fills a gap). `--no-append` turns the check off.
 
-The Binance book importers (`--book t1` / `--book depth20`) follow the same rule on the book record's update id, and encode every file on its own, starting from a snapshot, so book days may be imported in any order too. See [Import Binance book archives](import-binance-book-archive.md#append-safe-and-idempotent).
+The Binance bookTicker importer (`--book t1`) follows the same rule on the book record's update id, and encode every file on its own, starting from a snapshot, so book days may be imported in any order too. See [Import Binance book archives](import-binance-book-archive.md#append-safe-and-idempotent).
 
 ## Bybit
 
@@ -240,5 +240,5 @@ Register the new module in `archives/__init__.py`, add a `lrvx archive <exchange
 ## See also
 
 - [Import Binance public archives](import-binance-archive.md) — trade stream.
-- [Import Binance book archives](import-binance-book-archive.md) — bookTicker / bookDepth.
+- [Import Binance book archives](import-binance-book-archive.md) — bookTicker (best bid / ask) for um-futures and cm-futures.
 - [Merge multiple tapes on read](multi-tape.md) — `MergedTapeReader` semantics across multiple exchanges.

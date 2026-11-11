@@ -1,23 +1,22 @@
-"""Tests for ``lrvx.archives.binance.{t1_to_lrvx, depth20_to_lrvx}``.
+"""Tests for ``lrvx.archives.binance.{t1_to_lrvx, range_book_to_lrvx}``.
 
 No network: synthetic bookTicker CSVs in the layout published on
-``data.binance.vision`` and bookDepth CSVs in the long format
-``depth20_to_lrvx`` documents are built in-memory and fed through the
-converters. The resulting `.lrvx`
-directory is read back via ``lrvx.DataReader.read_book_updates``
-and asserted ladder-by-ladder.
+``data.binance.vision`` are built in-memory and fed through the
+converter. The resulting `.lrvx` directory is read back via
+``lrvx.DataReader.read_book_updates`` and asserted ladder-by-ladder.
 
 Covers:
 
   * `t1_to_lrvx`: initial snapshot + delta on the next change, no-op
     on unchanged ticks, dedup on re-run by `update_id`.
-  * `depth20_to_lrvx`: long-format snap → 20-level snapshot,
-    subsequent updates → deltas with qty=0 removals + new prices.
+  * Unsupported requests: a book_type other than ``t1`` and the spot
+    market fail with a clear error, in the library and on the CLI,
+    before anything is downloaded or written.
   * Co-existence: aggTrades + book events sit in one tape, monotonic
     on `exchange_ts_ns` (the existing reader interleaves them).
   * `metadata.json`: `has_book_snapshots` / `has_book_deltas` /
     `total_book_updates` / `book_depth` populated by the writer.
-  * Multi-day append for both products: days in sequence, re-imports,
+  * Multi-day append: days in sequence, re-imports,
     overlapping ranges, out-of-order days, a gap fill and a day cut
     short each give the tape one in-order import of the same days
     gives, and the dedup read covers only the incoming day's time range.
@@ -64,33 +63,6 @@ _T1_ROWS = [
 def _build_t1_zip(dest: Path) -> Path:
     buf = io.StringIO()
     for r in _T1_ROWS:
-        buf.write(",".join(str(x) for x in r) + "\n")
-    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(dest.with_suffix(".csv").name, buf.getvalue())
-    return dest
-
-
-def _build_depth20_zip(dest: Path) -> Path:
-    """bookDepth long format: symbol, ts_ms, first_id, last_id, side,
-    update_type, price, qty.
-
-    First group (last_update_id=10) is the snapshot — 3 bids + 3 asks.
-    Second group (last_update_id=11) is an update: top bid removed,
-    new top bid added, top ask qty changed.
-    """
-    rows = [
-        ("BTCUSDT", 1_700_000_000_000, 1, 10, "b", "snap", 42_000.0, 1.0),
-        ("BTCUSDT", 1_700_000_000_000, 1, 10, "b", "snap", 41_999.0, 1.5),
-        ("BTCUSDT", 1_700_000_000_000, 1, 10, "b", "snap", 41_998.0, 2.0),
-        ("BTCUSDT", 1_700_000_000_000, 1, 10, "a", "snap", 42_001.0, 1.0),
-        ("BTCUSDT", 1_700_000_000_000, 1, 10, "a", "snap", 42_002.0, 1.5),
-        ("BTCUSDT", 1_700_000_000_000, 1, 10, "a", "snap", 42_003.0, 2.0),
-        ("BTCUSDT", 1_700_000_001_000, 11, 11, "b", "set",  42_000.0, 0.0),
-        ("BTCUSDT", 1_700_000_001_000, 11, 11, "b", "set",  42_000.5, 0.8),
-        ("BTCUSDT", 1_700_000_001_000, 11, 11, "a", "set",  42_001.0, 0.5),
-    ]
-    buf = io.StringIO()
-    for r in rows:
         buf.write(",".join(str(x) for x in r) + "\n")
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(dest.with_suffix(".csv").name, buf.getvalue())
@@ -173,46 +145,92 @@ class T1Tests(unittest.TestCase):
         self.assertEqual(len(events), 2)  # unchanged from first run
 
 
-class Depth20Tests(unittest.TestCase):
+class UnsupportedBookRequestTests(unittest.TestCase):
+    """Only bookTicker on um-futures / cm-futures is importable; every
+    other request fails up front with a message naming what is
+    supported."""
+
     def setUp(self) -> None:
-        self.tmp = Path(tempfile.mkdtemp(prefix="binance-d20-"))
-        self.zip_path = self.tmp / "BTCUSDT-bookDepth-2024-01-15.zip"
+        self.tmp = Path(tempfile.mkdtemp(prefix="binance-unsupported-"))
         self.tape = self.tmp / "tape"
+        self.zip_path = _build_t1_zip(self.tmp / "BTCUSDT-bookTicker-2024-01-15.zip")
 
-    def test_snapshot_then_delta(self) -> None:
-        _build_depth20_zip(self.zip_path)
-        stats = bnc.depth20_to_lrvx(
-            self.zip_path, self.tape, levels=20,
-            symbol_id=7, symbol_name="BTCUSDT",
-        )
-        self.assertEqual(stats.snapshots_written, 1)
-        self.assertEqual(stats.deltas_written, 1)
+    def _range(self, market: str, book_type: str, **kwargs):
+        with mock.patch.object(bnc, "_download") as download:
+            with self.assertRaises(ValueError) as cm:
+                bnc.range_book_to_lrvx(
+                    "BTCUSDT", market, book_type, "2024-01-15", "2024-01-16",
+                    self.tape, mirror=self.tmp / "mirror", **kwargs)
+        download.assert_not_called()
+        self.assertFalse(self.tape.exists())
+        return str(cm.exception)
 
-        events = _read_events(self.tape)
-        self.assertEqual(len(events), 2)
-        # Snapshot: 3 bids + 3 asks.
-        self.assertTrue(events[0]["is_snapshot"])
-        self.assertEqual(len(events[0]["bids"]), 3)
-        self.assertEqual(len(events[0]["asks"]), 3)
-        # Delta: top bid removed, new top bid added, top ask changed.
-        self.assertFalse(events[1]["is_snapshot"])
-        bids = dict(events[1]["bids"])
-        asks = dict(events[1]["asks"])
-        # 42_000.0 → qty 0 (removal); 42_000.5 → 0.8 (new).
-        self.assertEqual(bids[4_200_000_000_000], 0)
-        self.assertEqual(bids[4_200_050_000_000], 80_000_000)
-        # 42_001.0 ask qty changed 1.0 → 0.5.
-        self.assertEqual(asks[4_200_100_000_000], 50_000_000)
+    def test_depth20_book_type_is_rejected(self) -> None:
+        msg = self._range("um-futures", "depth20")
+        self.assertIn("depth20", msg)
+        self.assertIn("'t1'", msg)
 
-    def test_metadata_book_fields(self) -> None:
-        _build_depth20_zip(self.zip_path)
-        bnc.depth20_to_lrvx(self.zip_path, self.tape, levels=20,
-                               symbol_id=7, symbol_name="BTCUSDT")
-        meta = json.loads((self.tape / "metadata.json").read_text())
-        self.assertTrue(meta["has_book_snapshots"])
-        self.assertTrue(meta["has_book_deltas"])
-        self.assertEqual(meta["total_book_updates"], 2)
-        self.assertEqual(meta["book_depth"], 20)
+    def test_depth20_is_rejected_even_with_skip_missing(self) -> None:
+        self._range("um-futures", "depth20", skip_missing=True)
+
+    def test_spot_range_is_rejected(self) -> None:
+        msg = self._range("spot", "t1")
+        self.assertIn("spot", msg)
+        self.assertIn("um-futures", msg)
+        self.assertIn("cm-futures", msg)
+
+    def test_spot_range_is_rejected_even_with_skip_missing(self) -> None:
+        self._range("spot", "t1", skip_missing=True)
+
+    def test_spot_single_file_is_rejected(self) -> None:
+        with self.assertRaises(ValueError) as cm:
+            bnc.t1_to_lrvx(self.zip_path, self.tape, market="spot")
+        self.assertIn("spot", str(cm.exception))
+        self.assertFalse(self.tape.exists())
+
+    def test_futures_markets_build_bookticker_urls(self) -> None:
+        day = date(2024, 1, 15)
+        self.assertEqual(
+            bnc._book_archive_url("BTCUSDT", "um-futures", "t1", day),
+            "https://data.binance.vision/data/futures/um/daily/bookTicker/"
+            "BTCUSDT/BTCUSDT-bookTicker-2024-01-15.zip")
+        self.assertEqual(
+            bnc._book_archive_url("BTCUSD_PERP", "cm-futures", "t1", day),
+            "https://data.binance.vision/data/futures/cm/daily/bookTicker/"
+            "BTCUSD_PERP/BTCUSD_PERP-bookTicker-2024-01-15.zip")
+
+    def _cli(self, *argv: str):
+        from lrvx import cli
+
+        err = io.StringIO()
+        code = None
+        with mock.patch.object(sys, "stderr", err), \
+                mock.patch.object(bnc, "_download") as download:
+            try:
+                code = cli.main(["archive", "binance", *argv,
+                                 "--out", str(self.tape)])
+            except SystemExit as exc:
+                code = exc.code
+        download.assert_not_called()
+        self.assertFalse(self.tape.exists())
+        return code, err.getvalue()
+
+    def test_cli_book_depth20_fails(self) -> None:
+        code, err = self._cli("--book", "depth20", "--symbol", "BTCUSDT",
+                              "--from", "2024-01-15", "--to", "2024-01-15")
+        self.assertEqual(code, 2)
+        self.assertIn("--book", err)
+        self.assertIn("invalid choice: 'depth20'", err)
+        self.assertIn("t1", err.split("invalid choice", 1)[1])
+
+    def test_cli_book_spot_fails(self) -> None:
+        for extra in (("--symbol", "BTCUSDT", "--from", "2024-01-15",
+                       "--to", "2024-01-15"),
+                      ("--csv", str(self.zip_path))):
+            code, err = self._cli("--book", "t1", "--market", "spot", *extra)
+            self.assertEqual(code, 2)
+            self.assertIn("spot", err)
+            self.assertIn("um-futures", err)
 
 
 class CoexistenceTests(unittest.TestCase):
@@ -305,43 +323,6 @@ def _t1_days() -> list:
     return days
 
 
-def _depth20_days() -> list:
-    """bookDepth long-format rows for _N_DAYS days: each day opens
-    with a ``snap`` group of the ladder the previous day left, then
-    single-id ``set`` groups that add, change and remove levels."""
-    rng = random.Random(23)
-    days = []
-    uid = 900_000
-    bids = {42_000.0 - i: 1.0 + i for i in range(5)}
-    asks = {42_001.0 + i: 1.0 + i for i in range(5)}
-    for d in range(_N_DAYS):
-        rows = []
-        ts = _DAY0_MS + d * _DAY_MS + 40
-        uid += 1
-        for p, q in sorted(bids.items(), reverse=True):
-            rows.append(("BTCUSDT", ts, uid, uid, "b", "snap", p, q))
-        for p, q in sorted(asks.items()):
-            rows.append(("BTCUSDT", ts, uid, uid, "a", "snap", p, q))
-        for _ in range(40):
-            uid += rng.randint(1, 3)
-            ts += rng.choice((1, 250, 5_000))
-            for _ in range(rng.randint(1, 3)):
-                side = rng.choice(("b", "a"))
-                book = bids if side == "b" else asks
-                if len(book) > 2 and rng.random() < 0.3:
-                    p, q = rng.choice(sorted(book)), 0.0
-                    del book[p]
-                else:
-                    best = max(bids) if side == "b" else min(asks)
-                    off = rng.choice((0.0, 1.0, 2.0, 3.0))
-                    p = best - off if side == "b" else best + off
-                    q = rng.choice((0.5, 1.25, 3.0))
-                    book[p] = q
-                rows.append(("BTCUSDT", ts, uid, uid, side, "set", p, q))
-        days.append(rows)
-    return days
-
-
 def _write_zip(dest: Path, rows) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     buf = io.StringIO()
@@ -398,16 +379,14 @@ def _book_at(tape: Path, ts_ns: int):
     return (tuple(snap.bids), tuple(snap.asks))
 
 
-class _MultiDayBookAppend:
-    """Scenarios shared by both products; subclasses pick the product."""
-
-    book_type = ""
+class T1MultiDayTests(unittest.TestCase):
+    book_type = "t1"
 
     def _days(self) -> list:
-        raise NotImplementedError
+        return _t1_days()
 
     def _row_ts_ms(self, row) -> int:
-        raise NotImplementedError
+        return row[5]
 
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix=f"binance-{self.book_type}-days-"))
@@ -422,9 +401,8 @@ class _MultiDayBookAppend:
         ]
 
     def _convert(self, path: Path, tape: Path) -> bnc.BookConvertStats:
-        convert = bnc.t1_to_lrvx if self.book_type == "t1" else bnc.depth20_to_lrvx
-        return convert(path, tape, symbol_id=_SYM, symbol_name="BTCUSDT",
-                       market="um-futures")
+        return bnc.t1_to_lrvx(path, tape, symbol_id=_SYM,
+                              symbol_name="BTCUSDT", market="um-futures")
 
     def _import(self, day: int) -> bnc.BookConvertStats:
         return self._convert(self.paths[day], self.tape)
@@ -465,8 +443,6 @@ class _MultiDayBookAppend:
     def test_reference_matches_source(self) -> None:
         ref = self._reference(*range(_N_DAYS))
         self.assertTrue(_records(ref))
-        if self.book_type != "t1":
-            return
         # The top in force at each probe time is the last source row
         # at or before it.
         rows = [r for day in self.days for r in day]
@@ -534,26 +510,6 @@ class _MultiDayBookAppend:
             self.assertEqual(kwargs.get("from_ns"), min(ts))
             self.assertEqual(kwargs.get("to_ns"), max(ts))
             self.assertEqual(kwargs.get("symbols"), [_SYM])
-
-
-class T1MultiDayTests(_MultiDayBookAppend, unittest.TestCase):
-    book_type = "t1"
-
-    def _days(self) -> list:
-        return _t1_days()
-
-    def _row_ts_ms(self, row) -> int:
-        return row[5]
-
-
-class Depth20MultiDayTests(_MultiDayBookAppend, unittest.TestCase):
-    book_type = "depth20"
-
-    def _days(self) -> list:
-        return _depth20_days()
-
-    def _row_ts_ms(self, row) -> int:
-        return row[1]
 
 
 if __name__ == "__main__":

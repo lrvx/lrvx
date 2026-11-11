@@ -66,8 +66,8 @@
     {
       "language": "python",
       "path": "docs/examples/python_binance_book_archive.py",
-      "sha256": "5bb8a2a9a3f0d709db356a90dee7441effa14169eccf7e7ac40d5d4f3a7d3ffc",
-      "size_bytes": 3214,
+      "sha256": "da10766cc9cdf16f8609fc26aa0d2e6b8b576963ece62dcc79158d47c3421cf1",
+      "size_bytes": 2140,
       "topic": "strategy"
     },
     {
