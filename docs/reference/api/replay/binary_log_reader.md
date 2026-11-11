@@ -48,6 +48,7 @@ public:
   ReaderStats stats() const;
   std::vector<std::filesystem::path> segmentFiles() const;
   const std::vector<SegmentInfo>& segments() const;
+  std::vector<SegmentInfo> segmentsInReadOrder() const;
 };
 ```
 
@@ -68,6 +69,7 @@ public:
 | verify_crc | `bool`                  | Verify CRC32 checksums (default: true)   |
 | reorder_window_ns | `int64_t`        | Bounded reorder buffer, default 10 s. Events arriving more than this far behind the emit cursor cannot be placed in order any more, so the reader throws `LrvxError` with the observed delta. The default covers exchange-WS jitter and the 99th percentile of reconnect-induced cross-block inversions on real tapes. Memory bound is roughly `reorder_window_ns x peak_event_rate x sizeof(ReplayEvent)` — about 36 MB at 10 s and a 10k ev/s burst |
 | skip_segments_by_time | `bool`           | With `from_ns` or `to_ns` set, do not decode segments that provably hold nothing in range (default: true). See [Time-ranged reads](#time-ranged-reads). The events returned are the same either way |
+| order_segments_by_time | `bool`          | Read segments in time order of their first event and merge overlapping ones (default: true). `false` reads them in file-name order. See [Ordering guarantee](#ordering-guarantee) |
 
 ## Core Methods
 
@@ -269,17 +271,38 @@ public:
 
 ## Ordering guarantee
 
-`forEach` and `forEachFrom` always deliver events in monotonically non-decreasing `timestamp_ns` order, regardless of how the underlying segment was recorded.
+Segment files are named by the wall-clock time they were opened. A tape filled out of order, such as an archive import of day 3 followed by one of day 1, therefore lists its segments out of time order. The reader does not read them in file-name order. It orders them by time wherever a segment's recorded bounds prove where it starts.
 
-For segments written with the current writer (which sets `SegmentFlags::Sorted`), events are streamed directly — O(1) memory, early exit on `false` return is immediate.
+**Time-bounded segments.** A segment flagged `Sorted` has a proven first event:
 
-For legacy segments without the flag, all events in the segment are buffered and sorted before delivery — O(segment events) memory, early exit stops delivery but the segment has already been read in full.
+* uncompressed: its first frame, since its frames are in non-decreasing order;
+* compressed: the smallest entry of its block index, since each entry is a block's minimum. A compressed segment without a usable index (none written, failed CRC) is not bounded.
+
+Between two segments that are not bounded, the bounded segments form a run. Within a run, `forEach`, `forEachFrom`, `streamForEach`, `streamForEachFrom` and `run(aggregators, 1)` deliver every event in non-decreasing `timestamp_ns` order:
+
+* Segments are sorted by first event.
+* Segments whose ranges overlap are merged event by event. Each overlapping segment has one cursor open (one decompressed block for a compressed segment); nothing is buffered beyond that.
+* Equal timestamps go first to the segment whose file name sorts first, then to the earlier event inside the segment.
+* A tape recorded in order is read exactly as in file-name order: the same events, in the same order, from the same segments. A segment is opened only when the previous one is exhausted, and a `false` return from the callback stops at once.
+
+**Segments that are not bounded** keep the position their file name gives them, and each one ends a run. These are segments without the `Sorted` flag: tapes from external writers, and a segment still being written or left by a writer that was killed before closing it. Events inside such a segment are put in order:
+
+* `forEach` / `forEachFrom` buffer the whole segment and sort it: O(segment events) memory, and early exit stops delivery after the segment has been read in full.
+* the streaming paths use the bounded reorder buffer (`reorder_window_ns`).
+
+Nothing orders such a segment against the runs around it. If an unsorted segment or a later run starts before the previous run ends, time steps back at that boundary. A live recording by one writer is not affected: the segment still being written is the newest file and holds the newest events, so it stays last.
+
+`run(aggregators, n)` with more than one thread visits segments in the same order, but partitions each segment across workers and merges their panels. Overlapping segments are not interleaved there, any more than one segment's blocks are.
+
+`stats().segments_reordered` counts the segments visited at a different position than their file name gives them. `stats().segments_interleaved` counts the segments whose events were merged with another segment's. `order_segments_by_time = false` restores plain file-name order. `segmentsInReadOrder()` lists the segments in the order they are visited; `segments()` keeps file-name order.
+
+`MergedTapeReader::streamEvents` walks each tape's segments in this read order. It merges overlapping segments of one tape only inside its per-tape reorder window.
 
 `BinaryLogIterator` is a low-level block-by-block streaming API with **no ordering guarantee**. Use `BinaryLogReader` when ordered output is required.
 
 ## Notes
 
-* Segments are automatically discovered and sorted by filename.
+* Segments are discovered automatically and read in time order (see [Ordering guarantee](#ordering-guarantee)).
 * Compressed segments (LZ4) are transparently decompressed.
 * Seeking uses segment indexes when available for O(log n) lookup.
 * The callback returning `false` stops iteration early.

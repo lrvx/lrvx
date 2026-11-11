@@ -566,9 +566,9 @@ class DEMA:
     def value(self) -> float | None:
         ...
 class DataReader:
-    def __init__(self, data_dir: str, from_ns: typing.Any = None, to_ns: typing.Any = None, symbols: typing.Any = None, reorder_window_ns: typing.Any = None, strict_ordering: bool = False) -> None:
+    def __init__(self, data_dir: str, from_ns: typing.Any = None, to_ns: typing.Any = None, symbols: typing.Any = None, reorder_window_ns: typing.Any = None, strict_ordering: bool = False, order_segments_by_time: bool = True) -> None:
         """
-        Create a DataReader for a binary log data directory. `reorder_window_ns` controls the bounded reorder buffer applied to segments without the Sorted flag (default 10s). An event that arrives past that window is dropped and counted in stats()['late_dropped'], with one warning logged per segment; set `strict_ordering=True` to raise LrvxError E_DATA_002 on the first such event instead. `to_ns` is inclusive for trade reads and exclusive for option-quote reads -- see read_option_quotes.
+        Create a DataReader for a binary log data directory. `reorder_window_ns` controls the bounded reorder buffer applied to segments without the Sorted flag (default 10s). An event that arrives past that window is dropped and counted in stats()['late_dropped'], with one warning logged per segment; set `strict_ordering=True` to raise LrvxError E_DATA_002 on the first such event instead. `to_ns` is inclusive for trade reads and exclusive for option-quote reads -- see read_option_quotes. Segments are read in time order of their first event, and Sorted segments whose ranges overlap are merged event by event; `order_segments_by_time=False` reads them in file-name order.
         """
     def count(self) -> int:
         """

@@ -36,8 +36,11 @@ reader = lrvx.DataReader(
     to_ns=None,               # end timestamp filter
     symbols=None,             # list of symbol IDs to filter
     reorder_window_ns=None,   # cross-block reorder window (default 10s)
+    order_segments_by_time=True,  # False: read segments in file-name order
 )
 ```
+
+Segments are read in time order of their first event, not in file-name order, so a tape filled out of order (day 3 imported before day 1) still reads forward in time. `Sorted` segments whose ranges overlap are merged event by event, with equal timestamps going to the segment whose file name sorts first. A segment without the `Sorted` flag, such as one still being written, keeps its file-name position. See [Ordering guarantee](../api/replay/binary_log_reader.md#ordering-guarantee).
 
 `reorder_window_ns` controls the bounded reorder buffer used by `run()` and `streamForEach` on segments without the `Sorted` flag. Events arriving more than `reorder_window_ns` past the watermark raise `LrvxError(code="E_DATA_002")`. See [Aggregate tape events](../../how-to/aggregate-tape-events.md#out-of-order-tapes-and-the-reorder-buffer) for details.
 
@@ -146,6 +149,8 @@ Reader statistics.
 | `book_updates_read` | `int` | Book update events |
 | `bytes_read` | `int` | Bytes read |
 | `crc_errors` | `int` | CRC checksum failures |
+| `segments_reordered` | `int` | Segments read at a different position than their file name gives them |
+| `segments_interleaved` | `int` | Segments whose events were merged with another segment's because their time ranges overlap |
 
 #### `run(aggregators, n_threads=0, progress_callback=None, progress_interval_ms=1000) -> bool`
 
@@ -185,7 +190,7 @@ List of segment file paths.
 
 #### `segments() -> list[dict]`
 
-Segment metadata.
+Segment metadata, in file-name order.
 
 | Key | Type | Description |
 |-----|------|-------------|

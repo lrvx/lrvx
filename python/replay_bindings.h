@@ -215,7 +215,8 @@ inline PyTrade tradeRecordToPyTrade(const lrvx::replay::TradeRecord& tr)
 
 inline ReaderConfig makeReaderConfig(const std::string& dataDir, py::object fromNs,
                                      py::object toNs, py::object symbols,
-                                     py::object reorderWindowNs, bool strictOrdering)
+                                     py::object reorderWindowNs, bool strictOrdering,
+                                     bool orderSegmentsByTime = true)
 {
   ReaderConfig cfg;
   cfg.data_dir = dataDir;
@@ -238,6 +239,7 @@ inline ReaderConfig makeReaderConfig(const std::string& dataDir, py::object from
     cfg.reorder_window_ns = reorderWindowNs.cast<int64_t>();
   }
   cfg.strict_ordering = strictOrdering;
+  cfg.order_segments_by_time = orderSegmentsByTime;
 
   return cfg;
 }
@@ -281,9 +283,10 @@ class PyDataReader
 
  public:
   PyDataReader(const std::string& dataDir, py::object fromNs, py::object toNs,
-               py::object symbols, py::object reorderWindowNs, bool strictOrdering)
+               py::object symbols, py::object reorderWindowNs, bool strictOrdering,
+               bool orderSegmentsByTime)
       : _reader(makeReaderConfig(dataDir, fromNs, toNs, symbols, reorderWindowNs,
-                                 strictOrdering))
+                                 strictOrdering, orderSegmentsByTime))
   {
     if (!toNs.is_none())
     {
@@ -624,6 +627,8 @@ class PyDataReader
     d["crc_errors"] = s.crc_errors;
     d["late_dropped"] = s.late_dropped;
     d["unknown_frames_skipped"] = s.unknown_frames_skipped;
+    d["segments_reordered"] = s.segments_reordered;
+    d["segments_interleaved"] = s.segments_interleaved;
     return d;
   }
 
@@ -1397,7 +1402,7 @@ inline void bindReplay(py::module_& m)
   // DataReader
   py::class_<PyDataReader>(m, "DataReader")
       .def(py::init<const std::string&, py::object, py::object, py::object,
-                    py::object, bool>(),
+                    py::object, bool, bool>(),
            "Create a DataReader for a binary log data directory. "
            "`reorder_window_ns` controls the bounded reorder buffer applied "
            "to segments without the Sorted flag (default 10s). An event that "
@@ -1405,13 +1410,17 @@ inline void bindReplay(py::module_& m)
            "stats()['late_dropped'], with one warning logged per segment; set "
            "`strict_ordering=True` to raise LrvxError E_DATA_002 on the first "
            "such event instead. `to_ns` is inclusive for trade reads and "
-           "exclusive for option-quote reads -- see read_option_quotes.",
+           "exclusive for option-quote reads -- see read_option_quotes. "
+           "Segments are read in time order of their first event, and Sorted "
+           "segments whose ranges overlap are merged event by event; "
+           "`order_segments_by_time=False` reads them in file-name order.",
            py::arg("data_dir"),
            py::arg("from_ns") = py::none(),
            py::arg("to_ns") = py::none(),
            py::arg("symbols") = py::none(),
            py::arg("reorder_window_ns") = py::none(),
-           py::arg("strict_ordering") = false)
+           py::arg("strict_ordering") = false,
+           py::arg("order_segments_by_time") = true)
       .def("summary", &PyDataReader::summary,
            "Return a dict summarizing the dataset")
       .def("count", &PyDataReader::count,
