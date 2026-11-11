@@ -281,8 +281,8 @@ The [`Stats`](engine.md#stats) object returned by `Engine.run()` is a different,
 | `avg_trade_duration_ns` | `int` | Mean trade holding time (ns) |
 | `median_trade_duration_ns` | `int` | Median trade holding time (ns) |
 | `max_trade_duration_ns` | `int` | Longest trade holding time (ns) |
-| `sharpe_ratio` | `float` | Annualized Sharpe ratio |
-| `sortino_ratio` | `float` | Annualized Sortino ratio |
+| `sharpe_ratio` | `float` | Sharpe ratio over the returns between closed trades, scaled by sqrt(252); one period is one closed trade, not one day, so it is not annualized by time |
+| `sortino_ratio` | `float` | Sortino ratio over the same per-trade returns, scaled the same way |
 | `calmar_ratio` | `float` | Calmar ratio |
 | `time_weighted_return` | `float` | Time-weighted return |
 | `return_pct` | `float` | Net return percentage |

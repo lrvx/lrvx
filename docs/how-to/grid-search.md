@@ -31,7 +31,7 @@ Find good strategy parameters by sweeping a grid and ranking results. The patter
     df.to_csv("grid_results.csv", index=False)
     ```
 
-    For parallelism, wrap `run_one` in `multiprocessing.Pool` or `concurrent.futures.ProcessPoolExecutor`. lrvx releases the GIL during the C++ backtest, so threads work too.
+    For parallelism, wrap `run_one` in `multiprocessing.Pool` or `concurrent.futures.ProcessPoolExecutor`. Use processes, not threads: a Python strategy's callbacks run under the GIL, so threads take turns and give no speedup.
 
 === "Node.js"
 
