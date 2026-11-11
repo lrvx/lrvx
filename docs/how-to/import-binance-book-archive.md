@@ -35,11 +35,13 @@ The script below is the same one CI runs on every push. It builds synthetic book
 
 ## Delta encoding
 
-bookTicker rows are best-bid / best-ask snapshots, one per update. The first imported row becomes a book snapshot; every subsequent row emits a delta with the changed top level (qty=0 marks a removed price). Unchanged ticks are skipped so the tape does not accumulate dead data.
+bookTicker rows are best-bid / best-ask snapshots, one per update. The first row of each imported file becomes a book snapshot; every subsequent row emits a delta with the changed top level (qty=0 marks a removed price). Unchanged ticks are skipped so the tape does not accumulate dead data.
 
 bookDepth is published in long format: one row per (event, side, price) tuple, grouped by `last_update_id`. The first group with `update_type=snap` becomes a snapshot containing every (price, qty) level for both sides; later groups emit a delta with only the levels that changed against the prior snapshot, again with qty=0 marking removals.
 
 Both converters keep the running ladder state in memory while writing, so the engine's existing book replay (snapshot replaces book, delta applies on top) gives the same `(bids, asks)` sequence the original CSV described.
+
+Each file is encoded on its own: the ladder starts empty, the file's first record is a snapshot, and its deltas are taken against the record before them in the same file, never against what the tape already holds. A multi-day tape therefore carries one snapshot at the start of every imported day, and a replay that starts at a day boundary needs nothing from the days before it.
 
 ## CLI
 
@@ -65,7 +67,9 @@ Use `--book-levels` to cap the ladder width if the archive publishes more than t
 
 ## Append-safe and idempotent
 
-The converter dedups on the `update_id` (bookTicker) or `last_update_id` (bookDepth) it has already written to the tape. Re-running the same day, or running an overlapping range, is a no-op: every previously-imported row is skipped, and the writer adds zero new events. The reported `rows_skipped` counter shows how many rows were elided.
+A record is left out when a book record with the same `update_id` (bookTicker) or `last_update_id` (bookDepth) is already on the tape for the same symbol within the incoming file's time range. Binance's update ids are unique per symbol and a record keeps its exchange timestamp, so only that range can hold a copy, and the dedup read covers that range instead of the whole tape: an import costs about one day of tape, whatever the tape's length.
+
+Because a file's records never depend on the tape, the outcome does not depend on the order days are imported in. Re-running a day adds nothing, an overlapping range keeps each record once, a day earlier than the ones already on the tape or one that fills a gap lands in full, and a day cut short by an interrupted import is completed by importing it again. In each case the tape holds the same book records a single in-order import of the same days writes, so a replay ordered by timestamp (`orderbook.book_at`, `OrderBookIterator`) reconstructs the same ladders; and because every day opens with a snapshot, so does a consumer that streams segments in file-name order, where a day imported later sits after the days imported before it. The reported `rows_skipped` counter counts rows not written: unchanged ticks, malformed rows and rows already on the tape. `--no-append` turns the check off.
 
 ## Co-existence with aggTrades
 

@@ -563,7 +563,8 @@ __all__ = [
 #
 # The two converters share the parse / write spine of the aggTrades
 # importer above (zip member open, append-safe dedup, metadata merge).
-# Book events are delta-encoded against the previous snapshot so the
+# Book events are delta-encoded against the previous event of the same
+# file, and every file opens with a snapshot (see _BookSink), so the
 # resulting lrvx plays back through MergedTapeReader and the
 # existing book aggregator surface without modification.
 
@@ -620,47 +621,134 @@ def _book_mirror_path(mirror: Path, symbol: str, market: str,
     return mirror / market / product / symbol / f"{symbol}-{product}-{day.isoformat()}.zip"
 
 
-def _existing_book_state(out_tape: Path, symbol_id: int) -> Tuple[int, int, dict, dict]:
-    """Inspect the existing tape and reconstruct (last_seq, last_ts_ns,
-    bid_levels, ask_levels) so an append can dedup by seq and re-base the
-    delta encoder on the right starting state. Returns
-    (0, 0, {}, {}) if the tape is empty / unreadable."""
-    if not out_tape.exists():
-        return 0, 0, {}, {}
-    try:
-        import lrvx
+def _file_ts_range_ms(path: Path, *, ts_col: int,
+                      numeric_col_idx: int = 0) -> Optional[Tuple[int, int]]:
+    """Smallest and largest timestamp (ms) in column ``ts_col`` of a
+    book archive file, or None when no row parses."""
+    lo: Optional[int] = None
+    hi: Optional[int] = None
+    for row in _open_csv_lines(path, numeric_col_idx=numeric_col_idx):
+        try:
+            ts = int(row[ts_col])
+        except (ValueError, IndexError):
+            continue
+        if lo is None or ts < lo:
+            lo = ts
+        if hi is None or ts > hi:
+            hi = ts
+    return None if lo is None else (lo, hi)
 
-        from ..orderbook import _apply_event
 
-        reader = lrvx.DataReader(str(out_tape))
-        headers, levels = reader.read_book_updates()
-        if headers.size == 0:
-            return 0, 0, {}, {}
-        # Walk events for this symbol in order, applying the same
-        # snapshot / delta / top semantics the iterator uses, so the
-        # dedup baseline sees the latest ladder.
-        bids: dict[int, int] = {}
-        asks: dict[int, int] = {}
-        last_seq = 0
-        last_ts_ns = 0
-        for h in headers:
-            if int(h["symbol_id"]) != symbol_id:
+class _BookSink:
+    """Writes one file's book records, leaving out those already on the
+    tape.
+
+    Every imported file is encoded on its own: the first record is a
+    snapshot and each delta is taken against the record before it in
+    the same file, never against what the tape held. A file therefore
+    always yields the same records whatever else is on the tape, and a
+    record is on the tape already exactly when a record with its
+    ``seq`` is, for the same symbol, inside the file's time range.
+    That bounded membership check is the whole dedup, so days land in
+    any order and a re-import or an overlapping range adds nothing."""
+
+    _BATCH = 4096
+
+    def __init__(self, out_tape: Path, *, symbol_id: int, exchange_id: int,
+                 max_segment_mb: int, compression: str,
+                 on_tape: "object") -> None:
+        self._out_tape = out_tape
+        self._symbol_id = int(symbol_id)
+        self._exchange_id = int(exchange_id)
+        self._max_segment_mb = int(max_segment_mb)
+        self._compression = compression
+        self._on_tape = on_tape
+        self._pending: List[Tuple[int, int, bool, list, list, int]] = []
+        self._writer = None
+        self.snapshots = 0
+        self.deltas = 0
+        self.rows_on_tape = 0
+        self.first_ts_ns = 0
+        self.last_ts_ns = 0
+        self.last_seq = 0
+
+    def emit(self, ts_ns: int, seq: int, is_snapshot: bool,
+             bids: List[Tuple[int, int]], asks: List[Tuple[int, int]],
+             n_rows: int) -> None:
+        self._pending.append((ts_ns, seq, is_snapshot, bids, asks, n_rows))
+        if len(self._pending) >= self._BATCH:
+            self._flush()
+
+    def _flush(self) -> None:
+        import numpy as np
+
+        pending, self._pending = self._pending, []
+        if not pending:
+            return
+        if self._on_tape.size:
+            seqs = np.fromiter((e[1] for e in pending), dtype=np.uint64,
+                               count=len(pending))
+            dup = np.isin(seqs, self._on_tape).tolist()
+        else:
+            dup = [False] * len(pending)
+        for (ts_ns, seq, is_snapshot, bids, asks, n_rows), seen in zip(pending, dup):
+            if seen:
+                self.rows_on_tape += n_rows
                 continue
-            _apply_event(bids, asks,
-                         event_type=int(h["event_type"]),
-                         n_bid=int(h["bid_count"]),
-                         n_ask=int(h["ask_count"]),
-                         off=int(h["level_offset"]),
-                         levels=levels)
-            seq = int(h["seq"])
-            ts = int(h["exchange_ts_ns"])
-            if seq > last_seq:
-                last_seq = seq
-            if ts > last_ts_ns:
-                last_ts_ns = ts
-        return last_seq, last_ts_ns, bids, asks
-    except Exception:
-        return 0, 0, {}, {}
+            self._write(ts_ns, seq, is_snapshot, bids, asks)
+
+    def _write(self, ts_ns: int, seq: int, is_snapshot: bool,
+               bids: List[Tuple[int, int]], asks: List[Tuple[int, int]]) -> None:
+        if self._writer is None:
+            import lrvx
+
+            self._out_tape.mkdir(parents=True, exist_ok=True)
+            self._writer = lrvx.DataWriter(
+                str(self._out_tape),
+                max_segment_mb=self._max_segment_mb,
+                exchange_id=self._exchange_id,
+                compression=self._compression,
+            )
+        self._writer.write_book(
+            exchange_ts_ns=ts_ns, recv_ts_ns=ts_ns,
+            seq=int(seq), symbol_id=self._symbol_id,
+            is_snapshot=is_snapshot,
+            bids=_levels_array(bids), asks=_levels_array(asks),
+        )
+        if is_snapshot:
+            self.snapshots += 1
+        else:
+            self.deltas += 1
+        self.first_ts_ns = self.first_ts_ns or ts_ns
+        self.last_ts_ns = ts_ns
+        self.last_seq = int(seq)
+
+    def close(self) -> None:
+        try:
+            self._flush()
+        finally:
+            if self._writer is not None:
+                self._writer.close()
+                self._writer = None
+
+
+def _open_book_sink(csv_path: Path, out_tape: Path, *, ts_col: int,
+                    numeric_col_idx: int, append: bool, symbol_id: int,
+                    exchange_id: int, max_segment_mb: int,
+                    compression: str) -> _BookSink:
+    import numpy as np
+
+    on_tape = np.empty(0, dtype=np.uint64)
+    if append:
+        span = _file_ts_range_ms(csv_path, ts_col=ts_col,
+                                 numeric_col_idx=numeric_col_idx)
+        if span is not None:
+            on_tape = _dedup.existing_book_seqs(
+                out_tape, symbol_id,
+                span[0] * 1_000_000, span[1] * 1_000_000)
+    return _BookSink(out_tape, symbol_id=symbol_id, exchange_id=exchange_id,
+                     max_segment_mb=max_segment_mb, compression=compression,
+                     on_tape=on_tape)
 
 
 def _levels_array(items: List[Tuple[int, int]]):
@@ -756,9 +844,15 @@ def t1_to_lrvx(
 
         update_id, best_bid_price, best_bid_qty, best_ask_price,
         best_ask_qty, transaction_time, event_time
-    """
-    import lrvx
 
+    The file is encoded on its own: its first change is written as a
+    snapshot and later ones as deltas against the row before, so the
+    records a day yields do not depend on what the tape already holds.
+    With ``append`` a record is left out when a record with its
+    ``update_id`` is on the tape for ``symbol_id`` inside the file's
+    time range; days may be imported in any order and re-imports add
+    nothing.
+    """
     csv_path = Path(csv_path).expanduser()
     out_tape = Path(out_tape).expanduser()
     if not csv_path.exists():
@@ -766,35 +860,22 @@ def t1_to_lrvx(
     if not symbol_name:
         symbol_name = csv_path.stem.split("-", 1)[0]
 
-    last_seq, last_ts_ns, prev_bids, prev_asks = (
-        _existing_book_state(out_tape, symbol_id) if append else (0, 0, {}, {})
-    )
+    sink = _open_book_sink(csv_path, out_tape, ts_col=5, numeric_col_idx=0,
+                           append=append, symbol_id=symbol_id,
+                           exchange_id=exchange_id,
+                           max_segment_mb=max_segment_mb,
+                           compression=compression)
 
     rows_read = 0
     rows_skipped = 0
-    snapshots_written = 0
-    deltas_written = 0
-    first_emitted_ts = 0
-    last_emitted_ts = last_ts_ns
-    last_emitted_seq = last_seq
-
-    out_tape.mkdir(parents=True, exist_ok=True)
-    w = lrvx.DataWriter(
-        str(out_tape),
-        max_segment_mb=int(max_segment_mb),
-        exchange_id=int(exchange_id),
-        compression=compression,
-    )
-
-    is_first_emit = (not prev_bids) and (not prev_asks)
+    prev_bids: dict = {}
+    prev_asks: dict = {}
+    is_first_emit = True
     try:
         for row in _open_csv_lines(csv_path):
             rows_read += 1
-            update_id = int(row[0])
-            if update_id <= last_seq:
-                rows_skipped += 1
-                continue
             try:
+                update_id = int(row[0])
                 bid_p = float(row[1])
                 bid_q = float(row[2])
                 ask_p = float(row[3])
@@ -820,52 +901,41 @@ def t1_to_lrvx(
             ts_ns = ts_ms * 1_000_000
 
             if is_first_emit:
-                # Initial snapshot: emit complete current top-of-book.
-                w.write_book(
-                    exchange_ts_ns=ts_ns, recv_ts_ns=ts_ns,
-                    seq=int(update_id), symbol_id=int(symbol_id),
-                    is_snapshot=True,
-                    bids=_levels_array(list(cur_bids.items())),
-                    asks=_levels_array(list(cur_asks.items())),
-                )
+                sink.emit(ts_ns, update_id, True, list(cur_bids.items()),
+                          list(cur_asks.items()), 1)
                 is_first_emit = False
-                snapshots_written += 1
-                first_emitted_ts = first_emitted_ts or ts_ns
             else:
                 bid_delta, ask_delta = _diff_book(
                     prev_bids, cur_bids, prev_asks, cur_asks)
-                if not bid_delta and not ask_delta:
-                    rows_skipped += 1
-                    continue
-                w.write_book(
-                    exchange_ts_ns=ts_ns, recv_ts_ns=ts_ns,
-                    seq=int(update_id), symbol_id=int(symbol_id),
-                    is_snapshot=False,
-                    bids=_levels_array(bid_delta),
-                    asks=_levels_array(ask_delta),
-                )
-                deltas_written += 1
-                first_emitted_ts = first_emitted_ts or ts_ns
+                sink.emit(ts_ns, update_id, False, bid_delta, ask_delta, 1)
 
             prev_bids = cur_bids
             prev_asks = cur_asks
-            last_emitted_ts = ts_ns
-            last_emitted_seq = int(update_id)
     finally:
-        w.close()
+        sink.close()
 
+    return _finish_book_import(
+        sink, out_tape, rows_read=rows_read, rows_skipped=rows_skipped,
+        write_metadata=write_metadata, exchange_name=exchange_name,
+        market=market, symbol_id=symbol_id, symbol_name=symbol_name,
+        depth=1)
+
+
+def _finish_book_import(sink: _BookSink, out_tape: Path, *, rows_read: int,
+                        rows_skipped: int, write_metadata: bool,
+                        exchange_name: str, market: str, symbol_id: int,
+                        symbol_name: str, depth: int) -> BookConvertStats:
     stats = BookConvertStats(
-        snapshots_written=snapshots_written,
-        deltas_written=deltas_written,
+        snapshots_written=sink.snapshots,
+        deltas_written=sink.deltas,
         rows_read=rows_read,
-        rows_skipped=rows_skipped,
+        rows_skipped=rows_skipped + sink.rows_on_tape,
         files_processed=1,
-        first_ts_ns=first_emitted_ts,
-        last_ts_ns=last_emitted_ts,
-        last_update_id=last_emitted_seq,
+        first_ts_ns=sink.first_ts_ns,
+        last_ts_ns=sink.last_ts_ns,
+        last_update_id=sink.last_seq,
     )
-
-    total_writes = snapshots_written + deltas_written
+    total_writes = sink.snapshots + sink.deltas
     if write_metadata and total_writes > 0:
         _write_book_metadata(
             out_tape,
@@ -873,12 +943,11 @@ def t1_to_lrvx(
             market=market,
             symbol_id=symbol_id,
             symbol_name=symbol_name,
-            first_ts_ns=first_emitted_ts,
-            last_ts_ns=last_emitted_ts,
+            first_ts_ns=sink.first_ts_ns,
+            last_ts_ns=sink.last_ts_ns,
             updates_added=total_writes,
-            depth=1,
+            depth=depth,
         )
-
     return stats
 
 
@@ -915,9 +984,16 @@ def depth20_to_lrvx(
     one book event per group: full snapshot for the first
     ``update_type == 'snap'`` group, delta for every group after.
     Unchanged ladders are skipped.
-    """
-    import lrvx
 
+    The file is encoded on its own: the ladder starts empty, the first
+    group is written as a snapshot and later groups as deltas against
+    the group before, so the records a day yields do not depend on what
+    the tape already holds. A day file is expected to open with its
+    ``snap`` group. With ``append`` a record is left out when a record
+    with its ``last_update_id`` is on the tape for ``symbol_id`` inside
+    the file's time range; days may be imported in any order and
+    re-imports add nothing.
+    """
     csv_path = Path(csv_path).expanduser()
     out_tape = Path(out_tape).expanduser()
     if not csv_path.exists():
@@ -925,64 +1001,38 @@ def depth20_to_lrvx(
     if not symbol_name:
         symbol_name = csv_path.stem.split("-", 1)[0]
 
-    last_seq, last_ts_ns, prev_bids, prev_asks = (
-        _existing_book_state(out_tape, symbol_id) if append else (0, 0, {}, {})
-    )
-
-    out_tape.mkdir(parents=True, exist_ok=True)
-    w = lrvx.DataWriter(
-        str(out_tape),
-        max_segment_mb=int(max_segment_mb),
-        exchange_id=int(exchange_id),
-        compression=compression,
-    )
+    sink = _open_book_sink(csv_path, out_tape, ts_col=1, numeric_col_idx=1,
+                           append=append, symbol_id=symbol_id,
+                           exchange_id=exchange_id,
+                           max_segment_mb=max_segment_mb,
+                           compression=compression)
 
     rows_read = 0
     rows_skipped = 0
-    snapshots = 0
-    deltas = 0
-    first_emitted_ts = 0
-    last_emitted_ts = last_ts_ns
-    last_emitted_seq = last_seq
+    prev_bids: dict = {}
+    prev_asks: dict = {}
 
     def _flush(group_id: int, group_ts_ms: int, group_is_snap: bool,
-               cur_bids: dict, cur_asks: dict) -> None:
-        nonlocal prev_bids, prev_asks, snapshots, deltas
-        nonlocal first_emitted_ts, last_emitted_ts, last_emitted_seq
-        if group_id <= last_seq:
-            return  # dedup against existing
+               cur_bids: dict, cur_asks: dict, n_rows: int) -> None:
+        nonlocal prev_bids, prev_asks, rows_skipped
         ts_ns = group_ts_ms * 1_000_000
         if group_is_snap or (not prev_bids and not prev_asks):
-            w.write_book(
-                exchange_ts_ns=ts_ns, recv_ts_ns=ts_ns,
-                seq=int(group_id), symbol_id=int(symbol_id),
-                is_snapshot=True,
-                bids=_levels_array(list(cur_bids.items())),
-                asks=_levels_array(list(cur_asks.items())),
-            )
-            snapshots += 1
+            sink.emit(ts_ns, group_id, True, list(cur_bids.items()),
+                      list(cur_asks.items()), n_rows)
         else:
             bid_delta, ask_delta = _diff_book(
                 prev_bids, cur_bids, prev_asks, cur_asks)
             if not bid_delta and not ask_delta:
+                rows_skipped += n_rows
                 return
-            w.write_book(
-                exchange_ts_ns=ts_ns, recv_ts_ns=ts_ns,
-                seq=int(group_id), symbol_id=int(symbol_id),
-                is_snapshot=False,
-                bids=_levels_array(bid_delta),
-                asks=_levels_array(ask_delta),
-            )
-            deltas += 1
+            sink.emit(ts_ns, group_id, False, bid_delta, ask_delta, n_rows)
         prev_bids = dict(cur_bids)
         prev_asks = dict(cur_asks)
-        first_emitted_ts = first_emitted_ts or ts_ns
-        last_emitted_ts = ts_ns
-        last_emitted_seq = int(group_id)
 
     cur_group_id: Optional[int] = None
     cur_group_ts_ms: int = 0
     cur_group_is_snap: bool = False
+    cur_group_rows: int = 0
     cur_bids_group: dict = {}
     cur_asks_group: dict = {}
 
@@ -1010,13 +1060,15 @@ def depth20_to_lrvx(
                 if cur_group_id is not None:
                     _flush(cur_group_id, cur_group_ts_ms,
                            cur_group_is_snap,
-                           cur_bids_group, cur_asks_group)
+                           cur_bids_group, cur_asks_group, cur_group_rows)
                 cur_group_id = last_update_id
+                cur_group_rows = 0
                 cur_group_ts_ms = ts_ms
                 cur_group_is_snap = is_snap
                 cur_bids_group = dict(prev_bids) if not is_snap else {}
                 cur_asks_group = dict(prev_asks) if not is_snap else {}
 
+            cur_group_rows += 1
             price_raw = int(round(price * 1e8))
             qty_raw = int(round(qty * 1e8))
             target = cur_bids_group if side in ("b", "bid") else cur_asks_group
@@ -1038,35 +1090,15 @@ def depth20_to_lrvx(
         if cur_group_id is not None:
             _flush(cur_group_id, cur_group_ts_ms,
                    cur_group_is_snap,
-                   cur_bids_group, cur_asks_group)
+                   cur_bids_group, cur_asks_group, cur_group_rows)
     finally:
-        w.close()
+        sink.close()
 
-    stats = BookConvertStats(
-        snapshots_written=snapshots,
-        deltas_written=deltas,
-        rows_read=rows_read,
-        rows_skipped=rows_skipped,
-        files_processed=1,
-        first_ts_ns=first_emitted_ts,
-        last_ts_ns=last_emitted_ts,
-        last_update_id=last_emitted_seq,
-    )
-
-    if write_metadata and (snapshots + deltas) > 0:
-        _write_book_metadata(
-            out_tape,
-            exchange_name=exchange_name,
-            market=market,
-            symbol_id=symbol_id,
-            symbol_name=symbol_name,
-            first_ts_ns=first_emitted_ts,
-            last_ts_ns=last_emitted_ts,
-            updates_added=snapshots + deltas,
-            depth=int(levels),
-        )
-
-    return stats
+    return _finish_book_import(
+        sink, out_tape, rows_read=rows_read, rows_skipped=rows_skipped,
+        write_metadata=write_metadata, exchange_name=exchange_name,
+        market=market, symbol_id=symbol_id, symbol_name=symbol_name,
+        depth=int(levels))
 
 
 def _write_book_metadata(out_tape: Path, *,

@@ -1356,9 +1356,10 @@ def _build_parser() -> argparse.ArgumentParser:
                            choices=("none", "lz4"),
                            help="Segment compression (default: none).")
     p_binance.add_argument("--no-append", action="store_true",
-                           help="Disable agg_trade_id dedup against an "
-                                "existing tape; every row is written even "
-                                "if its trade_id was already present.")
+                           help="Disable dedup against an existing tape "
+                                "(agg_trade_id, or the book update id with "
+                                "--book); every row is written even if it "
+                                "was already present.")
     p_binance.add_argument("--skip-missing", action="store_true",
                            help="Skip days that fail to download instead of "
                                 "aborting the whole range.")
@@ -1368,7 +1369,8 @@ def _build_parser() -> argparse.ArgumentParser:
                                 "`t1` imports bookTicker (best bid/ask "
                                 "snapshots); `depth20` imports bookDepth "
                                 "(top-20 levels per side, delta-encoded "
-                                "against the previous snapshot). Without "
+                                "within each day, every day opening with "
+                                "a snapshot). Without "
                                 "this flag, aggTrades is imported.")
     p_binance.add_argument("--book-levels", dest="book_levels", type=int,
                            default=20,
