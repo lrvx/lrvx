@@ -79,8 +79,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update -qq
-        sudo apt-get install -y --no-install-recommends \
+        scripts/ci-apt-install.sh --no-install-recommends \
           cmake ninja-build g++-14 ccache \
           libssl-dev zlib1g-dev libcurl4-openssl-dev liblz4-dev \
           python3-dev python3-pip

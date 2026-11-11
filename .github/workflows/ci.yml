@@ -56,6 +56,11 @@ jobs:
         . scripts/clang-format-version.sh
         python3 -m pip install --break-system-packages "clang-format==${CLANG_FORMAT_REQUIRED_VERSION}"
 
+    # Every Linux job installs its packages through this wrapper, so a break
+    # in it shows up in all of them at once; this is the job that says why.
+    - name: Test the apt wrapper
+      run: bash scripts/test_ci_apt_install.sh
+
     - name: Check formatting
       run: ./scripts/check-format.sh
 
@@ -211,7 +216,7 @@ jobs:
       # Mirrors linux-gcc's configure/build, minus the bindings this job
       # doesn't need.
       run: |
-        sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends cmake ninja-build g++-14
+        scripts/ci-apt-install.sh --no-install-recommends cmake ninja-build g++-14
         python3 -m pip install --break-system-packages "pybind11<3.1.0" numpy
         cmake -B build -G Ninja \
               -DCMAKE_CXX_COMPILER=g++-14 \
@@ -284,8 +289,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build liblz4-dev g++-14 python3-dev python3-pip ccache
+        scripts/ci-apt-install.sh cmake ninja-build liblz4-dev g++-14 python3-dev python3-pip ccache
 
     # Keyed on compiler + a hash of every CMakeLists.txt: a CMake-option
     # change invalidates the cache (compiler flags are part of what ccache
@@ -705,8 +709,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build liblz4-dev clang-18 libc++-18-dev libc++abi-18-dev ccache
+        scripts/ci-apt-install.sh cmake ninja-build liblz4-dev clang-18 libc++-18-dev libc++abi-18-dev ccache
 
     - name: Restore ccache
       id: ccache-restore
@@ -823,8 +826,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build liblz4-dev g++-14 ccache
+        scripts/ci-apt-install.sh cmake ninja-build liblz4-dev g++-14 ccache
 
     # A separate key per sanitizer, not a shared gcc14 key: the -fsanitize=
     # flag is baked into every translation unit ccache hashes, so a shared
@@ -1372,8 +1374,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build liblz4-dev libnuma-dev g++-14
+        scripts/ci-apt-install.sh cmake ninja-build liblz4-dev libnuma-dev g++-14
 
     - name: Build and Install GoogleTest
       run: |
@@ -1445,8 +1446,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build g++-14 ccache \
+        scripts/ci-apt-install.sh cmake ninja-build g++-14 ccache \
                                 libssl-dev zlib1g-dev libcurl4-openssl-dev
 
     - name: Restore ccache
@@ -1540,8 +1540,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build clang-18 libgtest-dev libgmock-dev
+        scripts/ci-apt-install.sh cmake ninja-build clang-18 libgtest-dev libgmock-dev
         pip install libclang
 
     - name: Configure
@@ -1594,8 +1593,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build g++-14 libgtest-dev libgmock-dev ccache
+        scripts/ci-apt-install.sh cmake ninja-build g++-14 libgtest-dev libgmock-dev ccache
 
     - name: Restore ccache
       id: ccache-restore
@@ -1715,8 +1713,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build g++-14 libgtest-dev libgmock-dev
+        scripts/ci-apt-install.sh cmake ninja-build g++-14 libgtest-dev libgmock-dev
 
     - name: Configure
       run: |
@@ -1777,8 +1774,7 @@ jobs:
     # grow, the profile has stopped being lite and the diff says so.
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build g++-14 libgtest-dev libgmock-dev ccache
+        scripts/ci-apt-install.sh cmake ninja-build g++-14 libgtest-dev libgmock-dev ccache
 
     - name: Restore ccache
       id: ccache-restore
@@ -1884,8 +1880,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build g++-14 libgtest-dev libgmock-dev ccache rsync
+        scripts/ci-apt-install.sh cmake ninja-build g++-14 libgtest-dev libgmock-dev ccache rsync
 
     - name: Restore ccache
       id: ccache-restore
