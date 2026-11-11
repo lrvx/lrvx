@@ -5019,7 +5019,7 @@ Find good strategy parameters by sweeping a grid and ranking results. The patter
     df.to_csv("grid_results.csv", index=False)
     ```
 
-    For parallelism, wrap `run_one` in `multiprocessing.Pool` or `concurrent.futures.ProcessPoolExecutor`. lrvx releases the GIL during the C++ backtest, so threads work too.
+    For parallelism, wrap `run_one` in `multiprocessing.Pool` or `concurrent.futures.ProcessPoolExecutor`. Use processes, not threads: a Python strategy's callbacks run under the GIL, so threads take turns and give no speedup.
 
 === "Node.js"
 
@@ -12270,7 +12270,7 @@ Each setter takes `None` to detach.
 | `net_pnl` | Net P&L after fees |
 | `total_trades` | Round-trip trade count |
 | `win_rate` | Winning trade fraction |
-| `sharpe_ratio` | Annualized Sharpe ratio |
+| `sharpe_ratio` | Sharpe ratio over the returns between closed trades, scaled by sqrt(252); one period is one closed trade, not one day, so it is not annualized by time |
 | `max_drawdown_pct` | Peak-to-trough drawdown (%) |
 
 ## Example
@@ -14618,8 +14618,8 @@ The [`Stats`](engine.md#stats) object returned by `Engine.run()` is a different,
 | `avg_trade_duration_ns` | `int` | Mean trade holding time (ns) |
 | `median_trade_duration_ns` | `int` | Median trade holding time (ns) |
 | `max_trade_duration_ns` | `int` | Longest trade holding time (ns) |
-| `sharpe_ratio` | `float` | Annualized Sharpe ratio |
-| `sortino_ratio` | `float` | Annualized Sortino ratio |
+| `sharpe_ratio` | `float` | Sharpe ratio over the returns between closed trades, scaled by sqrt(252); one period is one closed trade, not one day, so it is not annualized by time |
+| `sortino_ratio` | `float` | Sortino ratio over the same per-trade returns, scaled the same way |
 | `calmar_ratio` | `float` | Calmar ratio |
 | `time_weighted_return` | `float` | Time-weighted return |
 | `return_pct` | `float` | Net return percentage |

@@ -21,7 +21,7 @@ timestamp, symbol, side, size, price, tickDirection, trdMatchID,
 grossValue, homeNotional, foreignNotional
 ```
 
-`timestamp` is Unix seconds (microsecond decimal precision). `side` is the active flow as `Buy` / `Sell` strings; the importer maps to lrvx's `Side::BUY` / `Side::SELL`. `trdMatchID` is the exchange-assigned trade id, used as the lrvx `trade_id` for append-safe dedup.
+`timestamp` is Unix seconds (microsecond decimal precision). `side` is the active flow as `Buy` / `Sell` strings; the importer maps to lrvx's `Side::BUY` / `Side::SELL`. `trdMatchID` is the exchange-assigned trade id, a UUID string that the importer folds into the 64-bit lrvx `trade_id` (low 8 bytes of its MD5). The folded ids carry no order, so append dedup is by membership: a row is skipped when its id is already on the tape for the same symbol within the incoming file's time range. Re-importing a day adds nothing, a new day lands in full, and an overlapping range keeps each trade once. `--no-append` turns the check off.
 
 ### URL layout
 

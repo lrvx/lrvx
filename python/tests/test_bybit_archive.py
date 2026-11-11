@@ -13,6 +13,9 @@ Covers:
   * trade_id derivation from `trdMatchID` (UUID strings → folded
     int64 hash).
   * Dedup on re-run.
+  * Multi-day append with UUID ids: a later day lands in full, a
+    repeated day adds nothing, an overlapping range keeps each trade
+    once.
   * `metadata.json` carries `exchange=bybit`, `instrument_type`.
   * `bybit` module satisfies the `ArchiveReader` Protocol.
   * Multi-symbol co-existence with a Binance tape merges cleanly via
@@ -30,6 +33,8 @@ import json
 import sys
 import tempfile
 import unittest
+import uuid
+from datetime import date
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -98,7 +103,7 @@ class BybitConvertTests(unittest.TestCase):
     def test_dedup_on_rerun(self) -> None:
         first = self._convert()
         self.assertEqual(first.trades_written, 3)
-        # Re-run: every trade_id <= last_id → all skipped.
+        # Re-run: every trade_id is already on the tape → all skipped.
         second = bybit.trades_to_lrvx(
             self.gz_path, self.tape,
             symbol_id=7, symbol_name="BTCUSDT", market="linear",
@@ -122,6 +127,111 @@ class BybitConvertTests(unittest.TestCase):
     def test_protocol_compliance(self) -> None:
         # The runtime_checkable Protocol matches at module level.
         self.assertIsInstance(bybit, ArchiveReader)
+
+
+_DAY1_START_S = 1_705_276_800  # 2024-01-15T00:00:00Z
+_DAY_S = 86_400
+_ROWS_PER_DAY = 40
+
+
+def _day_rows(day_index: int) -> list:
+    """Bybit rows for one synthetic day with UUID-style trdMatchIDs.
+    Their folded ids are unordered, so every later day carries ids
+    below the maximum of the days before it."""
+    start = _DAY1_START_S + day_index * _DAY_S
+    rows = []
+    for i in range(_ROWS_PER_DAY):
+        trd = str(uuid.uuid5(uuid.NAMESPACE_OID, f"bybit-{day_index}-{i}"))
+        rows.append((f"{start + i * 60}.125", "BTCUSDT",
+                     "Buy" if i % 2 == 0 else "Sell", 0.01 * (i + 1),
+                     42_000.0 + i, "PlusTick", trd, "", "", ""))
+    return rows
+
+
+def _write_day_gz(dest: Path, rows: list) -> Path:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    buf = io.StringIO()
+    buf.write("timestamp,symbol,side,size,price,tickDirection,"
+              "trdMatchID,grossValue,homeNotional,foreignNotional\n")
+    for r in rows:
+        buf.write(",".join(str(x) for x in r) + "\n")
+    with gzip.open(dest, "wt", encoding="utf-8") as f:
+        f.write(buf.getvalue())
+    return dest
+
+
+class BybitMultiDayAppendTests(unittest.TestCase):
+    """Append dedup must key on trade-id membership: folded UUID ids
+    carry no order, so a later day is not "older" than the tape."""
+
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp(prefix="bybit-days-"))
+        self.mirror = self.tmp / "mirror"
+        self.tape = self.tmp / "tape"
+        self.day1 = _day_rows(0)
+        self.day2 = _day_rows(1)
+        self.day1_gz = _write_day_gz(
+            bybit._mirror_path(self.mirror, "BTCUSDT", "linear",
+                               date(2024, 1, 15)), self.day1)
+        self.day2_gz = _write_day_gz(
+            bybit._mirror_path(self.mirror, "BTCUSDT", "linear",
+                               date(2024, 1, 16)), self.day2)
+
+    def _import(self, path: Path) -> bybit.ConvertStats:
+        return bybit.trades_to_lrvx(
+            path, self.tape, symbol_id=7, symbol_name="BTCUSDT",
+            market="linear",
+        )
+
+    def _tape_ids(self) -> list:
+        trades = lrvx.DataReader(str(self.tape)).read_trades()
+        return [int(t["trade_id"]) for t in trades]
+
+    def _expected_ids(self, rows: list) -> list:
+        return [bybit._hash_trade_id(r[6]) for r in rows]
+
+    def test_fixture_ids_are_unordered_across_days(self) -> None:
+        day1_max = max(self._expected_ids(self.day1))
+        below = [i for i in self._expected_ids(self.day2) if i <= day1_max]
+        self.assertGreater(len(below), 0)
+
+    def test_two_days_in_sequence_both_land_in_full(self) -> None:
+        first = self._import(self.day1_gz)
+        second = self._import(self.day2_gz)
+        self.assertEqual(first.trades_written, _ROWS_PER_DAY)
+        self.assertEqual(second.trades_written, _ROWS_PER_DAY)
+        self.assertEqual(second.rows_skipped, 0)
+        self.assertEqual(sorted(self._tape_ids()),
+                         sorted(self._expected_ids(self.day1 + self.day2)))
+
+    def test_reimport_of_same_day_adds_nothing(self) -> None:
+        self._import(self.day1_gz)
+        self._import(self.day2_gz)
+        again = self._import(self.day2_gz)
+        self.assertEqual(again.trades_written, 0)
+        self.assertEqual(again.rows_skipped, _ROWS_PER_DAY)
+        again = self._import(self.day1_gz)
+        self.assertEqual(again.trades_written, 0)
+        self.assertEqual(again.rows_skipped, _ROWS_PER_DAY)
+        self.assertEqual(len(self._tape_ids()), 2 * _ROWS_PER_DAY)
+
+    def test_overlapping_range_keeps_each_trade_once(self) -> None:
+        bybit.range_to_lrvx(
+            "BTCUSDT", "linear", "2024-01-15", "2024-01-15", self.tape,
+            mirror=self.mirror, parallel=1, symbol_id=7,
+        )
+        stats = bybit.range_to_lrvx(
+            "BTCUSDT", "linear", "2024-01-15", "2024-01-16", self.tape,
+            mirror=self.mirror, parallel=1, symbol_id=7,
+        )
+        self.assertEqual(stats.trades_written, _ROWS_PER_DAY)
+        self.assertEqual(stats.rows_skipped, _ROWS_PER_DAY)
+        ids = self._tape_ids()
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual(sorted(ids),
+                         sorted(self._expected_ids(self.day1 + self.day2)))
+        meta = json.loads((self.tape / "metadata.json").read_text())
+        self.assertEqual(meta["total_trades"], 2 * _ROWS_PER_DAY)
 
 
 class CrossExchangeMergeTests(unittest.TestCase):

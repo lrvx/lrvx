@@ -350,7 +350,7 @@ Each setter takes `None` to detach.
 | `net_pnl` | Net P&L after fees |
 | `total_trades` | Round-trip trade count |
 | `win_rate` | Winning trade fraction |
-| `sharpe_ratio` | Annualized Sharpe ratio |
+| `sharpe_ratio` | Sharpe ratio over the returns between closed trades, scaled by sqrt(252); one period is one closed trade, not one day, so it is not annualized by time |
 | `max_drawdown_pct` | Peak-to-trough drawdown (%) |
 
 ## Example

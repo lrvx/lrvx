@@ -11,8 +11,10 @@ layout (post-2022) is:
 precision). ``side`` is the active flow side as the strings ``Buy``
 or ``Sell`` — mirrors the lrvx ``Side::BUY`` / ``Side::SELL``
 convention once mapped. ``trdMatchID`` is the per-trade exchange id;
-the converter uses it as the lrvx ``trade_id`` so re-running the
-same day is a no-op.
+the converter folds it into the lrvx ``trade_id``. With ``append``
+on, a row is skipped when its id is already on the tape for the same
+symbol within the incoming file's time range, so re-running a day is
+a no-op and a new day lands in full.
 
 URL layout per market:
 
@@ -133,9 +135,11 @@ def _open_csv(path: Path) -> Tuple[io.TextIOBase, "object"]:
 def _hash_trade_id(token: str) -> int:
     """Bybit's `trdMatchID` is a UUID string. Fold it to an int64 via
     the low 8 bytes of MD5 so the lrvx ``trade_id`` field (uint64)
-    can carry it. Collisions are vanishingly rare within a single
-    symbol's daily volume; the dedup path tolerates the occasional
-    duplicate (would write a second row, not silently corrupt)."""
+    can carry it. The folded ids are unordered, so append dedup checks
+    membership, never ``<= max``. Collisions are vanishingly rare
+    within a single symbol's daily volume; one would only matter when
+    a new trade collides with a trade already on the tape in the same
+    time window, which skips the new trade."""
     try:
         return int(token)
     except (ValueError, TypeError):
@@ -275,23 +279,31 @@ def _write_metadata(out_tape: Path, *,
     meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True))
 
 
-def _existing_max_trade_id(out_tape: Path, symbol_id: int) -> int:
+def _existing_trade_ids(out_tape: Path, symbol_id: int,
+                        from_ns: int, to_ns: int) -> "object":
+    """Return the trade ids already on the tape for ``symbol_id`` with
+    an exchange timestamp in ``[from_ns, to_ns]``, as a numpy uint64
+    array (empty when the tape is missing or unreadable).
+
+    Bybit ids are folded UUIDs and carry no order, so dedup is by
+    membership. Only the incoming file's time window can hold its
+    trades, which bounds the array by roughly one day of trades."""
+    import numpy as np
+
+    empty = np.empty(0, dtype=np.uint64)
     if not out_tape.exists():
-        return 0
+        return empty
     try:
         import lrvx
-        import numpy as np
 
-        reader = lrvx.DataReader(str(out_tape))
+        reader = lrvx.DataReader(str(out_tape), from_ns=int(from_ns),
+                                 to_ns=int(to_ns), symbols=[int(symbol_id)])
         trades = reader.read_trades()
         if trades.size == 0:
-            return 0
-        ids = np.asarray(trades["trade_id"])
-        syms = np.asarray(trades["symbol_id"])
-        mask = syms == symbol_id
-        return int(ids[mask].max()) if mask.any() else 0
+            return empty
+        return np.asarray(trades["trade_id"], dtype=np.uint64)
     except Exception:
-        return 0
+        return empty
 
 
 def trades_to_lrvx(
@@ -328,17 +340,20 @@ def trades_to_lrvx(
             stem = stem[:-10]
         symbol_name = stem
 
-    last_id = _existing_max_trade_id(out_tape, symbol_id) if append else 0
-
-    rows: List[Tuple[int, float, float, int, int]] = []
-    rows_read = 0
+    rows: List[Tuple[int, float, float, int, int]] = list(_iter_rows(csv_path))
+    rows_read = len(rows)
     rows_skipped = 0
-    for r in _iter_rows(csv_path):
-        rows_read += 1
-        if r[0] <= last_id and r[0] != 0:
-            rows_skipped += 1
-            continue
-        rows.append(r)
+    if append and rows:
+        existing = _existing_trade_ids(
+            out_tape, symbol_id,
+            min(r[3] for r in rows), max(r[3] for r in rows),
+        )
+        if existing.size:
+            incoming = np.fromiter((r[0] for r in rows), dtype=np.uint64,
+                                   count=rows_read)
+            seen = np.isin(incoming, existing)
+            rows = [r for r, dup in zip(rows, seen.tolist()) if not dup]
+            rows_skipped = rows_read - len(rows)
 
     if not rows:
         if write_metadata and rows_read:
@@ -349,8 +364,7 @@ def trades_to_lrvx(
             )
         return ConvertStats(rows_read=rows_read,
                             rows_skipped=rows_skipped,
-                            files_processed=1,
-                            last_trade_id=last_id)
+                            files_processed=1)
 
     # Bybit ticks come in chronological order, but a defensive sort
     # keeps the writer's monotonic invariant intact even when callers
