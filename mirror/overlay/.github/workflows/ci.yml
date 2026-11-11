@@ -22,8 +22,19 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build g++-14 libgtest-dev libgmock-dev ccache
+        # Bounded and retried: a stalled mirror once held this step until
+        # the job's timeout-minutes.
+        for attempt in 1 2 3; do
+          sudo timeout --kill-after=15 90 apt-get update && break
+          [ "$attempt" = 3 ] && exit 1
+          sleep 10
+        done
+        for attempt in 1 2 3; do
+          sudo timeout --kill-after=15 300 apt-get install -y cmake ninja-build g++-14 libgtest-dev libgmock-dev ccache && break
+          [ "$attempt" = 3 ] && exit 1
+          sudo timeout --kill-after=15 120 dpkg --configure -a || true
+          sleep 10
+        done
 
     - name: Restore ccache
       id: ccache-restore
@@ -84,8 +95,19 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build g++-14 libgtest-dev libgmock-dev ccache rsync
+        # Bounded and retried: a stalled mirror once held this step until
+        # the job's timeout-minutes.
+        for attempt in 1 2 3; do
+          sudo timeout --kill-after=15 90 apt-get update && break
+          [ "$attempt" = 3 ] && exit 1
+          sleep 10
+        done
+        for attempt in 1 2 3; do
+          sudo timeout --kill-after=15 300 apt-get install -y cmake ninja-build g++-14 libgtest-dev libgmock-dev ccache rsync && break
+          [ "$attempt" = 3 ] && exit 1
+          sudo timeout --kill-after=15 120 dpkg --configure -a || true
+          sleep 10
+        done
 
     - name: Restore ccache
       id: ccache-restore

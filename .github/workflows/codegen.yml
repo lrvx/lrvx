@@ -38,7 +38,7 @@ jobs:
 
       - name: Install codegen deps
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends clang-format
+          scripts/ci-apt-install.sh --no-install-recommends clang-format
           python -m pip install --quiet --upgrade pip
           python -m pip install --quiet -r tools/codegen/requirements.txt
           python -m pip install --quiet pytest

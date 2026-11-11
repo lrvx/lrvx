@@ -48,8 +48,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build liblz4-dev g++-14 ccache
+        scripts/ci-apt-install.sh cmake ninja-build liblz4-dev g++-14 ccache
 
     - name: Restore ccache
       id: ccache-restore
@@ -155,8 +154,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build liblz4-dev clang-18 libc++-18-dev libc++abi-18-dev ccache
+        scripts/ci-apt-install.sh cmake ninja-build liblz4-dev clang-18 libc++-18-dev libc++abi-18-dev ccache
 
     - name: Restore ccache
       id: ccache-restore
