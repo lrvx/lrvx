@@ -417,6 +417,15 @@ export interface MarketDataRecorderHook {
     asks: BigInt64Array,
     timestampNs: bigint
   ): void;
+  /** A top-of-book frame: one level per side, `null` for an empty side,
+   *  the shape `Runner.onBookTop` takes. Snapshots and deltas keep going
+   *  to `onBookUpdate`; a hook without `onBookTop` skips tops. */
+  onBookTop?(
+    symbol: number,
+    bid: { price: number; qty: number } | null,
+    ask: { price: number; qty: number } | null,
+    timestampNs: bigint
+  ): void;
   onStart?(): void;
   onStop?(): void;
 }

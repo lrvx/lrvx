@@ -195,6 +195,13 @@ A trade handed to a `MarketDataRecorderHook`'s `onTrade` is a `TradeData`:
 `{ symbol, price, qty, isBuy, side, timestampNs }`, with `timestampNs` a
 `bigint`. It is the same shape a strategy's `onTrade` receives.
 
+`onBookUpdate(symbol, isSnapshot, bids, asks, timestampNs)` receives
+snapshots and deltas. A top-of-book frame goes to
+`onBookTop(symbol, bid, ask, timestampNs)` instead, with `bid` / `ask` a
+`{ price, qty }` or `null` for an empty side, the shape `Runner.onBookTop`
+takes. Defining `onBookTop` does not change `onBookUpdate`, which keeps
+receiving every snapshot and delta. A hook without `onBookTop` skips tops.
+
 !!! warning "Deprecated: `trade.quantity` and `trade.exchangeTsNs`"
 
     The recorder hook used to be handed `quantity` and `exchangeTsNs` in

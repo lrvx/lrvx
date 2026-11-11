@@ -83,10 +83,14 @@ def on_book(ts_ns, global_id, is_snapshot, bids, asks):
     typ = "snap" if is_snapshot else "delta"
     print(f"  book  {ts_ns} sym={global_id} {typ} {len(bids)}b/{len(asks)}a")
 
+def on_book_top(ts_ns, global_id, bid, ask):
+    print(f"  top   {ts_ns} sym={global_id} {bid} / {ask}")
+
 stats = tape.replay_tapes(
     ["tapes/bybit-btc", "tapes/binance-btc"],
     on_trade=on_trade,
     on_book=on_book,
+    on_book_top=on_book_top,
 )
 
 print(f"merged {stats.trades} trades, {stats.books} books across "
@@ -94,6 +98,11 @@ print(f"merged {stats.trades} trades, {stats.books} books across "
 for entry in stats.tapes:
     print(f"  {entry['path']}: {entry['trades']} trades / {entry['books']} books")
 ```
+
+`on_book` receives snapshots and deltas. A top-of-book frame goes to
+`on_book_top`, with `bid` / `ask` a `(price, qty)` tuple or `None` for an
+empty side; leave it out and tops are skipped. `on_book` sees the same
+snapshots and deltas either way.
 
 `stats.tapes` gives a per-tape breakdown. Useful when one of the
 inputs is empty (typo in path, recording crashed before any events).
@@ -138,7 +147,11 @@ reader.stream_events(on_trade=on_trade)
 
 `on_book(exchange_ts_ns, recv_ts_ns, symbol_id, tape_index,
 is_snapshot, bids, asks)` receives `bids` / `asks` as lists of
-`(price_raw, qty_raw)` tuples. Note that `stream_events` reports raw
+`(price_raw, qty_raw)` tuples, for snapshots and deltas.
+`on_book_top(exchange_ts_ns, recv_ts_ns, symbol_id, tape_index, bid, ask)`
+receives a top-of-book frame, `bid` / `ask` a `(price_raw, qty_raw)` tuple
+or `None`; without it tops are skipped. Returning `False` from any of the
+three aborts the walk. Note that `stream_events` reports raw
 fixed-point values and a `tape_index` for provenance, which
 `replay_tapes` does not.
 

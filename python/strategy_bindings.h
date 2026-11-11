@@ -2873,6 +2873,11 @@ inline void bindStrategy(py::module_& m)
       .def("on_book_update", &lrvx::PyMarketDataRecorderHook::on_book_update,
            py::arg("symbol"), py::arg("is_snapshot"), py::arg("bids"),
            py::arg("asks"), py::arg("ts_ns"))
+      .def("on_book_top", &lrvx::PyMarketDataRecorderHook::on_book_top,
+           "A top-of-book frame: bid / ask are (price, qty), or None for an "
+           "empty side. Called only when a subclass defines it; snapshots and "
+           "deltas keep going to on_book_update.",
+           py::arg("symbol"), py::arg("bid"), py::arg("ask"), py::arg("ts_ns"))
       .def("on_start", &lrvx::PyMarketDataRecorderHook::on_start)
       .def("on_stop", &lrvx::PyMarketDataRecorderHook::on_stop);
 

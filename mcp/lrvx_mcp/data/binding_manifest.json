@@ -30179,6 +30179,11 @@
         },
         {
           "kind": "method",
+          "name": "onBookTop",
+          "parent": "MarketDataRecorderHook"
+        },
+        {
+          "kind": "method",
           "name": "onBookUpdate",
           "parent": "MarketDataRecorderHook"
         },
@@ -36189,6 +36194,11 @@
           "kind": "method",
           "name": "value",
           "parent": "MarkImpactModel"
+        },
+        {
+          "kind": "method",
+          "name": "on_book_top",
+          "parent": "MarketDataRecorderHook"
         },
         {
           "kind": "method",

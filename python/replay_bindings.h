@@ -1194,10 +1194,12 @@ class PyMergedTapeReader
   }
 
   // Streaming walk via the C++ N-way heap merge. O(N tapes) peak
-  // memory regardless of total event count. on_trade / on_book are
-  // optional Python callables; returning False from either aborts.
-  // Lossless raw int64 prices/qty preserved (no float conversion).
-  void streamEvents(py::object on_trade, py::object on_book)
+  // memory regardless of total event count. on_trade / on_book /
+  // on_book_top are optional Python callables; returning False from any
+  // aborts. Lossless raw int64 prices/qty preserved (no float conversion).
+  // on_book takes a bool, so tops go to on_book_top and are skipped when
+  // it is None.
+  void streamEvents(py::object on_trade, py::object on_book, py::object on_book_top)
   {
     _reader.streamEvents(
         [&](uint32_t tape_index, const lrvx::replay::ReplayEvent& ev) -> bool
@@ -1245,6 +1247,32 @@ class PyMergedTapeReader
                                     uint32_t{tape_index},
                                     is_snap,
                                     bids, asks);
+            if (!rv.is_none() && !rv.cast<bool>())
+            {
+              return false;
+            }
+            return true;
+          }
+          if (ev.type == lrvx::replay::EventType::BookTop)
+          {
+            if (on_book_top.is_none())
+            {
+              return true;
+            }
+            // One level per side; an empty side is None, not an empty list.
+            auto level = [](const auto& side) -> py::object
+            {
+              if (side.empty())
+              {
+                return py::none();
+              }
+              return py::make_tuple(int64_t{side.front().price_raw}, int64_t{side.front().qty_raw});
+            };
+            py::object rv = on_book_top(int64_t{ev.book_header.exchange_ts_ns},
+                                        int64_t{ev.book_header.recv_ts_ns},
+                                        uint32_t{ev.book_header.symbol_id},
+                                        uint32_t{tape_index},
+                                        level(ev.bids), level(ev.asks));
             if (!rv.is_none() && !rv.cast<bool>())
             {
               return false;
@@ -1570,11 +1598,16 @@ inline void bindReplay(py::module_& m)
            "peak memory). Calls on_trade(exchange_ts_ns, recv_ts_ns, "
            "price_raw, qty_raw, symbol_id, tape_index, side) and "
            "on_book(exchange_ts_ns, recv_ts_ns, symbol_id, "
-           "tape_index, is_snapshot, bids, asks). bids/asks are "
-           "lists of (price_raw, qty_raw) tuples. Returning False "
-           "from either aborts the walk.",
+           "tape_index, is_snapshot, bids, asks) for snapshots and "
+           "deltas. bids/asks are lists of (price_raw, qty_raw) tuples. "
+           "A top-of-book frame goes to on_book_top(exchange_ts_ns, "
+           "recv_ts_ns, symbol_id, tape_index, bid, ask) instead, bid/ask "
+           "a (price_raw, qty_raw) tuple or None for an empty side, and is "
+           "skipped when on_book_top is None. Returning False from any "
+           "callback aborts the walk.",
            py::arg("on_trade") = py::none(),
-           py::arg("on_book") = py::none())
+           py::arg("on_book") = py::none(),
+           py::arg("on_book_top") = py::none())
       .def("run", &PyMergedTapeReader::run,
            "Run a panel of streaming aggregators over the merged tape "
            "stream in a single decompression pass. Same semantics as "

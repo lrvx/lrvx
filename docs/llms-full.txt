@@ -4148,7 +4148,7 @@ Nothing special: `BacktestRunner.run_tape` delivers a top the way live did. The 
 
 ## Record tops
 
-A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), through Bybit or Bitget with their `subscribeBbo` on (off by default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`; so does a `DataWriter` given `update_type=2`. `EventTypeStatsAggregator` counts them in its `book_tops` column, and `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas and skip tops, since their book callback takes a bool; a C recorder hook receives the byte `2`.
+A recording made through the Hyperliquid connector with `subscribeBbo` on (the default), through Bybit or Bitget with their `subscribeBbo` on (off by default), or through a binding-side feed that calls `on_book_top` (the ccxt adapter's `bbo` stream does), carries tops as frame type `6`; so does a `DataWriter` given `update_type=2`. `EventTypeStatsAggregator` counts them in its `book_tops` column, and `metadata.json` says `has_book_tops`. Custom recorder hooks in Python and Node receive snapshots and deltas through their bool-shaped book callback and tops through `on_book_top`, one `(price, qty)` or `None` per side (`onBookTop` in Node, one `{ price, qty }` or `null` per side); a hook that does not define it skips tops. A C recorder hook receives the byte `2`.
 
 ## See also
 
@@ -10496,6 +10496,7 @@ Members:
 
 **Members**
 
+- `on_book_top(self, symbol: typing.SupportsInt | typing.SupportsIndex, bid: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ask: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ts_ns: typing.SupportsInt | typing.SupportsIndex) -> None`
 - `on_book_update(self, symbol: typing.SupportsInt | typing.SupportsIndex, is_snapshot: bool, bids: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], asks: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ts_ns: typing.SupportsInt | typing.SupportsIndex) -> None`
 - `on_start(self) -> None`
 - `on_stop(self) -> None`
@@ -10538,7 +10539,7 @@ Market Profile (TPO) aggregator. Tracks price activity across time periods.
 - `read_books(self) -> tuple`
 - `read_trades(self) -> numpy.ndarray`
 - `run(self, aggregators: list) -> bool`
-- `stream_events(self, on_trade: typing.Any = None, on_book: typing.Any = None) -> None`
+- `stream_events(self, on_trade: typing.Any = None, on_book: typing.Any = None, on_book_top: typing.Any = None) -> None`
 - `summary(self) -> dict`
 - `symbol_table(self) -> list`
 - `time_range(self) -> tuple`
@@ -12182,6 +12183,15 @@ runner.stop()
 | `set_order_validator(ov)` | Attach an `OrderValidator` |
 | `set_market_data_recorder(recorder)` | Attach a `MarketDataRecorderHook` or `BinaryLogRecorderHook` |
 | `set_executor(executor)` | Replace the executor |
+
+A `MarketDataRecorderHook` subclass overrides any of `on_trade(trade)`,
+`on_book_update(symbol, is_snapshot, bids, asks, ts_ns)`,
+`on_book_top(symbol, bid, ask, ts_ns)`, `on_start()` and `on_stop()`.
+`on_book_update` receives snapshots and deltas, with `bids` / `asks` lists of
+`(price, qty)`. A top-of-book frame goes to `on_book_top` instead: `bid` /
+`ask` are one `(price, qty)` each, or `None` for an empty side. Defining
+`on_book_top` does not change `on_book_update`, which keeps receiving every
+snapshot and delta. A hook that does not define it is not called for tops.
 
 ### Trace recording
 
@@ -15068,6 +15078,13 @@ stay `number`.
 A trade handed to a `MarketDataRecorderHook`'s `onTrade` is a `TradeData`:
 `{ symbol, price, qty, isBuy, side, timestampNs }`, with `timestampNs` a
 `bigint`. It is the same shape a strategy's `onTrade` receives.
+
+`onBookUpdate(symbol, isSnapshot, bids, asks, timestampNs)` receives
+snapshots and deltas. A top-of-book frame goes to
+`onBookTop(symbol, bid, ask, timestampNs)` instead, with `bid` / `ask` a
+`{ price, qty }` or `null` for an empty side, the shape `Runner.onBookTop`
+takes. Defining `onBookTop` does not change `onBookUpdate`, which keeps
+receiving every snapshot and delta. A hook without `onBookTop` skips tops.
 
 !!! warning "Deprecated: `trade.quantity` and `trade.exchangeTsNs`"
 
@@ -21931,7 +21948,7 @@ The recorder keeps the frame as its own kind. A top is frame type `6` (`BookTop`
 
 Two byte spaces meet here and the readers say which they speak. The record byte is `0` snapshot, `1` delta, `2` top, and that is what `event_type` carries on the rows of `DataReader.read_book_updates()` and `read_bbo()` and on their C API, Node and Codon equivalents. The frame type is `2`, `3`, `6`, and that is what `event_type` carries on the rows of `MergedTapeReader.read_books()`. A consumer that reconstructs depth from either must treat the top value as a touch, or skip it; applying it as a delta is the stranded-level failure above.
 
-The recorder hook's book callback carries a third value as well. Its `is_snapshot` argument is a byte: `1` snapshot, `0` delta, `2` top. The two boolean values predate the third and keep their meaning. Surfaces whose shape is a bool skip tops the way an old reader skips the frame: the custom recorder hooks in Python and Node, `MergedTapeReader.stream_events` and `replay_tapes`. `DataWriter.write_book` writes a top when given `update_type=2` (`updateType` in Node and embedded JavaScript), the record byte, and the batched `write_books` takes the same byte, so rows read back from `read_book_updates()` write back as they were. `metadata.json` carries `has_book_tops` next to `has_book_snapshots` and `has_book_deltas`, and `EventTypeStatsAggregator` counts tops in a `book_tops` column next to its snapshot and delta columns.
+The recorder hook's book callback carries a third value as well. Its `is_snapshot` argument is a byte: `1` snapshot, `0` delta, `2` top. The two boolean values predate the third and keep their meaning. Surfaces whose book callback is a bool keep it for snapshots and deltas and hand a top to a separate `on_book_top`, one level or `None` per side: the custom recorder hooks in Python and Node, `MergedTapeReader.stream_events` and `replay_tapes`. The Node hook's is `onBookTop`, with a `{ price, qty }` or `null` per side. Defining it does not take anything away from the bool-shaped callback, which still receives every snapshot and delta, and code that does not define it skips tops the way an old reader skips the frame. `DataWriter.write_book` writes a top when given `update_type=2` (`updateType` in Node and embedded JavaScript), the record byte, and the batched `write_books` takes the same byte, so rows read back from `read_book_updates()` write back as they were. `metadata.json` carries `has_book_tops` next to `has_book_snapshots` and `has_book_deltas`, and `EventTypeStatsAggregator` counts tops in a `book_tops` column next to its snapshot and delta columns.
 
 A backtest from such a tape replays the frame the way live delivered it: the strategy's touch moves and `onSymbolTouch` fires, the depth book stays put, and the simulated venue fills at the touch the strategy saw.
 

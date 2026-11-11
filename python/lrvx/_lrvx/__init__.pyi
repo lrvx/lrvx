@@ -1544,6 +1544,10 @@ class MarkImpactModel:
 class MarketDataRecorderHook:
     def __init__(self) -> None:
         ...
+    def on_book_top(self, symbol: typing.SupportsInt | typing.SupportsIndex, bid: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ask: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ts_ns: typing.SupportsInt | typing.SupportsIndex) -> None:
+        """
+        A top-of-book frame: bid / ask are (price, qty), or None for an empty side. Called only when a subclass defines it; snapshots and deltas keep going to on_book_update.
+        """
     def on_book_update(self, symbol: typing.SupportsInt | typing.SupportsIndex, is_snapshot: bool, bids: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], asks: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ts_ns: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
     def on_start(self) -> None:
@@ -1607,9 +1611,9 @@ class MergedTapeReader:
         """
         Run a panel of streaming aggregators over the merged tape stream in a single decompression pass. Same semantics as DataReader.run — events are seen with global-rewritten symbol ids; per-tape provenance is not surfaced to aggregators (reach for stream_events directly when needed).
         """
-    def stream_events(self, on_trade: typing.Any = None, on_book: typing.Any = None) -> None:
+    def stream_events(self, on_trade: typing.Any = None, on_book: typing.Any = None, on_book_top: typing.Any = None) -> None:
         """
-        Walk the merged stream via N-way heap merge (O(N tapes) peak memory). Calls on_trade(exchange_ts_ns, recv_ts_ns, price_raw, qty_raw, symbol_id, tape_index, side) and on_book(exchange_ts_ns, recv_ts_ns, symbol_id, tape_index, is_snapshot, bids, asks). bids/asks are lists of (price_raw, qty_raw) tuples. Returning False from either aborts the walk.
+        Walk the merged stream via N-way heap merge (O(N tapes) peak memory). Calls on_trade(exchange_ts_ns, recv_ts_ns, price_raw, qty_raw, symbol_id, tape_index, side) and on_book(exchange_ts_ns, recv_ts_ns, symbol_id, tape_index, is_snapshot, bids, asks) for snapshots and deltas. bids/asks are lists of (price_raw, qty_raw) tuples. A top-of-book frame goes to on_book_top(exchange_ts_ns, recv_ts_ns, symbol_id, tape_index, bid, ask) instead, bid/ask a (price_raw, qty_raw) tuple or None for an empty side, and is skipped when on_book_top is None. Returning False from any callback aborts the walk.
         """
     def summary(self) -> dict:
         """
