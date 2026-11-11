@@ -57,7 +57,7 @@ skew = skewness(prices, 20)
 
 ## Streaming indicators
 
-All streaming indicators share the same pattern: call `update()` each tick, read `.value`, check `.ready`. All support `.reset()` to clear state.
+All streaming indicators share the same pattern: call `update()` each tick, read `.value`, check `.ready`. All support `.reset()` to clear state, `.count` (updates since construction or the last reset) and `.close()` to release the C handle.
 
 ```codon
 from lrvx.indicators import EMA, SMA, RSI, ATR, MACD, Bollinger
@@ -71,8 +71,16 @@ The complete class list is `SMA`, `EMA`, `RMA`, `DEMA`, `TEMA`, `KAMA`, `RSI`, `
 `ParkinsonVol`, `RogersSatchellVol`, `Correlation`, `AutoCorrelation`. There is no `OBV`, `VWAP` or
 `CVD` class — those three are batch-only free functions.
 
-Streaming classes accumulate history internally and re-run the batch function over it, so `.value`
-is by construction identical to the last element of the batch result.
+Each instance holds one C handle (`lrvx_streaming_indicator_*`) that owns the C++ streaming
+indicator. `update()` runs one step of it and keeps no history, so the cost of an update depends
+only on the indicator's window, not on how many values it has seen: O(1) for SMA, EMA, RMA, RSI,
+DEMA, TEMA, Slope, ATR and MACD, O(period) for the others, which recompute their window each step.
+`.value`, `.ready` and the NaN behaviour are the C++ class's, and `.value` after k updates equals
+element k - 1 of the batch result bit for bit. `Stochastic.ready` needs both %K and %D.
+
+`.close()` releases the handle at once. An instance that is never closed is released by `__del__`
+when the collector reclaims it; one still reachable when the program exits is left to the process
+exit. After `.close()`, `.value` is NaN, `.ready` is False and `.count` is 0.
 
 ### Single-price indicators
 
@@ -87,7 +95,7 @@ if ema.ready:
 
 #### `SMA`
 
-Uses a circular buffer for O(1) updates.
+A running sum over a circular buffer: O(1) per update.
 
 ```codon
 sma = SMA(period=20)
@@ -289,7 +297,8 @@ cvd_series  = cvd(opens, highs, lows, closes, volumes)
 <!-- INDICATOR-LIST-START -->
 
 Every indicator below is **one Codon class** with streaming `update()` / `value` /
-`ready` / `reset()`. A batch `compute()` is **not** on every class — the `Batch`
+`ready` / `count` / `reset()`, one kernel step of the C++ class per update, and
+`close()` to release its C handle. A batch `compute()` is **not** on every class — the `Batch`
 column says what each class actually exposes. Classes and the batch free functions
 both come from `lrvx.indicators`.
 

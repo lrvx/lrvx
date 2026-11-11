@@ -1,9 +1,10 @@
 # lrvx/indicators.codon -- All indicators via the unified C API.
 #
 # Each class is ONE Codon class with both batch (compute) and streaming
-# (update / value / ready / reset) on the same instance. Streaming works
-# by accumulating history and re-running the same batch C-API function;
-# parity with .compute() is by construction.
+# (update / value / ready / count / reset) on the same instance. Batch
+# calls the lrvx_indicator_* functions; streaming holds one
+# lrvx_streaming_indicator handle per instance (see the class section
+# below), and the two run the same C++ kernel step.
 
 import math
 
@@ -298,28 +299,108 @@ def adf(data: List[float], max_lag: int = 4, regression: str = "c") -> AdfResult
 
 # ======================================================================
 # Streaming indicator classes — one class per indicator, with both
-# batch (compute) and streaming (update/value/ready/reset). Streaming
-# works by accumulating history and re-running the batch C-API function
-# on the full history. By-construction parity with .compute().
+# batch (compute) and streaming (update / value / ready / count / reset).
+#
+# Each instance holds one C handle (lrvx_streaming_indicator_*) that owns
+# the C++ streaming indicator, so update() is one kernel step of that
+# class: its cost does not depend on how many values the instance has
+# seen, and values, readiness and NaN behaviour are the C++ class's. No
+# input history is kept here.
+#
+# The handle is released by close(), or by __del__ when the collector
+# reclaims an instance that was never closed. An instance still reachable
+# when the program exits is not finalized; the process exit returns its
+# memory. After close(), value reads NaN, ready is False and count is 0.
 # ======================================================================
+
+from C import lrvx_streaming_indicator_create(cobj, Ptr[float], u32) -> cobj
+from C import lrvx_streaming_indicator_destroy(cobj)
+from C import lrvx_streaming_indicator_update(cobj, float) -> float
+from C import lrvx_streaming_indicator_update_bar(cobj, float, float, float) -> float
+from C import lrvx_streaming_indicator_update_high_low(cobj, float, float) -> float
+from C import lrvx_streaming_indicator_update_ohlc(cobj, float, float, float, float) -> float
+from C import lrvx_streaming_indicator_update_pair(cobj, float, float) -> float
+from C import lrvx_streaming_indicator_value(cobj) -> float
+from C import lrvx_streaming_indicator_output(cobj, u32) -> float
+from C import lrvx_streaming_indicator_ready(cobj) -> u8
+from C import lrvx_streaming_indicator_count(cobj) -> u64
+from C import lrvx_streaming_indicator_reset(cobj)
+from C import lrvx_last_error_message() -> cobj
+
+
+class _Stream:
+    """One lrvx_streaming_indicator handle, created from the registry's
+    snake_case name and the constructor arguments in registry order."""
+    _h: cobj
+
+    def __init__(self, name: str, args: List[float]):
+        self._h = lrvx_streaming_indicator_create(name.c_str(), args.arr.ptr, u32(len(args)))
+        if self._h == cobj():
+            raise ValueError(str.from_ptr(lrvx_last_error_message()))
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._h != cobj():
+            lrvx_streaming_indicator_destroy(self._h)
+            self._h = cobj()
+
+    def update(self, v: float) -> float:
+        if self._h == cobj(): return math.nan
+        return lrvx_streaming_indicator_update(self._h, v)
+
+    def update_bar(self, high: float, low: float, close: float) -> float:
+        if self._h == cobj(): return math.nan
+        return lrvx_streaming_indicator_update_bar(self._h, high, low, close)
+
+    def update_high_low(self, high: float, low: float) -> float:
+        if self._h == cobj(): return math.nan
+        return lrvx_streaming_indicator_update_high_low(self._h, high, low)
+
+    def update_ohlc(self, open_: float, high: float, low: float, close: float) -> float:
+        if self._h == cobj(): return math.nan
+        return lrvx_streaming_indicator_update_ohlc(self._h, open_, high, low, close)
+
+    def update_pair(self, x: float, y: float) -> float:
+        if self._h == cobj(): return math.nan
+        return lrvx_streaming_indicator_update_pair(self._h, x, y)
+
+    def value(self) -> float:
+        if self._h == cobj(): return math.nan
+        return lrvx_streaming_indicator_value(self._h)
+
+    def output(self, index: int) -> float:
+        if self._h == cobj(): return math.nan
+        return lrvx_streaming_indicator_output(self._h, u32(index))
+
+    def ready(self) -> bool:
+        return self._h != cobj() and lrvx_streaming_indicator_ready(self._h) != u8(0)
+
+    def count(self) -> int:
+        if self._h == cobj(): return 0
+        return int(lrvx_streaming_indicator_count(self._h))
+
+    def reset(self):
+        if self._h != cobj():
+            lrvx_streaming_indicator_reset(self._h)
+
 
 class SMA:
     _period: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int):
         self._period = period
-        self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v)
-        return self.value
+        self._s = _Stream("sma", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = sma(self._history, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, data: List[float]) -> List[float]: return sma(data, self._period)
     @staticmethod
     def compute_static(data: List[float], period: int) -> List[float]: return sma(data, period)
@@ -327,81 +408,73 @@ class SMA:
 
 class EMA:
     _period: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int):
         self._period = period
-        self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v)
-        return self.value
+        self._s = _Stream("ema", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = ema(self._history, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, data: List[float]) -> List[float]: return ema(data, self._period)
 
 
 class RMA:
     _period: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int):
         self._period = period
-        self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v)
-        return self.value
+        self._s = _Stream("rma", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = rma(self._history, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, data: List[float]) -> List[float]: return rma(data, self._period)
 
 
 class DEMA:
     _period: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int):
         self._period = period
-        self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v)
-        return self.value
+        self._s = _Stream("dema", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = dema(self._history, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, data: List[float]) -> List[float]: return dema(data, self._period)
 
 
 class TEMA:
     _period: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int):
         self._period = period
-        self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v)
-        return self.value
+        self._s = _Stream("tema", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = tema(self._history, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, data: List[float]) -> List[float]: return tema(data, self._period)
 
 
@@ -409,140 +482,120 @@ class KAMA:
     _period: int
     _fast: int
     _slow: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int, fast: int = 2, slow: int = 30):
         self._period = period; self._fast = fast; self._slow = slow
-        self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v)
-        return self.value
+        self._s = _Stream("kama", [float(period), float(fast), float(slow)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = kama(self._history, self._period, self._fast, self._slow)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, data: List[float]) -> List[float]:
         return kama(data, self._period, self._fast, self._slow)
 
 
 class RSI:
     _period: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int):
         self._period = period
-        self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v)
-        return self.value
+        self._s = _Stream("rsi", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = rsi(self._history, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, data: List[float]) -> List[float]: return rsi(data, self._period)
 
 
 class Slope:
     _length: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, length: int):
         self._length = length
-        self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v)
-        return self.value
+        self._s = _Stream("slope", [float(length)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = slope(self._history, self._length)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, data: List[float]) -> List[float]: return slope(data, self._length)
 
 
 class ATR:
     _period: int
-    _h: List[float]
-    _l: List[float]
-    _c: List[float]
+    _s: _Stream
     def __init__(self, period: int):
         self._period = period
-        self._h = []; self._l = []; self._c = []
+        self._s = _Stream("atr", [float(period)])
     def update(self, high: float, low: float, close: float) -> float:
-        self._h.append(high); self._l.append(low); self._c.append(close)
-        return self.value
+        return self._s.update_bar(high, low, close)
     @property
-    def value(self) -> float:
-        if len(self._h) == 0: return math.nan
-        out = atr(self._h, self._l, self._c, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._h = []; self._l = []; self._c = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, h: List[float], l: List[float], c: List[float]) -> List[float]:
         return atr(h, l, c, self._period)
 
 
 class CCI:
     _period: int
-    _h: List[float]
-    _l: List[float]
-    _c: List[float]
+    _s: _Stream
     def __init__(self, period: int):
         self._period = period
-        self._h = []; self._l = []; self._c = []
+        self._s = _Stream("cci", [float(period)])
     def update(self, high: float, low: float, close: float) -> float:
-        self._h.append(high); self._l.append(low); self._c.append(close)
-        return self.value
+        return self._s.update_bar(high, low, close)
     @property
-    def value(self) -> float:
-        if len(self._h) == 0: return math.nan
-        out = cci(self._h, self._l, self._c, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._h = []; self._l = []; self._c = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
 
 
 class MACD:
     _fast: int
     _slow: int
     _signal: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, fast: int = 12, slow: int = 26, signal: int = 9):
         self._fast = fast; self._slow = slow; self._signal = signal
-        self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v)
-        return self.value
+        self._s = _Stream("macd", [float(fast), float(slow), float(signal)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        r = macd(self._history, self._fast, self._slow, self._signal)
-        return r.line[len(r.line) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def line(self) -> float: return self.value
+    def line(self) -> float: return self._s.value()
     @property
-    def signal_value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        r = macd(self._history, self._fast, self._slow, self._signal)
-        return r.signal[len(r.signal) - 1]
+    def signal_value(self) -> float: return self._s.output(1)
     @property
-    def histogram(self) -> float:
-        if len(self._history) == 0: return math.nan
-        r = macd(self._history, self._fast, self._slow, self._signal)
-        return r.histogram[len(r.histogram) - 1]
+    def histogram(self) -> float: return self._s.output(2)
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, data: List[float]) -> MacdResult:
         return macd(data, self._fast, self._slow, self._signal)
 
@@ -550,206 +603,188 @@ class MACD:
 class Bollinger:
     _period: int
     _multiplier: float
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int = 20, multiplier: float = 2.0):
         self._period = period; self._multiplier = multiplier
-        self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v)
-        return self.value
+        self._s = _Stream("bollinger", [float(period), multiplier])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float: return self.middle
+    def value(self) -> float: return self._s.value()
     @property
-    def middle(self) -> float:
-        if len(self._history) == 0: return math.nan
-        r = bollinger(self._history, self._period, self._multiplier)
-        return r.middle[len(r.middle) - 1]
+    def middle(self) -> float: return self._s.value()
     @property
-    def upper(self) -> float:
-        if len(self._history) == 0: return math.nan
-        r = bollinger(self._history, self._period, self._multiplier)
-        return r.upper[len(r.upper) - 1]
+    def upper(self) -> float: return self._s.output(1)
     @property
-    def lower(self) -> float:
-        if len(self._history) == 0: return math.nan
-        r = bollinger(self._history, self._period, self._multiplier)
-        return r.lower[len(r.lower) - 1]
+    def lower(self) -> float: return self._s.output(2)
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
     def compute(self, data: List[float]) -> BollingerResult:
         return bollinger(data, self._period, self._multiplier)
 
 
 class Stochastic:
+    """value / k is %K, d is %D; ready once both are finite."""
     _k_period: int
     _d_period: int
-    _h: List[float]
-    _l: List[float]
-    _c: List[float]
+    _s: _Stream
     def __init__(self, k_period: int = 14, d_period: int = 3):
         self._k_period = k_period; self._d_period = d_period
-        self._h = []; self._l = []; self._c = []
+        self._s = _Stream("stochastic", [float(k_period), float(d_period)])
     def update(self, high: float, low: float, close: float) -> float:
-        self._h.append(high); self._l.append(low); self._c.append(close)
-        return self.value
+        return self._s.update_bar(high, low, close)
     @property
-    def value(self) -> float: return self.k
+    def value(self) -> float: return self._s.value()
     @property
-    def k(self) -> float:
-        if len(self._h) == 0: return math.nan
-        r = stochastic(self._h, self._l, self._c, self._k_period, self._d_period)
-        return r.k[len(r.k) - 1]
+    def k(self) -> float: return self._s.value()
     @property
-    def d(self) -> float:
-        if len(self._h) == 0: return math.nan
-        r = stochastic(self._h, self._l, self._c, self._k_period, self._d_period)
-        return r.d[len(r.d) - 1]
+    def d(self) -> float: return self._s.output(1)
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._h = []; self._l = []; self._c = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
 
 
 class Skewness:
     _period: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int):
-        self._period = period; self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v); return self.value
+        self._period = period
+        self._s = _Stream("skewness", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = skewness(self._history, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
 
 
 class Kurtosis:
     _period: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int):
-        self._period = period; self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v); return self.value
+        self._period = period
+        self._s = _Stream("kurtosis", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = kurtosis(self._history, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
 
 
 class RollingZScore:
     _period: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int):
-        self._period = period; self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v); return self.value
+        self._period = period
+        self._s = _Stream("rolling_zscore", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = rolling_zscore(self._history, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
 
 
 class ShannonEntropy:
     _period: int
     _bins: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, period: int, bins: int = 10):
-        self._period = period; self._bins = bins; self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v); return self.value
+        self._period = period; self._bins = bins
+        self._s = _Stream("shannon_entropy", [float(period), float(bins)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = shannon_entropy(self._history, self._period, self._bins)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
 
 
 class ParkinsonVol:
     _period: int
-    _h: List[float]
-    _l: List[float]
+    _s: _Stream
     def __init__(self, period: int):
-        self._period = period; self._h = []; self._l = []
+        self._period = period
+        self._s = _Stream("parkinson_vol", [float(period)])
     def update(self, high: float, low: float) -> float:
-        self._h.append(high); self._l.append(low); return self.value
+        return self._s.update_high_low(high, low)
     @property
-    def value(self) -> float:
-        if len(self._h) == 0: return math.nan
-        out = parkinson_vol(self._h, self._l, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._h = []; self._l = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
 
 
 class RogersSatchellVol:
     _period: int
-    _o: List[float]
-    _h: List[float]
-    _l: List[float]
-    _c: List[float]
+    _s: _Stream
     def __init__(self, period: int):
         self._period = period
-        self._o = []; self._h = []; self._l = []; self._c = []
+        self._s = _Stream("rogers_satchell_vol", [float(period)])
     def update(self, open_: float, high: float, low: float, close: float) -> float:
-        self._o.append(open_); self._h.append(high); self._l.append(low); self._c.append(close)
-        return self.value
+        return self._s.update_ohlc(open_, high, low, close)
     @property
-    def value(self) -> float:
-        if len(self._o) == 0: return math.nan
-        out = rogers_satchell_vol(self._o, self._h, self._l, self._c, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._o = []; self._h = []; self._l = []; self._c = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
 
 
 class Correlation:
     _period: int
-    _x: List[float]
-    _y: List[float]
+    _s: _Stream
     def __init__(self, period: int):
-        self._period = period; self._x = []; self._y = []
-    def update(self, x: float, y: float) -> float:
-        self._x.append(x); self._y.append(y); return self.value
+        self._period = period
+        self._s = _Stream("correlation", [float(period)])
+    def update(self, x: float, y: float) -> float: return self._s.update_pair(x, y)
     @property
-    def value(self) -> float:
-        if len(self._x) == 0: return math.nan
-        out = rolling_correlation(self._x, self._y, self._period)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._x = []; self._y = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
 
 
 class AutoCorrelation:
     _window: int
     _lag: int
-    _history: List[float]
+    _s: _Stream
     def __init__(self, window: int, lag: int):
-        self._window = window; self._lag = lag; self._history = []
-    def update(self, v: float) -> float:
-        self._history.append(v); return self.value
+        self._window = window; self._lag = lag
+        self._s = _Stream("autocorrelation", [float(window), float(lag)])
+    def update(self, v: float) -> float: return self._s.update(v)
     @property
-    def value(self) -> float:
-        if len(self._history) == 0: return math.nan
-        out = autocorrelation(self._history, self._window, self._lag)
-        return out[len(out) - 1]
+    def value(self) -> float: return self._s.value()
     @property
-    def ready(self) -> bool: return not math.isnan(self.value)
-    def reset(self): self._history = []
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()

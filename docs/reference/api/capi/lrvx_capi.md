@@ -7,8 +7,8 @@
 All language bindings (Python, Node.js, Codon, embedded JS) call into this header. You can use it directly to integrate lrvx into any language with a C FFI, or embed it in a C/C++ project.
 
 !!! warning "This page is a curated subset"
-    The full surface is **729 functions, 58 handles, 59 structs, 44 callback typedefs, 3 enums**
-    across 72 groups. This page covers the commonly used core (roughly 150 functions) with prose.
+    The full surface is **763 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums**
+    across 74 groups. This page covers the commonly used core (roughly 150 functions) with prose.
     The complete, machine-generated reference — every function signature, in group order — is
     [`tools/codegen/golden/lrvx_capi.md`](https://github.com/lrvx/lrvx/blob/main/tools/codegen/golden/lrvx_capi.md),
     generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. **That file is the reference of record.**
@@ -25,7 +25,7 @@ All language bindings (Python, Node.js, Codon, embedded JS) call into this heade
 
 ## Opaque handles
 
-All 58 handles are `void*`. Lifetime is managed by the matching `_create` / `_destroy` pair.
+All 59 handles are `void*`. Lifetime is managed by the matching `_create` / `_destroy` pair.
 
 ```c
 typedef void* LrvxStrategyHandle;
@@ -43,6 +43,7 @@ typedef void* LrvxCompositeBookHandle;
 typedef void* LrvxCurveHandle;
 typedef void* LrvxPoolTapeHandle;
 typedef void* LrvxPoolReplayHandle;
+typedef void* LrvxStreamingIndicatorHandle;
 typedef void* LrvxIndicatorGraphHandle;
 typedef LrvxIndicatorGraphHandle LrvxStreamingGraphHandle;  // alias
 typedef void* LrvxOrderGroupHandle;
@@ -798,8 +799,32 @@ that is not array-in / array-out: it writes three scalars through out-pointers a
 `const char* regression` selector. The `lrvx_indicator_graph_*` functions are a separate group and
 are not listed here.
 
-Streaming (stateful) indicator objects are not part of the C API; they are exposed by the Codon,
-QuickJS and Node bindings.
+### Streaming indicators
+
+One `LrvxStreamingIndicatorHandle` per streaming indicator instance, for every row of
+`include/lrvx/indicator/registry.def`. The handle owns the C++ class and forwards to it: an update
+is one kernel step, its cost independent of how many values the handle has seen, and nothing but
+`_create` allocates. The Codon and QuickJS indicator classes are built on these handles.
+
+| Function | Description |
+|----------|-------------|
+| `lrvx_streaming_indicator_create(name, args, num_args)` | Create by registry snake_case name (`"sma"`, `"macd"`, ...) with the row's constructor arguments as doubles; NULL and code 2 on a bad name or argument |
+| `lrvx_streaming_indicator_destroy(h)` | Free the handle; NULL is a no-op |
+| `lrvx_streaming_indicator_update(h, value)` | One step of a single-series indicator (SingleInput rows, MACD, Bollinger); returns the value after it |
+| `lrvx_streaming_indicator_update_bar(h, high, low, close)` | ATR, CCI, Stochastic |
+| `lrvx_streaming_indicator_update_high_low(h, high, low)` | ParkinsonVol |
+| `lrvx_streaming_indicator_update_ohlc(h, open, high, low, close)` | RogersSatchellVol |
+| `lrvx_streaming_indicator_update_pair(h, x, y)` | Correlation |
+| `lrvx_streaming_indicator_value(h)` | The class's `value()`, NaN while not ready |
+| `lrvx_streaming_indicator_output(h, index)` | Output `index`; 0 is `value()`. MACD: line, signal, histogram. Bollinger: middle, upper, lower. Stochastic: %K, %D |
+| `lrvx_streaming_indicator_ready(h)` | The class's `ready()` |
+| `lrvx_streaming_indicator_count(h)` | Updates since creation or the last reset |
+| `lrvx_streaming_indicator_reset(h)` | Back to the freshly created state |
+| `lrvx_streaming_indicator_input_count(h)` | Inputs per update: 1 to 4 |
+| `lrvx_streaming_indicator_output_count(h)` | Outputs: 3 for MACD and Bollinger, 2 for Stochastic, else 1 |
+
+An update function that does not match the indicator's inputs does not step it; it returns 0 and
+records code 2. `LRVX_HAS_STREAMING_INDICATOR_HANDLES` is defined by a header that declares them.
 
 ---
 

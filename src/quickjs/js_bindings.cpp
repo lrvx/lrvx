@@ -1162,6 +1162,144 @@ static JSValue js_indicator_autocorrelation(JSContext* ctx, JSValueConst, int,
 }
 
 // ============================================================
+// Streaming indicators
+// ============================================================
+//
+// The streaming classes in quickjs/lrvx/indicators.js each hold one
+// lrvx_streaming_indicator handle, on the generic LrvxHandle class, so the
+// finalizer destroys it when a script drops the object without calling
+// destroy(). An update is one call and one kernel step; nothing here keeps
+// history. A destroyed handle reads NaN (the classes show null), not ready,
+// count 0.
+
+static JSValue js_streaming_indicator_create(JSContext* ctx, JSValueConst, int,
+                                             JSValueConst* argv)
+{
+  LRVX_JS_CSTRING_OR_THROW(name, ctx, argv[0]);
+  uint32_t n = 0;
+  if (JS_IsArray(ctx, argv[1]))
+  {
+    JSValue lenVal = JS_GetPropertyStr(ctx, argv[1], "length");
+    JS_ToUint32(ctx, &n, lenVal);
+    JS_FreeValue(ctx, lenVal);
+  }
+  // Constructor arguments are a handful of numbers; anything longer is a
+  // mistake, and the length must not reach an allocation unchecked.
+  if (n > 16)
+  {
+    return JS_ThrowRangeError(ctx, "streaming indicator: %u constructor arguments", n);
+  }
+  std::vector<double> args = n ? jsArrayToDoubles(ctx, argv[1]) : std::vector<double>{};
+  LrvxStreamingIndicatorHandle h =
+      lrvx_streaming_indicator_create(name, args.data(), static_cast<uint32_t>(args.size()));
+  if (!h)
+  {
+    return JS_ThrowTypeError(ctx, "%s", lrvx_last_error_message());
+  }
+  return createHandleObject(ctx, h, lrvx_streaming_indicator_destroy);
+}
+
+static JSValue js_streaming_indicator_destroy(JSContext* ctx, JSValueConst, int,
+                                              JSValueConst* argv)
+{
+  return js_generic_handle_destroy(ctx, argv[0]);
+}
+
+static JSValue js_streaming_indicator_update(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  if (!h)
+  {
+    return JS_NewFloat64(ctx, std::nan(""));
+  }
+  return JS_NewFloat64(ctx, lrvx_streaming_indicator_update(h, toDouble(ctx, argv[1])));
+}
+
+static JSValue js_streaming_indicator_update_bar(JSContext* ctx, JSValueConst, int,
+                                                 JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  if (!h)
+  {
+    return JS_NewFloat64(ctx, std::nan(""));
+  }
+  return JS_NewFloat64(ctx, lrvx_streaming_indicator_update_bar(h, toDouble(ctx, argv[1]),
+                                                                toDouble(ctx, argv[2]),
+                                                                toDouble(ctx, argv[3])));
+}
+
+static JSValue js_streaming_indicator_update_high_low(JSContext* ctx, JSValueConst, int,
+                                                      JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  if (!h)
+  {
+    return JS_NewFloat64(ctx, std::nan(""));
+  }
+  return JS_NewFloat64(ctx, lrvx_streaming_indicator_update_high_low(h, toDouble(ctx, argv[1]),
+                                                                     toDouble(ctx, argv[2])));
+}
+
+static JSValue js_streaming_indicator_update_ohlc(JSContext* ctx, JSValueConst, int,
+                                                  JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  if (!h)
+  {
+    return JS_NewFloat64(ctx, std::nan(""));
+  }
+  return JS_NewFloat64(
+      ctx, lrvx_streaming_indicator_update_ohlc(h, toDouble(ctx, argv[1]), toDouble(ctx, argv[2]),
+                                                toDouble(ctx, argv[3]), toDouble(ctx, argv[4])));
+}
+
+static JSValue js_streaming_indicator_update_pair(JSContext* ctx, JSValueConst, int,
+                                                  JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  if (!h)
+  {
+    return JS_NewFloat64(ctx, std::nan(""));
+  }
+  return JS_NewFloat64(ctx, lrvx_streaming_indicator_update_pair(h, toDouble(ctx, argv[1]),
+                                                                 toDouble(ctx, argv[2])));
+}
+
+static JSValue js_streaming_indicator_value(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewFloat64(ctx, h ? lrvx_streaming_indicator_value(h) : std::nan(""));
+}
+
+static JSValue js_streaming_indicator_output(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewFloat64(ctx,
+                       h ? lrvx_streaming_indicator_output(h, toUint32(ctx, argv[1])) : std::nan(""));
+}
+
+static JSValue js_streaming_indicator_ready(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewBool(ctx, h != nullptr && lrvx_streaming_indicator_ready(h) != 0);
+}
+
+static JSValue js_streaming_indicator_count(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewFloat64(ctx, h ? static_cast<double>(lrvx_streaming_indicator_count(h)) : 0.0);
+}
+
+static JSValue js_streaming_indicator_reset(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  if (auto h = getHandle(ctx, argv[0]))
+  {
+    lrvx_streaming_indicator_reset(h);
+  }
+  return JS_UNDEFINED;
+}
+
+// ============================================================
 // Targets (forward-looking labels, batch only)
 // ============================================================
 
@@ -7155,6 +7293,24 @@ bool registerLrvxBindings(JSContext* ctx)
   addGlobalFunc(ctx, "__lrvx_indicator_correlation", js_indicator_correlation, 3);
   addGlobalFunc(ctx, "__lrvx_indicator_adf", js_indicator_adf, 3);
   addGlobalFunc(ctx, "__lrvx_indicator_autocorrelation", js_indicator_autocorrelation, 3);
+
+  // Streaming indicators (one C handle per indicator object)
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_create", js_streaming_indicator_create, 2);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_destroy", js_streaming_indicator_destroy, 1);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_update", js_streaming_indicator_update, 2);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_update_bar", js_streaming_indicator_update_bar,
+                4);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_update_high_low",
+                js_streaming_indicator_update_high_low, 3);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_update_ohlc", js_streaming_indicator_update_ohlc,
+                5);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_update_pair", js_streaming_indicator_update_pair,
+                3);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_value", js_streaming_indicator_value, 1);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_output", js_streaming_indicator_output, 2);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_ready", js_streaming_indicator_ready, 1);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_count", js_streaming_indicator_count, 1);
+  addGlobalFunc(ctx, "__lrvx_streaming_indicator_reset", js_streaming_indicator_reset, 1);
 
   // Targets (forward-looking labels)
   addGlobalFunc(ctx, "__lrvx_target_future_return", js_target_future_return, 2);

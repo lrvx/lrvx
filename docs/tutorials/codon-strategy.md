@@ -99,11 +99,12 @@ Because Codon compiles to native code:
 - `on_trade` is compiled to a native function, not interpreted
 - No GIL, no interpreter, no garbage collector pauses
 
-`SMA.update()` is **not** an O(1) online recurrence. The indicator classes
-in `lrvx.indicators` accumulate the full history and re-run the batch C-API
-function over all of it on every call, which guarantees parity with
-`compute()` but costs one FFI call over the whole history per tick. For
-tick-rate hot paths, buffer the prices and call `compute()` on the batch.
+`SMA.update()` is one FFI call that runs one step of the C++ `SMA` held by
+the instance (a running sum, O(1)). The indicator classes in
+`lrvx.indicators` keep no history, so an update costs the same on the
+millionth tick as on the first, and the values match `compute()` and the
+C++ classes bit for bit. Each instance owns a C handle; `close()` frees it
+early, otherwise the collector frees it with the instance.
 
 ## Step 4: Compare with C++ and Python
 

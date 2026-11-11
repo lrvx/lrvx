@@ -1,16 +1,22 @@
 // quickjs/lrvx/indicators.js
 //
 // Each indicator is ONE class with both batch and streaming API on the
-// same instance. No own ring buffer / alpha / sum / count — streaming
-// works by accumulating history and re-running the same C-API batch
-// function. Parity with .compute() is by construction.
+// same instance.
 //
 //   const ema = new EMA(10);
-//   const out = ema.compute(prices);          // batch
+//   const out = EMA.compute(prices);          // batch
 //   for (const v of stream) {                 // streaming on the same instance
 //     ema.update(v);
 //     if (ema.ready) console.log(ema.value);
 //   }
+//
+// Streaming: each instance holds one C handle (lrvx_streaming_indicator_*)
+// that owns the C++ streaming indicator. update() is one kernel step of that
+// class, so its cost does not depend on how many values the instance has
+// seen, and values, readiness and NaN behaviour are the C++ class's. A value
+// that is NaN reads as null. destroy() releases the handle at once; an
+// instance dropped without destroy() is released by the QuickJS finalizer
+// when it is collected, or when the runtime is torn down.
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -21,28 +27,57 @@ function _last(arr) {
 
 function _optNum(v) { return (typeof v !== 'number' || isNaN(v)) ? null : v; }
 
-// Single-input streaming pattern: history + re-run batch on full history.
-class _Stream1 {
-    constructor(period, batchFn) {
-        this._period = period;
-        this._batchFn = batchFn;
-        this._history = [];
-    }
-    update(v) {
-        this._history.push(v);
-        return _optNum(_last(this._batchFn(this._history, this._period)));
-    }
-    get value() {
-        if (this._history.length === 0) return null;
-        return _optNum(_last(this._batchFn(this._history, this._period)));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._history.length; }
-    reset() { this._history = []; }
+// Integer constructor arguments convert the way the batch bindings convert
+// a period (ToUint32), so a period such as 14.0 or "14" means what it did.
+function _u(v) { return v >>> 0; }
+
+// Streaming base: the handle, and everything that does not depend on the
+// shape of an update.
+class _StreamHandle {
+    constructor(name, args) { this._h = __lrvx_streaming_indicator_create(name, args); }
+    get value() { return _optNum(__lrvx_streaming_indicator_value(this._h)); }
+    get ready() { return __lrvx_streaming_indicator_ready(this._h); }
+    get count() { return __lrvx_streaming_indicator_count(this._h); }
+    reset() { __lrvx_streaming_indicator_reset(this._h); }
+    destroy() { __lrvx_streaming_indicator_destroy(this._h); }
+    _output(i) { return _optNum(__lrvx_streaming_indicator_output(this._h, i)); }
 }
 
-// Bar-input streaming (high, low, close).
-class _StreamBar {
+// Single-input: update(v).
+class _Stream1 extends _StreamHandle {
+    update(v) { return _optNum(__lrvx_streaming_indicator_update(this._h, v)); }
+}
+
+// Bar-input: update(high, low, close).
+class _StreamBar extends _StreamHandle {
+    update(high, low, close) {
+        return _optNum(__lrvx_streaming_indicator_update_bar(this._h, high, low, close));
+    }
+}
+
+// High/low: update(high, low).
+class _StreamHighLow extends _StreamHandle {
+    update(high, low) {
+        return _optNum(__lrvx_streaming_indicator_update_high_low(this._h, high, low));
+    }
+}
+
+// OHLC: update(open, high, low, close).
+class _StreamOhlc extends _StreamHandle {
+    update(open, high, low, close) {
+        return _optNum(__lrvx_streaming_indicator_update_ohlc(this._h, open, high, low, close));
+    }
+}
+
+// Pair: update(x, y).
+class _StreamPair extends _StreamHandle {
+    update(x, y) { return _optNum(__lrvx_streaming_indicator_update_pair(this._h, x, y)); }
+}
+
+// CHOP has no C++ streaming class (it is not in registry.def), so its
+// streaming form still keeps the bar history and re-runs the batch function
+// on each update: O(history) per update.
+class _HistoryBar {
     constructor(period, batchFn) {
         this._period = period;
         this._batchFn = batchFn;
@@ -61,122 +96,51 @@ class _StreamBar {
     reset() { this._h = []; this._l = []; this._c = []; }
 }
 
-// HighLow streaming (high, low).
-class _StreamHighLow {
-    constructor(period, batchFn) {
-        this._period = period;
-        this._batchFn = batchFn;
-        this._h = []; this._l = [];
-    }
-    update(high, low) {
-        this._h.push(high); this._l.push(low);
-        return _optNum(_last(this._batchFn(this._h, this._l, this._period)));
-    }
-    get value() {
-        if (this._h.length === 0) return null;
-        return _optNum(_last(this._batchFn(this._h, this._l, this._period)));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._h.length; }
-    reset() { this._h = []; this._l = []; }
-}
-
-// OHLC streaming.
-class _StreamOhlc {
-    constructor(period, batchFn) {
-        this._period = period;
-        this._batchFn = batchFn;
-        this._o = []; this._h = []; this._l = []; this._c = [];
-    }
-    update(open, high, low, close) {
-        this._o.push(open); this._h.push(high); this._l.push(low); this._c.push(close);
-        return _optNum(_last(this._batchFn(this._o, this._h, this._l, this._c, this._period)));
-    }
-    get value() {
-        if (this._o.length === 0) return null;
-        return _optNum(_last(this._batchFn(this._o, this._h, this._l, this._c, this._period)));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._o.length; }
-    reset() { this._o = []; this._h = []; this._l = []; this._c = []; }
-}
-
-// Pair streaming (x, y).
-class _StreamPair {
-    constructor(period, batchFn) {
-        this._period = period;
-        this._batchFn = batchFn;
-        this._x = []; this._y = [];
-    }
-    update(x, y) {
-        this._x.push(x); this._y.push(y);
-        return _optNum(_last(this._batchFn(this._x, this._y, this._period)));
-    }
-    get value() {
-        if (this._x.length === 0) return null;
-        return _optNum(_last(this._batchFn(this._x, this._y, this._period)));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._x.length; }
-    reset() { this._x = []; this._y = []; }
-}
-
 // ============================================================
 // Moving averages / oscillators
 // ============================================================
 
 class SMA extends _Stream1 {
-    constructor(period) { super(period, __lrvx_indicator_sma); }
+    constructor(period) { super('sma', [_u(period)]); }
     static compute(data, period) { return __lrvx_indicator_sma(data, period); }
 }
 
 class EMA extends _Stream1 {
-    constructor(period) { super(period, __lrvx_indicator_ema); }
+    constructor(period) { super('ema', [_u(period)]); }
     static compute(data, period) { return __lrvx_indicator_ema(data, period); }
 }
 
 class RMA extends _Stream1 {
-    constructor(period) { super(period, __lrvx_indicator_rma); }
+    constructor(period) { super('rma', [_u(period)]); }
     static compute(data, period) { return __lrvx_indicator_rma(data, period); }
 }
 
 class DEMA extends _Stream1 {
-    constructor(period) { super(period, __lrvx_indicator_dema); }
+    constructor(period) { super('dema', [_u(period)]); }
     static compute(data, period) { return __lrvx_indicator_dema(data, period); }
 }
 
 class TEMA extends _Stream1 {
-    constructor(period) { super(period, __lrvx_indicator_tema); }
+    constructor(period) { super('tema', [_u(period)]); }
     static compute(data, period) { return __lrvx_indicator_tema(data, period); }
 }
 
 class RSI extends _Stream1 {
-    constructor(period) { super(period, __lrvx_indicator_rsi); }
+    constructor(period) { super('rsi', [_u(period)]); }
     static compute(data, period) { return __lrvx_indicator_rsi(data, period); }
 }
 
 class Slope extends _Stream1 {
-    constructor(length) { super(length, __lrvx_indicator_slope); }
+    constructor(length) { super('slope', [_u(length)]); }
     static compute(data, length) { return __lrvx_indicator_slope(data, length); }
 }
 
-// KAMA(period, fast=2, slow=30) — extra ctor args, custom adapter
-class KAMA {
+// KAMA(period, fast=2, slow=30)
+class KAMA extends _Stream1 {
     constructor(period, fast = 2, slow = 30) {
+        super('kama', [_u(period), _u(fast), _u(slow)]);
         this._period = period; this._fast = fast; this._slow = slow;
-        this._history = [];
     }
-    update(v) {
-        this._history.push(v);
-        return _optNum(_last(__lrvx_indicator_kama(this._history, this._period, this._fast, this._slow)));
-    }
-    get value() {
-        if (this._history.length === 0) return null;
-        return _optNum(_last(__lrvx_indicator_kama(this._history, this._period, this._fast, this._slow)));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._history.length; }
-    reset() { this._history = []; }
     compute(data) { return __lrvx_indicator_kama(data, this._period, this._fast, this._slow); }
     static compute(data, period, fast = 2, slow = 30) {
         return __lrvx_indicator_kama(data, period, fast, slow);
@@ -188,20 +152,20 @@ class KAMA {
 // ============================================================
 
 class ATR extends _StreamBar {
-    constructor(period) { super(period, __lrvx_indicator_atr); }
+    constructor(period) { super('atr', [_u(period)]); }
     static compute(high, low, close, period) {
         return __lrvx_indicator_atr(high, low, close, period);
     }
 }
 
 class CCI extends _StreamBar {
-    constructor(period) { super(period, __lrvx_indicator_cci); }
+    constructor(period) { super('cci', [_u(period)]); }
     static compute(high, low, close, period) {
         return __lrvx_indicator_cci(high, low, close, period);
     }
 }
 
-class CHOP extends _StreamBar {
+class CHOP extends _HistoryBar {
     constructor(period) { super(period, __lrvx_indicator_chop); }
     static compute(high, low, close, period) {
         return __lrvx_indicator_chop(high, low, close, period);
@@ -219,96 +183,44 @@ class ADX {
 // Multi-output (line/signal/histogram, upper/middle/lower, k/d)
 // ============================================================
 
-// MACD(fast, slow, signal) — multi-output
-class MACD {
+// MACD(fast, slow, signal) — multi-output: value/line, signal, histogram
+class MACD extends _Stream1 {
     constructor(fast = 12, slow = 26, signal = 9) {
+        super('macd', [_u(fast), _u(slow), _u(signal)]);
         this._fast = fast; this._slow = slow; this._signal = signal;
-        this._history = [];
-    }
-    update(v) {
-        this._history.push(v);
-        const r = __lrvx_indicator_macd(this._history, this._fast, this._slow, this._signal);
-        return _optNum(_last(r.line));
-    }
-    get value() {
-        if (this._history.length === 0) return null;
-        const r = __lrvx_indicator_macd(this._history, this._fast, this._slow, this._signal);
-        return _optNum(_last(r.line));
     }
     get line() { return this.value; }
-    get signal() {
-        if (this._history.length === 0) return null;
-        const r = __lrvx_indicator_macd(this._history, this._fast, this._slow, this._signal);
-        return _optNum(_last(r.signal));
-    }
-    get histogram() {
-        if (this._history.length === 0) return null;
-        const r = __lrvx_indicator_macd(this._history, this._fast, this._slow, this._signal);
-        return _optNum(_last(r.histogram));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._history.length; }
-    reset() { this._history = []; }
+    get signal() { return this._output(1); }
+    get histogram() { return this._output(2); }
     compute(data) { return __lrvx_indicator_macd(data, this._fast, this._slow, this._signal); }
     static compute(data, fast = 12, slow = 26, signal = 9) {
         return __lrvx_indicator_macd(data, fast, slow, signal);
     }
 }
 
-class Bollinger {
+// Bollinger(period, multiplier) — value/middle, upper, lower
+class Bollinger extends _Stream1 {
     constructor(period = 20, multiplier = 2.0) {
+        super('bollinger', [_u(period), +multiplier]);
         this._period = period; this._mul = multiplier;
-        this._history = [];
     }
-    update(v) {
-        this._history.push(v);
-        const r = __lrvx_indicator_bollinger(this._history, this._period, this._mul);
-        return _optNum(_last(r.middle));
-    }
-    get value() { return this.middle; }
-    get middle() {
-        if (this._history.length === 0) return null;
-        return _optNum(_last(__lrvx_indicator_bollinger(this._history, this._period, this._mul).middle));
-    }
-    get upper() {
-        if (this._history.length === 0) return null;
-        return _optNum(_last(__lrvx_indicator_bollinger(this._history, this._period, this._mul).upper));
-    }
-    get lower() {
-        if (this._history.length === 0) return null;
-        return _optNum(_last(__lrvx_indicator_bollinger(this._history, this._period, this._mul).lower));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._history.length; }
-    reset() { this._history = []; }
+    get middle() { return this.value; }
+    get upper() { return this._output(1); }
+    get lower() { return this._output(2); }
     compute(data) { return __lrvx_indicator_bollinger(data, this._period, this._mul); }
     static compute(data, period = 20, multiplier = 2.0) {
         return __lrvx_indicator_bollinger(data, period, multiplier);
     }
 }
 
-class Stochastic {
+// Stochastic(kPeriod, dPeriod) — value/k, d. ready once both are finite.
+class Stochastic extends _StreamBar {
     constructor(kPeriod = 14, dPeriod = 3) {
+        super('stochastic', [_u(kPeriod), _u(dPeriod)]);
         this._k = kPeriod; this._d = dPeriod;
-        this._h = []; this._l = []; this._c = [];
     }
-    update(high, low, close) {
-        this._h.push(high); this._l.push(low); this._c.push(close);
-        const r = __lrvx_indicator_stochastic(this._h, this._l, this._c, this._k, this._d);
-        return _optNum(_last(r.k));
-    }
-    get value() { return this.k; }
-    get k() {
-        if (this._h.length === 0) return null;
-        return _optNum(_last(__lrvx_indicator_stochastic(this._h, this._l, this._c, this._k, this._d).k));
-    }
-    get d() {
-        if (this._h.length === 0) return null;
-        return _optNum(_last(__lrvx_indicator_stochastic(this._h, this._l, this._c, this._k, this._d).d));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._h.length; }
-    reset() { this._h = []; this._l = []; this._c = []; }
+    get k() { return this.value; }
+    get d() { return this._output(1); }
     compute(high, low, close) { return __lrvx_indicator_stochastic(high, low, close, this._k, this._d); }
     static compute(high, low, close, kPeriod = 14, dPeriod = 3) {
         return __lrvx_indicator_stochastic(high, low, close, kPeriod, dPeriod);
@@ -336,34 +248,26 @@ class CVD {
 // ============================================================
 
 class Skewness extends _Stream1 {
-    constructor(period) { super(period, __lrvx_indicator_skewness); }
+    constructor(period) { super('skewness', [_u(period)]); }
     static compute(data, period) { return __lrvx_indicator_skewness(data, period); }
 }
 
 class Kurtosis extends _Stream1 {
-    constructor(period) { super(period, __lrvx_indicator_kurtosis); }
+    constructor(period) { super('kurtosis', [_u(period)]); }
     static compute(data, period) { return __lrvx_indicator_kurtosis(data, period); }
 }
 
 class RollingZScore extends _Stream1 {
-    constructor(period) { super(period, __lrvx_indicator_rolling_zscore); }
+    constructor(period) { super('rolling_zscore', [_u(period)]); }
     static compute(data, period) { return __lrvx_indicator_rolling_zscore(data, period); }
 }
 
 // ShannonEntropy(period, bins)
-class ShannonEntropy {
-    constructor(period, bins = 10) { this._period = period; this._bins = bins; this._history = []; }
-    update(v) {
-        this._history.push(v);
-        return _optNum(_last(__lrvx_indicator_shannon_entropy(this._history, this._period, this._bins)));
+class ShannonEntropy extends _Stream1 {
+    constructor(period, bins = 10) {
+        super('shannon_entropy', [_u(period), _u(bins)]);
+        this._period = period; this._bins = bins;
     }
-    get value() {
-        if (this._history.length === 0) return null;
-        return _optNum(_last(__lrvx_indicator_shannon_entropy(this._history, this._period, this._bins)));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._history.length; }
-    reset() { this._history = []; }
     compute(data) { return __lrvx_indicator_shannon_entropy(data, this._period, this._bins); }
     static compute(data, period, bins = 10) {
         return __lrvx_indicator_shannon_entropy(data, period, bins);
@@ -371,19 +275,19 @@ class ShannonEntropy {
 }
 
 class ParkinsonVol extends _StreamHighLow {
-    constructor(period) { super(period, __lrvx_indicator_parkinson_vol); }
+    constructor(period) { super('parkinson_vol', [_u(period)]); }
     static compute(high, low, period) { return __lrvx_indicator_parkinson_vol(high, low, period); }
 }
 
 class RogersSatchellVol extends _StreamOhlc {
-    constructor(period) { super(period, __lrvx_indicator_rogers_satchell_vol); }
+    constructor(period) { super('rogers_satchell_vol', [_u(period)]); }
     static compute(open, high, low, close, period) {
         return __lrvx_indicator_rogers_satchell_vol(open, high, low, close, period);
     }
 }
 
 class Correlation extends _StreamPair {
-    constructor(period) { super(period, __lrvx_indicator_correlation); }
+    constructor(period) { super('correlation', [_u(period)]); }
     static compute(x, y, period) { return __lrvx_indicator_correlation(x, y, period); }
 }
 
@@ -401,19 +305,11 @@ function adf(data, max_lag, regression) {
 // AutoCorrelation
 // ============================================================
 
-class AutoCorrelation {
-    constructor(window, lag) { this._window = window; this._lag = lag; this._history = []; }
-    update(v) {
-        this._history.push(v);
-        return _optNum(_last(__lrvx_indicator_autocorrelation(this._history, this._window, this._lag)));
+class AutoCorrelation extends _Stream1 {
+    constructor(window, lag) {
+        super('autocorrelation', [_u(window), _u(lag)]);
+        this._window = window; this._lag = lag;
     }
-    get value() {
-        if (this._history.length === 0) return null;
-        return _optNum(_last(__lrvx_indicator_autocorrelation(this._history, this._window, this._lag)));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._history.length; }
-    reset() { this._history = []; }
     compute(data) { return __lrvx_indicator_autocorrelation(data, this._window, this._lag); }
     static compute(data, window, lag) { return __lrvx_indicator_autocorrelation(data, window, lag); }
 }

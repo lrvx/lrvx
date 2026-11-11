@@ -138,7 +138,10 @@
 #include <set>
 #include <span>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 using namespace lrvx;
@@ -1140,6 +1143,454 @@ void lrvx_indicator_autocorrelation(const double* input, size_t len, size_t wind
   LRVX_CAPI_ENTER_NOHANDLE;
   indicator::AutoCorrelation ind(window, lag);
   ind.compute(std::span<const double>(input, len), std::span<double>(output, len));
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+// ============================================================
+// Streaming indicators
+// ============================================================
+//
+// A handle owns one instance of a registry indicator class behind a small
+// virtual interface. The table of creatable indicators is the registry
+// itself (include/lrvx/indicator/registry.def), so a row added there can be
+// created here with no change to this file beyond its #include. Each call
+// forwards to the class: update is the class's update(), one kernel step,
+// and the getters read what that step stored.
+
+namespace
+{
+
+// The registry's kind column, spelled as it is there.
+enum class StreamingIndicatorKind
+{
+  SingleInput,
+  BarInput,
+  HighLowInput,
+  OhlcInput,
+  PairInput,
+  MultiOutput,
+};
+
+// What one update takes. HighLow and Pair both take two numbers but are
+// separate functions on the C side, so each keeps its own value.
+enum class StreamingIndicatorInputs : uint8_t
+{
+  Single,
+  Bar,
+  HighLow,
+  Ohlc,
+  Pair,
+};
+
+constexpr uint32_t streamingIndicatorInputCount(StreamingIndicatorInputs in) noexcept
+{
+  switch (in)
+  {
+    case StreamingIndicatorInputs::Single:
+      return 1;
+    case StreamingIndicatorInputs::HighLow:
+    case StreamingIndicatorInputs::Pair:
+      return 2;
+    case StreamingIndicatorInputs::Bar:
+      return 3;
+    case StreamingIndicatorInputs::Ohlc:
+      return 4;
+  }
+  return 0;
+}
+
+const char* streamingIndicatorUpdateName(StreamingIndicatorInputs in) noexcept
+{
+  switch (in)
+  {
+    case StreamingIndicatorInputs::Single:
+      return "lrvx_streaming_indicator_update";
+    case StreamingIndicatorInputs::Bar:
+      return "lrvx_streaming_indicator_update_bar";
+    case StreamingIndicatorInputs::HighLow:
+      return "lrvx_streaming_indicator_update_high_low";
+    case StreamingIndicatorInputs::Ohlc:
+      return "lrvx_streaming_indicator_update_ohlc";
+    case StreamingIndicatorInputs::Pair:
+      return "lrvx_streaming_indicator_update_pair";
+  }
+  return "?";
+}
+
+// The outputs of a class, in the order lrvx_streaming_indicator_output
+// documents. Output 0 is always value(). A MultiOutput registry row with no
+// specialisation here fails to compile (see streamingIndicatorInputsOf).
+template <typename T>
+struct StreamingIndicatorOutputs
+{
+  static constexpr uint32_t count = 1;
+  static double get(const T& ind, uint32_t) noexcept { return ind.value(); }
+};
+
+template <>
+struct StreamingIndicatorOutputs<indicator::MACD>
+{
+  static constexpr uint32_t count = 3;
+  static double get(const indicator::MACD& ind, uint32_t i) noexcept
+  {
+    return i == 0 ? ind.value() : i == 1 ? ind.signalValue()
+                                         : ind.histogramValue();
+  }
+};
+
+template <>
+struct StreamingIndicatorOutputs<indicator::Bollinger>
+{
+  static constexpr uint32_t count = 3;
+  static double get(const indicator::Bollinger& ind, uint32_t i) noexcept
+  {
+    return i == 0 ? ind.value() : i == 1 ? ind.upperValue()
+                                         : ind.lowerValue();
+  }
+};
+
+template <>
+struct StreamingIndicatorOutputs<indicator::Stochastic>
+{
+  static constexpr uint32_t count = 2;
+  static double get(const indicator::Stochastic& ind, uint32_t i) noexcept
+  {
+    return i == 0 ? ind.value() : ind.dValue();
+  }
+};
+
+class StreamingIndicatorHandle
+{
+ public:
+  StreamingIndicatorHandle(const char* name, StreamingIndicatorInputs inputs, uint32_t outputs)
+      : _name(name), _inputs(inputs), _outputs(outputs)
+  {
+  }
+  virtual ~StreamingIndicatorHandle() = default;
+
+  StreamingIndicatorHandle(const StreamingIndicatorHandle&) = delete;
+  StreamingIndicatorHandle& operator=(const StreamingIndicatorHandle&) = delete;
+
+  // Steps the indicator when `in` is the update it takes; unused trailing
+  // arguments are ignored.
+  double update(StreamingIndicatorInputs in, double a, double b, double c, double d)
+  {
+    if (in != _inputs)
+    {
+      throw std::invalid_argument(std::string(_name) + " is updated with " +
+                                  streamingIndicatorUpdateName(_inputs));
+    }
+    return step(a, b, c, d);
+  }
+
+  double output(uint32_t index) const
+  {
+    if (index >= _outputs)
+    {
+      throw std::out_of_range(std::string(_name) + " has " + std::to_string(_outputs) +
+                              " output(s), index " + std::to_string(index) + " requested");
+    }
+    return outputAt(index);
+  }
+
+  uint32_t inputCount() const noexcept { return streamingIndicatorInputCount(_inputs); }
+  uint32_t outputCount() const noexcept { return _outputs; }
+
+  virtual double value() const noexcept = 0;
+  virtual bool ready() const noexcept = 0;
+  virtual size_t count() const noexcept = 0;
+  virtual void reset() = 0;
+
+ protected:
+  virtual double step(double a, double b, double c, double d) = 0;
+  virtual double outputAt(uint32_t index) const noexcept = 0;
+
+ private:
+  const char* _name;
+  StreamingIndicatorInputs _inputs;
+  uint32_t _outputs;
+};
+
+template <typename T, StreamingIndicatorInputs In>
+class StreamingIndicatorOf final : public StreamingIndicatorHandle
+{
+ public:
+  StreamingIndicatorOf(const char* name, T ind)
+      : StreamingIndicatorHandle(name, In, StreamingIndicatorOutputs<T>::count),
+        _ind(std::move(ind))
+  {
+  }
+
+  double value() const noexcept override { return _ind.value(); }
+  bool ready() const noexcept override { return _ind.ready(); }
+  size_t count() const noexcept override { return _ind.count(); }
+  void reset() override { _ind.reset(); }
+
+ protected:
+  double step(double a, double b, double c, double d) override
+  {
+    if constexpr (In == StreamingIndicatorInputs::Single)
+    {
+      _ind.update(a);
+    }
+    else if constexpr (In == StreamingIndicatorInputs::HighLow ||
+                       In == StreamingIndicatorInputs::Pair)
+    {
+      _ind.update(a, b);
+    }
+    else if constexpr (In == StreamingIndicatorInputs::Bar)
+    {
+      _ind.update(a, b, c);
+    }
+    else
+    {
+      _ind.update(a, b, c, d);
+    }
+    return _ind.value();
+  }
+
+  double outputAt(uint32_t index) const noexcept override
+  {
+    return StreamingIndicatorOutputs<T>::get(_ind, index);
+  }
+
+ private:
+  T _ind;
+};
+
+// The update a registry row takes. A MultiOutput row says nothing about its
+// inputs, so the class's update() decides; for every other kind the class
+// must agree with the registry, checked at compile time.
+template <typename T, StreamingIndicatorKind K>
+constexpr StreamingIndicatorInputs streamingIndicatorInputsOf()
+{
+  constexpr bool one = requires(T t) { t.update(0.0); };
+  constexpr bool two = requires(T t) { t.update(0.0, 0.0); };
+  constexpr bool three = requires(T t) { t.update(0.0, 0.0, 0.0); };
+  constexpr bool four = requires(T t) { t.update(0.0, 0.0, 0.0, 0.0); };
+  if constexpr (K == StreamingIndicatorKind::SingleInput)
+  {
+    static_assert(one, "registry kind SingleInput: class has no update(double)");
+    return StreamingIndicatorInputs::Single;
+  }
+  else if constexpr (K == StreamingIndicatorKind::BarInput)
+  {
+    static_assert(three, "registry kind BarInput: class has no update(high, low, close)");
+    return StreamingIndicatorInputs::Bar;
+  }
+  else if constexpr (K == StreamingIndicatorKind::HighLowInput)
+  {
+    static_assert(two, "registry kind HighLowInput: class has no update(high, low)");
+    return StreamingIndicatorInputs::HighLow;
+  }
+  else if constexpr (K == StreamingIndicatorKind::OhlcInput)
+  {
+    static_assert(four, "registry kind OhlcInput: class has no update(open, high, low, close)");
+    return StreamingIndicatorInputs::Ohlc;
+  }
+  else if constexpr (K == StreamingIndicatorKind::PairInput)
+  {
+    static_assert(two, "registry kind PairInput: class has no update(x, y)");
+    return StreamingIndicatorInputs::Pair;
+  }
+  else
+  {
+    static_assert(StreamingIndicatorOutputs<T>::count > 1,
+                  "registry kind MultiOutput: add a StreamingIndicatorOutputs specialisation");
+    static_assert(one || three, "MultiOutput class takes neither one input nor a bar");
+    if constexpr (one)
+    {
+      return StreamingIndicatorInputs::Single;
+    }
+    else
+    {
+      return StreamingIndicatorInputs::Bar;
+    }
+  }
+}
+
+// One constructor argument, of the type the registry declares, from a double.
+template <typename A>
+A streamingIndicatorArg(const char* name, size_t position, double v)
+{
+  if constexpr (std::is_same_v<A, double>)
+  {
+    return v;
+  }
+  else
+  {
+    static_assert(std::is_same_v<A, size_t>, "registry ctor args are size_t or double");
+    // 2^53: every whole double up to it is exact.
+    if (!(v >= 0.0) || v > 9007199254740992.0 || v != std::floor(v))
+    {
+      throw std::invalid_argument(std::string(name) + ": argument " + std::to_string(position) +
+                                  " must be a non-negative whole number, got " +
+                                  std::to_string(v));
+    }
+    return static_cast<size_t>(v);
+  }
+}
+
+template <typename T, StreamingIndicatorInputs In, typename... A, size_t... I>
+StreamingIndicatorHandle* makeStreamingIndicatorFrom(std::type_identity<void(A...)>,
+                                                     std::index_sequence<I...>, const char* name,
+                                                     const double* args)
+{
+  return new StreamingIndicatorOf<T, In>(name, T(streamingIndicatorArg<A>(name, I, args[I])...));
+}
+
+template <typename T, StreamingIndicatorKind K, typename... A>
+StreamingIndicatorHandle* makeStreamingIndicator(std::type_identity<void(A...)> sig,
+                                                 const char* name, const double* args,
+                                                 uint32_t num_args)
+{
+  if (num_args != sizeof...(A))
+  {
+    throw std::invalid_argument(std::string(name) + " takes " + std::to_string(sizeof...(A)) +
+                                " argument(s), got " + std::to_string(num_args));
+  }
+  if (sizeof...(A) > 0 && args == nullptr)
+  {
+    throw std::invalid_argument(std::string(name) + ": args must not be NULL");
+  }
+  return makeStreamingIndicatorFrom<T, streamingIndicatorInputsOf<T, K>()>(
+      sig, std::index_sequence_for<A...>{}, name, args);
+}
+
+struct StreamingIndicatorRow
+{
+  const char* name;
+  StreamingIndicatorHandle* (*make)(const double* args, uint32_t num_args);
+};
+
+// One row per registry row. `void Args` turns the registry's parenthesised
+// parameter list into a function type whose parameter types say how each
+// double is converted.
+const StreamingIndicatorRow kStreamingIndicatorRows[] = {
+#define LRVX_INDICATOR(Cls, snake, Kind, Args)                                    \
+  {#snake, [](const double* args, uint32_t num_args) -> StreamingIndicatorHandle* \
+   {                                                                              \
+     return makeStreamingIndicator<indicator::Cls, StreamingIndicatorKind::Kind>( \
+         std::type_identity<void Args>{}, #snake, args, num_args);                \
+   }},
+#include "lrvx/indicator/registry.def"
+#undef LRVX_INDICATOR
+};
+
+StreamingIndicatorHandle* toStreamingIndicator(LrvxStreamingIndicatorHandle h)
+{
+  return static_cast<StreamingIndicatorHandle*>(h);
+}
+
+}  // namespace
+
+LrvxStreamingIndicatorHandle lrvx_streaming_indicator_create(const char* name, const double* args,
+                                                             uint32_t num_args)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  LRVX_CAPI_REQUIRE(name);
+  for (const auto& row : kStreamingIndicatorRows)
+  {
+    if (std::strcmp(row.name, name) == 0)
+    {
+      return static_cast<LrvxStreamingIndicatorHandle>(row.make(args, num_args));
+    }
+  }
+  throw std::invalid_argument(std::string("unknown streaming indicator '") + name + "'");
+  LRVX_CAPI_LEAVE;
+}
+
+void lrvx_streaming_indicator_destroy(LrvxStreamingIndicatorHandle h)
+{
+  LRVX_CAPI_ENTER_DESTROY(h);
+  delete toStreamingIndicator(h);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+uint32_t lrvx_streaming_indicator_input_count(LrvxStreamingIndicatorHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return toStreamingIndicator(h)->inputCount();
+  LRVX_CAPI_LEAVE;
+}
+
+uint32_t lrvx_streaming_indicator_output_count(LrvxStreamingIndicatorHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return toStreamingIndicator(h)->outputCount();
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_streaming_indicator_update(LrvxStreamingIndicatorHandle h, double value)
+{
+  LRVX_CAPI_ENTER(h);
+  return toStreamingIndicator(h)->update(StreamingIndicatorInputs::Single, value, 0.0, 0.0, 0.0);
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_streaming_indicator_update_bar(LrvxStreamingIndicatorHandle h, double high, double low,
+                                           double close)
+{
+  LRVX_CAPI_ENTER(h);
+  return toStreamingIndicator(h)->update(StreamingIndicatorInputs::Bar, high, low, close, 0.0);
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_streaming_indicator_update_high_low(LrvxStreamingIndicatorHandle h, double high,
+                                                double low)
+{
+  LRVX_CAPI_ENTER(h);
+  return toStreamingIndicator(h)->update(StreamingIndicatorInputs::HighLow, high, low, 0.0, 0.0);
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_streaming_indicator_update_ohlc(LrvxStreamingIndicatorHandle h, double open,
+                                            double high, double low, double close)
+{
+  LRVX_CAPI_ENTER(h);
+  return toStreamingIndicator(h)->update(StreamingIndicatorInputs::Ohlc, open, high, low, close);
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_streaming_indicator_update_pair(LrvxStreamingIndicatorHandle h, double x, double y)
+{
+  LRVX_CAPI_ENTER(h);
+  return toStreamingIndicator(h)->update(StreamingIndicatorInputs::Pair, x, y, 0.0, 0.0);
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_streaming_indicator_value(LrvxStreamingIndicatorHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return toStreamingIndicator(h)->value();
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_streaming_indicator_output(LrvxStreamingIndicatorHandle h, uint32_t index)
+{
+  LRVX_CAPI_ENTER(h);
+  return toStreamingIndicator(h)->output(index);
+  LRVX_CAPI_LEAVE;
+}
+
+uint8_t lrvx_streaming_indicator_ready(LrvxStreamingIndicatorHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return toStreamingIndicator(h)->ready() ? 1 : 0;
+  LRVX_CAPI_LEAVE;
+}
+
+uint64_t lrvx_streaming_indicator_count(LrvxStreamingIndicatorHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return static_cast<uint64_t>(toStreamingIndicator(h)->count());
+  LRVX_CAPI_LEAVE;
+}
+
+void lrvx_streaming_indicator_reset(LrvxStreamingIndicatorHandle h)
+{
+  LRVX_CAPI_ENTER_VOID(h);
+  toStreamingIndicator(h)->reset();
   LRVX_CAPI_LEAVE_VOID;
 }
 

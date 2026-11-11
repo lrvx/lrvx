@@ -11,6 +11,7 @@ LRVX_CAPI_ABI_VERSION: int = 5
 
 # ── macro: feature_flags ──
 LRVX_HAS_OPTIONAL_RAW_BEST_QUOTE: int = 1
+LRVX_HAS_STREAMING_INDICATOR_HANDLES: int = 1
 
 # ── macro: signal_type ──
 LRVX_SIGNAL_TYPE_MARKET: int = 0
@@ -829,6 +830,22 @@ from C import lrvx_runner_on_trade(cobj, u32, float, float, u8, i64)
 from C import lrvx_runner_on_book_snapshot(cobj, u32, Ptr[float], Ptr[float], u32, Ptr[float], Ptr[float], u32, i64)
 from C import lrvx_runner_on_book_top(cobj, u32, u8, float, float, u8, float, float, i64)
 from C import lrvx_runner_on_bar(cobj, u32, u8, u64, float, float, float, float, float, float, i64, i64, u8)
+
+# ── streaming_indicator ──
+from C import lrvx_streaming_indicator_create(cobj, Ptr[float], u32) -> cobj
+from C import lrvx_streaming_indicator_destroy(cobj)
+from C import lrvx_streaming_indicator_input_count(cobj) -> u32
+from C import lrvx_streaming_indicator_output_count(cobj) -> u32
+from C import lrvx_streaming_indicator_update(cobj, float) -> float
+from C import lrvx_streaming_indicator_update_bar(cobj, float, float, float) -> float
+from C import lrvx_streaming_indicator_update_high_low(cobj, float, float) -> float
+from C import lrvx_streaming_indicator_update_ohlc(cobj, float, float, float, float) -> float
+from C import lrvx_streaming_indicator_update_pair(cobj, float, float) -> float
+from C import lrvx_streaming_indicator_value(cobj) -> float
+from C import lrvx_streaming_indicator_output(cobj, u32) -> float
+from C import lrvx_streaming_indicator_ready(cobj) -> u8
+from C import lrvx_streaming_indicator_count(cobj) -> u64
+from C import lrvx_streaming_indicator_reset(cobj)
 
 # ── symbol_registry ──
 from C import lrvx_registry_create() -> cobj

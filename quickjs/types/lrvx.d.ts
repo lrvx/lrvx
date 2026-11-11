@@ -170,6 +170,11 @@ declare class SMA {
     update(value: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(data: number[], period: number): number[];
 }
 
@@ -178,6 +183,11 @@ declare class EMA {
     update(value: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(data: number[], period: number): number[];
 }
 
@@ -186,6 +196,11 @@ declare class RMA {
     update(value: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(data: number[], period: number): number[];
 }
 
@@ -194,6 +209,11 @@ declare class DEMA {
     update(value: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(data: number[], period: number): number[];
 }
 
@@ -202,6 +222,11 @@ declare class TEMA {
     update(value: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(data: number[], period: number): number[];
 }
 
@@ -210,6 +235,11 @@ declare class KAMA {
     update(value: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(data: number[], period: number, fast?: number, slow?: number): number[];
 }
 
@@ -220,6 +250,11 @@ declare class RSI {
     update(value: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(data: number[], period: number): number[];
 }
 
@@ -230,6 +265,11 @@ declare class Stochastic {
     readonly d: number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(high: number[], low: number[], close: number[], kPeriod?: number, dPeriod?: number): { k: number[]; d: number[] };
 }
 
@@ -238,6 +278,11 @@ declare class CCI {
     update(high: number, low: number, close: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(high: number[], low: number[], close: number[], period?: number): number[];
 }
 
@@ -246,6 +291,9 @@ declare class CHOP {
     update(high: number, low: number, close: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
     static compute(high: number[], low: number[], close: number[], period: number): number[];
 }
 
@@ -256,6 +304,11 @@ declare class ATR {
     update(high: number, low: number, close: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(high: number[], low: number[], close: number[], period: number): number[];
 }
 
@@ -269,6 +322,11 @@ declare class Slope {
     update(value: number): number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(data: number[], length: number): number[];
 }
 
@@ -280,6 +338,11 @@ declare class MACD {
     readonly histogram: number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(data: number[], fast?: number, slow?: number, signal?: number): {
         line: number[];
         signal: number[];
@@ -295,6 +358,11 @@ declare class Bollinger {
     readonly lower: number | null;
     readonly value: number | null;
     readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(data: number[], period?: number, multiplier?: number): {
         upper: number[];
         middle: number[];

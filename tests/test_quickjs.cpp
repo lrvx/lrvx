@@ -10,6 +10,8 @@
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/capi/lrvx_capi.h"
 
+#include "support/streaming_indicator_cases.h"
+
 #include <gtest/gtest.h>
 #include <chrono>
 #include <cstdint>
@@ -3704,4 +3706,356 @@ TEST(JsIntegrationTest, NoOnTouchMeansNoTouchSlot)
 
   LrvxJsExecutor executor(script.path(), registry);
   EXPECT_EQ(executor.getCallbacks().on_touch, nullptr);
+}
+
+// ============================================================
+// Streaming indicator classes (quickjs/lrvx/indicators.js)
+//
+// Every class named in registry.def must be defined, must equal the C++
+// streaming class bit for bit at every step (a JS null standing for the
+// class's NaN), must hold a C handle released by destroy() or by the
+// finalizer, and must cost the same per update whatever its history.
+// ============================================================
+
+namespace
+{
+
+using lrvx::test_streaming::bits;
+using lrvx::test_streaming::kCases;
+using lrvx::test_streaming::kRegistry;
+using lrvx::test_streaming::Step;
+
+std::string jsNumber(double v)
+{
+  if (std::isnan(v))
+  {
+    return "NaN";
+  }
+  char buf[40];
+  std::snprintf(buf, sizeof buf, "%.17g", v);
+  return buf;
+}
+
+std::string jsArray(const std::vector<Step>& steps, double Step::*field)
+{
+  std::string out = "[";
+  for (size_t i = 0; i < steps.size(); ++i)
+  {
+    out += (i ? "," : "") + jsNumber(steps[i].*field);
+  }
+  return out + "]";
+}
+
+// The JS side of the parity check. runCase(cls) feeds the series twice, with
+// a reset in between, and returns one flat array: per step the value update()
+// returned, then each output getter, then ready (1/0), then count.
+std::string jsParityDriver(const std::vector<Step>& steps)
+{
+  std::string js = "var S = {o:" + jsArray(steps, &Step::open) +
+                   ",h:" + jsArray(steps, &Step::high) + ",l:" + jsArray(steps, &Step::low) +
+                   ",c:" + jsArray(steps, &Step::close) + ",x:" + jsArray(steps, &Step::x) +
+                   ",y:" + jsArray(steps, &Step::y) + "};\n";
+  js += "var CTORS = {};\nvar ARGS = {};\nvar KINDS = {};\n";
+  for (const auto& row : kRegistry)
+  {
+    std::string args;
+    for (double a : kCases.at(row.snake))
+    {
+      args += (args.empty() ? "" : ",") + jsNumber(a);
+    }
+    js += std::string("CTORS['") + row.cls + "'] = (typeof " + row.cls + " === 'function') ? " +
+          row.cls + " : null;\n";
+    js += std::string("ARGS['") + row.cls + "'] = [" + args + "];\n";
+    js += std::string("KINDS['") + row.cls + "'] = '" + row.kind + "';\n";
+  }
+  js += R"(
+    function outputsOf(cls, ind) {
+      if (cls === 'MACD') return [ind.value, ind.signal, ind.histogram];
+      if (cls === 'Bollinger') return [ind.value, ind.upper, ind.lower];
+      if (cls === 'Stochastic') return [ind.value, ind.d];
+      return [ind.value];
+    }
+    function stepOf(cls, ind, i) {
+      switch (KINDS[cls]) {
+        case 'BarInput': return ind.update(S.h[i], S.l[i], S.c[i]);
+        case 'HighLowInput': return ind.update(S.h[i], S.l[i]);
+        case 'OhlcInput': return ind.update(S.o[i], S.h[i], S.l[i], S.c[i]);
+        case 'PairInput': return ind.update(S.x[i], S.y[i]);
+        default: return ind.update(S.c[i]);
+      }
+    }
+    function runCase(cls) {
+      var ind = new CTORS[cls](...ARGS[cls]);
+      var out = [];
+      for (var pass = 0; pass < 2; pass++) {
+        for (var i = 0; i < S.c.length; i++) {
+          out.push(stepOf(cls, ind, i));
+          var o = outputsOf(cls, ind);
+          for (var k = 0; k < o.length; k++) out.push(o[k]);
+          out.push(ind.ready ? 1 : 0);
+          out.push(ind.count);
+        }
+        ind.reset();
+      }
+      if (typeof ind.destroy === 'function') ind.destroy();
+      return out;
+    }
+  )";
+  return js;
+}
+
+double jsElementAsDouble(JSContext* ctx, JSValueConst arr, uint32_t i, bool* isNull)
+{
+  JSValue v = JS_GetPropertyUint32(ctx, arr, i);
+  *isNull = JS_IsNull(v) || JS_IsUndefined(v);
+  double d = std::nan("");
+  if (!*isNull)
+  {
+    JS_ToFloat64(ctx, &d, v);
+  }
+  JS_FreeValue(ctx, v);
+  return d;
+}
+
+// Compares one JS value against the C++ value it stands for. The classes
+// report NaN as null and every other double as itself.
+bool sameJsValue(bool isNull, double js, double cpp)
+{
+  if (isNull)
+  {
+    return std::isnan(cpp);
+  }
+  return bits(js) == bits(cpp);
+}
+
+std::string shown(bool isNull, double v) { return isNull ? std::string("null") : jsNumber(v); }
+
+void checkJsParity(const std::vector<Step>& steps, size_t minReadySteps)
+{
+  TempJsFile script(jsParityDriver(steps));
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  JSContext* ctx = jsStrat.engine().context();
+
+  for (const auto& row : kRegistry)
+  {
+    SCOPED_TRACE(row.cls);
+    auto cpp = lrvx::test_streaming::makeCppSide(row.snake, kCases.at(row.snake));
+    const size_t outputs = cpp.outputs().size();
+
+    JSValue fn = jsStrat.engine().getGlobalProperty("runCase");
+    JSValue arg = JS_NewString(ctx, row.cls);
+    JSValue res = JS_Call(ctx, fn, JS_UNDEFINED, 1, &arg);
+    JS_FreeValue(ctx, arg);
+    JS_FreeValue(ctx, fn);
+    if (JS_IsException(res))
+    {
+      JSValue exc = JS_GetException(ctx);
+      const char* msg = JS_ToCString(ctx, exc);
+      ADD_FAILURE() << row.cls << " threw: " << (msg ? msg : "?");
+      JS_FreeCString(ctx, msg);
+      JS_FreeValue(ctx, exc);
+      continue;
+    }
+
+    uint32_t at = 0;
+    size_t mismatches = 0;
+    size_t readySteps = 0;
+    for (int pass = 0; pass < 2; ++pass)
+    {
+      for (size_t i = 0; i < steps.size(); ++i)
+      {
+        bool isNull = false;
+        const double upd = jsElementAsDouble(ctx, res, at++, &isNull);
+        const double cppUpd = cpp.step(steps[i]);
+        if (!sameJsValue(isNull, upd, cppUpd) && mismatches++ < 5)
+        {
+          ADD_FAILURE() << row.cls << " pass " << pass << " step " << i << ": update() returned "
+                        << shown(isNull, upd) << ", C++ " << jsNumber(cppUpd);
+        }
+        const auto expected = cpp.outputs();
+        for (size_t o = 0; o < outputs; ++o)
+        {
+          const double got = jsElementAsDouble(ctx, res, at++, &isNull);
+          if (!sameJsValue(isNull, got, expected[o]) && mismatches++ < 5)
+          {
+            ADD_FAILURE() << row.cls << " pass " << pass << " step " << i << ": output " << o
+                          << " " << shown(isNull, got) << ", C++ " << jsNumber(expected[o]);
+          }
+        }
+        const bool ready = jsElementAsDouble(ctx, res, at++, &isNull) != 0.0;
+        readySteps += ready ? 1 : 0;
+        if (ready != cpp.ready() && mismatches++ < 5)
+        {
+          ADD_FAILURE() << row.cls << " pass " << pass << " step " << i << ": ready " << ready
+                        << ", C++ " << cpp.ready();
+        }
+        const double count = jsElementAsDouble(ctx, res, at++, &isNull);
+        if (count != static_cast<double>(cpp.count()) && mismatches++ < 5)
+        {
+          ADD_FAILURE() << row.cls << " pass " << pass << " step " << i << ": count " << count
+                        << ", C++ " << cpp.count();
+        }
+      }
+      cpp.reset();
+    }
+    JS_FreeValue(ctx, res);
+    EXPECT_EQ(mismatches, 0u) << row.cls;
+    EXPECT_GT(readySteps, 2 * minReadySteps) << row.cls << " was ready on too few steps";
+  }
+}
+
+}  // namespace
+
+TEST(JsStreamingIndicators, EveryRegistryRowHasAClass)
+{
+  TempJsFile script(jsParityDriver({}));
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  JSContext* ctx = jsStrat.engine().context();
+  JSValue ctors = jsStrat.engine().getGlobalProperty("CTORS");
+  for (const auto& row : kRegistry)
+  {
+    JSValue c = JS_GetPropertyStr(ctx, ctors, row.cls);
+    EXPECT_TRUE(JS_IsFunction(ctx, c))
+        << "registry row " << row.cls << " has no class in quickjs/lrvx/indicators.js";
+    JS_FreeValue(ctx, c);
+  }
+  JS_FreeValue(ctx, ctors);
+}
+
+TEST(JsStreamingIndicators, MatchCppStreamingBitForBit)
+{
+  checkJsParity(lrvx::test_streaming::series(400, false), 200);
+}
+
+TEST(JsStreamingIndicators, MatchCppStreamingBitForBitThroughNaNs)
+{
+  checkJsParity(lrvx::test_streaming::series(400, true), 10);
+}
+
+// Each streaming class holds one C handle. Dropping the object without
+// destroy() leaves it to the finalizer; destroy() releases it at once and a
+// second destroy() is a no-op.
+TEST(JsStreamingIndicators, HandlesAreReleasedByDestroyAndByTheFinalizer)
+{
+  const size_t before = lrvxJsHandleLiveCountForTesting();
+  {
+    TempJsFile script(R"(
+      var keep = [];
+      for (var i = 0; i < 20; i++) {
+        keep.push(new SMA(10));
+        keep.push(new MACD(12, 26, 9));
+        keep.push(new Stochastic(14, 3));
+        keep.push(new Correlation(20));
+      }
+      var a = new EMA(5);
+      a.update(1); a.update(2);
+      if (typeof a.destroy === 'function') { a.destroy(); a.destroy(); }
+      var afterDestroy = a.value;
+    )");
+    SymbolRegistry registry;
+    LrvxJsStrategy jsStrat(script.path(), registry);
+    EXPECT_EQ(lrvxJsHandleLiveCountForTesting(), before + 80)
+        << "each live streaming indicator should hold exactly one C handle";
+    JSValue v = jsStrat.engine().getGlobalProperty("afterDestroy");
+    EXPECT_TRUE(JS_IsNull(v)) << "a destroyed indicator reads null";
+    JS_FreeValue(jsStrat.engine().context(), v);
+  }
+  EXPECT_EQ(lrvxJsHandleLiveCountForTesting(), before)
+      << "indicators dropped without destroy() were not released by the finalizer";
+}
+
+// Cost of an update must not grow with history: 20,000 updates must take
+// less than 25 x the time of 2,000. A constant per-update cost gives about
+// 10; one linear in history gives about 100. Each side is the minimum of a
+// few runs, and a 20,000 run that passes the bound is cut short, so a
+// history-bound implementation fails in seconds instead of running to
+// completion.
+TEST(JsStreamingIndicators, UpdateCostDoesNotGrowWithHistory)
+{
+  TempJsFile script(R"(
+    function costRun(cls, n, deadlineMs) {
+      var ind;
+      switch (cls) {
+        case 'SMA': ind = new SMA(240); break;
+        case 'RollingZScore': ind = new RollingZScore(240); break;
+        case 'ATR': ind = new ATR(14); break;
+        case 'MACD': ind = new MACD(12, 26, 9); break;
+      }
+      var t0 = Date.now();
+      var px = 100, acc = 0;
+      for (var i = 0; i < n; i++) {
+        px += Math.sin(i * 0.37) + 0.01 * (i % 7);
+        var v = (cls === 'ATR') ? ind.update(px + 1, px - 1, px) : ind.update(px);
+        if (v !== null) acc += v;
+        if ((i & 255) === 255 && Date.now() - t0 > deadlineMs) {
+          if (typeof ind.destroy === 'function') ind.destroy();
+          return -1;
+        }
+      }
+      if (typeof ind.destroy === 'function') ind.destroy();
+      return acc;
+    }
+  )");
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  JSContext* ctx = jsStrat.engine().context();
+
+  using Clock = std::chrono::steady_clock;
+  auto run = [&](const char* cls, int n, double deadlineMs, bool* cutShort)
+  {
+    JSValue fn = jsStrat.engine().getGlobalProperty("costRun");
+    JSValue argv[3] = {JS_NewString(ctx, cls), JS_NewInt32(ctx, n),
+                       JS_NewFloat64(ctx, deadlineMs)};
+    const auto t0 = Clock::now();
+    JSValue res = JS_Call(ctx, fn, JS_UNDEFINED, 3, argv);
+    const double el = std::chrono::duration<double>(Clock::now() - t0).count();
+    double r = 0;
+    JS_ToFloat64(ctx, &r, res);
+    *cutShort = JS_IsException(res) || r == -1;
+    JS_FreeValue(ctx, res);
+    for (auto& a : argv)
+    {
+      JS_FreeValue(ctx, a);
+    }
+    JS_FreeValue(ctx, fn);
+    return el;
+  };
+
+  constexpr double kMaxRatio = 25.0;
+  for (const char* cls : {"SMA", "RollingZScore", "ATR", "MACD"})
+  {
+    bool cut = false;
+    double t1 = 1e300;
+    for (int r = 0; r < 5; ++r)
+    {
+      t1 = std::min(t1, run(cls, 2000, 1e12, &cut));
+    }
+    ASSERT_GT(t1, 0.0) << cls;
+    // Date.now() ticks in milliseconds and a fast run takes a few of them,
+    // so the cut-short budget has a floor; the ratio check below is exact.
+    const double budgetMs = std::max(kMaxRatio * t1 * 1000.0, 20.0);
+    double t10 = 1e300;
+    int cuts = 0;
+    for (int r = 0; r < 3; ++r)
+    {
+      const double t = run(cls, 20000, budgetMs, &cut);
+      if (cut)
+      {
+        ++cuts;
+        continue;
+      }
+      t10 = std::min(t10, t);
+    }
+    if (cuts == 3)
+    {
+      FAIL() << cls << ": every run of 20000 updates exceeded " << kMaxRatio
+             << " x the time of 2000 (" << t1
+             << " s) and was cut short; per-update cost grows with history";
+    }
+    std::printf("QuickJS %s: t(2000)=%.6f s, t(20000)=%.6f s, ratio %.2f (limit %.0f)\n", cls,
+                t1, t10, t10 / t1, kMaxRatio);
+    EXPECT_LT(t10, kMaxRatio * t1) << cls << ": ratio " << t10 / t1;
+  }
 }

@@ -3503,6 +3503,76 @@
           "name": "lrvx_streaming_graph_volume"
         },
         {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_count"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_create"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_destroy"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_input_count"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_output"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_output_count"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_ready"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_reset"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_update"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_update_bar"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_update_high_low"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_update_ohlc"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_update_pair"
+        },
+        {
+          "group": "streaming_indicator",
+          "kind": "function",
+          "name": "lrvx_streaming_indicator_value"
+        },
+        {
           "group": "tape_diff",
           "kind": "function",
           "name": "lrvx_tape_diff_copy_mismatches"
@@ -4213,6 +4283,10 @@
         },
         {
           "kind": "handle",
+          "name": "LrvxStreamingIndicatorHandle"
+        },
+        {
+          "kind": "handle",
           "name": "LrvxTapeDiffHandle"
         },
         {
@@ -4294,6 +4368,7 @@
         "storage",
         "strategy_lifecycle",
         "strategyrunner_synchronous",
+        "streaming_indicator",
         "symbol_registry",
         "tape_aggregator",
         "tape_diff",
@@ -4787,6 +4862,10 @@
           "name": "_SignalEntry"
         },
         {
+          "kind": "class",
+          "name": "_Stream"
+        },
+        {
           "kind": "function",
           "name": "adf"
         },
@@ -5036,7 +5115,17 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "ATR"
+        },
+        {
+          "kind": "method",
           "name": "compute",
+          "parent": "ATR"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "ATR"
         },
         {
@@ -5183,6 +5272,16 @@
           "kind": "method",
           "name": "volume",
           "parent": "AggBar"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "AutoCorrelation"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "AutoCorrelation"
         },
         {
           "kind": "method",
@@ -5371,7 +5470,17 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "Bollinger"
+        },
+        {
+          "kind": "method",
           "name": "compute",
+          "parent": "Bollinger"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "Bollinger"
         },
         {
@@ -5418,6 +5527,16 @@
           "kind": "method",
           "name": "qty",
           "parent": "BookLevel"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "CCI"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "CCI"
         },
         {
           "kind": "method",
@@ -5526,6 +5645,16 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "Correlation"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "Correlation"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "Correlation"
         },
@@ -5546,7 +5675,17 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "DEMA"
+        },
+        {
+          "kind": "method",
           "name": "compute",
+          "parent": "DEMA"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "DEMA"
         },
         {
@@ -5681,7 +5820,17 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "EMA"
+        },
+        {
+          "kind": "method",
           "name": "compute",
+          "parent": "EMA"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "EMA"
         },
         {
@@ -6136,7 +6285,17 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "KAMA"
+        },
+        {
+          "kind": "method",
           "name": "compute",
+          "parent": "KAMA"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "KAMA"
         },
         {
@@ -6158,6 +6317,16 @@
           "kind": "method",
           "name": "value",
           "parent": "KAMA"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "Kurtosis"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "Kurtosis"
         },
         {
           "kind": "method",
@@ -6441,7 +6610,17 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "MACD"
+        },
+        {
+          "kind": "method",
           "name": "compute",
+          "parent": "MACD"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "MACD"
         },
         {
@@ -6816,6 +6995,16 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "ParkinsonVol"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "ParkinsonVol"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "ParkinsonVol"
         },
@@ -7041,7 +7230,17 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "RMA"
+        },
+        {
+          "kind": "method",
           "name": "compute",
+          "parent": "RMA"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "RMA"
         },
         {
@@ -7066,7 +7265,17 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "RSI"
+        },
+        {
+          "kind": "method",
           "name": "compute",
+          "parent": "RSI"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "RSI"
         },
         {
@@ -7136,6 +7345,16 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "RogersSatchellVol"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "RogersSatchellVol"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "RogersSatchellVol"
         },
@@ -7153,6 +7372,16 @@
           "kind": "method",
           "name": "value",
           "parent": "RogersSatchellVol"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "RollingZScore"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "RollingZScore"
         },
         {
           "kind": "method",
@@ -7221,12 +7450,22 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "SMA"
+        },
+        {
+          "kind": "method",
           "name": "compute",
           "parent": "SMA"
         },
         {
           "kind": "method",
           "name": "compute_static",
+          "parent": "SMA"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "SMA"
         },
         {
@@ -7248,6 +7487,16 @@
           "kind": "method",
           "name": "value",
           "parent": "SMA"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "ShannonEntropy"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "ShannonEntropy"
         },
         {
           "kind": "method",
@@ -7551,6 +7800,16 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "Skewness"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "Skewness"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "Skewness"
         },
@@ -7568,6 +7827,11 @@
           "kind": "method",
           "name": "value",
           "parent": "Skewness"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "Slope"
         },
         {
           "kind": "method",
@@ -7576,6 +7840,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "Slope"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "Slope"
         },
@@ -7593,6 +7862,16 @@
           "kind": "method",
           "name": "value",
           "parent": "Slope"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "Stochastic"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "Stochastic"
         },
         {
           "kind": "method",
@@ -8041,7 +8320,17 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "TEMA"
+        },
+        {
+          "kind": "method",
           "name": "compute",
+          "parent": "TEMA"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "TEMA"
         },
         {
@@ -8333,6 +8622,61 @@
           "kind": "method",
           "name": "volume",
           "parent": "_OhlcvBar"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "_Stream"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "_Stream"
+        },
+        {
+          "kind": "method",
+          "name": "output",
+          "parent": "_Stream"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "_Stream"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "_Stream"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "_Stream"
+        },
+        {
+          "kind": "method",
+          "name": "update_bar",
+          "parent": "_Stream"
+        },
+        {
+          "kind": "method",
+          "name": "update_high_low",
+          "parent": "_Stream"
+        },
+        {
+          "kind": "method",
+          "name": "update_ohlc",
+          "parent": "_Stream"
+        },
+        {
+          "kind": "method",
+          "name": "update_pair",
+          "parent": "_Stream"
+        },
+        {
+          "kind": "method",
+          "name": "value",
+          "parent": "_Stream"
         },
         {
           "kind": "c_import",
@@ -11133,6 +11477,62 @@
         {
           "kind": "c_import",
           "name": "lrvx_streaming_graph_volume"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_count"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_create"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_destroy"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_input_count"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_output"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_output_count"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_ready"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_reset"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_update"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_update_bar"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_update_high_low"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_update_ohlc"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_update_pair"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_streaming_indicator_value"
         },
         {
           "kind": "c_import",
@@ -41209,6 +41609,54 @@
         },
         {
           "kind": "global",
+          "name": "__lrvx_streaming_indicator_count"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_create"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_destroy"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_output"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_ready"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_reset"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_update"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_update_bar"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_update_high_low"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_update_ohlc"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_update_pair"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_streaming_indicator_value"
+        },
+        {
+          "kind": "global",
           "name": "__lrvx_streaming_low"
         },
         {
@@ -44285,6 +44733,72 @@
       "quickjs": {
         "classes": [],
         "functions": [],
+        "status": "required"
+      }
+    },
+    "streaming_indicator": {
+      "capi_functions": [
+        "lrvx_streaming_indicator_count",
+        "lrvx_streaming_indicator_create",
+        "lrvx_streaming_indicator_destroy",
+        "lrvx_streaming_indicator_input_count",
+        "lrvx_streaming_indicator_output",
+        "lrvx_streaming_indicator_output_count",
+        "lrvx_streaming_indicator_ready",
+        "lrvx_streaming_indicator_reset",
+        "lrvx_streaming_indicator_update",
+        "lrvx_streaming_indicator_update_bar",
+        "lrvx_streaming_indicator_update_high_low",
+        "lrvx_streaming_indicator_update_ohlc",
+        "lrvx_streaming_indicator_update_pair",
+        "lrvx_streaming_indicator_value"
+      ],
+      "codon": {
+        "present": true,
+        "status": "required"
+      },
+      "napi": {
+        "classes": [
+          "SMA",
+          "EMA",
+          "ATR",
+          "MACD",
+          "Bollinger",
+          "Stochastic",
+          "Correlation"
+        ],
+        "functions": [],
+        "status": "required"
+      },
+      "pybind11": {
+        "classes": [
+          "SMA",
+          "EMA",
+          "ATR",
+          "MACD",
+          "Bollinger",
+          "Stochastic",
+          "Correlation"
+        ],
+        "functions": [],
+        "status": "required"
+      },
+      "quickjs": {
+        "classes": [],
+        "functions": [
+          "__lrvx_streaming_indicator_count",
+          "__lrvx_streaming_indicator_create",
+          "__lrvx_streaming_indicator_destroy",
+          "__lrvx_streaming_indicator_output",
+          "__lrvx_streaming_indicator_ready",
+          "__lrvx_streaming_indicator_reset",
+          "__lrvx_streaming_indicator_update",
+          "__lrvx_streaming_indicator_update_bar",
+          "__lrvx_streaming_indicator_update_high_low",
+          "__lrvx_streaming_indicator_update_ohlc",
+          "__lrvx_streaming_indicator_update_pair",
+          "__lrvx_streaming_indicator_value"
+        ],
         "status": "required"
       }
     },

@@ -933,7 +933,9 @@ ema = EMA(12)
 val = ema.update(price)
 ```
 
-`update()` is not an O(1) online recurrence. Each class accumulates the full history and re-runs the batch C-API function over it, which keeps results identical to `compute()` by construction but costs one FFI call over the whole history per tick. For tick-rate hot paths, buffer and call `compute()` on the batch instead.
+Each instance holds one C handle (`lrvx_streaming_indicator_*`) that owns the C++ streaming indicator, and `update()` is one FFI call that runs one step of that indicator. No history is kept: the cost of an update depends on the indicator's window, never on how many values it has seen, and the values, `ready` and NaN behaviour are the C++ class's, bit for bit. `count` is the number of updates since construction or `reset()`.
+
+`close()` releases the handle at once; an instance that is never closed is released by `__del__` when the collector reclaims it. One still reachable at program exit is not finalized and its memory goes back with the process. After `close()`, `value` is NaN, `ready` is False and `count` is 0.
 
 Batch indicators via C API (`ema`, `sma`, `rsi`, `atr`, `macd`, `bollinger`) — see [Codon Indicators](../reference/codon/indicators.md).
 
@@ -1137,7 +1139,7 @@ change.
 
 ## Indicators
 
-Each indicator supports `.update()` for per-tick and `static compute()` for batch:
+Each indicator supports `.update()` for per-tick and `static compute()` for batch. A per-tick instance holds a C handle to the C++ streaming indicator, so `.update()` is one kernel step whatever the history; `.destroy()` frees the handle early, otherwise the finalizer does (see [QuickJS indicators](../reference/quickjs/indicators.md)):
 
 | Single-value input | OHLC input | Volume input |
 |---|---|---|
@@ -1525,6 +1527,33 @@ lrvx_delta_book_encoder_copy_bids(enc, out, 4);
 The strings a `LrvxBreach` points at follow the same rule. They live until
 the next call that refills the breach list for that handle, or until the
 handle is destroyed. Copy them out if they have to outlive that.
+
+## Streaming indicators
+
+`lrvx_indicator_<name>` computes a whole array. For one value at a time, a
+`LrvxStreamingIndicatorHandle` owns an instance of the C++ streaming
+indicator; every row of `include/lrvx/indicator/registry.def` can be created
+by its snake_case name, with that row's constructor arguments passed as
+doubles:
+
+```c
+double args[] = {20};
+LrvxStreamingIndicatorHandle sma = lrvx_streaming_indicator_create("sma", args, 1);
+for (size_t i = 0; i < n; ++i) {
+    double v = lrvx_streaming_indicator_update(sma, close[i]);  /* NaN until ready */
+}
+lrvx_streaming_indicator_destroy(sma);
+```
+
+An update is one step of the C++ class: no history is kept, its cost does
+not depend on how many values the handle has seen, and update, value,
+output, ready and count never allocate. Values, readiness and NaN behaviour
+are the class's, bit for bit. Each indicator takes the update for its inputs
+(`_update`, `_update_bar`, `_update_high_low`, `_update_ohlc` or
+`_update_pair`); `_output(h, i)` reads the extra outputs of MACD, Bollinger
+and Stochastic. A bad name or argument returns NULL with the reason in
+`lrvx_last_error_message()`. The Codon and QuickJS indicator classes are
+built on these handles.
 
 ## Full API reference
 
@@ -2049,11 +2078,12 @@ Because Codon compiles to native code:
 - `on_trade` is compiled to a native function, not interpreted
 - No GIL, no interpreter, no garbage collector pauses
 
-`SMA.update()` is **not** an O(1) online recurrence. The indicator classes
-in `lrvx.indicators` accumulate the full history and re-run the batch C-API
-function over all of it on every call, which guarantees parity with
-`compute()` but costs one FFI call over the whole history per tick. For
-tick-rate hot paths, buffer the prices and call `compute()` on the batch.
+`SMA.update()` is one FFI call that runs one step of the C++ `SMA` held by
+the instance (a running sum, O(1)). The indicator classes in
+`lrvx.indicators` keep no history, so an update costs the same on the
+millionth tick as on the first, and the values match `compute()` and the
+C++ classes bit for bit. Each instance owns a C handle; `close()` frees it
+early, otherwise the collector frees it with the instance.
 
 ## Step 4: Compare with C++ and Python
 
@@ -8235,11 +8265,20 @@ You now have:
   `update(v)` / `value` / `ready` / `reset()` on the same instance.
 - `lrvx.MyIndicator(...)` in **Node.js** — same surface, same semantics
   (thin N-API wrapper around the same C++ class).
-- `MyIndicator` in **QuickJS** (`quickjs/lrvx/indicators.js`) — accumulates
-  history and re-runs the batch C-API; same `update`/`value`/`ready`/`reset`.
-  Add a 3-line class to that file using one of the `_Stream*` helper bases.
-- `MyIndicator` in **Codon** (`codon/lrvx/indicators.codon`) — same pattern
-  as QuickJS, history + batch call.
+- A C API handle: `lrvx_streaming_indicator_create("my_indicator", args, n)`
+  creates one from the registry row, with `_update*` / `_value` / `_ready` /
+  `_count` / `_reset` / `_destroy` forwarding to the C++ class (include the
+  new header in `src/capi/lrvx_capi.cpp`). A `MultiOutput` row also needs a
+  `StreamingIndicatorOutputs` specialisation there, or it does not compile.
+  Add the row's constructor arguments to `kCases` in
+  `tests/support/streaming_indicator_cases.h`; the C API and QuickJS tests
+  fail until you do, and then hold the handle against the class bit for bit.
+- `MyIndicator` in **QuickJS** (`quickjs/lrvx/indicators.js`) — a 3-line
+  class on one of the `_Stream*` bases, which hold the C handle; same
+  `update`/`value`/`ready`/`count`/`reset`, one kernel step per update.
+- `MyIndicator` in **Codon** (`codon/lrvx/indicators.codon`) — a class
+  around `_Stream`, the same handle; add it to
+  `codon/examples/indicator_streaming_smoke.codon`.
 - The streaming-vs-batch parity test
   (`tests/test_streaming_parity.cpp`) automatically covers it once you add
   one line to the registry-driven test list.
@@ -16515,7 +16554,7 @@ skew = skewness(prices, 20)
 
 ## Streaming indicators
 
-All streaming indicators share the same pattern: call `update()` each tick, read `.value`, check `.ready`. All support `.reset()` to clear state.
+All streaming indicators share the same pattern: call `update()` each tick, read `.value`, check `.ready`. All support `.reset()` to clear state, `.count` (updates since construction or the last reset) and `.close()` to release the C handle.
 
 ```codon
 from lrvx.indicators import EMA, SMA, RSI, ATR, MACD, Bollinger
@@ -16529,8 +16568,16 @@ The complete class list is `SMA`, `EMA`, `RMA`, `DEMA`, `TEMA`, `KAMA`, `RSI`, `
 `ParkinsonVol`, `RogersSatchellVol`, `Correlation`, `AutoCorrelation`. There is no `OBV`, `VWAP` or
 `CVD` class — those three are batch-only free functions.
 
-Streaming classes accumulate history internally and re-run the batch function over it, so `.value`
-is by construction identical to the last element of the batch result.
+Each instance holds one C handle (`lrvx_streaming_indicator_*`) that owns the C++ streaming
+indicator. `update()` runs one step of it and keeps no history, so the cost of an update depends
+only on the indicator's window, not on how many values it has seen: O(1) for SMA, EMA, RMA, RSI,
+DEMA, TEMA, Slope, ATR and MACD, O(period) for the others, which recompute their window each step.
+`.value`, `.ready` and the NaN behaviour are the C++ class's, and `.value` after k updates equals
+element k - 1 of the batch result bit for bit. `Stochastic.ready` needs both %K and %D.
+
+`.close()` releases the handle at once. An instance that is never closed is released by `__del__`
+when the collector reclaims it; one still reachable when the program exits is left to the process
+exit. After `.close()`, `.value` is NaN, `.ready` is False and `.count` is 0.
 
 ### Single-price indicators
 
@@ -16545,7 +16592,7 @@ if ema.ready:
 
 #### `SMA`
 
-Uses a circular buffer for O(1) updates.
+A running sum over a circular buffer: O(1) per update.
 
 ```codon
 sma = SMA(period=20)
@@ -16747,7 +16794,8 @@ cvd_series  = cvd(opens, highs, lows, closes, volumes)
 <!-- INDICATOR-LIST-START -->
 
 Every indicator below is **one Codon class** with streaming `update()` / `value` /
-`ready` / `reset()`. A batch `compute()` is **not** on every class — the `Batch`
+`ready` / `count` / `reset()`, one kernel step of the C++ class per update, and
+`close()` to release its C handle. A batch `compute()` is **not** on every class — the `Batch`
 column says what each class actually exposes. Classes and the batch free functions
 both come from `lrvx.indicators`.
 
@@ -17762,8 +17810,10 @@ Classes are injected as globals by the embedded runtime. There is no `require()`
 ```javascript
 // Single value
 const ema = new EMA(20);
-ema.update(price);        // returns current value (NaN during warmup)
+ema.update(price);        // returns current value (null during warmup)
+ema.count;                // updates since construction or the last reset()
 ema.reset();
+ema.destroy();            // optional: frees the C handle now instead of at GC
 
 // Multi-output
 const macd = new MACD(12, 26, 9);
@@ -17791,6 +17841,18 @@ adxResult.adx; adxResult.plusDi; adxResult.minusDi;
 
 const skewArr = Skewness.compute(prices, 20);
 ```
+
+**Cost and lifetime.** Each streaming instance holds one C handle (`lrvx_streaming_indicator_*`)
+that owns the C++ streaming indicator. `update()` is one call that runs one step of it; no history
+is kept in JavaScript or in C, so the cost of an update depends only on the indicator's window,
+not on how many values it has seen: O(1) for SMA, EMA, RMA, RSI, DEMA, TEMA, Slope, ATR and MACD,
+O(period) for the others. Values, `ready` and the NaN behaviour are the C++ class's, bit for bit,
+with NaN shown as `null`; `Stochastic.ready` needs both `.k` and `.d`. `destroy()` frees the handle
+at once and a second call does nothing; an instance dropped without it is freed by the QuickJS
+finalizer when it is collected, and every remaining one when the runtime is torn down. After
+`destroy()` the value reads `null`, `ready` is false and `count` is 0. `CHOP` is the exception: it has
+no C++ streaming class, so its `update()` still re-runs the batch function over the bars it has
+kept, at a cost that grows with history.
 
 **Single value** — `update(value)`:
 
@@ -17822,9 +17884,10 @@ const skewArr = Skewness.compute(prices, 20);
 
 Every indicator below is a **global class**: the embedded runtime evaluates
 `quickjs/lrvx/indicators.js` at global scope, so there is no `require()` and no
-namespace prefix. Streaming is `update()` / `value` / `ready` / `reset()` on the
-instance; batch is a **static** `compute()`. Only some classes also carry an
-instance `compute()` — see the `Batch` column.
+namespace prefix. Streaming is `update()` / `value` / `ready` / `count` /
+`reset()` on the instance, one kernel step of the C++ class per update, and
+`destroy()` releases the instance's C handle. Batch is a **static** `compute()`.
+Only some classes also carry an instance `compute()` — see the `Batch` column.
 
 ```js
 const ema = new EMA(10);                    // global class, no require()
@@ -18161,8 +18224,8 @@ Copy `quickjs/types/lrvx.d.ts` and `quickjs/jsconfig.json` into your project dir
 All language bindings (Python, Node.js, Codon, embedded JS) call into this header. You can use it directly to integrate lrvx into any language with a C FFI, or embed it in a C/C++ project.
 
 !!! warning "This page is a curated subset"
-    The full surface is **729 functions, 58 handles, 59 structs, 44 callback typedefs, 3 enums**
-    across 72 groups. This page covers the commonly used core (roughly 150 functions) with prose.
+    The full surface is **763 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums**
+    across 74 groups. This page covers the commonly used core (roughly 150 functions) with prose.
     The complete, machine-generated reference — every function signature, in group order — is
     [`tools/codegen/golden/lrvx_capi.md`](https://github.com/lrvx/lrvx/blob/main/tools/codegen/golden/lrvx_capi.md),
     generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. **That file is the reference of record.**
@@ -18179,7 +18242,7 @@ All language bindings (Python, Node.js, Codon, embedded JS) call into this heade
 
 ## Opaque handles
 
-All 58 handles are `void*`. Lifetime is managed by the matching `_create` / `_destroy` pair.
+All 59 handles are `void*`. Lifetime is managed by the matching `_create` / `_destroy` pair.
 
 ```c
 typedef void* LrvxStrategyHandle;
@@ -18197,6 +18260,7 @@ typedef void* LrvxCompositeBookHandle;
 typedef void* LrvxCurveHandle;
 typedef void* LrvxPoolTapeHandle;
 typedef void* LrvxPoolReplayHandle;
+typedef void* LrvxStreamingIndicatorHandle;
 typedef void* LrvxIndicatorGraphHandle;
 typedef LrvxIndicatorGraphHandle LrvxStreamingGraphHandle;  // alias
 typedef void* LrvxOrderGroupHandle;
@@ -18952,8 +19016,32 @@ that is not array-in / array-out: it writes three scalars through out-pointers a
 `const char* regression` selector. The `lrvx_indicator_graph_*` functions are a separate group and
 are not listed here.
 
-Streaming (stateful) indicator objects are not part of the C API; they are exposed by the Codon,
-QuickJS and Node bindings.
+### Streaming indicators
+
+One `LrvxStreamingIndicatorHandle` per streaming indicator instance, for every row of
+`include/lrvx/indicator/registry.def`. The handle owns the C++ class and forwards to it: an update
+is one kernel step, its cost independent of how many values the handle has seen, and nothing but
+`_create` allocates. The Codon and QuickJS indicator classes are built on these handles.
+
+| Function | Description |
+|----------|-------------|
+| `lrvx_streaming_indicator_create(name, args, num_args)` | Create by registry snake_case name (`"sma"`, `"macd"`, ...) with the row's constructor arguments as doubles; NULL and code 2 on a bad name or argument |
+| `lrvx_streaming_indicator_destroy(h)` | Free the handle; NULL is a no-op |
+| `lrvx_streaming_indicator_update(h, value)` | One step of a single-series indicator (SingleInput rows, MACD, Bollinger); returns the value after it |
+| `lrvx_streaming_indicator_update_bar(h, high, low, close)` | ATR, CCI, Stochastic |
+| `lrvx_streaming_indicator_update_high_low(h, high, low)` | ParkinsonVol |
+| `lrvx_streaming_indicator_update_ohlc(h, open, high, low, close)` | RogersSatchellVol |
+| `lrvx_streaming_indicator_update_pair(h, x, y)` | Correlation |
+| `lrvx_streaming_indicator_value(h)` | The class's `value()`, NaN while not ready |
+| `lrvx_streaming_indicator_output(h, index)` | Output `index`; 0 is `value()`. MACD: line, signal, histogram. Bollinger: middle, upper, lower. Stochastic: %K, %D |
+| `lrvx_streaming_indicator_ready(h)` | The class's `ready()` |
+| `lrvx_streaming_indicator_count(h)` | Updates since creation or the last reset |
+| `lrvx_streaming_indicator_reset(h)` | Back to the freshly created state |
+| `lrvx_streaming_indicator_input_count(h)` | Inputs per update: 1 to 4 |
+| `lrvx_streaming_indicator_output_count(h)` | Outputs: 3 for MACD and Bollinger, 2 for Stochastic, else 1 |
+
+An update function that does not match the indicator's inputs does not step it; it returns 0 and
+records code 2. `LRVX_HAS_STREAMING_INDICATOR_HANDLES` is defined by a header that declares them.
 
 ---
 

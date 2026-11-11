@@ -141,7 +141,7 @@ change.
 
 ## Indicators
 
-Each indicator supports `.update()` for per-tick and `static compute()` for batch:
+Each indicator supports `.update()` for per-tick and `static compute()` for batch. A per-tick instance holds a C handle to the C++ streaming indicator, so `.update()` is one kernel step whatever the history; `.destroy()` frees the handle early, otherwise the finalizer does (see [QuickJS indicators](../reference/quickjs/indicators.md)):
 
 | Single-value input | OHLC input | Volume input |
 |---|---|---|

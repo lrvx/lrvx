@@ -1,0 +1,331 @@
+# Smoke test: the streaming indicator classes in lrvx.indicators.
+#
+# Parity. Each class is fed a 400-step series with NaNs in it, and at every
+# step its value (and every output of MACD, Bollinger and Stochastic) must
+# equal, bit for bit, the batch function's output at that index. The batch
+# functions and the C++ streaming classes run the same kernel step, which
+# tests/test_streaming_parity.cpp holds bit for bit, and the C handles under
+# these classes are held against the C++ classes by
+# tests/test_capi_streaming_indicator.cpp. ready must follow the C++ rule
+# (finite value; for Stochastic, finite %K and %D), count must count updates,
+# and reset must return the class to a fresh state.
+#
+# Cost. 20,000 updates must take less than 25 x the time of 2,000: about 10
+# when an update costs the same whatever the history, about 100 when it
+# grows with it. Each side is the best of several runs, and a 20,000 run
+# that passes the bound is cut short and reported as FAIL.
+
+import math
+import time
+
+from lrvx.indicators import (
+    SMA, EMA, RMA, RSI, KAMA, DEMA, TEMA, Slope, Skewness, Kurtosis,
+    RollingZScore, ShannonEntropy, AutoCorrelation, ATR, CCI, Stochastic,
+    ParkinsonVol, RogersSatchellVol, Correlation, MACD, Bollinger,
+    sma, ema, rma, rsi, kama, dema, tema, slope, skewness, kurtosis,
+    rolling_zscore, shannon_entropy, autocorrelation, atr, cci, stochastic,
+    parkinson_vol, rogers_satchell_vol, rolling_correlation, macd, bollinger,
+)
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+def bits(x: float) -> int:
+    p = Ptr[float](1)
+    p[0] = x
+    return Ptr[int](p.as_byte())[0]
+
+
+def finite(x: float) -> bool:
+    return not math.isnan(x) and not math.isinf(x)
+
+
+# ── Series: a deterministic walk with NaNs in every field ──────────────
+
+N = 400
+o = List[float](N)
+h = List[float](N)
+l = List[float](N)
+c = List[float](N)
+y = List[float](N)
+px = 100.0
+other = 50.0
+for i in range(N):
+    o.append(px)
+    px += math.sin(i * 0.731) + 0.3 * math.cos(i * 0.119)
+    other += 0.5 * math.sin(i * 0.413 + 1.0)
+    c.append(px)
+    h.append(max(o[i], px) + 0.5 + 0.4 * math.sin(i * 1.7))
+    l.append(min(o[i], px) - 0.5 - 0.4 * math.cos(i * 1.3))
+    y.append(other + 0.3 * px)
+for i in (57, 58, 59, 140, 301):
+    c[i] = math.nan
+for i in (90, 222):
+    h[i] = math.nan
+    y[i] = math.nan
+for i in (175, 340):
+    l[i] = math.nan
+    o[i] = math.nan
+
+
+# ── Parity helpers, one per input shape ────────────────────────────────
+
+def report(name: str, bad: int, ready_bad: int, count_bad: int, ready_steps: int):
+    check(bad == 0, f"{name}: values equal the batch output bit for bit ({bad} mismatches)")
+    check(ready_bad == 0, f"{name}: ready follows the C++ rule ({ready_bad} mismatches)")
+    check(count_bad == 0, f"{name}: count counts updates ({count_bad} mismatches)")
+    check(ready_steps > 10, f"{name}: ready on {ready_steps} steps")
+
+
+def check_single(name: str, ind, ref: List[float]):
+    for rnd in range(2):
+        bad = 0; ready_bad = 0; count_bad = 0; ready_steps = 0
+        for i in range(N):
+            r = ind.update(c[i])
+            if bits(r) != bits(ref[i]) or bits(ind.value) != bits(ref[i]):
+                bad += 1
+            if ind.ready != finite(ref[i]):
+                ready_bad += 1
+            if ind.ready:
+                ready_steps += 1
+            if ind.count != i + 1:
+                count_bad += 1
+        report(f"{name} run {rnd}", bad, ready_bad, count_bad, ready_steps)
+        ind.reset()
+    ind.close()
+
+
+def check_bar(name: str, ind, ref: List[float]):
+    for rnd in range(2):
+        bad = 0; ready_bad = 0; count_bad = 0; ready_steps = 0
+        for i in range(N):
+            r = ind.update(h[i], l[i], c[i])
+            if bits(r) != bits(ref[i]) or bits(ind.value) != bits(ref[i]):
+                bad += 1
+            if ind.ready != finite(ref[i]):
+                ready_bad += 1
+            if ind.ready:
+                ready_steps += 1
+            if ind.count != i + 1:
+                count_bad += 1
+        report(f"{name} run {rnd}", bad, ready_bad, count_bad, ready_steps)
+        ind.reset()
+    ind.close()
+
+
+check_single("SMA(20)", SMA(20), sma(c, 20))
+check_single("EMA(14)", EMA(14), ema(c, 14))
+check_single("RMA(14)", RMA(14), rma(c, 14))
+check_single("RSI(14)", RSI(14), rsi(c, 14))
+check_single("KAMA(10,2,30)", KAMA(10, 2, 30), kama(c, 10, 2, 30))
+check_single("DEMA(10)", DEMA(10), dema(c, 10))
+check_single("TEMA(10)", TEMA(10), tema(c, 10))
+check_single("Slope(12)", Slope(12), slope(c, 12))
+check_single("Skewness(20)", Skewness(20), skewness(c, 20))
+check_single("Kurtosis(20)", Kurtosis(20), kurtosis(c, 20))
+check_single("RollingZScore(30)", RollingZScore(30), rolling_zscore(c, 30))
+check_single("ShannonEntropy(20,8)", ShannonEntropy(20, 8), shannon_entropy(c, 20, 8))
+check_single("AutoCorrelation(20,3)", AutoCorrelation(20, 3), autocorrelation(c, 20, 3))
+check_bar("ATR(14)", ATR(14), atr(h, l, c, 14))
+check_bar("CCI(20)", CCI(20), cci(h, l, c, 20))
+
+
+def check_parkinson():
+    ref = parkinson_vol(h, l, 20)
+    ind = ParkinsonVol(20)
+    bad = 0; ready_bad = 0; count_bad = 0; ready_steps = 0
+    for i in range(N):
+        r = ind.update(h[i], l[i])
+        if bits(r) != bits(ref[i]) or bits(ind.value) != bits(ref[i]):
+            bad += 1
+        if ind.ready != finite(ref[i]):
+            ready_bad += 1
+        if ind.ready:
+            ready_steps += 1
+        if ind.count != i + 1:
+            count_bad += 1
+    report("ParkinsonVol(20)", bad, ready_bad, count_bad, ready_steps)
+    ind.close()
+
+
+def check_rogers_satchell():
+    ref = rogers_satchell_vol(o, h, l, c, 20)
+    ind = RogersSatchellVol(20)
+    bad = 0; ready_bad = 0; count_bad = 0; ready_steps = 0
+    for i in range(N):
+        r = ind.update(o[i], h[i], l[i], c[i])
+        if bits(r) != bits(ref[i]) or bits(ind.value) != bits(ref[i]):
+            bad += 1
+        if ind.ready != finite(ref[i]):
+            ready_bad += 1
+        if ind.ready:
+            ready_steps += 1
+        if ind.count != i + 1:
+            count_bad += 1
+    report("RogersSatchellVol(20)", bad, ready_bad, count_bad, ready_steps)
+    ind.close()
+
+
+def check_correlation():
+    ref = rolling_correlation(c, y, 20)
+    ind = Correlation(20)
+    bad = 0; ready_bad = 0; count_bad = 0; ready_steps = 0
+    for i in range(N):
+        r = ind.update(c[i], y[i])
+        if bits(r) != bits(ref[i]) or bits(ind.value) != bits(ref[i]):
+            bad += 1
+        if ind.ready != finite(ref[i]):
+            ready_bad += 1
+        if ind.ready:
+            ready_steps += 1
+        if ind.count != i + 1:
+            count_bad += 1
+    report("Correlation(20)", bad, ready_bad, count_bad, ready_steps)
+    ind.close()
+
+
+def check_macd():
+    # A clean series: MACD's fast line stays NaN for good after a NaN input.
+    clean = [100.0 + 5.0 * math.sin(i * 0.05) + math.sin(i * 0.9) for i in range(N)]
+    ref = macd(clean, 12, 26, 9)
+    ind = MACD(12, 26, 9)
+    bad = 0; ready_bad = 0; count_bad = 0; ready_steps = 0
+    for i in range(N):
+        r = ind.update(clean[i])
+        if (bits(r) != bits(ref.line[i]) or bits(ind.value) != bits(ref.line[i])
+                or bits(ind.line) != bits(ref.line[i])
+                or bits(ind.signal_value) != bits(ref.signal[i])
+                or bits(ind.histogram) != bits(ref.histogram[i])):
+            bad += 1
+        if ind.ready != finite(ref.line[i]):
+            ready_bad += 1
+        if ind.ready:
+            ready_steps += 1
+        if ind.count != i + 1:
+            count_bad += 1
+    report("MACD(12,26,9)", bad, ready_bad, count_bad, ready_steps)
+    ind.close()
+
+
+def check_bollinger():
+    ref = bollinger(c, 20, 2.0)
+    ind = Bollinger(20, 2.0)
+    bad = 0; ready_bad = 0; count_bad = 0; ready_steps = 0
+    for i in range(N):
+        r = ind.update(c[i])
+        if (bits(r) != bits(ref.middle[i]) or bits(ind.value) != bits(ref.middle[i])
+                or bits(ind.middle) != bits(ref.middle[i])
+                or bits(ind.upper) != bits(ref.upper[i])
+                or bits(ind.lower) != bits(ref.lower[i])):
+            bad += 1
+        if ind.ready != finite(ref.middle[i]):
+            ready_bad += 1
+        if ind.ready:
+            ready_steps += 1
+        if ind.count != i + 1:
+            count_bad += 1
+    report("Bollinger(20,2)", bad, ready_bad, count_bad, ready_steps)
+    ind.close()
+
+
+def check_stochastic():
+    ref = stochastic(h, l, c, 14, 3)
+    ind = Stochastic(14, 3)
+    bad = 0; ready_bad = 0; count_bad = 0; ready_steps = 0
+    for i in range(N):
+        r = ind.update(h[i], l[i], c[i])
+        if (bits(r) != bits(ref.k[i]) or bits(ind.value) != bits(ref.k[i])
+                or bits(ind.k) != bits(ref.k[i]) or bits(ind.d) != bits(ref.d[i])):
+            bad += 1
+        if ind.ready != (finite(ref.k[i]) and finite(ref.d[i])):
+            ready_bad += 1
+        if ind.ready:
+            ready_steps += 1
+        if ind.count != i + 1:
+            count_bad += 1
+    report("Stochastic(14,3)", bad, ready_bad, count_bad, ready_steps)
+    ind.close()
+
+
+check_parkinson()
+check_rogers_satchell()
+check_correlation()
+check_macd()
+check_bollinger()
+check_stochastic()
+
+
+# ── Cost: 2,000 vs 20,000 updates ──────────────────────────────────────
+
+MAX_RATIO = 25.0
+sink = 0.0
+
+
+def timed_run(kind: int, n: int, budget: float) -> float:
+    # Seconds for n updates on a fresh indicator, or a negative number when
+    # the run went past `budget` seconds and was cut short.
+    p = 100.0
+    acc = 0.0
+    t0 = time.perf_counter()
+    if kind == 0:
+        ind = RollingZScore(240)
+        for i in range(n):
+            p += math.sin(i * 0.37)
+            acc += ind.update(p)
+            if (i & 255) == 255 and time.perf_counter() - t0 > budget:
+                return -(time.perf_counter() - t0)
+    elif kind == 1:
+        ind2 = SMA(240)
+        for i in range(n):
+            p += math.sin(i * 0.37)
+            acc += ind2.update(p)
+            if (i & 255) == 255 and time.perf_counter() - t0 > budget:
+                return -(time.perf_counter() - t0)
+    else:
+        ind3 = ATR(14)
+        for i in range(n):
+            p += math.sin(i * 0.37)
+            acc += ind3.update(p + 1.0, p - 1.0, p)
+            if (i & 255) == 255 and time.perf_counter() - t0 > budget:
+                return -(time.perf_counter() - t0)
+    el = time.perf_counter() - t0
+    global sink
+    sink += acc
+    return el
+
+
+for kind, name in ((0, "RollingZScore(240)"), (1, "SMA(240)"), (2, "ATR(14)")):
+    t1 = 1e300
+    for _ in range(5):
+        t1 = min(t1, timed_run(kind, 2000, 1e300))
+    # A preempted run on a shared runner can pass the bound on its own; only
+    # a bound passed by every run fails.
+    budget = MAX_RATIO * t1
+    t10 = 1e300
+    cuts = 0
+    for _ in range(3):
+        t = timed_run(kind, 20000, budget)
+        if t < 0:
+            cuts += 1
+            print(f"{name}: 20000 updates cut short after {-t:.4f} s "
+                  f"(2000 took {t1:.6f} s)")
+            continue
+        t10 = min(t10, t)
+    if cuts < 3:
+        print(f"{name}: t(2000)={t1:.6f} s, t(20000)={t10:.6f} s, ratio {t10 / t1:.2f}")
+    check(cuts < 3 and t1 > 0.0 and t10 < budget,
+          f"{name}: 20000 updates take under {MAX_RATIO:.0f} x the time of 2000")
+
+if failed:
+    print(f"{failed} check(s) failed")
+    raise ValueError("indicator_streaming_smoke failed")
+print("all indicator streaming checks passed")
