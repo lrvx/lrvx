@@ -129,8 +129,8 @@ struct ReaderConfig
 
   // With from_ns or to_ns set, segments whose recorded time bounds prove
   // they hold no event in [from_ns, to_ns] are not decoded, and Sorted
-  // segments are entered at the index entry nearest from_ns and left at the
-  // first event past to_ns. The result is identical either way; false
+  // segments are entered at the last index entry strictly below from_ns and
+  // left at the first event past to_ns. The result is identical either way; false
   // restores the full walk (benchmarks, equivalence tests).
   bool skip_segments_by_time{true};
 
@@ -380,10 +380,9 @@ class BinaryLogReader
   // thread (a replay loop scanning lazily while the owner asks for timeRange).
   bool ensureScanned() const;
   bool readSegment(const std::filesystem::path& path, EventCallback& callback);
-  bool readSegmentFrom(const SegmentInfo& segment, int64_t start_ts_ns, bool seek,
-                       EventCallback& callback);
+  bool readSegmentFrom(const SegmentInfo& segment, int64_t start_ts_ns, EventCallback& callback);
   bool readSegmentStreaming(const std::filesystem::path& path, EventCallback& callback);
-  bool readSegmentStreamingFrom(const SegmentInfo& segment, int64_t start_ts_ns, bool seek,
+  bool readSegmentStreamingFrom(const SegmentInfo& segment, int64_t start_ts_ns,
                                 EventCallback& callback);
 
   // Fills _read_order / _read_groups from _segments.
@@ -409,8 +408,9 @@ class BinaryLogReader
   bool passesFilter(const ReplayEvent& event) const;
 
   bool rangeSkipActive() const;
-  // True when the scanned header alone proves the segment holds no event in
-  // the configured range. Only an uncompressed Sorted segment qualifies.
+  // True when the segment's proven bounds, recorded at scan time, place it
+  // outside the configured range: an uncompressed Sorted segment by its first
+  // frame and last event, a compressed Sorted one by its block index minimum.
   bool segmentOutsideRange(const SegmentInfo& segment) const;
   // For a Sorted segment just opened: positions `iter` at the index entry
   // nearest from_ns and sets `stop_past_to` when the segment is monotonic, so
@@ -448,6 +448,10 @@ class BinaryLogIterator
   bool isValid() const { return _file != nullptr; }
   bool isCompressed() const { return _header.isCompressed(); }
 
+  // Moves to the last index entry strictly below the target, so reading on and
+  // skipping earlier events yields every event at or after it. Only a Sorted
+  // segment with a usable index is positioned; otherwise returns false and
+  // leaves the iterator at the first event.
   bool seekToTimestamp(int64_t target_ts_ns);
   bool loadIndex();
   // Answers from the segment header, the way MmapSegmentReader::hasIndex

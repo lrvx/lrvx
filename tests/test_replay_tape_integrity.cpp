@@ -452,7 +452,9 @@ TEST_F(ReplayTapeIntegrityTest, SeekOnCompressedSegmentDiscardsStaleBlock)
     after.push_back(ev.timestamp_ns);
   }
   ASSERT_FALSE(after.empty());
-  EXPECT_GE(after.front(), 16 * kSec)
+  // Blocks 10-13 | 14-17 | 18-21: the seek lands on the last block whose
+  // minimum lies strictly below 18. The block held before it was 10-13.
+  EXPECT_EQ(after.front(), 14 * kSec)
       << "seek returned stale events from the block held before the seek";
 }
 

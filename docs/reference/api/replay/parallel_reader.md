@@ -160,9 +160,18 @@ flowchart TB
     end
 ```
 
+## Ordering
+
+`segments()` lists the segments in `BinaryLogReader::segmentsInReadOrder()` order: by proven first event where a segment proves one, by file name otherwise (see [BinaryLogReader, Ordering guarantee](binary_log_reader.md#ordering-guarantee)). What `forEach` delivers depends on the path it takes:
+
+* **One thread, or at most two segments.** `forEach` is `BinaryLogReader::forEach`, with that page's ordering guarantee: `Sorted` segments in timestamp order across segments, overlapping ones merged, a segment without the `Sorted` flag sorted in its file-name position. One segment at a time is in memory.
+* **Several threads and more than two segments, `sort_output = true`.** Every segment is read into memory, a segment without the `Sorted` flag is sorted, and all of them are merged: the whole tape arrives in timestamp order, equal timestamps by file name, then by position in the segment.
+* **`sort_output = false`.** Each segment's events in its stored order, segments in whatever order the workers finish; no ordering promise.
+
+`forEachBatch` and `mapSegments` hand each segment's events over in stored order. With `from_ns` set, a `Sorted` segment is entered at its last index entry strictly below `from_ns`.
+
 ## Notes
 
 * Workers read segments independently and buffer events in memory.
-* K-way merge produces globally sorted output when `sort_output=true`.
 * Thread count defaults to `std::thread::hardware_concurrency()`.
 * Best for bulk processing where I/O bandwidth is the bottleneck.

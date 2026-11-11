@@ -8,9 +8,12 @@
  */
 
 #include "lrvx/replay/readers/mmap_reader.h"
+#include "segment_bounds.h"
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
+#include <optional>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -396,38 +399,26 @@ bool MmapSegmentReader::next(ReplayEvent& out)
 
 bool MmapSegmentReader::seekToTimestamp(int64_t target_ts_ns)
 {
-  if (!hasIndex() || !_index_loaded)
-  {
-    if (!loadIndex())
-    {
-      return false;
-    }
-  }
-
-  if (_index_entries.empty())
+  if (!isValid())
   {
     return false;
   }
-
-  auto it = std::upper_bound(_index_entries.begin(), _index_entries.end(), target_ts_ns,
-                             [](int64_t ts, const IndexEntry& entry)
-                             {
-                               return ts < entry.timestamp_ns;
-                             });
-
-  if (it != _index_entries.begin())
+  // Same rule as BinaryLogIterator::seekToTimestamp: the last index entry
+  // strictly below the target, and only in a Sorted segment; otherwise the
+  // reader goes back to the first event and the caller walks the segment.
+  std::optional<detail::IndexWindow> window;
+  if (_header->isSorted() && hasIndex() && loadIndex())
   {
-    --it;
+    window = detail::indexWindow(_index_entries, *_header, target_ts_ns,
+                                 std::numeric_limits<int64_t>::max());
   }
-
-  size_t offset = it->file_offset - sizeof(SegmentHeader);
-  if (offset < dataSize())
+  if (!window || window->start - sizeof(SegmentHeader) >= dataSize())
   {
-    _current = _data_start + offset;
-    return true;
+    reset();
+    return false;
   }
-
-  return false;
+  _current = _data_start + (window->start - sizeof(SegmentHeader));
+  return true;
 }
 
 bool MmapSegmentReader::loadIndex()
@@ -489,13 +480,15 @@ MmapReader::MmapReader(const Config& config) : _config(config)
       .symbols = _config.symbols,
   };
 
+  // The order BinaryLogReader visits segments in: by proven first event where
+  // the segment proves one, by file name otherwise.
   BinaryLogReader scanner(reader_config);
-  scanner.summary();
-  _segments = scanner.segments();
+  _segments = scanner.segmentsInReadOrder();
 
-  std::sort(_segments.begin(), _segments.end(), [](const SegmentInfo& a, const SegmentInfo& b)
-            { return a.first_event_ns < b.first_event_ns; });
-
+  // One reader per segment, valid or not, so _readers[i] maps _segments[i]:
+  // a segment that cannot be mapped (removed or replaced after the scan) is
+  // skipped where it stands instead of shifting every later segment's
+  // metadata onto the wrong file.
   _readers.reserve(_segments.size());
   for (const auto& seg : _segments)
   {
@@ -521,9 +514,8 @@ MmapReader::MmapReader(const Config& config) : _config(config)
         }
         (void)dummy;
       }
-
-      _readers.push_back(std::move(reader));
     }
+    _readers.push_back(std::move(reader));
   }
 }
 
@@ -593,19 +585,16 @@ uint64_t MmapReader::forEachFrom(int64_t start_ts_ns, EventCallback callback)
       continue;
     }
 
-    if (i < _segments.size() && _segments[i].last_event_ns < start_ts_ns)
+    // Passed over only when its proven maximum lies below the start; the
+    // header's last_event_ns bounds nothing on a segment without Sorted.
+    if (detail::provenOutside(_segments[i], start_ts_ns, std::numeric_limits<int64_t>::max()))
     {
       continue;
     }
 
-    if (reader->hasIndex())
-    {
-      reader->seekToTimestamp(start_ts_ns);
-    }
-    else
-    {
-      reader->reset();
-    }
+    // Leaves the reader at the first event when the index cannot position
+    // the start (no index, or no Sorted flag).
+    reader->seekToTimestamp(start_ts_ns);
 
     ReplayEvent event;
     while (reader->next(event))
