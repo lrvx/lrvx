@@ -158,7 +158,7 @@ trade_id, timestamp_ms, instrument, side, price, amount,
 mark_price, iv, index_price
 ```
 
-`trade_id` is integer, used directly for append-safe dedup. `side` is `buy` / `sell` lowercase. `mark_price`, `iv`, and `index_price` are dropped at read time — the lrvx `TradeRecord` schema does not represent them; keep the source CSV alongside the tape and re-join in numpy when needed.
+`trade_id` is integer, used directly for append-safe dedup. `side` is `buy` / `sell` lowercase. For an option instrument `mark_price`, `iv` and `index_price` are kept: each trade row also writes an OptionQuote frame carrying them, with `iv` stored as the archive gives it. For a future or perpetual the three columns are not written, since the `TradeRecord` schema has no field for them.
 
 ### Instrument naming
 

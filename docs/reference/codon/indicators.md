@@ -113,7 +113,7 @@ value = rma.update(price)
 
 #### `DEMA`
 
-Double Exponential Moving Average. `.ready` is true after `2 * period` values.
+Double Exponential Moving Average. `.ready` is true after `2 * period - 1` values.
 
 ```codon
 dema = DEMA(period=20)
@@ -122,7 +122,7 @@ value = dema.update(price)
 
 #### `TEMA`
 
-Triple Exponential Moving Average. `.ready` is true after `3 * period` values.
+Triple Exponential Moving Average. `.ready` is true after `3 * period - 2` values.
 
 ```codon
 tema = TEMA(period=20)

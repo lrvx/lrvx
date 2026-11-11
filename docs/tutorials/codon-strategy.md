@@ -97,7 +97,7 @@ codon build -exe \
 
 Because Codon compiles to native code:
 - `on_trade` is compiled to a native function, not interpreted
-- No GIL, no interpreter, no garbage collector pauses
+- No GIL and no interpreter. Codon does have a garbage collector (Boehm); a callback that allocates nothing gives it nothing to do
 
 `SMA.update()` is one FFI call that runs one step of the C++ `SMA` held by
 the instance (a running sum, O(1)). The indicator classes in

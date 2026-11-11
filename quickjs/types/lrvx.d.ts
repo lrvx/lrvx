@@ -258,6 +258,110 @@ declare class RSI {
     static compute(data: number[], period: number): number[];
 }
 
+declare class Skewness {
+    constructor(period: number);
+    update(value: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(data: number[], period: number): number[];
+}
+
+declare class Kurtosis {
+    constructor(period: number);
+    update(value: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(data: number[], period: number): number[];
+}
+
+declare class RollingZScore {
+    constructor(period: number);
+    update(value: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(data: number[], period: number): number[];
+}
+
+declare class ShannonEntropy {
+    constructor(period: number, bins?: number);
+    update(value: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(data: number[], period: number, bins?: number): number[];
+}
+
+declare class ParkinsonVol {
+    constructor(period: number);
+    update(high: number, low: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(high: number[], low: number[], period: number): number[];
+}
+
+declare class RogersSatchellVol {
+    constructor(period: number);
+    update(open: number, high: number, low: number, close: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(open: number[], high: number[], low: number[], close: number[], period: number): number[];
+}
+
+declare class Correlation {
+    constructor(period: number);
+    update(x: number, y: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(x: number[], y: number[], period: number): number[];
+}
+
+declare class AutoCorrelation {
+    constructor(window: number, lag: number);
+    update(value: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(data: number[], window: number, lag: number): number[];
+}
+
 declare class Stochastic {
     constructor(kPeriod?: number, dPeriod?: number);
     update(high: number, low: number, close: number): number | null;

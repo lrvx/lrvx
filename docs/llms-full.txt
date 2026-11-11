@@ -1139,7 +1139,7 @@ change.
 
 ## Indicators
 
-Each indicator supports `.update()` for per-tick and `static compute()` for batch. A per-tick instance holds a C handle to the C++ streaming indicator, so `.update()` is one kernel step whatever the history; `.destroy()` frees the handle early, otherwise the finalizer does (see [QuickJS indicators](../reference/quickjs/indicators.md)):
+Every indicator has `static compute()` for batch. All of them except ADX, OBV, VWAP and CVD, which are batch-only, also have `.update()` for per-tick use. A per-tick instance holds a C handle to the C++ streaming indicator, so `.update()` is one kernel step whatever the history; `.destroy()` frees the handle early, otherwise the finalizer does (see [QuickJS indicators](../reference/quickjs/indicators.md)):
 
 | Single-value input | OHLC input | Volume input |
 |---|---|---|
@@ -2076,7 +2076,7 @@ codon build -exe \
 
 Because Codon compiles to native code:
 - `on_trade` is compiled to a native function, not interpreted
-- No GIL, no interpreter, no garbage collector pauses
+- No GIL and no interpreter. Codon does have a garbage collector (Boehm); a callback that allocates nothing gives it nothing to do
 
 `SMA.update()` is one FFI call that runs one step of the C++ `SMA` held by
 the instance (a running sum, O(1)). The indicator classes in
@@ -16610,7 +16610,7 @@ value = rma.update(price)
 
 #### `DEMA`
 
-Double Exponential Moving Average. `.ready` is true after `2 * period` values.
+Double Exponential Moving Average. `.ready` is true after `2 * period - 1` values.
 
 ```codon
 dema = DEMA(period=20)
@@ -16619,7 +16619,7 @@ value = dema.update(price)
 
 #### `TEMA`
 
-Triple Exponential Moving Average. `.ready` is true after `3 * period` values.
+Triple Exponential Moving Average. `.ready` is true after `3 * period - 2` values.
 
 ```codon
 tema = TEMA(period=20)
