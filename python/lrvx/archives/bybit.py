@@ -45,7 +45,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple, Union
 
-from . import _cache
+from . import _cache, _dedup
 
 
 _BASE_URL = "https://public.bybit.com"
@@ -279,33 +279,6 @@ def _write_metadata(out_tape: Path, *,
     meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True))
 
 
-def _existing_trade_ids(out_tape: Path, symbol_id: int,
-                        from_ns: int, to_ns: int) -> "object":
-    """Return the trade ids already on the tape for ``symbol_id`` with
-    an exchange timestamp in ``[from_ns, to_ns]``, as a numpy uint64
-    array (empty when the tape is missing or unreadable).
-
-    Bybit ids are folded UUIDs and carry no order, so dedup is by
-    membership. Only the incoming file's time window can hold its
-    trades, which bounds the array by roughly one day of trades."""
-    import numpy as np
-
-    empty = np.empty(0, dtype=np.uint64)
-    if not out_tape.exists():
-        return empty
-    try:
-        import lrvx
-
-        reader = lrvx.DataReader(str(out_tape), from_ns=int(from_ns),
-                                 to_ns=int(to_ns), symbols=[int(symbol_id)])
-        trades = reader.read_trades()
-        if trades.size == 0:
-            return empty
-        return np.asarray(trades["trade_id"], dtype=np.uint64)
-    except Exception:
-        return empty
-
-
 def trades_to_lrvx(
     csv_path: Union[str, Path],
     out_tape: Union[str, Path],
@@ -343,17 +316,8 @@ def trades_to_lrvx(
     rows: List[Tuple[int, float, float, int, int]] = list(_iter_rows(csv_path))
     rows_read = len(rows)
     rows_skipped = 0
-    if append and rows:
-        existing = _existing_trade_ids(
-            out_tape, symbol_id,
-            min(r[3] for r in rows), max(r[3] for r in rows),
-        )
-        if existing.size:
-            incoming = np.fromiter((r[0] for r in rows), dtype=np.uint64,
-                                   count=rows_read)
-            seen = np.isin(incoming, existing)
-            rows = [r for r, dup in zip(rows, seen.tolist()) if not dup]
-            rows_skipped = rows_read - len(rows)
+    if append:
+        rows, rows_skipped = _dedup.drop_trades_on_tape(rows, out_tape, symbol_id)
 
     if not rows:
         if write_metadata and rows_read:

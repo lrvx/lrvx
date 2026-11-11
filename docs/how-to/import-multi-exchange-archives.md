@@ -12,6 +12,8 @@
 
 Adding a new venue is a self-contained module under `lrvx/archives/` that implements `trades_to_lrvx` + `range_to_lrvx` matching the `ArchiveReader` Protocol.
 
+All five trade importers append by default and dedup the same way: a row is skipped when its trade id is already on the tape for the same symbol within the incoming file's time range. A trade keeps its exchange timestamp, so only that range can hold a copy of it, and the dedup read covers that range instead of the whole tape. Re-importing a day adds nothing, a new day lands in full, an overlapping range keeps each trade once, and days may be imported in any order (a later day first, or a day that fills a gap). `--no-append` turns the check off.
+
 ## Bybit
 
 Bybit publishes daily trade ticks at `https://public.bybit.com/` going back two-plus years. The on-disk CSV layout (post-2022):
@@ -228,7 +230,7 @@ The `(exchange, name)` keying is the contract: every cross-exchange analysis tha
 
 A new exchange importer is one module under `lrvx/archives/<exchange>.py` exposing:
 
-- `trades_to_lrvx(csv_path, out_tape, *, symbol_id, symbol_name, market, ...)` — parse one day's CSV, write trades via `DataWriter`, append-safe by the venue's trade id.
+- `trades_to_lrvx(csv_path, out_tape, *, symbol_id, symbol_name, market, ...)` — parse one day's CSV, write trades via `DataWriter`, append-safe by the venue's trade id (`lrvx.archives._dedup.drop_trades_on_tape` does the dedup described above).
 - `range_to_lrvx(symbol, market, date_from, date_to, out_tape, *, mirror, parallel, ...)` — download a date range, hand each day to the single-day function, merge `metadata.json` with the union counters.
 
 Register the new module in `archives/__init__.py`, add a `lrvx archive <exchange>` subparser in `lrvx/cli.py`, and write a synthetic-fixture test under `python/tests/`. The CLI and tests work generically against the `ArchiveReader` Protocol; no changes elsewhere in the framework are required.

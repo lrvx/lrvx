@@ -16,8 +16,10 @@ transparently. Side encoding follows the existing lrvx convention:
     buying  → ``Side::BUY``  (0)
 
 The converter writes through ``lrvx.DataWriter`` and is append-safe:
-re-running the same day is a no-op because dedup keys on
-``agg_trade_id`` (stable, exchange-assigned).
+a row is skipped when its ``agg_trade_id`` (stable, exchange-assigned)
+is already on the tape for the same symbol within the incoming file's
+time range, so re-running a day is a no-op and days may be imported
+in any order.
 
 A standalone ``metadata.json`` is written alongside the segments so the
 result keys cleanly into ``MergedTapeReader`` against other lrvx
@@ -39,6 +41,8 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, List, Optional, Sequence, Tuple, Union
+
+from . import _dedup
 
 # Market identifier → URL path prefix on data.binance.vision for the
 # trade stream (aggTrades) and the two book streams (bookTicker /
@@ -295,28 +299,6 @@ def _write_metadata(
 # ── Single-day conversion ───────────────────────────────────────────
 
 
-def _existing_max_trade_id(out_tape: Path, symbol_id: int) -> int:
-    """Return the highest existing trade_id for ``symbol_id`` in the
-    tape, or 0 if the tape is empty / unreadable. Used for dedup so a
-    re-run of the same day is a no-op."""
-    if not out_tape.exists():
-        return 0
-    try:
-        import lrvx
-        import numpy as np
-
-        reader = lrvx.DataReader(str(out_tape))
-        trades = reader.read_trades()
-        if trades.size == 0:
-            return 0
-        ids = np.asarray(trades["trade_id"])
-        syms = np.asarray(trades["symbol_id"])
-        mask = syms == symbol_id
-        return int(ids[mask].max()) if mask.any() else 0
-    except Exception:
-        return 0
-
-
 def aggtrades_to_lrvx(
     csv_path: Union[str, Path],
     out_tape: Union[str, Path],
@@ -335,7 +317,8 @@ def aggtrades_to_lrvx(
     a lrvx tape.
 
     ``symbol_name`` defaults to the file's basename leading token if
-    omitted. Dedup keys on ``agg_trade_id`` so re-running a day already
+    omitted. Dedup keys on ``agg_trade_id`` within the file's time
+    range, so re-running a day already
     present in ``out_tape`` returns ``trades_written=0`` and updates
     only ``rows_skipped``.
     """
@@ -350,23 +333,16 @@ def aggtrades_to_lrvx(
         # "BTCUSDT-aggTrades-2024-01-15.zip" → "BTCUSDT"
         symbol_name = csv_path.stem.split("-", 1)[0]
 
-    last_id = _existing_max_trade_id(out_tape, symbol_id) if append else 0
-
     # Stream-then-batch: the daily file is small enough (typically
     # <100 MB extracted) that one numpy round-trip beats the per-row
     # call overhead of write_trade.
-    rows: List[Tuple[int, float, float, int, bool]] = []
-    rows_read = 0
+    rows: List[Tuple[int, float, float, int, bool]] = list(_iter_rows(csv_path))
+    rows_read = len(rows)
+    last_seen_id = max((r[0] for r in rows), default=0)
     rows_skipped = 0
-    for r in _iter_rows(csv_path):
-        rows_read += 1
-        # last_id == 0 doubles as "nothing archived yet", so a real
-        # aggTradeId of 0 was skipped as already-seen. The sibling
-        # archives (bybit, deribit, bitget) already carry this guard.
-        if r[0] <= last_id and r[0] != 0:
-            rows_skipped += 1
-            continue
-        rows.append(r)
+    if append:
+        rows, rows_skipped = _dedup.drop_trades_on_tape(
+            rows, out_tape, symbol_id, ts_ns_per_unit=1_000_000)
 
     if not rows:
         if write_metadata and rows_read:
@@ -385,7 +361,7 @@ def aggtrades_to_lrvx(
             rows_read=rows_read,
             rows_skipped=rows_skipped,
             files_processed=1,
-            last_trade_id=last_id,
+            last_trade_id=last_seen_id,
         )
 
     n = len(rows)
