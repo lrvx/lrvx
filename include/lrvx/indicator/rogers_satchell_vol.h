@@ -12,21 +12,84 @@
 namespace lrvx::indicator
 {
 
-class RogersSatchellVol : public StreamingOhlc<RogersSatchellVol>
+namespace detail
+{
+
+// Rogers-Satchell OHLC volatility over the last `period` bars. O(period) per
+// step: the log-ratio sum is recomputed over the rings. A window holding a
+// bar with open <= 0 or close <= 0 gives NaN; a negative mean clamps to 0.
+class RogersSatchellVolKernel
 {
  public:
-  explicit RogersSatchellVol(size_t period) noexcept : _period(period) { assert(period >= 1); }
+  explicit RogersSatchellVolKernel(size_t period)
+      : _period(period), _open(period), _high(period), _low(period), _close(period)
+  {
+  }
+
+  LRVX_INDICATOR_STEP double step(double open, double high, double low, double close)
+  {
+    _open.push(open);
+    _high.push(high);
+    _low.push(low);
+    _close.push(close);
+    if (_period == 0 || !_open.full())
+    {
+      return std::nan("");
+    }
+    const auto o = _open.window();
+    const auto h = _high.window();
+    const auto l = _low.window();
+    const auto c = _close.window();
+
+    double sum = 0;
+    LRVX_INDICATOR_NO_UNROLL
+    for (size_t j = 0; j < _period; ++j)
+    {
+      if (o[j] <= 0.0 || c[j] <= 0.0)
+      {
+        return std::nan("");
+      }
+      double lnHC = std::log(h[j] / c[j]);
+      double lnHO = std::log(h[j] / o[j]);
+      double lnLC = std::log(l[j] / c[j]);
+      double lnLO = std::log(l[j] / o[j]);
+      sum += lnHC * lnHO + lnLC * lnLO;
+    }
+
+    double avg = sum / static_cast<double>(_period);
+    return avg >= 0.0 ? std::sqrt(avg) : 0.0;
+  }
+
+  void reset()
+  {
+    _open.clear();
+    _high.clear();
+    _low.clear();
+    _close.clear();
+  }
+
+ private:
+  size_t _period;
+  Ring _open, _high, _low, _close;
+};
+
+}  // namespace detail
+
+class RogersSatchellVol : public StreamingOhlc<RogersSatchellVol, detail::RogersSatchellVolKernel>
+{
+ public:
+  explicit RogersSatchellVol(size_t period)
+      : StreamingOhlc(detail::RogersSatchellVolKernel(period)), _period(period)
+  {
+    assert(period >= 1);
+  }
 
   std::vector<double> compute(std::span<const double> open, std::span<const double> high,
                               std::span<const double> low, std::span<const double> close) const
   {
     assert(open.size() == high.size() && high.size() == low.size() && low.size() == close.size());
-    const size_t n = open.size();
-    std::vector<double> out(n, std::nan(""));
-    if (n > 0)
-    {
-      compute(open, high, low, close, out);
-    }
+    std::vector<double> out(open.size(), std::nan(""));
+    compute(open, high, low, close, out);
     return out;
   }
 
@@ -36,44 +99,7 @@ class RogersSatchellVol : public StreamingOhlc<RogersSatchellVol>
   {
     assert(open.size() == high.size() && high.size() == low.size() && low.size() == close.size());
     assert(output.size() >= open.size());
-    const size_t n = open.size();
-
-    for (size_t i = 0; i < n; ++i)
-    {
-      output[i] = std::nan("");
-    }
-
-    if (n < _period)
-    {
-      return;
-    }
-
-    for (size_t i = _period - 1; i < n; ++i)
-    {
-      double sum = 0;
-      bool valid = true;
-      for (size_t j = i - _period + 1; j <= i; ++j)
-      {
-        if (open[j] <= 0.0 || close[j] <= 0.0)
-        {
-          valid = false;
-          break;
-        }
-        double lnHC = std::log(high[j] / close[j]);
-        double lnHO = std::log(high[j] / open[j]);
-        double lnLC = std::log(low[j] / close[j]);
-        double lnLO = std::log(low[j] / open[j]);
-        sum += lnHC * lnHO + lnLC * lnLO;
-      }
-
-      if (!valid)
-      {
-        continue;
-      }
-
-      double avg = sum / static_cast<double>(_period);
-      output[i] = avg >= 0.0 ? std::sqrt(avg) : 0.0;
-    }
+    fold(detail::RogersSatchellVolKernel(_period), open, high, low, close, output);
   }
 
   std::vector<double> compute(std::span<const Bar> bars) const

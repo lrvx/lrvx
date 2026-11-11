@@ -10,41 +10,56 @@
 namespace lrvx::indicator
 {
 
-// (input[i] - input[i-length]) / length
-class Slope : public StreamingSingle<Slope>
+namespace detail
+{
+
+// (input[i] - input[i - length]) / length. O(1) per step; the ring holds the
+// last length + 1 inputs. NaN at either end gives NaN for that step only.
+class SlopeKernel
 {
  public:
-  explicit Slope(size_t length) noexcept : _length(length) {}
+  explicit SlopeKernel(size_t length) : _length(length), _win(length + 1) {}
+
+  LRVX_INDICATOR_STEP double step(double x)
+  {
+    _win.push(x);
+    if (!_win.full())
+    {
+      return std::nan("");
+    }
+    const double back = _win.window()[0];
+    if (std::isnan(x) || std::isnan(back))
+    {
+      return std::nan("");
+    }
+    return (x - back) / static_cast<double>(_length);
+  }
+
+  void reset() { _win.clear(); }
+
+ private:
+  size_t _length;
+  Ring _win;
+};
+
+}  // namespace detail
+
+class Slope : public StreamingSingle<Slope, detail::SlopeKernel>
+{
+ public:
+  explicit Slope(size_t length) : StreamingSingle(detail::SlopeKernel(length)), _length(length) {}
 
   std::vector<double> compute(std::span<const double> input) const
   {
     std::vector<double> out(input.size(), std::nan(""));
-    if (!input.empty())
-    {
-      compute(input, out);
-    }
+    compute(input, out);
     return out;
   }
 
   void compute(std::span<const double> input, std::span<double> output) const
   {
-    const size_t n = input.size();
-    assert(output.size() >= n);
-
-    for (size_t i = 0; i < n; ++i)
-    {
-      output[i] = std::nan("");
-    }
-
-    const double len = static_cast<double>(_length);
-    for (size_t i = _length; i < n; ++i)
-    {
-      if (std::isnan(input[i]) || std::isnan(input[i - _length]))
-      {
-        continue;
-      }
-      output[i] = (input[i] - input[i - _length]) / len;
-    }
+    assert(output.size() >= input.size());
+    fold(detail::SlopeKernel(_length), input, output);
   }
 
   size_t period() const noexcept { return _length; }

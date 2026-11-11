@@ -11,24 +11,82 @@
 namespace lrvx::indicator
 {
 
-class DEMA : public StreamingSingle<DEMA>
+namespace detail
+{
+
+// DEMA = 2*EMA(x) - EMA(EMA(x)): two chained EMA steps, O(1).
+class DemaKernel
 {
  public:
-  explicit DEMA(size_t period) noexcept : _ema(period), _period(period) {}
+  explicit DemaKernel(const EMA& ema) noexcept : _e1(ema.kernel()), _e2(ema.kernel()) {}
+
+  LRVX_INDICATOR_STEP double step(double x) noexcept
+  {
+    const double a = _e1.step(x);
+    const double b = _e2.step(a);
+    if (!std::isnan(a) && !std::isnan(b))
+    {
+      return 2.0 * a - b;
+    }
+    return std::nan("");
+  }
+
+  void reset() noexcept
+  {
+    _e1.reset();
+    _e2.reset();
+  }
+
+ private:
+  ExpSmoothingKernel _e1, _e2;
+};
+
+// TEMA = 3*EMA - 3*EMA(EMA) + EMA(EMA(EMA)): three chained EMA steps, O(1).
+class TemaKernel
+{
+ public:
+  explicit TemaKernel(const EMA& ema) noexcept
+      : _e1(ema.kernel()), _e2(ema.kernel()), _e3(ema.kernel())
+  {
+  }
+
+  LRVX_INDICATOR_STEP double step(double x) noexcept
+  {
+    const double a = _e1.step(x);
+    const double b = _e2.step(a);
+    const double c = _e3.step(b);
+    if (!std::isnan(a) && !std::isnan(b) && !std::isnan(c))
+    {
+      return 3.0 * a - 3.0 * b + c;
+    }
+    return std::nan("");
+  }
+
+  void reset() noexcept
+  {
+    _e1.reset();
+    _e2.reset();
+    _e3.reset();
+  }
+
+ private:
+  ExpSmoothingKernel _e1, _e2, _e3;
+};
+
+}  // namespace detail
+
+class DEMA : public StreamingSingle<DEMA, detail::DemaKernel>
+{
+ public:
+  explicit DEMA(size_t period) noexcept
+      : StreamingSingle(detail::DemaKernel(EMA(period))), _ema(period), _period(period)
+  {
+  }
 
   std::vector<double> compute(std::span<const double> input) const
   {
-    auto ema1 = _ema.compute(input);
-    auto ema2 = _ema.compute(std::span<const double>(ema1));
-    const size_t n = input.size();
-    std::vector<double> out(n, std::nan(""));
-    for (size_t i = 0; i < n; ++i)
-    {
-      if (!std::isnan(ema1[i]) && !std::isnan(ema2[i]))
-      {
-        out[i] = 2.0 * ema1[i] - ema2[i];
-      }
-    }
+    std::vector<double> out(input.size(), std::nan(""));
+    fold(detail::DemaKernel(_ema), input, out);
     return out;
   }
 
@@ -39,25 +97,18 @@ class DEMA : public StreamingSingle<DEMA>
   size_t _period;
 };
 
-class TEMA : public StreamingSingle<TEMA>
+class TEMA : public StreamingSingle<TEMA, detail::TemaKernel>
 {
  public:
-  explicit TEMA(size_t period) noexcept : _ema(period), _period(period) {}
+  explicit TEMA(size_t period) noexcept
+      : StreamingSingle(detail::TemaKernel(EMA(period))), _ema(period), _period(period)
+  {
+  }
 
   std::vector<double> compute(std::span<const double> input) const
   {
-    auto ema1 = _ema.compute(input);
-    auto ema2 = _ema.compute(std::span<const double>(ema1));
-    auto ema3 = _ema.compute(std::span<const double>(ema2));
-    const size_t n = input.size();
-    std::vector<double> out(n, std::nan(""));
-    for (size_t i = 0; i < n; ++i)
-    {
-      if (!std::isnan(ema1[i]) && !std::isnan(ema2[i]) && !std::isnan(ema3[i]))
-      {
-        out[i] = 3.0 * ema1[i] - 3.0 * ema2[i] + ema3[i];
-      }
-    }
+    std::vector<double> out(input.size(), std::nan(""));
+    fold(detail::TemaKernel(_ema), input, out);
     return out;
   }
 

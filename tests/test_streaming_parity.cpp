@@ -1,17 +1,19 @@
 // tests/test_streaming_parity.cpp
 //
-// Tautology check: every indicator in registry.def exposes both compute() and
-// update()/value(). After feeding the same input through both paths, the last
-// value() must equal compute().back().
+// Every indicator in registry.def exposes both compute() and
+// update()/value(). Feeding the same input through both paths must give the
+// same output at every step, bit for bit: value() after update k equals
+// compute(input)[k] exactly, with NaN matching NaN.
 //
-// This is by-construction parity (compute is reused inside update via mixin),
-// so the test is really proving "the mixin wasn't accidentally short-circuited"
-// -- a broken compute() itself is out of scope here (test_indicators.cpp owns
-// that) and this file cannot see it: the streaming side calls the exact same
-// compute() the batch side does, so both would return the same wrong answer.
-// `expectClose` only skips the numeric comparison on a genuine NaN/NaN pair
-// (both sides agree the window has not filled yet); any other non-finite
-// value fails the assertion instead of being silently folded into "NaN".
+// Both paths run the same per-indicator step kernel (compute() folds a fresh
+// kernel over the input, update() advances the instance's kernel by one
+// step), so any difference means the mixin or a hand-written streaming path
+// diverged from the batch one. A broken compute() itself is out of scope here
+// (test_indicators.cpp owns that).
+//
+// Each case runs twice: on a clean random series and on the same series with
+// NaN sprinkled in, so the NaN contracts (SMA's poisoned window, EMA/RMA/RSI/
+// ATR holding through NaN, ...) are held to the same exactness.
 
 #include "lrvx/indicator/atr.h"
 #include "lrvx/indicator/autocorrelation.h"
@@ -36,7 +38,11 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
 #include <random>
+#include <string>
 #include <vector>
 
 namespace
@@ -79,25 +85,47 @@ Hlc randomHlc(size_t n, uint32_t seed)
   return out;
 }
 
-// Only NaN passes through unmapped -- the legitimate "not enough history
-// yet" sentinel every indicator in this file uses. +-inf does NOT map to
-// NaN here (TD-01: it used to, via std::isfinite() catching both), because
-// inf is never a valid "insufficient window" result for any indicator
-// below; a wrapper bug that divides by an accumulator it forgot to
-// initialize is exactly the kind of thing this file exists to catch, and
-// collapsing it into the same silently-accepted NaN/NaN case as a real
-// warm-up period threw that signal away.
-double finiteOrNaN(double v) { return v; }
-
-void expectClose(double a, double b, const char* msg)
+std::vector<double> withNaNs(std::vector<double> v, uint32_t seed)
 {
-  if (std::isnan(a) && std::isnan(b))
+  std::mt19937 rng(seed);
+  std::uniform_int_distribution<int> pick(0, 9);
+  for (auto& x : v)
+  {
+    if (pick(rng) == 0)
+    {
+      x = std::nan("");
+    }
+  }
+  return v;
+}
+
+Hlc withNaNs(Hlc h, uint32_t seed)
+{
+  h.high = withNaNs(std::move(h.high), seed);
+  h.low = withNaNs(std::move(h.low), seed + 1);
+  h.close = withNaNs(std::move(h.close), seed + 2);
+  return h;
+}
+
+uint64_t bits(double v)
+{
+  uint64_t b;
+  std::memcpy(&b, &v, sizeof b);
+  return b;
+}
+
+// Exact equality on the bit pattern; any NaN equals any NaN.
+void expectSame(double stream, double batch, const char* name, size_t step)
+{
+  if (std::isnan(stream) && std::isnan(batch))
   {
     return;
   }
-  ASSERT_TRUE(std::isfinite(a) && std::isfinite(b)) << msg << ": got " << a << ", " << b;
-  EXPECT_NEAR(a, b, 1e-12) << msg;
+  EXPECT_EQ(bits(stream), bits(batch))
+      << name << " step " << step << ": stream " << stream << " vs batch " << batch;
 }
+
+constexpr size_t kLen = 400;
 
 }  // namespace
 
@@ -106,155 +134,239 @@ using namespace lrvx::indicator;
 // ---- Single input ---------------------------------------------------------
 
 template <typename T, typename... Args>
-void checkSingleParity(const char* name, Args&&... args)
+void checkSingleParityOn(const char* name, const std::vector<double>& input, Args... args)
 {
-  auto input = randomSeries(50, 42);
-  T batch(std::forward<Args>(args)...);
+  T batch(args...);
   auto out = batch.compute(input);
+  ASSERT_EQ(out.size(), input.size());
 
-  T stream(std::forward<Args>(args)...);
-  for (auto v : input)
+  T stream(args...);
+  for (size_t i = 0; i < input.size(); ++i)
   {
-    stream.update(v);
+    stream.update(input[i]);
+    expectSame(stream.value(), out[i], name, i);
+    EXPECT_EQ(stream.ready(), std::isfinite(out[i])) << name << " step " << i;
   }
-
-  expectClose(finiteOrNaN(stream.value()), finiteOrNaN(out.back()), name);
   EXPECT_EQ(stream.count(), input.size());
+
+  // reset() returns to the just-constructed state.
+  stream.reset();
+  EXPECT_EQ(stream.count(), 0u);
+  EXPECT_TRUE(std::isnan(stream.value()));
+  for (size_t i = 0; i < input.size(); ++i)
+  {
+    stream.update(input[i]);
+    expectSame(stream.value(), out[i], name, i);
+  }
 }
 
-TEST(StreamingParity, EMA) { checkSingleParity<EMA>("EMA", 10); }
-TEST(StreamingParity, SMA) { checkSingleParity<SMA>("SMA", 10); }
-TEST(StreamingParity, RMA) { checkSingleParity<RMA>("RMA", 10); }
-TEST(StreamingParity, RSI) { checkSingleParity<RSI>("RSI", 14); }
-TEST(StreamingParity, DEMA) { checkSingleParity<DEMA>("DEMA", 10); }
-TEST(StreamingParity, TEMA) { checkSingleParity<TEMA>("TEMA", 10); }
-TEST(StreamingParity, KAMA) { checkSingleParity<KAMA>("KAMA", 10); }
-TEST(StreamingParity, Slope) { checkSingleParity<Slope>("Slope", 10); }
-TEST(StreamingParity, Skewness) { checkSingleParity<Skewness>("Skewness", 10); }
-TEST(StreamingParity, Kurtosis) { checkSingleParity<Kurtosis>("Kurtosis", 10); }
-TEST(StreamingParity, RollingZScore) { checkSingleParity<RollingZScore>("RollingZScore", 10); }
-TEST(StreamingParity, ShannonEntropy) { checkSingleParity<ShannonEntropy>("ShannonEntropy", 10, 5); }
-TEST(StreamingParity, AutoCorrelation) { checkSingleParity<AutoCorrelation>("AutoCorrelation", 10, 1); }
+template <typename T, typename... Args>
+void checkSingleParity(const char* name, Args... args)
+{
+  auto clean = randomSeries(kLen, 42);
+  checkSingleParityOn<T>(name, clean, args...);
+  checkSingleParityOn<T>(name, withNaNs(clean, 9), args...);
+}
+
+TEST(StreamingParity, EMA) { checkSingleParity<EMA>("EMA", size_t{10}); }
+TEST(StreamingParity, SMA) { checkSingleParity<SMA>("SMA", size_t{10}); }
+TEST(StreamingParity, RMA) { checkSingleParity<RMA>("RMA", size_t{10}); }
+TEST(StreamingParity, RSI) { checkSingleParity<RSI>("RSI", size_t{14}); }
+TEST(StreamingParity, DEMA) { checkSingleParity<DEMA>("DEMA", size_t{10}); }
+TEST(StreamingParity, TEMA) { checkSingleParity<TEMA>("TEMA", size_t{10}); }
+TEST(StreamingParity, KAMA) { checkSingleParity<KAMA>("KAMA", size_t{10}, size_t{2}, size_t{30}); }
+TEST(StreamingParity, Slope) { checkSingleParity<Slope>("Slope", size_t{10}); }
+TEST(StreamingParity, Skewness) { checkSingleParity<Skewness>("Skewness", size_t{10}); }
+TEST(StreamingParity, Kurtosis) { checkSingleParity<Kurtosis>("Kurtosis", size_t{10}); }
+TEST(StreamingParity, RollingZScore) { checkSingleParity<RollingZScore>("RollingZScore", size_t{10}); }
+TEST(StreamingParity, ShannonEntropy)
+{
+  checkSingleParity<ShannonEntropy>("ShannonEntropy", size_t{10}, size_t{5});
+}
+TEST(StreamingParity, AutoCorrelation)
+{
+  checkSingleParity<AutoCorrelation>("AutoCorrelation", size_t{10}, size_t{1});
+}
 
 // ---- Bar input -----------------------------------------------------------
 
 template <typename T, typename... Args>
-void checkBarParity(const char* name, Args&&... args)
+void checkBarParityOn(const char* name, const Hlc& bars, Args... args)
 {
-  auto bars = randomHlc(50, 42);
-  T batch(std::forward<Args>(args)...);
+  T batch(args...);
   auto out = batch.compute(std::span<const double>(bars.high), std::span<const double>(bars.low),
                            std::span<const double>(bars.close));
+  ASSERT_EQ(out.size(), bars.high.size());
 
-  T stream(std::forward<Args>(args)...);
+  T stream(args...);
   for (size_t i = 0; i < bars.high.size(); ++i)
   {
     stream.update(bars.high[i], bars.low[i], bars.close[i]);
+    expectSame(stream.value(), out[i], name, i);
+    EXPECT_EQ(stream.ready(), std::isfinite(out[i])) << name << " step " << i;
   }
-
-  expectClose(finiteOrNaN(stream.value()), finiteOrNaN(out.back()), name);
   EXPECT_EQ(stream.count(), bars.high.size());
 }
 
-TEST(StreamingParity, ATR) { checkBarParity<ATR>("ATR", 14); }
-TEST(StreamingParity, CCI) { checkBarParity<CCI>("CCI", 20); }
+template <typename T, typename... Args>
+void checkBarParity(const char* name, Args... args)
+{
+  auto clean = randomHlc(kLen, 42);
+  checkBarParityOn<T>(name, clean, args...);
+  checkBarParityOn<T>(name, withNaNs(clean, 9), args...);
+}
+
+TEST(StreamingParity, ATR) { checkBarParity<ATR>("ATR", size_t{14}); }
+TEST(StreamingParity, CCI) { checkBarParity<CCI>("CCI", size_t{20}); }
 
 // Stochastic (multi-output bar)
 TEST(StreamingParity, Stochastic)
 {
-  auto bars = randomHlc(50, 42);
-  Stochastic s(14, 3);
-  auto r = s.compute(std::span<const double>(bars.high), std::span<const double>(bars.low),
-                     std::span<const double>(bars.close));
-  Stochastic stream(14, 3);
-  for (size_t i = 0; i < bars.high.size(); ++i)
+  for (const auto& bars : {randomHlc(kLen, 42), withNaNs(randomHlc(kLen, 42), 9)})
   {
-    stream.update(bars.high[i], bars.low[i], bars.close[i]);
+    Stochastic s(14, 3);
+    auto r = s.compute(std::span<const double>(bars.high), std::span<const double>(bars.low),
+                       std::span<const double>(bars.close));
+    Stochastic stream(14, 3);
+    for (size_t i = 0; i < bars.high.size(); ++i)
+    {
+      stream.update(bars.high[i], bars.low[i], bars.close[i]);
+      expectSame(stream.value(), r.k[i], "Stochastic.value", i);
+      expectSame(stream.kValue(), r.k[i], "Stochastic.k", i);
+      expectSame(stream.dValue(), r.d[i], "Stochastic.d", i);
+      EXPECT_EQ(stream.ready(), std::isfinite(r.k[i]) && std::isfinite(r.d[i]));
+    }
+    EXPECT_EQ(stream.count(), bars.high.size());
   }
-  expectClose(finiteOrNaN(stream.kValue()), finiteOrNaN(r.k.back()), "Stochastic.k");
-  expectClose(finiteOrNaN(stream.dValue()), finiteOrNaN(r.d.back()), "Stochastic.d");
 }
 
 // ---- High/Low only -------------------------------------------------------
 
 TEST(StreamingParity, ParkinsonVol)
 {
-  auto bars = randomHlc(50, 42);
-  ParkinsonVol p(14);
-  auto out = p.compute(std::span<const double>(bars.high), std::span<const double>(bars.low));
-  ParkinsonVol stream(14);
-  for (size_t i = 0; i < bars.high.size(); ++i)
+  for (const auto& bars : {randomHlc(kLen, 42), withNaNs(randomHlc(kLen, 42), 9)})
   {
-    stream.update(bars.high[i], bars.low[i]);
+    ParkinsonVol p(14);
+    auto out = p.compute(std::span<const double>(bars.high), std::span<const double>(bars.low));
+    ParkinsonVol stream(14);
+    for (size_t i = 0; i < bars.high.size(); ++i)
+    {
+      stream.update(bars.high[i], bars.low[i]);
+      expectSame(stream.value(), out[i], "ParkinsonVol", i);
+    }
+    EXPECT_EQ(stream.count(), bars.high.size());
   }
-  expectClose(finiteOrNaN(stream.value()), finiteOrNaN(out.back()), "ParkinsonVol");
 }
 
 // ---- OHLC ----------------------------------------------------------------
 
 TEST(StreamingParity, RogersSatchellVol)
 {
-  auto bars = randomHlc(50, 42);
-  std::vector<double> open(bars.high.size());
-  for (size_t i = 0; i < open.size(); ++i)
+  for (const auto& bars : {randomHlc(kLen, 42), withNaNs(randomHlc(kLen, 42), 9)})
   {
-    open[i] = (bars.high[i] + bars.low[i]) * 0.5;  // synthetic
+    std::vector<double> open(bars.high.size());
+    for (size_t i = 0; i < open.size(); ++i)
+    {
+      open[i] = (bars.high[i] + bars.low[i]) * 0.5;  // synthetic
+    }
+    RogersSatchellVol p(14);
+    auto out = p.compute(std::span<const double>(open), std::span<const double>(bars.high),
+                         std::span<const double>(bars.low), std::span<const double>(bars.close));
+    RogersSatchellVol stream(14);
+    for (size_t i = 0; i < bars.high.size(); ++i)
+    {
+      stream.update(open[i], bars.high[i], bars.low[i], bars.close[i]);
+      expectSame(stream.value(), out[i], "RogersSatchellVol", i);
+    }
+    EXPECT_EQ(stream.count(), bars.high.size());
   }
-  RogersSatchellVol p(14);
-  auto out = p.compute(std::span<const double>(open), std::span<const double>(bars.high),
-                       std::span<const double>(bars.low), std::span<const double>(bars.close));
-  RogersSatchellVol stream(14);
-  for (size_t i = 0; i < bars.high.size(); ++i)
-  {
-    stream.update(open[i], bars.high[i], bars.low[i], bars.close[i]);
-  }
-  expectClose(finiteOrNaN(stream.value()), finiteOrNaN(out.back()), "RogersSatchellVol");
 }
 
 // ---- Pair ----------------------------------------------------------------
 
 TEST(StreamingParity, Correlation)
 {
-  auto x = randomSeries(50, 42);
-  auto y = randomSeries(50, 7);
-  Correlation c(10);
-  auto out = c.compute(std::span<const double>(x), std::span<const double>(y));
-  Correlation stream(10);
-  for (size_t i = 0; i < x.size(); ++i)
+  for (bool nans : {false, true})
   {
-    stream.update(x[i], y[i]);
+    auto x = randomSeries(kLen, 42);
+    auto y = randomSeries(kLen, 7);
+    if (nans)
+    {
+      x = withNaNs(x, 9);
+      y = withNaNs(y, 10);
+    }
+    Correlation c(10);
+    auto out = c.compute(std::span<const double>(x), std::span<const double>(y));
+    Correlation stream(10);
+    for (size_t i = 0; i < x.size(); ++i)
+    {
+      stream.update(x[i], y[i]);
+      expectSame(stream.value(), out[i], "Correlation", i);
+    }
+    EXPECT_EQ(stream.count(), x.size());
   }
-  expectClose(finiteOrNaN(stream.value()), finiteOrNaN(out.back()), "Correlation");
 }
 
 // ---- Multi-output single input -------------------------------------------
 
 TEST(StreamingParity, MACD)
 {
-  auto input = randomSeries(50, 42);
-  MACD m(5, 10, 4);
-  auto r = m.compute(std::span<const double>(input));
-  MACD stream(5, 10, 4);
-  for (auto v : input)
+  for (const auto& input : {randomSeries(kLen, 42), withNaNs(randomSeries(kLen, 42), 9)})
   {
-    stream.update(v);
+    MACD m(5, 10, 4);
+    auto r = m.compute(std::span<const double>(input));
+    MACD stream(5, 10, 4);
+    for (size_t i = 0; i < input.size(); ++i)
+    {
+      stream.update(input[i]);
+      expectSame(stream.value(), r.line[i], "MACD.line", i);
+      expectSame(stream.signalValue(), r.signal[i], "MACD.signal", i);
+      expectSame(stream.histogramValue(), r.histogram[i], "MACD.hist", i);
+      EXPECT_EQ(stream.ready(), std::isfinite(r.line[i]));
+    }
+    EXPECT_EQ(stream.count(), input.size());
   }
-  expectClose(finiteOrNaN(stream.value()), finiteOrNaN(r.line.back()), "MACD.line");
-  expectClose(finiteOrNaN(stream.signalValue()), finiteOrNaN(r.signal.back()), "MACD.signal");
-  expectClose(finiteOrNaN(stream.histogramValue()), finiteOrNaN(r.histogram.back()), "MACD.hist");
 }
 
 TEST(StreamingParity, Bollinger)
 {
-  auto input = randomSeries(50, 42);
-  Bollinger b(10, 2.0);
-  auto r = b.compute(std::span<const double>(input));
-  Bollinger stream(10, 2.0);
-  for (auto v : input)
+  for (const auto& input : {randomSeries(kLen, 42), withNaNs(randomSeries(kLen, 42), 9)})
   {
-    stream.update(v);
+    Bollinger b(10, 2.0);
+    auto r = b.compute(std::span<const double>(input));
+    Bollinger stream(10, 2.0);
+    for (size_t i = 0; i < input.size(); ++i)
+    {
+      stream.update(input[i]);
+      expectSame(stream.value(), r.middle[i], "Bollinger.value", i);
+      expectSame(stream.middleValue(), r.middle[i], "Bollinger.middle", i);
+      expectSame(stream.upperValue(), r.upper[i], "Bollinger.upper", i);
+      expectSame(stream.lowerValue(), r.lower[i], "Bollinger.lower", i);
+      EXPECT_EQ(stream.ready(), std::isfinite(r.middle[i]));
+    }
+    EXPECT_EQ(stream.count(), input.size());
   }
-  expectClose(finiteOrNaN(stream.middleValue()), finiteOrNaN(r.middle.back()), "Bollinger.middle");
-  expectClose(finiteOrNaN(stream.upperValue()), finiteOrNaN(r.upper.back()), "Bollinger.upper");
-  expectClose(finiteOrNaN(stream.lowerValue()), finiteOrNaN(r.lower.back()), "Bollinger.lower");
+}
+
+// ---- Registry coverage -----------------------------------------------------
+
+// Every registry row must have a case above; a new row without one fails here.
+TEST(StreamingParity, CoversEveryRegistryRow)
+{
+  const std::vector<std::string> covered = {
+      "EMA", "SMA", "RMA", "RSI", "KAMA",
+      "DEMA", "TEMA", "Slope", "Skewness", "Kurtosis",
+      "RollingZScore", "ShannonEntropy", "AutoCorrelation",
+      "ATR", "CCI", "Stochastic", "ParkinsonVol", "RogersSatchellVol",
+      "Correlation", "MACD", "Bollinger"};
+  std::vector<std::string> registry;
+#define LRVX_INDICATOR(Cls, name, Kind, Args) registry.emplace_back(#Cls);
+#include "lrvx/indicator/registry.def"
+#undef LRVX_INDICATOR
+  for (const auto& r : registry)
+  {
+    EXPECT_NE(std::find(covered.begin(), covered.end(), r), covered.end())
+        << r << " is in registry.def but has no parity case";
+  }
+  EXPECT_EQ(registry.size(), covered.size());
 }

@@ -2,423 +2,266 @@
 
 // lrvx/indicator/streaming.h
 //
-// CRTP mixins that give any compute()-providing indicator a streaming API
-// (update / value / ready / reset / count) on the *same* class.
+// CRTP mixins that give an indicator a streaming API (update / value / ready /
+// reset / count) on the same class that provides batch compute().
 //
-// Design contract:
+// Contract:
 //
-//   - One class per indicator. Same name as before. Same compute() as before.
-//   - Inheriting from the appropriate Streaming<Kind><Derived> mixin adds
-//     streaming methods that work by accumulating history and re-running
-//     compute() on it. value() == compute(history).back().
-//   - This guarantees batch ↔ streaming parity by construction; no separate
-//     ring buffer / alpha / seed logic to drift.
+//   - The step is the primitive. Each indicator defines a small state object,
+//     its kernel, whose step() takes one input (or one bar's inputs) and
+//     returns the indicator's output at that position, NaN while not ready.
+//   - update() advances the instance's kernel by exactly one step and stores
+//     the result. value() and ready() read that stored result. No input
+//     history is kept: the kernel holds only what its window needs (at most a
+//     ring buffer of the last `period` inputs), all allocated when the
+//     indicator is constructed.
+//   - compute(span...) builds a fresh kernel and folds it over the input.
+//     Batch and streaming run the same step, so value() after k updates
+//     equals compute(input)[k - 1] bit for bit.
 //
-// Cost: O(N) per update where N = accumulated history. Acceptable for
-// research / UI / moderate-throughput live trading. For high-frequency: use
-// compute(span) directly. Specific indicators may later override update() with
-// O(1) state-keeping IF they keep value() output identical (parity test must
-// pass).
+// Cost per update is O(1) for the recursive indicators (SMA, EMA, RMA, RSI,
+// DEMA, TEMA, Slope, ATR, MACD) and O(period) for the ones that recompute
+// their window on every step to keep the exact numerics of a two-pass
+// computation (the rolling moments, correlation, entropy, range and
+// volatility estimators). It never depends on how many values the indicator
+// has already seen.
 
 #include <cmath>
+#include <cstddef>
 #include <span>
+#include <utility>
 #include <vector>
+
+// Kernel step() functions are kept out of line. compute() and update() then
+// run the same machine code for a step, so batch and streaming agree bit for
+// bit in every build, not just at the source level: the compiler may fuse a
+// multiply-add (a * b + c) into one FMA or not depending on the surrounding
+// code, and an inlined step could round differently in the batch loop than in
+// a binding's update() call.
+#if defined(_MSC_VER) && !defined(__clang__)
+#define LRVX_INDICATOR_STEP __declspec(noinline)
+#else
+#define LRVX_INDICATOR_STEP __attribute__((noinline))
+#endif
+
+// Marks a window loop that must not be unrolled. Unrolling lets clang split
+// some of the loop's contracted multiply-adds back into a multiply and an add,
+// which changes the last bits of the result relative to the batch loops these
+// kernels replaced.
+#if defined(__clang__)
+#define LRVX_INDICATOR_NO_UNROLL _Pragma("clang loop unroll(disable)")
+#else
+#define LRVX_INDICATOR_NO_UNROLL
+#endif
 
 namespace lrvx::indicator
 {
 
-// -----------------------------------------------------------------------------
-// SingleInput — compute(span) -> vector<double>
-// -----------------------------------------------------------------------------
-template <typename Derived>
-class StreamingSingle
+namespace detail
+{
+
+// Fixed-capacity ring of the last `capacity` values. Every value is written
+// twice, at `head` and `head + capacity`, so the last `capacity` values are
+// always one contiguous oldest-to-newest span and window loops need no index
+// wrapping. window() is meaningful once full(); before that its leading slots
+// hold zeros. Memory is allocated once, in the constructor.
+class Ring
 {
  public:
-  void update(double v)
+  explicit Ring(size_t capacity) : _cap(capacity), _buf(2 * capacity, 0.0) {}
+
+  void push(double v) noexcept
   {
-    _history.push_back(v);
-    _dirty = true;
+    if (_cap == 0)
+    {
+      return;
+    }
+    _buf[_head] = v;
+    _buf[_head + _cap] = v;
+    _head = (_head + 1 == _cap) ? 0 : _head + 1;
+    if (_size < _cap)
+    {
+      ++_size;
+    }
   }
 
-  double value() const
+  // Oldest value still held (the one the next push() evicts once full).
+  double oldest() const noexcept { return _buf[_head]; }
+
+  // The last capacity() values, oldest first.
+  std::span<const double> window() const noexcept
   {
-    ensureFresh();
-    return _last;
+    return std::span<const double>(_buf.data() + _head, _cap);
   }
 
-  bool ready() const
+  size_t size() const noexcept { return _size; }
+  size_t capacity() const noexcept { return _cap; }
+  bool full() const noexcept { return _size == _cap; }
+
+  void clear() noexcept
   {
-    ensureFresh();
-    return std::isfinite(_last);
+    _head = 0;
+    _size = 0;
   }
+
+ private:
+  size_t _cap;
+  std::vector<double> _buf;
+  size_t _head = 0;
+  size_t _size = 0;
+};
+
+// Shared state of every single-value streaming mixin.
+template <typename Kernel>
+class StreamingCore
+{
+ public:
+  double value() const noexcept { return _last; }
+  bool ready() const noexcept { return std::isfinite(_last); }
 
   void reset()
   {
-    _history.clear();
+    _kernel.reset();
     _last = std::nan("");
-    _dirty = false;
+    _count = 0;
   }
 
-  size_t count() const noexcept { return _history.size(); }
+  size_t count() const noexcept { return _count; }
 
  protected:
-  const std::vector<double>& streamHistory() const noexcept { return _history; }
+  explicit StreamingCore(Kernel kernel) : _kernel(std::move(kernel)) {}
+
+  template <typename... In>
+  void advance(In... in)
+  {
+    _last = _kernel.step(in...);
+    ++_count;
+  }
 
  private:
-  void ensureFresh() const
-  {
-    if (!_dirty)
-    {
-      return;
-    }
-    if (_history.empty())
-    {
-      _last = std::nan("");
-    }
-    else
-    {
-      auto out = static_cast<const Derived*>(this)->compute(
-          std::span<const double>(_history));
-      _last = out.empty() ? std::nan("") : out.back();
-    }
-    _dirty = false;
-  }
-
-  std::vector<double> _history;
-  mutable double _last = std::nan("");
-  mutable bool _dirty = false;
+  Kernel _kernel;
+  double _last = std::nan("");
+  size_t _count = 0;
 };
 
+}  // namespace detail
+
 // -----------------------------------------------------------------------------
-// BarInput — compute(high, low, close) -> vector<double>
+// SingleInput: compute(span) -> vector<double>; Kernel::step(double)
 // -----------------------------------------------------------------------------
-template <typename Derived>
-class StreamingBar
+template <typename Derived, typename Kernel>
+class StreamingSingle : public detail::StreamingCore<Kernel>
 {
  public:
-  void update(double high, double low, double close)
-  {
-    _high.push_back(high);
-    _low.push_back(low);
-    _close.push_back(close);
-    _dirty = true;
-  }
-
-  double value() const
-  {
-    ensureFresh();
-    return _last;
-  }
-
-  bool ready() const
-  {
-    ensureFresh();
-    return std::isfinite(_last);
-  }
-
-  void reset()
-  {
-    _high.clear();
-    _low.clear();
-    _close.clear();
-    _last = std::nan("");
-    _dirty = false;
-  }
-
-  size_t count() const noexcept { return _high.size(); }
+  void update(double v) { this->advance(v); }
 
  protected:
-  const std::vector<double>& streamHigh() const noexcept { return _high; }
-  const std::vector<double>& streamLow() const noexcept { return _low; }
-  const std::vector<double>& streamClose() const noexcept { return _close; }
+  explicit StreamingSingle(Kernel kernel) : detail::StreamingCore<Kernel>(std::move(kernel)) {}
 
- private:
-  void ensureFresh() const
+  // Runs `kernel` (fresh) over `input`, writing one output per input.
+  static void fold(Kernel kernel, std::span<const double> input, std::span<double> output)
   {
-    if (!_dirty)
+    for (size_t i = 0; i < input.size(); ++i)
     {
-      return;
+      output[i] = kernel.step(input[i]);
     }
-    if (_high.empty())
-    {
-      _last = std::nan("");
-    }
-    else
-    {
-      auto out = static_cast<const Derived*>(this)->compute(
-          std::span<const double>(_high), std::span<const double>(_low),
-          std::span<const double>(_close));
-      _last = out.empty() ? std::nan("") : out.back();
-    }
-    _dirty = false;
   }
-
-  std::vector<double> _high, _low, _close;
-  mutable double _last = std::nan("");
-  mutable bool _dirty = false;
 };
 
 // -----------------------------------------------------------------------------
-// HighLowInput — compute(high, low) -> vector<double>  (or via output buffer)
+// BarInput: compute(high, low, close) -> vector<double>; Kernel::step(h, l, c)
 // -----------------------------------------------------------------------------
-template <typename Derived>
-class StreamingHighLow
+template <typename Derived, typename Kernel>
+class StreamingBar : public detail::StreamingCore<Kernel>
 {
  public:
-  void update(double high, double low)
-  {
-    _high.push_back(high);
-    _low.push_back(low);
-    _dirty = true;
-  }
+  void update(double high, double low, double close) { this->advance(high, low, close); }
 
-  double value() const
-  {
-    ensureFresh();
-    return _last;
-  }
+ protected:
+  explicit StreamingBar(Kernel kernel) : detail::StreamingCore<Kernel>(std::move(kernel)) {}
 
-  bool ready() const
+  static void fold(Kernel kernel, std::span<const double> high, std::span<const double> low,
+                   std::span<const double> close, std::span<double> output)
   {
-    ensureFresh();
-    return std::isfinite(_last);
-  }
-
-  void reset()
-  {
-    _high.clear();
-    _low.clear();
-    _last = std::nan("");
-    _dirty = false;
-  }
-
-  size_t count() const noexcept { return _high.size(); }
-
- private:
-  void ensureFresh() const
-  {
-    if (!_dirty)
+    for (size_t i = 0; i < high.size(); ++i)
     {
-      return;
+      output[i] = kernel.step(high[i], low[i], close[i]);
     }
-    if (_high.empty())
-    {
-      _last = std::nan("");
-    }
-    else
-    {
-      auto out = static_cast<const Derived*>(this)->compute(
-          std::span<const double>(_high), std::span<const double>(_low));
-      _last = out.empty() ? std::nan("") : out.back();
-    }
-    _dirty = false;
   }
-
-  std::vector<double> _high, _low;
-  mutable double _last = std::nan("");
-  mutable bool _dirty = false;
 };
 
 // -----------------------------------------------------------------------------
-// OhlcInput — compute(open, high, low, close) -> vector<double>
+// HighLowInput: compute(high, low) -> vector<double>; Kernel::step(h, l)
 // -----------------------------------------------------------------------------
-template <typename Derived>
-class StreamingOhlc
+template <typename Derived, typename Kernel>
+class StreamingHighLow : public detail::StreamingCore<Kernel>
+{
+ public:
+  void update(double high, double low) { this->advance(high, low); }
+
+ protected:
+  explicit StreamingHighLow(Kernel kernel) : detail::StreamingCore<Kernel>(std::move(kernel)) {}
+
+  static void fold(Kernel kernel, std::span<const double> high, std::span<const double> low,
+                   std::span<double> output)
+  {
+    for (size_t i = 0; i < high.size(); ++i)
+    {
+      output[i] = kernel.step(high[i], low[i]);
+    }
+  }
+};
+
+// -----------------------------------------------------------------------------
+// OhlcInput: compute(open, high, low, close) -> vector<double>;
+// Kernel::step(o, h, l, c)
+// -----------------------------------------------------------------------------
+template <typename Derived, typename Kernel>
+class StreamingOhlc : public detail::StreamingCore<Kernel>
 {
  public:
   void update(double open, double high, double low, double close)
   {
-    _o.push_back(open);
-    _h.push_back(high);
-    _l.push_back(low);
-    _c.push_back(close);
-    _dirty = true;
+    this->advance(open, high, low, close);
   }
-
-  double value() const
-  {
-    ensureFresh();
-    return _last;
-  }
-
-  bool ready() const
-  {
-    ensureFresh();
-    return std::isfinite(_last);
-  }
-
-  void reset()
-  {
-    _o.clear();
-    _h.clear();
-    _l.clear();
-    _c.clear();
-    _last = std::nan("");
-    _dirty = false;
-  }
-
-  size_t count() const noexcept { return _o.size(); }
-
- private:
-  void ensureFresh() const
-  {
-    if (!_dirty)
-    {
-      return;
-    }
-    if (_o.empty())
-    {
-      _last = std::nan("");
-    }
-    else
-    {
-      auto out = static_cast<const Derived*>(this)->compute(
-          std::span<const double>(_o), std::span<const double>(_h),
-          std::span<const double>(_l), std::span<const double>(_c));
-      _last = out.empty() ? std::nan("") : out.back();
-    }
-    _dirty = false;
-  }
-
-  std::vector<double> _o, _h, _l, _c;
-  mutable double _last = std::nan("");
-  mutable bool _dirty = false;
-};
-
-// -----------------------------------------------------------------------------
-// PairInput — compute(x, y) -> vector<double>   (e.g. Correlation)
-// -----------------------------------------------------------------------------
-template <typename Derived>
-class StreamingPair
-{
- public:
-  void update(double x, double y)
-  {
-    _x.push_back(x);
-    _y.push_back(y);
-    _dirty = true;
-  }
-
-  double value() const
-  {
-    ensureFresh();
-    return _last;
-  }
-
-  bool ready() const
-  {
-    ensureFresh();
-    return std::isfinite(_last);
-  }
-
-  void reset()
-  {
-    _x.clear();
-    _y.clear();
-    _last = std::nan("");
-    _dirty = false;
-  }
-
-  size_t count() const noexcept { return _x.size(); }
-
- private:
-  void ensureFresh() const
-  {
-    if (!_dirty)
-    {
-      return;
-    }
-    if (_x.empty())
-    {
-      _last = std::nan("");
-    }
-    else
-    {
-      auto out = static_cast<const Derived*>(this)->compute(
-          std::span<const double>(_x), std::span<const double>(_y));
-      _last = out.empty() ? std::nan("") : out.back();
-    }
-    _dirty = false;
-  }
-
-  std::vector<double> _x, _y;
-  mutable double _last = std::nan("");
-  mutable bool _dirty = false;
-};
-
-// -----------------------------------------------------------------------------
-// MultiOutput on single-input — compute(span) -> Result struct
-//
-// Result must expose `line` (or `middle`) `signal` / `histogram` / `upper` /
-// `lower` as vector<double>. Mixin requires Derived to provide:
-//   using ResultT = ...;
-//   ResultT compute(span) const;
-//   static double primary(const ResultT&);          // value()
-//   static double named(const ResultT&, std::string_view)  // optional
-//
-// We keep streaming generic with a primary() function pointer; named getters
-// can be added per-indicator on the public class.
-// -----------------------------------------------------------------------------
-template <typename Derived, typename Result>
-class StreamingMultiOutputSingle
-{
- public:
-  void update(double v)
-  {
-    _history.push_back(v);
-    _dirty = true;
-  }
-
-  const Result& result() const
-  {
-    ensureFresh();
-    return _last;
-  }
-
-  bool ready() const
-  {
-    ensureFresh();
-    return _hasValue;
-  }
-
-  void reset()
-  {
-    _history.clear();
-    _last = Result{};
-    _dirty = false;
-    _hasValue = false;
-  }
-
-  size_t count() const noexcept { return _history.size(); }
 
  protected:
-  const std::vector<double>& streamHistory() const noexcept { return _history; }
+  explicit StreamingOhlc(Kernel kernel) : detail::StreamingCore<Kernel>(std::move(kernel)) {}
 
- private:
-  void ensureFresh() const
+  static void fold(Kernel kernel, std::span<const double> open, std::span<const double> high,
+                   std::span<const double> low, std::span<const double> close,
+                   std::span<double> output)
   {
-    if (!_dirty)
+    for (size_t i = 0; i < open.size(); ++i)
     {
-      return;
+      output[i] = kernel.step(open[i], high[i], low[i], close[i]);
     }
-    if (_history.empty())
-    {
-      _last = Result{};
-      _hasValue = false;
-    }
-    else
-    {
-      _last = static_cast<const Derived*>(this)->compute(
-          std::span<const double>(_history));
-      _hasValue = !_last.line.empty() && std::isfinite(_last.line.back());
-    }
-    _dirty = false;
   }
-
-  std::vector<double> _history;
-  mutable Result _last;
-  mutable bool _dirty = false;
-  mutable bool _hasValue = false;
 };
+
+// -----------------------------------------------------------------------------
+// PairInput: compute(x, y) -> vector<double>; Kernel::step(x, y)
+// -----------------------------------------------------------------------------
+template <typename Derived, typename Kernel>
+class StreamingPair : public detail::StreamingCore<Kernel>
+{
+ public:
+  void update(double x, double y) { this->advance(x, y); }
+
+ protected:
+  explicit StreamingPair(Kernel kernel) : detail::StreamingCore<Kernel>(std::move(kernel)) {}
+
+  static void fold(Kernel kernel, std::span<const double> x, std::span<const double> y,
+                   std::span<double> output)
+  {
+    for (size_t i = 0; i < x.size(); ++i)
+    {
+      output[i] = kernel.step(x[i], y[i]);
+    }
+  }
+};
+
+// Multi-output indicators (MACD, Bollinger, Stochastic) hold their kernel
+// directly and expose one getter per output; see those headers.
 
 }  // namespace lrvx::indicator

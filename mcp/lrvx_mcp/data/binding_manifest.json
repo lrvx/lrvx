@@ -11415,6 +11415,11 @@
           "name": "AtomicLoggerOptions"
         },
         {
+          "header": "include/lrvx/indicator/atr.h",
+          "kind": "type",
+          "name": "AtrKernel"
+        },
+        {
           "header": "include/lrvx/strategy/exits.h",
           "kind": "type",
           "name": "AtrStop"
@@ -11423,6 +11428,11 @@
           "header": "include/lrvx/indicator/autocorrelation.h",
           "kind": "type",
           "name": "AutoCorrelation"
+        },
+        {
+          "header": "include/lrvx/indicator/autocorrelation.h",
+          "kind": "type",
+          "name": "AutoCorrelationKernel"
         },
         {
           "header": "include/lrvx/backtest/backtest_config.h",
@@ -11533,6 +11543,11 @@
           "header": "include/lrvx/indicator/bollinger.h",
           "kind": "type",
           "name": "Bollinger"
+        },
+        {
+          "header": "include/lrvx/indicator/bollinger.h",
+          "kind": "type",
+          "name": "BollingerKernel"
         },
         {
           "header": "include/lrvx/indicator/bollinger.h",
@@ -11650,6 +11665,11 @@
           "name": "CancelRequest"
         },
         {
+          "header": "include/lrvx/indicator/cci.h",
+          "kind": "type",
+          "name": "CciKernel"
+        },
+        {
           "header": "include/lrvx/strategy/exits.h",
           "kind": "type",
           "name": "ChandelierExit"
@@ -11733,6 +11753,11 @@
           "header": "include/lrvx/indicator/correlation.h",
           "kind": "type",
           "name": "Correlation"
+        },
+        {
+          "header": "include/lrvx/indicator/correlation.h",
+          "kind": "type",
+          "name": "CorrelationKernel"
         },
         {
           "header": "include/lrvx/position/hedge_cost.h",
@@ -11823,6 +11848,11 @@
           "header": "include/lrvx/position/delta_hedger.h",
           "kind": "type",
           "name": "DeltaHedger"
+        },
+        {
+          "header": "include/lrvx/indicator/dema.h",
+          "kind": "type",
+          "name": "DemaKernel"
         },
         {
           "header": "include/lrvx/pricing/carry.h",
@@ -11928,6 +11958,11 @@
           "header": "include/lrvx/execution/execution_tracker_adapter.h",
           "kind": "type",
           "name": "ExecutionTrackerAdapter"
+        },
+        {
+          "header": "include/lrvx/indicator/ema.h",
+          "kind": "type",
+          "name": "ExpSmoothingKernel"
         },
         {
           "header": "include/lrvx/backtest/latency_model.h",
@@ -12355,9 +12390,19 @@
           "name": "KAMA"
         },
         {
+          "header": "include/lrvx/indicator/kama.h",
+          "kind": "type",
+          "name": "KamaKernel"
+        },
+        {
           "header": "include/lrvx/indicator/kurtosis.h",
           "kind": "type",
           "name": "Kurtosis"
+        },
+        {
+          "header": "include/lrvx/indicator/kurtosis.h",
+          "kind": "type",
+          "name": "KurtosisKernel"
         },
         {
           "header": "include/lrvx/book/l3/l3_order_book.h",
@@ -12478,6 +12523,11 @@
           "header": "include/lrvx/indicator/macd.h",
           "kind": "type",
           "name": "MACD"
+        },
+        {
+          "header": "include/lrvx/indicator/macd.h",
+          "kind": "type",
+          "name": "MacdKernel"
         },
         {
           "header": "include/lrvx/indicator/macd.h",
@@ -12820,6 +12870,11 @@
           "name": "ParkinsonVol"
         },
         {
+          "header": "include/lrvx/indicator/parkinson_vol.h",
+          "kind": "type",
+          "name": "ParkinsonVolKernel"
+        },
+        {
           "header": "include/lrvx/replay/ops/partitioner.h",
           "kind": "type",
           "name": "Partition"
@@ -13100,6 +13155,11 @@
           "name": "RestingOrder"
         },
         {
+          "header": "include/lrvx/indicator/streaming.h",
+          "kind": "type",
+          "name": "Ring"
+        },
+        {
           "header": "include/lrvx/risk/portfolio_risk.h",
           "kind": "type",
           "name": "RiskRules"
@@ -13110,9 +13170,24 @@
           "name": "RogersSatchellVol"
         },
         {
+          "header": "include/lrvx/indicator/rogers_satchell_vol.h",
+          "kind": "type",
+          "name": "RogersSatchellVolKernel"
+        },
+        {
           "header": "include/lrvx/indicator/rolling_zscore.h",
           "kind": "type",
           "name": "RollingZScore"
+        },
+        {
+          "header": "include/lrvx/indicator/rolling_zscore.h",
+          "kind": "type",
+          "name": "RollingZScoreKernel"
+        },
+        {
+          "header": "include/lrvx/indicator/rsi.h",
+          "kind": "type",
+          "name": "RsiKernel"
         },
         {
           "header": "include/lrvx/util/performance/rt_spin_guard.h",
@@ -13205,6 +13280,11 @@
           "name": "ShannonEntropy"
         },
         {
+          "header": "include/lrvx/indicator/shannon_entropy.h",
+          "kind": "type",
+          "name": "ShannonEntropyKernel"
+        },
+        {
           "header": "include/lrvx/strategy/signal.h",
           "kind": "type",
           "name": "Signal"
@@ -13230,6 +13310,11 @@
           "name": "Skewness"
         },
         {
+          "header": "include/lrvx/indicator/skewness.h",
+          "kind": "type",
+          "name": "SkewnessKernel"
+        },
+        {
           "header": "include/lrvx/backtest/backtest_config.h",
           "kind": "type",
           "name": "SlippageProfile"
@@ -13238,6 +13323,16 @@
           "header": "include/lrvx/indicator/slope.h",
           "kind": "type",
           "name": "Slope"
+        },
+        {
+          "header": "include/lrvx/indicator/slope.h",
+          "kind": "type",
+          "name": "SlopeKernel"
+        },
+        {
+          "header": "include/lrvx/indicator/sma.h",
+          "kind": "type",
+          "name": "SmaKernel"
         },
         {
           "header": "include/lrvx/replay/ops/segment_ops.h",
@@ -13282,6 +13377,11 @@
         {
           "header": "include/lrvx/indicator/stochastic.h",
           "kind": "type",
+          "name": "StochasticKernel"
+        },
+        {
+          "header": "include/lrvx/indicator/stochastic.h",
+          "kind": "type",
           "name": "StochasticResult"
         },
         {
@@ -13312,12 +13412,12 @@
         {
           "header": "include/lrvx/indicator/streaming.h",
           "kind": "type",
-          "name": "StreamingHighLow"
+          "name": "StreamingCore"
         },
         {
           "header": "include/lrvx/indicator/streaming.h",
           "kind": "type",
-          "name": "StreamingMultiOutputSingle"
+          "name": "StreamingHighLow"
         },
         {
           "header": "include/lrvx/indicator/streaming.h",
@@ -13398,6 +13498,11 @@
           "header": "include/lrvx/run/trace_recorder.h",
           "kind": "type",
           "name": "TapeRef"
+        },
+        {
+          "header": "include/lrvx/indicator/dema.h",
+          "kind": "type",
+          "name": "TemaKernel"
         },
         {
           "header": "include/lrvx/util/performance/thread_affinity.h",
@@ -14071,6 +14176,16 @@
         },
         {
           "kind": "method",
+          "name": "reset",
+          "parent": "AtrKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "AtrKernel"
+        },
+        {
+          "kind": "method",
           "name": "arm",
           "parent": "AtrStop"
         },
@@ -14118,6 +14233,16 @@
           "kind": "method",
           "name": "window",
           "parent": "AutoCorrelation"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "AutoCorrelationKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "AutoCorrelationKernel"
         },
         {
           "kind": "method",
@@ -15186,6 +15311,11 @@
         },
         {
           "kind": "method",
+          "name": "nanOut",
+          "parent": "Bollinger"
+        },
+        {
+          "kind": "method",
           "name": "period",
           "parent": "Bollinger"
         },
@@ -15196,17 +15326,7 @@
         },
         {
           "kind": "method",
-          "name": "refresh",
-          "parent": "Bollinger"
-        },
-        {
-          "kind": "method",
           "name": "reset",
-          "parent": "Bollinger"
-        },
-        {
-          "kind": "method",
-          "name": "tail",
           "parent": "Bollinger"
         },
         {
@@ -15223,6 +15343,16 @@
           "kind": "method",
           "name": "value",
           "parent": "Bollinger"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "BollingerKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "BollingerKernel"
         },
         {
           "kind": "method",
@@ -15613,6 +15743,16 @@
           "kind": "method",
           "name": "position",
           "parent": "CachedPositionState"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "CciKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "CciKernel"
         },
         {
           "kind": "method",
@@ -16131,6 +16271,16 @@
         },
         {
           "kind": "method",
+          "name": "reset",
+          "parent": "CorrelationKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "CorrelationKernel"
+        },
+        {
+          "kind": "method",
           "name": "total",
           "parent": "CostOfHedge"
         },
@@ -16631,6 +16781,16 @@
         },
         {
           "kind": "method",
+          "name": "reset",
+          "parent": "DemaKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "DemaKernel"
+        },
+        {
+          "kind": "method",
           "name": "bsPrice",
           "parent": "Dividend"
         },
@@ -16641,7 +16801,17 @@
         },
         {
           "kind": "method",
+          "name": "alphaFor",
+          "parent": "EMA"
+        },
+        {
+          "kind": "method",
           "name": "compute",
+          "parent": "EMA"
+        },
+        {
+          "kind": "method",
+          "name": "kernel",
           "parent": "EMA"
         },
         {
@@ -17178,6 +17348,16 @@
           "kind": "method",
           "name": "onOrderSubmitted",
           "parent": "ExecutionTrackerAdapter"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "ExpSmoothingKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "ExpSmoothingKernel"
         },
         {
           "kind": "method",
@@ -18851,6 +19031,16 @@
         },
         {
           "kind": "method",
+          "name": "reset",
+          "parent": "KamaKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "KamaKernel"
+        },
+        {
+          "kind": "method",
           "name": "compute",
           "parent": "Kurtosis"
         },
@@ -18858,6 +19048,16 @@
           "kind": "method",
           "name": "period",
           "parent": "Kurtosis"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "KurtosisKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "KurtosisKernel"
         },
         {
           "kind": "method",
@@ -19851,17 +20051,17 @@
         },
         {
           "kind": "method",
+          "name": "nanOut",
+          "parent": "MACD"
+        },
+        {
+          "kind": "method",
           "name": "period",
           "parent": "MACD"
         },
         {
           "kind": "method",
           "name": "ready",
-          "parent": "MACD"
-        },
-        {
-          "kind": "method",
-          "name": "refresh",
           "parent": "MACD"
         },
         {
@@ -19876,11 +20076,6 @@
         },
         {
           "kind": "method",
-          "name": "tail",
-          "parent": "MACD"
-        },
-        {
-          "kind": "method",
           "name": "update",
           "parent": "MACD"
         },
@@ -19888,6 +20083,16 @@
           "kind": "method",
           "name": "value",
           "parent": "MACD"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "MacdKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "MacdKernel"
         },
         {
           "kind": "method",
@@ -22011,6 +22216,16 @@
         },
         {
           "kind": "method",
+          "name": "reset",
+          "parent": "ParkinsonVolKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "ParkinsonVolKernel"
+        },
+        {
+          "kind": "method",
           "name": "hasSymbolFilter",
           "parent": "Partition"
         },
@@ -22781,6 +22996,11 @@
         },
         {
           "kind": "method",
+          "name": "kernelFor",
+          "parent": "RMA"
+        },
+        {
+          "kind": "method",
           "name": "period",
           "parent": "RMA"
         },
@@ -23306,6 +23526,41 @@
         },
         {
           "kind": "method",
+          "name": "capacity",
+          "parent": "Ring"
+        },
+        {
+          "kind": "method",
+          "name": "clear",
+          "parent": "Ring"
+        },
+        {
+          "kind": "method",
+          "name": "full",
+          "parent": "Ring"
+        },
+        {
+          "kind": "method",
+          "name": "oldest",
+          "parent": "Ring"
+        },
+        {
+          "kind": "method",
+          "name": "push",
+          "parent": "Ring"
+        },
+        {
+          "kind": "method",
+          "name": "size",
+          "parent": "Ring"
+        },
+        {
+          "kind": "method",
+          "name": "window",
+          "parent": "Ring"
+        },
+        {
+          "kind": "method",
           "name": "compute",
           "parent": "RogersSatchellVol"
         },
@@ -23316,6 +23571,16 @@
         },
         {
           "kind": "method",
+          "name": "reset",
+          "parent": "RogersSatchellVolKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "RogersSatchellVolKernel"
+        },
+        {
+          "kind": "method",
           "name": "compute",
           "parent": "RollingZScore"
         },
@@ -23323,6 +23588,31 @@
           "kind": "method",
           "name": "period",
           "parent": "RollingZScore"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "RollingZScoreKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "RollingZScoreKernel"
+        },
+        {
+          "kind": "method",
+          "name": "accumulateSeed",
+          "parent": "RsiKernel"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "RsiKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "RsiKernel"
         },
         {
           "kind": "method",
@@ -23738,6 +24028,16 @@
           "kind": "method",
           "name": "period",
           "parent": "ShannonEntropy"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "ShannonEntropyKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "ShannonEntropyKernel"
         },
         {
           "kind": "method",
@@ -24506,6 +24806,16 @@
         },
         {
           "kind": "method",
+          "name": "reset",
+          "parent": "SkewnessKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "SkewnessKernel"
+        },
+        {
+          "kind": "method",
           "name": "compute",
           "parent": "Slope"
         },
@@ -24513,6 +24823,31 @@
           "kind": "method",
           "name": "period",
           "parent": "Slope"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "SlopeKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "SlopeKernel"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "SmaKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "SmaKernel"
+        },
+        {
+          "kind": "method",
+          "name": "window",
+          "parent": "SmaKernel"
         },
         {
           "kind": "method",
@@ -24686,17 +25021,7 @@
         },
         {
           "kind": "method",
-          "name": "refresh",
-          "parent": "Stochastic"
-        },
-        {
-          "kind": "method",
           "name": "reset",
-          "parent": "Stochastic"
-        },
-        {
-          "kind": "method",
-          "name": "tail",
           "parent": "Stochastic"
         },
         {
@@ -24708,6 +25033,16 @@
           "kind": "method",
           "name": "value",
           "parent": "Stochastic"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "StochasticKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "StochasticKernel"
         },
         {
           "kind": "method",
@@ -24986,67 +25321,42 @@
         },
         {
           "kind": "method",
-          "name": "count",
-          "parent": "StreamingBar"
-        },
-        {
-          "kind": "method",
-          "name": "ensureFresh",
-          "parent": "StreamingBar"
-        },
-        {
-          "kind": "method",
-          "name": "ready",
-          "parent": "StreamingBar"
-        },
-        {
-          "kind": "method",
-          "name": "reset",
-          "parent": "StreamingBar"
-        },
-        {
-          "kind": "method",
-          "name": "streamClose",
-          "parent": "StreamingBar"
-        },
-        {
-          "kind": "method",
-          "name": "streamHigh",
-          "parent": "StreamingBar"
-        },
-        {
-          "kind": "method",
-          "name": "streamLow",
+          "name": "fold",
           "parent": "StreamingBar"
         },
         {
           "kind": "method",
           "name": "update",
           "parent": "StreamingBar"
+        },
+        {
+          "kind": "method",
+          "name": "advance",
+          "parent": "StreamingCore"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "StreamingCore"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "StreamingCore"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "StreamingCore"
         },
         {
           "kind": "method",
           "name": "value",
-          "parent": "StreamingBar"
+          "parent": "StreamingCore"
         },
         {
           "kind": "method",
-          "name": "count",
-          "parent": "StreamingHighLow"
-        },
-        {
-          "kind": "method",
-          "name": "ensureFresh",
-          "parent": "StreamingHighLow"
-        },
-        {
-          "kind": "method",
-          "name": "ready",
-          "parent": "StreamingHighLow"
-        },
-        {
-          "kind": "method",
-          "name": "reset",
+          "name": "fold",
           "parent": "StreamingHighLow"
         },
         {
@@ -25056,62 +25366,7 @@
         },
         {
           "kind": "method",
-          "name": "value",
-          "parent": "StreamingHighLow"
-        },
-        {
-          "kind": "method",
-          "name": "count",
-          "parent": "StreamingMultiOutputSingle"
-        },
-        {
-          "kind": "method",
-          "name": "ensureFresh",
-          "parent": "StreamingMultiOutputSingle"
-        },
-        {
-          "kind": "method",
-          "name": "ready",
-          "parent": "StreamingMultiOutputSingle"
-        },
-        {
-          "kind": "method",
-          "name": "reset",
-          "parent": "StreamingMultiOutputSingle"
-        },
-        {
-          "kind": "method",
-          "name": "result",
-          "parent": "StreamingMultiOutputSingle"
-        },
-        {
-          "kind": "method",
-          "name": "streamHistory",
-          "parent": "StreamingMultiOutputSingle"
-        },
-        {
-          "kind": "method",
-          "name": "update",
-          "parent": "StreamingMultiOutputSingle"
-        },
-        {
-          "kind": "method",
-          "name": "count",
-          "parent": "StreamingOhlc"
-        },
-        {
-          "kind": "method",
-          "name": "ensureFresh",
-          "parent": "StreamingOhlc"
-        },
-        {
-          "kind": "method",
-          "name": "ready",
-          "parent": "StreamingOhlc"
-        },
-        {
-          "kind": "method",
-          "name": "reset",
+          "name": "fold",
           "parent": "StreamingOhlc"
         },
         {
@@ -25121,27 +25376,7 @@
         },
         {
           "kind": "method",
-          "name": "value",
-          "parent": "StreamingOhlc"
-        },
-        {
-          "kind": "method",
-          "name": "count",
-          "parent": "StreamingPair"
-        },
-        {
-          "kind": "method",
-          "name": "ensureFresh",
-          "parent": "StreamingPair"
-        },
-        {
-          "kind": "method",
-          "name": "ready",
-          "parent": "StreamingPair"
-        },
-        {
-          "kind": "method",
-          "name": "reset",
+          "name": "fold",
           "parent": "StreamingPair"
         },
         {
@@ -25151,42 +25386,12 @@
         },
         {
           "kind": "method",
-          "name": "value",
-          "parent": "StreamingPair"
-        },
-        {
-          "kind": "method",
-          "name": "count",
-          "parent": "StreamingSingle"
-        },
-        {
-          "kind": "method",
-          "name": "ensureFresh",
-          "parent": "StreamingSingle"
-        },
-        {
-          "kind": "method",
-          "name": "ready",
-          "parent": "StreamingSingle"
-        },
-        {
-          "kind": "method",
-          "name": "reset",
-          "parent": "StreamingSingle"
-        },
-        {
-          "kind": "method",
-          "name": "streamHistory",
+          "name": "fold",
           "parent": "StreamingSingle"
         },
         {
           "kind": "method",
           "name": "update",
-          "parent": "StreamingSingle"
-        },
-        {
-          "kind": "method",
-          "name": "value",
           "parent": "StreamingSingle"
         },
         {
@@ -25433,6 +25638,16 @@
           "kind": "method",
           "name": "step",
           "parent": "TWAPExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "TemaKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "TemaKernel"
         },
         {
           "kind": "method",

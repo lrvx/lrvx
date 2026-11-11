@@ -10,10 +10,12 @@ tests, and in the docs site, all automatically.
 
 ## 1. Write the C++ class
 
-Create `include/lrvx/indicator/my_indicator.h`. Implement the canonical
-`compute()` for your indicator — that's the single source of truth for the
-math. Inherit from the matching streaming mixin to get
-`update()`/`value()`/`ready()`/`reset()` on the same class for free:
+Create `include/lrvx/indicator/my_indicator.h`. The math lives in one place:
+a small state object, the kernel, whose `step()` takes one input and returns
+the indicator's value at that position (NaN until it is ready). Inherit from
+the matching streaming mixin with that kernel to get
+`update()`/`value()`/`ready()`/`reset()`/`count()` on the same class, and
+implement `compute()` by folding a fresh kernel over the input:
 
 ```cpp
 #pragma once
@@ -27,15 +29,51 @@ math. Inherit from the matching streaming mixin to get
 namespace lrvx::indicator
 {
 
-class MyIndicator : public StreamingSingle<MyIndicator>
+namespace detail
+{
+
+// Mean of the last `period` inputs, recomputed over a ring buffer.
+class MyIndicatorKernel
 {
  public:
-  explicit MyIndicator(size_t period) noexcept : _period(period) {}
+  explicit MyIndicatorKernel(size_t period) : _period(period), _window(period) {}
+
+  LRVX_INDICATOR_STEP double step(double x)
+  {
+    _window.push(x);
+    if (_period == 0 || !_window.full())
+    {
+      return std::nan("");
+    }
+    double sum = 0.0;
+    for (double v : _window.window())
+    {
+      sum += v;
+    }
+    return sum / static_cast<double>(_period);
+  }
+
+  void reset() { _window.clear(); }
+
+ private:
+  size_t _period;
+  Ring _window;
+};
+
+}  // namespace detail
+
+class MyIndicator : public StreamingSingle<MyIndicator, detail::MyIndicatorKernel>
+{
+ public:
+  explicit MyIndicator(size_t period)
+      : StreamingSingle(detail::MyIndicatorKernel(period)), _period(period)
+  {
+  }
 
   std::vector<double> compute(std::span<const double> input) const
   {
     std::vector<double> out(input.size(), std::nan(""));
-    // ... your logic ...
+    fold(detail::MyIndicatorKernel(_period), input, out);
     return out;
   }
 
@@ -51,17 +89,22 @@ class MyIndicator : public StreamingSingle<MyIndicator>
 static_assert(lrvx::indicator::SingleIndicator<lrvx::indicator::MyIndicator>);
 ```
 
-The streaming mixin you choose depends on the input shape:
+Keep everything the kernel needs inside it and size it in the constructor:
+`update()` must not allocate, and its cost must depend on the window, never on
+how many values the indicator has seen. `tests/test_indicator_streaming_cost.cpp`
+checks both for the built-in indicators.
+
+The streaming mixin you choose depends on the input shape; the kernel's
+`step()` takes the same arguments as `update()`:
 
 | Input | Mixin |
 |---|---|
-| Single series (`compute(span)`) | `StreamingSingle<T>` |
-| `compute(high, low, close)` | `StreamingBar<T>` |
-| `compute(high, low)` | `StreamingHighLow<T>` |
-| `compute(open, high, low, close)` | `StreamingOhlc<T>` |
-| `compute(x, y)` | `StreamingPair<T>` |
-| Single series returning a result struct | `StreamingMultiOutputSingle<T, Result>` |
-| Multi-output result struct, other input shapes | hand-written streaming methods (see `MACD`, `Bollinger`, `Stochastic`) |
+| Single series (`compute(span)`) | `StreamingSingle<T, Kernel>` |
+| `compute(high, low, close)` | `StreamingBar<T, Kernel>` |
+| `compute(high, low)` | `StreamingHighLow<T, Kernel>` |
+| `compute(open, high, low, close)` | `StreamingOhlc<T, Kernel>` |
+| `compute(x, y)` | `StreamingPair<T, Kernel>` |
+| Multi-output result struct | the class holds its kernel and one getter per output (see `MACD`, `Bollinger`, `Stochastic`) |
 
 ## 2. Register it
 
@@ -102,9 +145,10 @@ You now have:
 - The docs site lists it on every per-binding page (run
   `python3 scripts/gen_indicator_docs.py`).
 
-The parity is **by construction** — `update()` calls your `compute()`
-internally, so there is no separate streaming logic to drift. No ring
-buffer, no warmup logic, no seeding to debug.
+The parity is **by construction**: `update()` runs one `step()` of the
+instance's kernel and `compute()` runs the same `step()` over the whole input
+on a fresh kernel, so there is no separate streaming logic to drift. The
+parity test compares every step bit for bit.
 
 ## 4. Reading the existing 21 indicators
 
@@ -112,11 +156,14 @@ Every indicator listed in `registry.def` (EMA, SMA, RSI, ATR, MACD, ...)
 follows exactly this pattern. Look at any `include/lrvx/indicator/<name>.h`
 for a working example.
 
-## When NOT to use the streaming mixin
+## Cost of a streaming update
 
-The mixin re-runs `compute()` on the accumulated history each
-`update()` — O(N) per tick. Acceptable for research, UI, and
-moderate-throughput live trading. For a production-critical hot path you
-can specialize `update()` to do O(1) state-keeping, but you **must** keep
-the observable behaviour identical to `compute().back()` so the parity
-test continues to pass.
+An `update()` is one kernel step. The mixin keeps no input history, so the
+cost of a step depends only on the indicator's parameters. Recursive
+indicators (SMA's running sum, EMA, RMA, RSI, DEMA, TEMA, Slope, ATR, MACD)
+step in O(1). Indicators that recompute their window each step to keep the
+exact numerics of a two-pass computation (Skewness, Kurtosis, RollingZScore,
+Correlation, AutoCorrelation, ShannonEntropy, KAMA, CCI, Bollinger,
+Stochastic, ParkinsonVol, RogersSatchellVol) step in O(period). Memory is a
+ring buffer of at most the last `period` inputs, allocated when the indicator
+is constructed.

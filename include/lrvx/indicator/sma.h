@@ -10,82 +10,105 @@
 namespace lrvx::indicator
 {
 
-class SMA : public StreamingSingle<SMA>
+namespace detail
+{
+
+// Running-sum SMA step. O(1) per step; the ring holds the last `period`
+// inputs so the outgoing one can be subtracted.
+//
+// NaN in the window poisons only that window, not the rest of the series:
+// the kernel counts how many of the `period` most recent inputs are NaN and
+// withholds the output while that count is nonzero, excluding NaN entries
+// from the running sum so it stays finite. The window recovers on its own
+// once the NaN slides out, matching the NaN-tolerant contract EMA/RSI have
+// (see NaNInputSkipped / NaNInputHandled). A zero period has no well-defined
+// window and never produces a value.
+class SmaKernel
 {
  public:
-  explicit SMA(size_t period) noexcept : _period(period) {}
+  explicit SmaKernel(size_t period) : _period(period), _window(period) {}
+
+  LRVX_INDICATOR_STEP double step(double incoming)
+  {
+    if (_period == 0)
+    {
+      return std::nan("");
+    }
+    if (!_window.full())
+    {
+      if (std::isnan(incoming))
+      {
+        ++_nanCount;
+      }
+      else
+      {
+        _sum += incoming;
+      }
+      _window.push(incoming);
+      if (!_window.full())
+      {
+        return std::nan("");
+      }
+      return _nanCount == 0 ? _sum / static_cast<double>(_period) : std::nan("");
+    }
+
+    const double outgoing = _window.oldest();
+    if (std::isnan(incoming))
+    {
+      ++_nanCount;
+    }
+    else
+    {
+      _sum += incoming;
+    }
+    if (std::isnan(outgoing))
+    {
+      --_nanCount;
+    }
+    else
+    {
+      _sum -= outgoing;
+    }
+    _window.push(incoming);
+    return _nanCount == 0 ? _sum / static_cast<double>(_period) : std::nan("");
+  }
+
+  // The last `period` inputs, oldest first; complete once the first output
+  // has been produced. CCI and Bollinger reuse it for their window loops.
+  std::span<const double> window() const noexcept { return _window.window(); }
+
+  void reset()
+  {
+    _window.clear();
+    _sum = 0.0;
+    _nanCount = 0;
+  }
+
+ private:
+  size_t _period;
+  Ring _window;
+  double _sum = 0.0;
+  size_t _nanCount = 0;
+};
+
+}  // namespace detail
+
+class SMA : public StreamingSingle<SMA, detail::SmaKernel>
+{
+ public:
+  explicit SMA(size_t period) : StreamingSingle(detail::SmaKernel(period)), _period(period) {}
 
   std::vector<double> compute(std::span<const double> input) const
   {
     std::vector<double> out(input.size(), std::nan(""));
-    if (!input.empty())
-    {
-      compute(input, out);
-    }
+    compute(input, out);
     return out;
   }
 
   void compute(std::span<const double> input, std::span<double> output) const
   {
     assert(output.size() >= input.size());
-    const size_t n = input.size();
-
-    for (size_t i = 0; i < n; ++i)
-    {
-      output[i] = std::nan("");
-    }
-
-    // A zero period has no well-defined window; treat it like "not enough
-    // data yet" instead of underflowing _period - 1 into a huge index below.
-    if (_period == 0 || n < _period)
-    {
-      return;
-    }
-
-    // NaN in the window poisons only that window, not the rest of the
-    // series: track how many of the _period most recent inputs are NaN and
-    // withhold the output while that count is nonzero, excluding NaN
-    // entries from the running sum so it stays finite. The window
-    // recovers on its own once the NaN slides out, matching the
-    // NaN-tolerant contract EMA/RSI already have (see NaNInputSkipped /
-    // NaNInputHandled) instead of poisoning every output from that point on.
-    double sum = 0.0;
-    size_t nanCount = 0;
-    for (size_t i = 0; i < _period; ++i)
-    {
-      if (std::isnan(input[i]))
-      {
-        ++nanCount;
-      }
-      else
-      {
-        sum += input[i];
-      }
-    }
-    output[_period - 1] = nanCount == 0 ? sum / static_cast<double>(_period) : std::nan("");
-
-    for (size_t i = _period; i < n; ++i)
-    {
-      const double incoming = input[i];
-      const double outgoing = input[i - _period];
-      if (std::isnan(incoming))
-      {
-        ++nanCount;
-      }
-      else
-      {
-        sum += incoming;
-      }
-      if (std::isnan(outgoing))
-      {
-        --nanCount;
-      }
-      else
-      {
-        sum -= outgoing;
-      }
-      output[i] = nanCount == 0 ? sum / static_cast<double>(_period) : std::nan("");
-    }
+    fold(detail::SmaKernel(_period), input, output);
   }
 
   size_t period() const noexcept { return _period; }

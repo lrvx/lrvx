@@ -11,10 +11,90 @@
 namespace lrvx::indicator
 {
 
-class ShannonEntropy : public StreamingSingle<ShannonEntropy>
+namespace detail
+{
+
+// Normalised Shannon entropy of the last `period` inputs binned into `bins`
+// equal-width bins between the window's min and max. O(period + bins) per
+// step: the bins depend on the window's range, so the histogram is rebuilt
+// each step. A constant window has entropy 0.
+class ShannonEntropyKernel
 {
  public:
-  explicit ShannonEntropy(size_t period, size_t bins = 10) noexcept : _period(period), _bins(bins)
+  ShannonEntropyKernel(size_t period, size_t bins) : _period(period), _bins(bins), _win(period), _counts(bins)
+  {
+  }
+
+  LRVX_INDICATOR_STEP double step(double x)
+  {
+    _win.push(x);
+    if (_period == 0 || !_win.full())
+    {
+      return std::nan("");
+    }
+    const auto w = _win.window();
+
+    double lo = w[0], hi = w[0];
+    for (size_t j = 1; j < _period; ++j)
+    {
+      if (w[j] < lo)
+      {
+        lo = w[j];
+      }
+      if (w[j] > hi)
+      {
+        hi = w[j];
+      }
+    }
+
+    if (lo == hi)
+    {
+      return 0.0;
+    }
+
+    std::fill(_counts.begin(), _counts.end(), 0);
+    double range = hi - lo;
+
+    for (double v : w)
+    {
+      size_t bin = static_cast<size_t>(((v - lo) / range) * _bins);
+      if (bin >= _bins)
+      {
+        bin = _bins - 1;
+      }
+      _counts[bin]++;
+    }
+
+    double entropy = 0;
+    double p_denom = static_cast<double>(_period);
+    for (size_t b = 0; b < _bins; ++b)
+    {
+      if (_counts[b] > 0)
+      {
+        double p = static_cast<double>(_counts[b]) / p_denom;
+        entropy -= p * std::log(p);
+      }
+    }
+
+    return entropy / std::log(static_cast<double>(_bins));
+  }
+
+  void reset() { _win.clear(); }
+
+ private:
+  size_t _period;
+  size_t _bins;
+  Ring _win;
+  std::vector<size_t> _counts;
+};
+
+}  // namespace detail
+
+class ShannonEntropy : public StreamingSingle<ShannonEntropy, detail::ShannonEntropyKernel>
+{
+ public:
+  explicit ShannonEntropy(size_t period, size_t bins = 10)
+      : StreamingSingle(detail::ShannonEntropyKernel(period, bins)), _period(period), _bins(bins)
   {
     assert(period >= 2);
     assert(bins >= 2);
@@ -23,79 +103,14 @@ class ShannonEntropy : public StreamingSingle<ShannonEntropy>
   std::vector<double> compute(std::span<const double> input) const
   {
     std::vector<double> out(input.size(), std::nan(""));
-    if (!input.empty())
-    {
-      compute(input, out);
-    }
+    compute(input, out);
     return out;
   }
 
   void compute(std::span<const double> input, std::span<double> output) const
   {
     assert(output.size() >= input.size());
-    const size_t n = input.size();
-
-    for (size_t i = 0; i < n; ++i)
-    {
-      output[i] = std::nan("");
-    }
-
-    if (n < _period)
-    {
-      return;
-    }
-
-    std::vector<size_t> counts(_bins);
-
-    for (size_t i = _period - 1; i < n; ++i)
-    {
-      size_t start = i - _period + 1;
-
-      double lo = input[start], hi = input[start];
-      for (size_t j = start + 1; j <= i; ++j)
-      {
-        if (input[j] < lo)
-        {
-          lo = input[j];
-        }
-        if (input[j] > hi)
-        {
-          hi = input[j];
-        }
-      }
-
-      if (lo == hi)
-      {
-        output[i] = 0.0;
-        continue;
-      }
-
-      std::fill(counts.begin(), counts.end(), 0);
-      double range = hi - lo;
-
-      for (size_t j = start; j <= i; ++j)
-      {
-        size_t bin = static_cast<size_t>(((input[j] - lo) / range) * _bins);
-        if (bin >= _bins)
-        {
-          bin = _bins - 1;
-        }
-        counts[bin]++;
-      }
-
-      double entropy = 0;
-      double p_denom = static_cast<double>(_period);
-      for (size_t b = 0; b < _bins; ++b)
-      {
-        if (counts[b] > 0)
-        {
-          double p = static_cast<double>(counts[b]) / p_denom;
-          entropy -= p * std::log(p);
-        }
-      }
-
-      output[i] = entropy / std::log(static_cast<double>(_bins));
-    }
+    fold(detail::ShannonEntropyKernel(_period, _bins), input, output);
   }
 
   size_t period() const noexcept { return _period; }
