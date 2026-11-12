@@ -10,6 +10,7 @@
 #include <limits>
 #include <stdexcept>
 
+#include "backtest_bindings.h"
 #include "callback_guard.h"
 #include "hook_bindings.h"
 #include "lrvx/backtest/backtest_config.h"
@@ -2504,7 +2505,199 @@ class PyBacktestRunner
     return d;
   }
 
+ public:
+  // ── Live session ────────────────────────────────────────────────────
+  //
+  // The same runner, fed one market event at a time by the caller instead
+  // of by a replay. Every event goes where a tick replay sends it: the
+  // runner's clock is moved to the event's time, the built-in simulator
+  // sees it first, then the strategy. A signal the strategy emits reaches
+  // BacktestRunner::onSignal, so it is routed, gated and turned into an
+  // order exactly as in a backtest (every order type the simulator takes),
+  // and every order event comes back through the runner's own listener
+  // chain: the position tracker first, then the attached listeners, then
+  // the strategy's on_fill / on_order_update -- the same events, fields and
+  // order as a run_tape over the same trades, and the same ctx.position.
+  // The registry's ticks are applied as in a backtest. PaperBroker is built
+  // on this.
+  void begin_session(py::object on_signal)
+  {
+    if (!_host)
+    {
+      throw lrvx::LrvxError("E_RUN_001",
+                            "BacktestRunner.begin_session() called before set_strategy().");
+    }
+    if (_sessionOpen)
+    {
+      throw lrvx::LrvxError("E_RUN_001", "BacktestRunner.begin_session(): a session is open.");
+    }
+    if (_runner->customExecutor() != nullptr || _runner->simulatedExecutorOverride() != nullptr)
+    {
+      throw lrvx::LrvxError(
+          "E_VAL_002",
+          "BacktestRunner.begin_session(): a session drives the built-in simulator; detach "
+          "set_executor / set_venue_stack first.");
+    }
+    if (_sessionUsed || _lastResult.has_value())
+    {
+      throw lrvx::LrvxError(
+          "E_RUN_001",
+          "BacktestRunner.begin_session(): this runner already ran; a session starts from a "
+          "fresh runner, so its fills and positions are its own.");
+    }
+    _sessionTee.runner = _runner.get();
+    _sessionTee.callback = std::move(on_signal);
+    // After set_strategy made the runner the bridge's signal handler: the
+    // tee hands every signal to the runner first, then to the callback.
+    _host->bridge->setSignalHandler(&_sessionTee);
+    _sessionOpen = true;
+    _sessionUsed = true;
+    _host->bridge->start();
+  }
+
+  void session_trade(uint32_t symbol, double price, double qty, bool is_buy, int64_t ts_ns)
+  {
+    requireSession("session_trade");
+    const UnixNanos ts = UnixNanos::fromRaw(ts_ns);
+    _runner->clock().advanceTo(ts);
+
+    TradeEvent ev;
+    ev.trade.symbol = symbol;
+    ev.trade.price = Price::fromDouble(price);
+    ev.trade.quantity = Quantity::fromDouble(qty);
+    ev.trade.isBuy = is_buy;
+    ev.trade.exchangeTsNs = ts;
+    if (auto info = _reg->getSymbolInfo(symbol))
+    {
+      ev.trade.instrument = info->type;
+    }
+    ev.exchangeMsgTsNs = ts;
+
+    _runner->executor().onTrade(symbol, ev.trade.price, ev.trade.quantity, is_buy);
+    _host->bridge->onTrade(ev);
+  }
+
+  void session_book_snapshot(uint32_t symbol, const std::vector<std::pair<double, double>>& bids,
+                             const std::vector<std::pair<double, double>>& asks, int64_t ts_ns)
+  {
+    requireSession("session_book_snapshot");
+    const UnixNanos ts = UnixNanos::fromRaw(ts_ns);
+    _runner->clock().advanceTo(ts);
+
+    std::pmr::monotonic_buffer_resource pool(4096);
+    BookUpdateEvent ev(&pool);
+    ev.update.symbol = symbol;
+    ev.update.type = BookUpdateType::SNAPSHOT;
+    ev.update.exchangeTsNs = ts;
+    if (auto info = _reg->getSymbolInfo(symbol))
+    {
+      ev.update.instrument = info->type;
+    }
+    ev.update.bids.reserve(bids.size());
+    ev.update.asks.reserve(asks.size());
+    for (const auto& [p, q] : bids)
+    {
+      ev.update.bids.emplace_back(Price::fromDouble(p), Quantity::fromDouble(q));
+    }
+    for (const auto& [p, q] : asks)
+    {
+      ev.update.asks.emplace_back(Price::fromDouble(p), Quantity::fromDouble(q));
+    }
+    _runner->executor().onBookUpdate(symbol, ev.update.bids, ev.update.asks);
+    _host->bridge->onBookUpdate(ev);
+  }
+
+  // Ends the session: the strategy's on_stop, the signal handler back to the
+  // runner, and the run's stats in the shape run_tape returns (equity_curve()
+  // and trades() then read this session).
+  py::object end_session()
+  {
+    requireSession("end_session");
+    _host->bridge->stop();
+    _host->bridge->setSignalHandler(_runner.get());
+    _sessionOpen = false;
+    _sessionTee.callback = py::none();
+    return statsToDict(_runner->result());
+  }
+
+  bool session_open() const noexcept { return _sessionOpen; }
+
+  // The built-in simulator's fills so far, in the shapes
+  // SimulatedExecutor.fills() / fills_list() return.
+  py::array_t<PyFill> session_fills() const
+  {
+    const auto& f = _runner->executor().fills();
+    py::array_t<PyFill> result(f.size());
+    auto* out = result.mutable_data();
+    for (size_t i = 0; i < f.size(); ++i)
+    {
+      out[i] = fillToPyFill(f[i]);
+    }
+    return result;
+  }
+
+  py::list session_fills_list() const
+  {
+    py::list result;
+    for (const auto& f : _runner->executor().fills())
+    {
+      py::dict d;
+      d["order_id"] = f.orderId;
+      d["symbol"] = f.symbol;
+      d["side"] = (f.side == Side::BUY) ? "buy" : "sell";
+      d["price"] = f.price.toDouble();
+      d["quantity"] = f.quantity.toDouble();
+      d["timestamp_ns"] = f.timestampNs.raw();
+      d["is_maker"] = f.isMaker;
+      result.append(d);
+    }
+    return result;
+  }
+
+  // Per-symbol slippage on the built-in simulator, the counterpart of
+  // SimulatedExecutor.set_symbol_slippage. The default model is the
+  // constructor's slippage_model.
+  void set_symbol_slippage(uint32_t symbol, const std::string& model, int32_t ticks,
+                           double tick_size, double bps, double impact)
+  {
+    _runner->executor().setSymbolSlippage(
+        symbol, makePyProfile("BacktestRunner.set_symbol_slippage", model, ticks, tick_size,
+                              bps, impact));
+  }
+
  private:
+  // Forwards every signal to the runner, then hands a copy to the session's
+  // Python callback. The runner routes first, so by the time the callback
+  // sees a signal the simulator has already taken the order.
+  struct SessionSignalTee final : public lrvx::ISignalHandler
+  {
+    BacktestRunner* runner{nullptr};
+    py::object callback = py::none();
+
+    void onSignal(const Signal& sig) override
+    {
+      runner->onSignal(sig);
+      if (!callback.is_none())
+      {
+        callback(pySignalFromCxx(sig));
+      }
+    }
+  };
+
+  void requireSession(const char* method) const
+  {
+    if (!_sessionOpen)
+    {
+      throw lrvx::LrvxError("E_RUN_001", std::string("BacktestRunner.") + method +
+                                             "() called outside begin_session() / "
+                                             "end_session().");
+    }
+  }
+
+  SessionSignalTee _sessionTee;
+  bool _sessionOpen{false};
+  bool _sessionUsed{false};
+
   SymbolRegistry* _reg;
   std::unique_ptr<BacktestRunner> _runner;
   std::unique_ptr<PyStrategyHost> _host;
@@ -3344,6 +3537,26 @@ inline void bindStrategy(py::module_& m)
            py::arg("symbol") = "",
            py::arg("bar_type") = 0,
            py::arg("bar_type_param") = 0)
+      .def("begin_session", &PyBacktestRunner::begin_session,
+           py::arg("on_signal") = py::none(),
+           "Open a live session: market data is then pushed one event at a time with "
+           "session_trade / session_book_snapshot instead of replayed, and goes exactly where "
+           "a tick replay sends it -- clock, built-in simulator, strategy. Signals are routed "
+           "and order events delivered (position tracker, listeners, on_fill / "
+           "on_order_update) as in run_tape. on_signal, when given, receives each Signal after "
+           "the runner has routed it. Needs set_strategy and a runner that has not run.")
+      .def("session_trade", [](PyBacktestRunner& r, py::object sym, double price, double qty, bool is_buy, int64_t ts_ns)
+           { r.session_trade(symId(sym), price, qty, is_buy, ts_ns); }, py::arg("symbol"), py::arg("price"), py::arg("qty"), py::arg("is_buy"), py::arg("ts_ns") = 0)
+      .def("session_book_snapshot", [](PyBacktestRunner& r, py::object sym, const std::vector<std::pair<double, double>>& bids, const std::vector<std::pair<double, double>>& asks, int64_t ts_ns)
+           { r.session_book_snapshot(symId(sym), bids, asks, ts_ns); }, py::arg("symbol"), py::arg("bid_levels"), py::arg("ask_levels"), py::arg("ts_ns") = 0, "bid_levels / ask_levels: sequences of (price, qty), best first.")
+      .def("end_session", &PyBacktestRunner::end_session, "Close the session (strategy on_stop) and return its stats dict.")
+      .def_property_readonly("session_open", &PyBacktestRunner::session_open)
+      .def("session_fills", &PyBacktestRunner::session_fills, "The built-in simulator's fills, as a numpy structured array.")
+      .def("session_fills_list", &PyBacktestRunner::session_fills_list, "The built-in simulator's fills, as a list of dicts.")
+      .def("set_symbol_slippage", [](PyBacktestRunner& r, py::object sym, const std::string& model, int32_t ticks, double tick_size, double bps, double impact)
+           { r.set_symbol_slippage(symId(sym), model, ticks, tick_size, bps, impact); }, py::arg("symbol"), py::arg("model"), py::arg("ticks") = 0, py::arg("tick_size") = 0.0, py::arg("bps") = 0.0, py::arg("impact") = 0.0,
+           "Per-symbol slippage on the built-in simulator; the constructor's slippage_model "
+           "is the default for every other symbol.")
       .def("equity_curve", &PyBacktestRunner::equity_curve,
            "Return the equity curve from the most recent run as a dict of "
            "numpy arrays (timestamp_ns, equity, drawdown_pct).")

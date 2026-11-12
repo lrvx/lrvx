@@ -285,6 +285,8 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 **Members**
 
 - `add_execution_listener(self, listener: ExecutionListener) -> None`
+- `begin_session(self, on_signal: typing.Any = None) -> None`
+- `end_session(self) -> typing.Any`
 - `equity_curve(self) -> typing.Any`
 - `run_bars(self, start_time_ns: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], end_time_ns: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], open: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], high: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], low: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], volume: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol: str = '', bar_type: typing.SupportsInt | typing.SupportsIndex = 0, bar_type_param: typing.SupportsInt | typing.SupportsIndex = 0) -> typing.Any`
 - `run_csv(self, path: str, symbol: str = '') -> typing.Any`
@@ -292,6 +294,10 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 - `run_tape(self, path: str) -> typing.Any`
 - `run_tape_bars(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any`
 - `run_tapes(self, paths: collections.abc.Sequence[str]) -> typing.Any`
+- `session_book_snapshot(self, symbol: typing.Any, bid_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ask_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
+- `session_fills(self) -> numpy.ndarray[typing.Any, numpy.dtype[numpy.void]]`
+- `session_fills_list(self) -> list`
+- `session_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `set_executor(self, executor: Executor) -> None`
 - `set_executor(self, executor: VenueExecutor) -> None`
 - `set_kill_switch(self, ks: KillSwitch) -> None`
@@ -299,8 +305,10 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 - `set_pnl_tracker(self, tracker: PnLTracker) -> None`
 - `set_risk_manager(self, rm: RiskManager) -> None`
 - `set_strategy(self, strategy: Strategy) -> None`
+- `set_symbol_slippage(self, symbol: typing.Any, model: str, ticks: typing.SupportsInt | typing.SupportsIndex = 0, tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.0, bps: typing.SupportsFloat | typing.SupportsIndex = 0.0, impact: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None`
 - `set_venue_stack(self, stack: VenueStack) -> None`
 - `trades(self) -> typing.Any`
+- *property* `session_open: bool`
 
 ### `class BarData`
 

@@ -201,7 +201,7 @@ policy = make_rl_policy(
 from lrvx.paper import PaperBroker
 
 broker = PaperBroker(registry=registry)
-broker.runner.add_strategy(policy)   # the broker owns its Runner
+broker.set_strategy(policy)   # the broker owns its BacktestRunner session
 broker.start()
 # feed trades from your live source:
 #   broker.observe_trade(symbol_id, price, qty, is_buy, ts_ns)

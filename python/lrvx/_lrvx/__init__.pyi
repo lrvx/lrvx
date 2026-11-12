@@ -244,6 +244,14 @@ class BacktestRunner:
         """
     def add_execution_listener(self, listener: ExecutionListener) -> None:
         ...
+    def begin_session(self, on_signal: typing.Any = None) -> None:
+        """
+        Open a live session: market data is then pushed one event at a time with session_trade / session_book_snapshot instead of replayed, and goes exactly where a tick replay sends it -- clock, built-in simulator, strategy. Signals are routed and order events delivered (position tracker, listeners, on_fill / on_order_update) as in run_tape. on_signal, when given, receives each Signal after the runner has routed it. Needs set_strategy and a runner that has not run.
+        """
+    def end_session(self) -> typing.Any:
+        """
+        Close the session (strategy on_stop) and return its stats dict.
+        """
     def equity_curve(self) -> typing.Any:
         """
         Return the equity curve from the most recent run as a dict of numpy arrays (timestamp_ns, equity, drawdown_pct).
@@ -266,6 +274,20 @@ class BacktestRunner:
         """
         Run a backtest off N `.lrvx` tapes merged on read. Symbols are rekeyed by (metadata.exchange, name) so two captures of the same venue/symbol collapse, and two different venues stay distinct. `run_tapes([t])` is equivalent to `run_tape(t)`. Stats shape mirrors run_tape, including skipped_option_quotes and skipped_pool_states.
         """
+    def session_book_snapshot(self, symbol: typing.Any, bid_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ask_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
+        """
+        bid_levels / ask_levels: sequences of (price, qty), best first.
+        """
+    def session_fills(self) -> numpy.ndarray[typing.Any, numpy.dtype[numpy.void]]:
+        """
+        The built-in simulator's fills, as a numpy structured array.
+        """
+    def session_fills_list(self) -> list:
+        """
+        The built-in simulator's fills, as a list of dicts.
+        """
+    def session_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
+        ...
     @typing.overload
     def set_executor(self, executor: Executor) -> None:
         ...
@@ -292,6 +314,10 @@ class BacktestRunner:
         """
     def set_strategy(self, strategy: Strategy) -> None:
         ...
+    def set_symbol_slippage(self, symbol: typing.Any, model: str, ticks: typing.SupportsInt | typing.SupportsIndex = 0, tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.0, bps: typing.SupportsFloat | typing.SupportsIndex = 0.0, impact: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:
+        """
+        Per-symbol slippage on the built-in simulator; the constructor's slippage_model is the default for every other symbol.
+        """
     def set_venue_stack(self, stack: VenueStack) -> None:
         """
         Run against a VenueStack: the runner feeds the stack executor market data and harvests its fills, so the run uses the venue's fill mechanics (queue model, iceberg latency, venue availability, rate limits) and its fee ladder -- each fill is billed at the tier the stack's 30-day notional resolves to instead of the flat fee_rate. Funding and liquidation are still driven by explicit calls rather than the replay loop. Pass None to revert to the built-in executor.
@@ -300,6 +326,9 @@ class BacktestRunner:
         """
         Return closed trades from the most recent run as a dict of numpy arrays (symbol, side, entry_price, exit_price, quantity, pnl, fee, entry_time_ns, exit_time_ns).
         """
+    @property
+    def session_open(self) -> bool:
+        ...
 class BarData:
     symbol_name: str
     def __init__(self) -> None:

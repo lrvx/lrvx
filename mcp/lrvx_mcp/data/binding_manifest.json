@@ -35585,6 +35585,16 @@
         },
         {
           "kind": "method",
+          "name": "begin_session",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "end_session",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "equity_curve",
           "parent": "BacktestRunner"
         },
@@ -35620,6 +35630,31 @@
         },
         {
           "kind": "method",
+          "name": "session_book_snapshot",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "session_fills",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "session_fills_list",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "session_open",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "session_trade",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "set_executor",
           "parent": "BacktestRunner"
         },
@@ -35646,6 +35681,11 @@
         {
           "kind": "method",
           "name": "set_strategy",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "set_symbol_slippage",
           "parent": "BacktestRunner"
         },
         {
