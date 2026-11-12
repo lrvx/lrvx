@@ -85,7 +85,7 @@ public:
 | `clearProgressCallback()` | Remove the progress callback                        |
 | `timeRange()`      | Returns (first_event_ns, last_event_ns) pair             |
 | `stats()`          | Returns read statistics (events, bytes, errors)          |
-| `segmentFiles()`   | Returns list of segment file paths                       |
+| `segmentFiles()`   | Returns segment file paths in file-name order            |
 | `segments()`       | Returns detailed segment information                     |
 
 ## Data Structures
@@ -159,10 +159,24 @@ struct ReaderStats
   uint64_t events_read{0};
   uint64_t trades_read{0};
   uint64_t book_updates_read{0};
-  uint64_t bytes_read{0};
+  uint64_t bytes_read{0};        // event-data bytes read from segment files
   uint64_t crc_errors{0};
 };
 ```
+
+`bytes_read` counts the segment-file bytes a read consumed as event data:
+every frame (header and payload) of an uncompressed segment, every block
+(header and compressed payload) of a compressed one. Segment headers, the
+index and the directory scan are not counted, and a segment the range skips
+adds nothing. A full read therefore adds, per segment, the bytes between its
+header and its index, whichever of `forEach`, `forEachFrom`,
+`streamForEach`, `streamForEachFrom` or `run` (any thread count) delivered
+it. Counters accumulate across reads on the same reader.
+
+The metadata accessors (`segmentFiles()`, `segments()`,
+`segmentsInReadOrder()`, `timeRange()`, `count()`, `summary()`) scan the
+directory on first use, so a freshly constructed reader answers them
+without a prior read.
 
 ### SegmentInfo
 

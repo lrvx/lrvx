@@ -103,7 +103,7 @@ These are the fields on the dict returned by `run_csv` / `run_ohlcv` / `run_bars
 | Python / Codon | Node.js | Description |
 |---|---|---|
 | `total_trades` | `totalTrades` | Number of closed trades |
-| `net_pnl` | `netPnl` | Total P&L net of fees |
+| `net_pnl` | `netPnl` | Realized P&L of the closed trades minus the fees of every fill, including the entry fee of a position still open at the end ([details](../reference/python/strategy.md#a-position-open-at-the-end)) |
 | `return_pct` | `returnPct` | Total return % |
 | `sharpe_ratio` | `sharpeRatio` | Annualised Sharpe |
 | `sortino_ratio` | `sortinoRatio` | Annualised Sortino |

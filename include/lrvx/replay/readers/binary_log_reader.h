@@ -189,6 +189,12 @@ struct ReaderStats
   uint64_t events_read{0};
   uint64_t trades_read{0};
   uint64_t book_updates_read{0};
+  // Segment-file bytes consumed as event data: each frame (header and payload)
+  // of an uncompressed segment, each block (header and compressed payload) of
+  // a compressed one. Segment headers, indexes and the segment scan are not
+  // counted, and a segment the range skips adds nothing. A full read adds,
+  // per segment, the bytes between its header and its index, whichever read
+  // path or thread count delivered it.
   uint64_t bytes_read{0};
   uint64_t crc_errors{0};
   // Events discarded because they arrived past reorder_window_ns.
@@ -482,6 +488,12 @@ class BinaryLogIterator
   uint64_t crcErrors() const { return _crc_errors; }
   uint64_t unknownFramesSkipped() const { return _unknown_frames_skipped; }
 
+  // Event-data bytes read from the file so far: each whole frame (header and
+  // payload) of an uncompressed segment, each whole block (header and
+  // compressed payload) of a compressed one. The segment header and the index
+  // are not counted. This is what ReaderStats::bytes_read sums.
+  uint64_t bytesConsumed() const { return _bytes_consumed; }
+
   // File offset the event returned by the last successful next() came from:
   // the frame offset on an uncompressed segment, the enclosing block's offset
   // on a compressed one. Diagnostics only -- it gives a late or malformed
@@ -515,6 +527,7 @@ class BinaryLogIterator
 
   uint64_t _crc_errors{0};
   uint64_t _unknown_frames_skipped{0};
+  uint64_t _bytes_consumed{0};
   uint64_t _last_event_offset{0};
   uint64_t _block_file_offset{0};
 };

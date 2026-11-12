@@ -147,3 +147,60 @@ TEST(BacktestDrawdown, MaxDrawdownPctUsesThePeakThatStoodAtTheTime)
   }
   EXPECT_NEAR(stats.maxDrawdownPct, curveMax, 1e-9);
 }
+
+// A run that ends with a position open. totalFees counts every fill, so it
+// holds the open entry's fee; trades() and the equity curve hold closed trades
+// only. netPnl is therefore the closed trades' net minus that fee, and the
+// open position's unrealized PnL is in none of them. fills() is where the
+// open position shows. This pins the rule docs/reference/api/backtest/
+// backtest_result.md states.
+TEST(BacktestFeeAttribution, OpenPositionAtTheEndChargesItsEntryFeeToNetPnlOnly)
+{
+  BacktestConfig config;
+  config.initialCapital = 10'000.0;
+  config.feeRate = 0.0004;
+  BacktestResult result(config);
+
+  result.recordFill(makeFill(1, Side::BUY, 78000.0, 0.01, 1000));
+  result.recordFill(makeFill(2, Side::SELL, 79000.0, 0.01, 2000));
+  result.recordFill(makeFill(3, Side::BUY, 78000.0, 0.01, 3000));
+
+  ASSERT_EQ(result.trades().size(), 1u);
+  ASSERT_EQ(result.equityCurve().size(), 1u);
+  const auto& trade = result.trades()[0];
+  const double closedNet = trade.pnl.toDouble() - trade.fee.toDouble();
+  const double openEntryFee = 0.01 * 78000.0 * 0.0004;  // 0.312
+
+  const auto stats = result.computeStats();
+  EXPECT_NEAR(stats.totalFees, trade.fee.toDouble() + openEntryFee, 1e-9);
+  EXPECT_NEAR(stats.netPnl, closedNet - openEntryFee, 1e-9);
+  EXPECT_NEAR(stats.finalCapital, 10'000.0 + closedNet - openEntryFee, 1e-9);
+  EXPECT_NEAR(result.equityCurve().back().equity, 10'000.0 + closedNet, 1e-9);
+
+  double net = 0.0;
+  for (const auto& f : result.fills())
+  {
+    net += (f.side == Side::BUY ? 1.0 : -1.0) * f.quantity.toDouble();
+  }
+  EXPECT_NEAR(net, 0.01, 1e-12);
+}
+
+// With no closed trade the statistics are all zero, the open entry's fee
+// included.
+TEST(BacktestFeeAttribution, NoClosedTradeReportsNoFees)
+{
+  BacktestConfig config;
+  config.initialCapital = 10'000.0;
+  config.feeRate = 0.0004;
+  BacktestResult result(config);
+
+  result.recordFill(makeFill(1, Side::BUY, 78000.0, 0.01, 1000));
+
+  const auto stats = result.computeStats();
+  EXPECT_EQ(stats.totalTrades, 0u);
+  EXPECT_EQ(stats.totalFees, 0.0);
+  EXPECT_EQ(stats.netPnl, 0.0);
+  EXPECT_EQ(stats.finalCapital, 10'000.0);
+  EXPECT_TRUE(result.trades().empty());
+  EXPECT_TRUE(result.equityCurve().empty());
+}

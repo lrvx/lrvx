@@ -24,6 +24,7 @@ These are the rules the numbers below follow. They are the behaviour of `Backtes
 - **Fill timestamps are bar end times.** The runner moves its clock to a bar's end time before walking it, so a fill in bar N carries bar N's end time, not the signal bar's.
 - **Fees are charged per fill on notional.** A round trip pays the rate twice: once on the entry notional and once on the exit notional.
 - **A trade is an entry fill matched with the exit fill that flattens it.** `pnl` is price difference times quantity, before fees; `fee` is the two fills' fees; `net_pnl` across the run is `total_pnl` minus `total_fees`, and `final_capital` is the initial capital plus `net_pnl`.
+- **A position open when the data ends is not a trade.** It is not in `trades()` or the equity curve and its unrealized P&L is not counted, but its entry fee is in `total_fees` and so in `net_pnl`. This run ends flat, so here `net_pnl` equals the sum of the trades' `pnl - fee`. See [A position open at the end](../reference/python/strategy.md#a-position-open-at-the-end).
 
 In this run SMA(40) is ready on the 40th close (bar index 39). The buy that close produces fills at the open of bar 40, 75822.85, and the trade's `entry_time_ns` is bar 40's end time.
 

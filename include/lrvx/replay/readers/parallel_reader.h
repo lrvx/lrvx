@@ -43,6 +43,7 @@ struct ParallelReaderStats
   uint64_t events_read{0};
   uint64_t trades_read{0};
   uint64_t book_updates_read{0};
+  // Same definition as ReaderStats::bytes_read.
   uint64_t bytes_read{0};
   uint64_t crc_errors{0};
 
@@ -75,6 +76,8 @@ struct SegmentBuffer
   std::vector<ReplayEvent> events;
   SegmentInfo info;
   size_t current_index{0};
+  // Event-data bytes read from the segment file (BinaryLogIterator::bytesConsumed).
+  uint64_t bytes_read{0};
 
   bool empty() const { return current_index >= events.size(); }
   const ReplayEvent& front() const { return events[current_index]; }

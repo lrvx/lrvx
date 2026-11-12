@@ -658,6 +658,22 @@ namespace
 using detail::IndexWindow;
 using detail::indexWindow;
 
+// Adds what an iterator consumed to ReaderStats::bytes_read when the segment
+// read ends, on every return path including a callback that stops the walk.
+class BytesReadTally
+{
+ public:
+  BytesReadTally(const BinaryLogIterator& iter, ReaderStats& stats) : _iter(iter), _stats(stats) {}
+  ~BytesReadTally() { _stats.bytes_read += _iter.bytesConsumed(); }
+
+  BytesReadTally(const BytesReadTally&) = delete;
+  BytesReadTally& operator=(const BytesReadTally&) = delete;
+
+ private:
+  const BinaryLogIterator& _iter;
+  ReaderStats& _stats;
+};
+
 // Proven lower bound on every event of a Sorted segment, or nullopt.
 //
 // Uncompressed: the frames are in non-decreasing order, so the first frame's
@@ -869,6 +885,7 @@ bool streamBlockRangeImpl(const std::filesystem::path& path,
   {
     return false;
   }
+  BytesReadTally tally(iter, stats);
   iter.setStopAtBlockEnd(true);
 
   ++stats.files_read;
@@ -1194,6 +1211,7 @@ bool BinaryLogReader::readSegment(const std::filesystem::path& path, EventCallba
   {
     return false;
   }
+  BytesReadTally tally(iter, _stats);
 
   bool stop_past_to = false;
   if (!narrowToRange(iter, stop_past_to))
@@ -1278,6 +1296,7 @@ bool BinaryLogReader::readSegmentFrom(const SegmentInfo& segment, int64_t start_
   {
     return false;
   }
+  BytesReadTally tally(iter, _stats);
 
   ++_stats.files_read;
 
@@ -1404,9 +1423,12 @@ namespace
 // will deliver.
 struct SortedCursor
 {
-  explicit SortedCursor(const std::filesystem::path& path) : iter(path) {}
+  SortedCursor(const std::filesystem::path& path, ReaderStats& stats) : iter(path), tally(iter, stats)
+  {
+  }
 
   BinaryLogIterator iter;
+  BytesReadTally tally;
   ReplayEvent head;
   size_t file_index{0};
   bool stop_past_to{false};
@@ -1483,7 +1505,7 @@ bool BinaryLogReader::mergeSortedRun(const ReadGroup& run, std::optional<int64_t
         continue;
       }
 
-      auto cursor = std::make_unique<SortedCursor>(segment.path);
+      auto cursor = std::make_unique<SortedCursor>(segment.path, _stats);
       if (!cursor->iter.isValid())
       {
         // Every segment whose range overlaps the current position holds an
@@ -2024,6 +2046,7 @@ bool BinaryLogReader::streamSegmentWithStats(const std::filesystem::path& path,
   {
     return false;
   }
+  BytesReadTally tally(iter, stats);
 
   bool stop_past_to = false;
   if (!narrowToRange(iter, stop_past_to))
@@ -2105,6 +2128,7 @@ bool BinaryLogReader::readSegmentStreamingFrom(const SegmentInfo& segment,
   {
     return false;
   }
+  BytesReadTally tally(iter, _stats);
 
   ++_stats.files_read;
 
@@ -2202,6 +2226,7 @@ ReaderStats BinaryLogReader::stats() const { return _stats; }
 
 std::vector<std::filesystem::path> BinaryLogReader::segmentFiles() const
 {
+  ensureScanned();
   std::vector<std::filesystem::path> paths;
   paths.reserve(_segments.size());
   for (const auto& seg : _segments)
@@ -2491,6 +2516,7 @@ bool BinaryLogIterator::nextUncompressed(ReplayEvent& out)
     {
       return false;  // Torn frame at the tail of a live segment
     }
+    _bytes_consumed += sizeof(frame) + frame.size;
 
     _last_event_offset = frame_pos >= 0 ? static_cast<uint64_t>(frame_pos) : 0;
 
@@ -2664,6 +2690,7 @@ bool BinaryLogIterator::loadNextBlock()
   {
     return false;
   }
+  _bytes_consumed += sizeof(block_header) + block_header.compressed_size;
 
   // Decompress
   _block_data.resize(block_header.original_size);
