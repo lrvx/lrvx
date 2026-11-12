@@ -11,8 +11,14 @@ UTC day:
   * inverse: ``public.bybit.com/trading/<SYM>/<SYM><YYYY-MM-DD>.csv.gz``
 
 Linear and inverse share the ``trading/`` prefix and differ only in
-symbol naming (``BTCUSDT`` linear, ``BTCUSD`` inverse). The symbol is
-used verbatim.
+symbol naming: linear ``BTCUSDT`` (USDT perpetual), ``BTCPERP`` (USDC
+perpetual) and ``BTC-27DEC24`` (USDC dated future); inverse ``BTCUSD``
+and ``BTCUSDZ24`` (dated). The symbol is used verbatim after a shape
+check against these forms.
+
+Days are UTC days. The range form caches the downloaded files under
+``<cache_root>/bybit/<market>/<symbol>/`` (``mirror`` replaces
+``<cache_root>/bybit``), with the download policy of ``_download``.
 
 The CSV layout is read from the header row. Derivatives files:
 
@@ -47,17 +53,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import shutil
-import time
-import urllib.error
-import urllib.request
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Iterator, Optional, Tuple, Union
 
-from . import _cache, _dedup, _layout
+from . import _cache, _dedup, _layout, _range
+from ._download import evict_if_corrupt
+from ._download import fetch as _download
 
 
 _BASE_URL = "https://public.bybit.com"
@@ -94,6 +97,9 @@ _QTY_UNIT = {"spot": "base", "linear": "base", "inverse": "usd_contracts"}
 
 DateLike = Union[str, date]
 
+# The archive's days start at midnight UTC.
+DAY_UTC_OFFSET_HOURS = 0
+
 
 @dataclass
 class ConvertStats:
@@ -129,27 +135,32 @@ def _mirror_path(mirror: Path, symbol: str, market: str, day: date) -> Path:
     return mirror / market / symbol / _file_name(symbol, market, day)
 
 
-def _download(url: str, dest: Path, *, retries: int = 3,
-              backoff: float = 2.0) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + ".tmp")
-    last_err: Optional[BaseException] = None
-    for attempt in range(retries):
-        try:
-            with urllib.request.urlopen(url, timeout=60) as resp, open(tmp, "wb") as f:
-                shutil.copyfileobj(resp, f)
-            tmp.replace(dest)
-            return
-        except (urllib.error.URLError, OSError, TimeoutError) as e:
-            last_err = e
-            if tmp.exists():
-                try:
-                    tmp.unlink()
-                except OSError:
-                    pass
-            if attempt < retries - 1:
-                time.sleep(backoff * (2 ** attempt))
-    raise RuntimeError(f"failed to download {url}: {last_err}") from last_err
+_INVERSE_DATED = re.compile(r"[A-Z0-9]+USD[FGHJKMNQUVXZ]\d{2}")
+_LINEAR_DATED = re.compile(r"[A-Z0-9_]+-\d{2}[A-Z]{3}\d{2}")
+
+
+def check_symbol(symbol: str, market: str) -> None:
+    """Raise ValueError unless ``symbol`` has the shape of a Bybit
+    ``market`` symbol as the archive names it. A local check; no
+    request is made."""
+    _market_path(market)
+    alnum = _range.is_upper_alnum(symbol)
+    if market == "spot":
+        ok = alnum
+        expected, example = "the pair in upper case with no separator", "BTCUSDT"
+    elif market == "linear":
+        ok = ((alnum and symbol.endswith(("USDT", "PERP")) and len(symbol) > 4)
+              or bool(_LINEAR_DATED.fullmatch(symbol)))
+        expected = ("<COIN>USDT, <COIN>PERP (USDC perpetual) or "
+                    "<NAME>-<DDMMMYY> (dated contract)")
+        example = "BTCUSDT, BTCPERP or BTC-27DEC24"
+    else:
+        ok = ((alnum and symbol.endswith("USD") and len(symbol) > 3)
+              or bool(_INVERSE_DATED.fullmatch(symbol)))
+        expected = "<COIN>USD or <COIN>USD<month code><YY> (dated)"
+        example = "BTCUSD or BTCUSDZ24"
+    if not ok:
+        raise _range.bad_symbol("Bybit", market, symbol, expected, example)
 
 
 def _hash_trade_id(token: str) -> int:
@@ -360,18 +371,6 @@ def trades_to_lrvx(
     return stats
 
 
-def _coerce_day(d: DateLike) -> date:
-    return d if isinstance(d, date) else date.fromisoformat(d)
-
-
-def _iter_days(date_from: DateLike, date_to: DateLike) -> Iterator[date]:
-    cur = _coerce_day(date_from)
-    end = _coerce_day(date_to)
-    while cur <= end:
-        yield cur
-        cur += timedelta(days=1)
-
-
 def range_to_lrvx(
     symbol: str,
     market: str,
@@ -389,49 +388,44 @@ def range_to_lrvx(
     compression: str = "none",
     skip_missing: bool = False,
 ) -> ConvertStats:
-    """Convert a multi-day Bybit range into lrvx.
+    """Convert a range of UTC days (inclusive) into lrvx.
 
-    When ``mirror`` is omitted, the shared ``cache_root() / "bybit"``
-    directory is used so repeated calls reuse the same on-disk cache
-    across runs. Pass an explicit path to keep the downloaded files
-    in a per-project folder."""
-    days = list(_iter_days(date_from, date_to))
+    Files are taken from, and missing ones downloaded into, the cache:
+    ``<cache_root>/bybit`` (``~/.lrvx/archive-cache/bybit`` unless
+    ``LRVX_ARCHIVE_CACHE`` says otherwise), or ``mirror`` when given,
+    laid out as ``<market>/<symbol>/<file name as published>``.
+
+    The symbol's shape is checked before any request. A range in which
+    no day is published raises ``NoFilesError``; a missing day raises
+    ``FileNotFoundError`` unless ``skip_missing``."""
+    check_symbol(symbol, market)
+    days = _range.days_between(date_from, date_to)
     if not days:
         return ConvertStats()
+    mirror = _cache.exchange_dir("bybit", mirror)
 
-    if mirror is None:
-        mirror = _cache.cache_root() / "bybit"
-    mirror = Path(mirror).expanduser()
-    mirror.mkdir(parents=True, exist_ok=True)
-
-    def _ensure(day: date) -> Tuple[date, Optional[Path]]:
+    def _ensure(day: date) -> Path:
         local = _mirror_path(mirror, symbol, market, day)
-        if local.exists():
-            return day, local
-        try:
+        if not local.exists():
             _download(_archive_url(symbol, market, day), local)
-        except Exception:
-            if skip_missing:
-                return day, None
-            raise
-        return day, local
+        return local
 
-    pairs: List[Tuple[date, Optional[Path]]] = []
-    with ThreadPoolExecutor(max_workers=max(1, int(parallel))) as ex:
-        for pair in ex.map(_ensure, days):
-            pairs.append(pair)
+    pairs = _range.fetch_days(days, _ensure, parallel=parallel,
+                              skip_missing=skip_missing,
+                              what=f"bybit {market} trades {symbol}")
 
     agg = ConvertStats()
     for day, path in pairs:
         if path is None:
             continue
-        s = trades_to_lrvx(
-            path, out_tape,
-            symbol_id=symbol_id, symbol_name=symbol, market=market,
-            exchange_id=exchange_id, exchange_name=exchange_name,
-            append=append, max_segment_mb=max_segment_mb,
-            compression=compression, write_metadata=False,
-        )
+        with evict_if_corrupt(path):
+            s = trades_to_lrvx(
+                path, out_tape,
+                symbol_id=symbol_id, symbol_name=symbol, market=market,
+                exchange_id=exchange_id, exchange_name=exchange_name,
+                append=append, max_segment_mb=max_segment_mb,
+                compression=compression, write_metadata=False,
+            )
         agg.trades_written += s.trades_written
         agg.rows_read += s.rows_read
         agg.rows_skipped += s.rows_skipped
@@ -461,6 +455,7 @@ NothingParsedError = _layout.NothingParsedError
 __all__ = [
     "ConvertStats",
     "NothingParsedError",
+    "check_symbol",
     "UnknownLayoutError",
     "trades_to_lrvx",
     "range_to_lrvx",
