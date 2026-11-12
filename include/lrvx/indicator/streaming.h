@@ -22,8 +22,8 @@
 // Cost per update is O(1) for the recursive indicators (SMA, EMA, RMA, RSI,
 // DEMA, TEMA, Slope, ATR, MACD) and O(period) for the ones that recompute
 // their window on every step to keep the exact numerics of a two-pass
-// computation (the rolling moments, correlation, entropy, range and
-// volatility estimators). It never depends on how many values the indicator
+// computation (the rolling moments, correlation, entropy, range, choppiness
+// and volatility estimators). It never depends on how many values the indicator
 // has already seen.
 
 #include <cmath>

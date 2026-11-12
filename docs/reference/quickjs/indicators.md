@@ -49,9 +49,7 @@ O(period) for the others. Values, `ready` and the NaN behaviour are the C++ clas
 with NaN shown as `null`; `Stochastic.ready` needs both `.k` and `.d`. `destroy()` frees the handle
 at once and a second call does nothing; an instance dropped without it is freed by the QuickJS
 finalizer when it is collected, and every remaining one when the runtime is torn down. After
-`destroy()` the value reads `null`, `ready` is false and `count` is 0. `CHOP` is the exception: it has
-no C++ streaming class, so its `update()` still re-runs the batch function over the bars it has
-kept, at a cost that grows with history.
+`destroy()` the value reads `null`, `ready` is false and `count` is 0.
 
 **Single value** — `update(value)`:
 
@@ -114,6 +112,7 @@ for (const v of stream) {
 | `AutoCorrelation` | `new AutoCorrelation(window, lag)` | SingleInput | static `AutoCorrelation.compute(data, window, lag)`, instance `compute(data)` |
 | `ATR` | `new ATR(period)` | BarInput | static `ATR.compute(high, low, close, period)` |
 | `CCI` | `new CCI(period)` | BarInput | static `CCI.compute(high, low, close, period)` |
+| `CHOP` | `new CHOP(period)` | BarInput | static `CHOP.compute(high, low, close, period)` |
 | `Stochastic` | `new Stochastic(kPeriod=14, dPeriod=3)` | BarInput | static `Stochastic.compute(high, low, close, kPeriod=14, dPeriod=3)`, instance `compute(high, low, close)` |
 | `ParkinsonVol` | `new ParkinsonVol(period)` | HighLowInput | static `ParkinsonVol.compute(high, low, period)` |
 | `RogersSatchellVol` | `new RogersSatchellVol(period)` | OhlcInput | static `RogersSatchellVol.compute(open, high, low, close, period)` |
@@ -125,8 +124,8 @@ An instance `compute()` exists only on `KAMA`, `ShannonEntropy`, `AutoCorrelatio
 `Stochastic`, `MACD`, `Bollinger`. On every other class above `new EMA(20).compute(prices)` is
 `undefined` — call `EMA.compute(prices, 20)`.
 
-Also defined in `lrvx/indicators.js` but not in the shared registry: `CHOP` (streaming plus a
-static `compute()`); `ADX`, `OBV`, `VWAP`, `CVD` (batch-only static `compute()`, no `update()`).
+Also defined in `lrvx/indicators.js` but not in the shared registry: `ADX`, `OBV`, `VWAP`, `CVD`
+(batch-only static `compute()`, no `update()`).
 
 
 <!-- INDICATOR-LIST-END -->

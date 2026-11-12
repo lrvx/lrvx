@@ -20,11 +20,6 @@
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-function _last(arr) {
-    if (!arr || arr.length === 0) return NaN;
-    return arr[arr.length - 1];
-}
-
 function _optNum(v) { return (typeof v !== 'number' || isNaN(v)) ? null : v; }
 
 // Integer constructor arguments convert the way the batch bindings convert
@@ -72,28 +67,6 @@ class _StreamOhlc extends _StreamHandle {
 // Pair: update(x, y).
 class _StreamPair extends _StreamHandle {
     update(x, y) { return _optNum(__lrvx_streaming_indicator_update_pair(this._h, x, y)); }
-}
-
-// CHOP has no C++ streaming class (it is not in registry.def), so its
-// streaming form still keeps the bar history and re-runs the batch function
-// on each update: O(history) per update.
-class _HistoryBar {
-    constructor(period, batchFn) {
-        this._period = period;
-        this._batchFn = batchFn;
-        this._h = []; this._l = []; this._c = [];
-    }
-    update(high, low, close) {
-        this._h.push(high); this._l.push(low); this._c.push(close);
-        return _optNum(_last(this._batchFn(this._h, this._l, this._c, this._period)));
-    }
-    get value() {
-        if (this._h.length === 0) return null;
-        return _optNum(_last(this._batchFn(this._h, this._l, this._c, this._period)));
-    }
-    get ready() { return this.value !== null; }
-    get count() { return this._h.length; }
-    reset() { this._h = []; this._l = []; this._c = []; }
 }
 
 // ============================================================
@@ -165,8 +138,8 @@ class CCI extends _StreamBar {
     }
 }
 
-class CHOP extends _HistoryBar {
-    constructor(period) { super(period, __lrvx_indicator_chop); }
+class CHOP extends _StreamBar {
+    constructor(period) { super('chop', [_u(period)]); }
     static compute(high, low, close, period) {
         return __lrvx_indicator_chop(high, low, close, period);
     }

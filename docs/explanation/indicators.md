@@ -1,8 +1,8 @@
 # Indicators
 
-lrvx has 21 streaming indicator classes plus several batch-only functions, split across moving averages, oscillators, trend, volatility, volume, and statistics. The same set is exposed by every binding — Python, Node.js, Codon, and the C++ core all share one implementation.
+lrvx has 22 streaming indicator classes plus several batch-only functions, split across moving averages, oscillators, trend, volatility, volume, and statistics. The same set is exposed by every binding — Python, Node.js, Codon, and the C++ core all share one implementation.
 
-Most of them work in two modes: batch (pass an array, get an array back) and streaming (call `.update()` each tick, check `.ready` before reading `.value`). Several are batch-only — a free function but no indicator class or streaming mode: **ADX**, **CHOP**, **OBV**, **VWAP**, **CVD**, plus the statistical **ADF** stationarity test and **Hurst/DFA** (`hurst_dfa`, `rolling_hurst`). The 21 streaming classes are the ones in `include/lrvx/indicator/registry.def`; `lrvx.list_indicators()` returns exactly that list at runtime.
+Most of them work in two modes: batch (pass an array, get an array back) and streaming (call `.update()` each tick, check `.ready` before reading `.value`). Several are batch-only — a free function but no indicator class or streaming mode: **ADX**, **OBV**, **VWAP**, **CVD**, plus the statistical **ADF** stationarity test and **Hurst/DFA** (`hurst_dfa`, `rolling_hurst`). The 22 streaming classes are the ones in `include/lrvx/indicator/registry.def`; `lrvx.list_indicators()` returns exactly that list at runtime.
 
 This page covers what each one actually measures and when you'd want it.
 
@@ -153,7 +153,7 @@ ADX above 25 typically means there's a trend worth following. Below 20 is choppy
 
 ### CHOP
 
-*Batch-only — `chop(high, low, close, period)`. No streaming class.*
+*Streaming class `CHOP(period)` with `update(high, low, close)`, and batch `chop(high, low, close, period)`.*
 
 How much price moved as a fraction of the maximum possible range over the period.
 

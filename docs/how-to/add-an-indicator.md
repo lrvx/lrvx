@@ -159,7 +159,7 @@ instance's kernel and `compute()` runs the same `step()` over the whole input
 on a fresh kernel, so there is no separate streaming logic to drift. The
 parity test compares every step bit for bit.
 
-## 4. Reading the existing 21 indicators
+## 4. Reading the existing 22 indicators
 
 Every indicator listed in `registry.def` (EMA, SMA, RSI, ATR, MACD, ...)
 follows exactly this pattern. Look at any `include/lrvx/indicator/<name>.h`
@@ -172,7 +172,7 @@ cost of a step depends only on the indicator's parameters. Recursive
 indicators (SMA's running sum, EMA, RMA, RSI, DEMA, TEMA, Slope, ATR, MACD)
 step in O(1). Indicators that recompute their window each step to keep the
 exact numerics of a two-pass computation (Skewness, Kurtosis, RollingZScore,
-Correlation, AutoCorrelation, ShannonEntropy, KAMA, CCI, Bollinger,
+Correlation, AutoCorrelation, ShannonEntropy, KAMA, CCI, CHOP, Bollinger,
 Stochastic, ParkinsonVol, RogersSatchellVol) step in O(period). Memory is a
 ring buffer of at most the last `period` inputs, allocated when the indicator
 is constructed.

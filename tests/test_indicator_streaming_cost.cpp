@@ -25,6 +25,7 @@
 #include "lrvx/indicator/autocorrelation.h"
 #include "lrvx/indicator/bollinger.h"
 #include "lrvx/indicator/cci.h"
+#include "lrvx/indicator/chop.h"
 #include "lrvx/indicator/correlation.h"
 #include "lrvx/indicator/dema.h"
 #include "lrvx/indicator/ema.h"
@@ -284,6 +285,12 @@ TEST(IndicatorStreamingCost, ATR14)
                                 { return ATR(14); }, 20000);
 }
 
+TEST(IndicatorStreamingCost, CHOP240)
+{
+  checkCostIndependentOfHistory("CHOP(240)", []
+                                { return CHOP(240); }, 2000);
+}
+
 // ---- Structural: no allocation after construction -------------------------
 
 TEST(IndicatorStreamingCost, NoAllocationPerUpdate)
@@ -319,6 +326,8 @@ TEST(IndicatorStreamingCost, NoAllocationPerUpdate)
                     { return ATR(14); });
   checkNoAllocation("CCI", []
                     { return CCI(20); });
+  checkNoAllocation("CHOP", []
+                    { return CHOP(14); });
   checkNoAllocation("Stochastic", []
                     { return Stochastic(14, 3); });
   checkNoAllocation("ParkinsonVol", []

@@ -631,6 +631,7 @@ class AutoCorrelationWrap : public Napi::ObjectWrap<AutoCorrelationWrap>
 
 WRAP_BAR_1(ATR)
 WRAP_BAR_1(CCI)
+WRAP_BAR_1(CHOP)
 
 #undef WRAP_BAR_1
 
@@ -1009,6 +1010,7 @@ inline void registerIndicators(Napi::Env env, Napi::Object exports)
   exports.Set("Slope", SlopeWrap::Init(env));
   exports.Set("Stochastic", StochasticWrap::Init(env));
   exports.Set("CCI", CCIWrap::Init(env));
+  exports.Set("CHOP", CHOPWrap::Init(env));
   exports.Set("Skewness", SkewnessWrap::Init(env));
   exports.Set("Kurtosis", KurtosisWrap::Init(env));
   exports.Set("RollingZScore", RollingZScoreWrap::Init(env));

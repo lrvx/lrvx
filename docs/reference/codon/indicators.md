@@ -61,13 +61,13 @@ All streaming indicators share the same pattern: call `update()` each tick, read
 
 ```codon
 from lrvx.indicators import EMA, SMA, RSI, ATR, MACD, Bollinger
-from lrvx.indicators import RMA, DEMA, TEMA, KAMA, Slope, CCI, Stochastic
+from lrvx.indicators import RMA, DEMA, TEMA, KAMA, Slope, CCI, CHOP, Stochastic
 from lrvx.indicators import Skewness, Kurtosis, RollingZScore, ShannonEntropy
 from lrvx.indicators import ParkinsonVol, RogersSatchellVol, Correlation, AutoCorrelation
 ```
 
 The complete class list is `SMA`, `EMA`, `RMA`, `DEMA`, `TEMA`, `KAMA`, `RSI`, `Slope`, `ATR`, `CCI`,
-`MACD`, `Bollinger`, `Stochastic`, `Skewness`, `Kurtosis`, `RollingZScore`, `ShannonEntropy`,
+`CHOP`, `MACD`, `Bollinger`, `Stochastic`, `Skewness`, `Kurtosis`, `RollingZScore`, `ShannonEntropy`,
 `ParkinsonVol`, `RogersSatchellVol`, `Correlation`, `AutoCorrelation`. There is no `OBV`, `VWAP` or
 `CVD` class — those three are batch-only free functions.
 
@@ -257,6 +257,15 @@ cci = CCI(period=20)
 value = cci.update(high, low, close)
 ```
 
+#### `CHOP`
+
+Choppiness Index.
+
+```codon
+ch = CHOP(14)
+value = ch.update(high, low, close)
+```
+
 #### `Stochastic`
 
 ```codon
@@ -332,6 +341,7 @@ series = cci(highs, lows, closes, 20)      # batch via the free function
 | `AutoCorrelation` | `AutoCorrelation(window, lag)` | SingleInput | none — free function `autocorrelation(data, window, lag)` |
 | `ATR` | `ATR(period)` | BarInput | instance `compute(h, l, c)` |
 | `CCI` | `CCI(period)` | BarInput | none — free function `cci(high, low, close, period)` |
+| `CHOP` | `CHOP(period)` | BarInput | instance `compute(h, l, c)` |
 | `Stochastic` | `Stochastic(k_period=14, d_period=3)` | BarInput | none — free function `stochastic(high, low, close, k_period=14, d_period=3)` |
 | `ParkinsonVol` | `ParkinsonVol(period)` | HighLowInput | none — free function `parkinson_vol(high, low, period)` |
 | `RogersSatchellVol` | `RogersSatchellVol(period)` | OhlcInput | none — free function `rogers_satchell_vol(open_, high, low, close, period)` |

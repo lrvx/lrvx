@@ -20,10 +20,10 @@ import time
 
 from lrvx.indicators import (
     SMA, EMA, RMA, RSI, KAMA, DEMA, TEMA, Slope, Skewness, Kurtosis,
-    RollingZScore, ShannonEntropy, AutoCorrelation, ATR, CCI, Stochastic,
+    RollingZScore, ShannonEntropy, AutoCorrelation, ATR, CCI, CHOP, Stochastic,
     ParkinsonVol, RogersSatchellVol, Correlation, MACD, Bollinger,
     sma, ema, rma, rsi, kama, dema, tema, slope, skewness, kurtosis,
-    rolling_zscore, shannon_entropy, autocorrelation, atr, cci, stochastic,
+    rolling_zscore, shannon_entropy, autocorrelation, atr, cci, chop, stochastic,
     parkinson_vol, rogers_satchell_vol, rolling_correlation, macd, bollinger,
 )
 
@@ -137,6 +137,7 @@ check_single("ShannonEntropy(20,8)", ShannonEntropy(20, 8), shannon_entropy(c, 2
 check_single("AutoCorrelation(20,3)", AutoCorrelation(20, 3), autocorrelation(c, 20, 3))
 check_bar("ATR(14)", ATR(14), atr(h, l, c, 14))
 check_bar("CCI(20)", CCI(20), cci(h, l, c, 20))
+check_bar("CHOP(14)", CHOP(14), chop(h, l, c, 14))
 
 
 def check_parkinson():
@@ -290,11 +291,18 @@ def timed_run(kind: int, n: int, budget: float) -> float:
             acc += ind2.update(p)
             if (i & 255) == 255 and time.perf_counter() - t0 > budget:
                 return -(time.perf_counter() - t0)
-    else:
+    elif kind == 2:
         ind3 = ATR(14)
         for i in range(n):
             p += math.sin(i * 0.37)
             acc += ind3.update(p + 1.0, p - 1.0, p)
+            if (i & 255) == 255 and time.perf_counter() - t0 > budget:
+                return -(time.perf_counter() - t0)
+    else:
+        ind4 = CHOP(240)
+        for i in range(n):
+            p += math.sin(i * 0.37)
+            acc += ind4.update(p + 1.0, p - 1.0, p)
             if (i & 255) == 255 and time.perf_counter() - t0 > budget:
                 return -(time.perf_counter() - t0)
     el = time.perf_counter() - t0
@@ -303,7 +311,7 @@ def timed_run(kind: int, n: int, budget: float) -> float:
     return el
 
 
-for kind, name in ((0, "RollingZScore(240)"), (1, "SMA(240)"), (2, "ATR(14)")):
+for kind, name in ((0, "RollingZScore(240)"), (1, "SMA(240)"), (2, "ATR(14)"), (3, "CHOP(240)")):
     t1 = 1e300
     for _ in range(5):
         t1 = min(t1, timed_run(kind, 2000, 1e300))

@@ -427,6 +427,81 @@ void test_conditional_orders_obey_the_instrument()
   CHECK(accepted == 1);
 }
 
+// ---- property 5: a conditional is refused for the same reason a limit is ----
+//
+// The same violation gets the same reason whichever order type carries it: a
+// client that rounds an off-grid limit on TickSizeViolation must not need a
+// second rule for an off-grid stop. Each case is submitted as a stop-market
+// (the price is its trigger), as a stop-limit (the price is both trigger and
+// limit), and as a plain limit, and the three reasons must agree.
+
+RejectReason firstReject(const SymbolConfig& sc, const NewOrder& o)
+{
+  std::vector<OutboundEvent> ev;
+  Eng eng(sc, [&](const OutboundEvent& e)
+          { ev.push_back(e); });
+  eng.submit(InboundCommand{o}, 1);
+  for (auto& e : ev)
+  {
+    if (const auto* r = std::get_if<OrderRejected>(&e))
+    {
+      return r->reason;
+    }
+  }
+  return RejectReason::None;
+}
+
+void test_conditional_reasons_match_limit_reasons()
+{
+  std::printf("test_conditional_reasons_match_limit_reasons\n");
+  struct Case
+  {
+    const char* name;
+    double price;
+    double quantity;
+    RejectReason expected;
+  };
+  const Case bad[] = {
+      {"off-tick price", 50.005, 5, RejectReason::TickSizeViolation},
+      {"price below band", 0.5, 5, RejectReason::InvalidPrice},
+      {"price above band", 5000, 5, RejectReason::InvalidPrice},
+      {"sub-lot quantity", 50, 0.5, RejectReason::LotSizeViolation},
+  };
+  SymbolConfig sc = cfg();
+  sc.minPrice = px(10);
+  sc.lotSize = qty(1);
+
+  for (const auto& c : bad)
+  {
+    const NewOrder lim = limit(1, Side::SELL, c.price, c.quantity, 1);
+    NewOrder stopMkt = limit(1, Side::SELL, 0, c.quantity, 1);
+    stopMkt.type = OrderType::STOP_MARKET;
+    stopMkt.triggerPrice = px(c.price);
+    NewOrder stopLim = lim;
+    stopLim.type = OrderType::STOP_LIMIT;
+    stopLim.triggerPrice = px(c.price);
+
+    const RejectReason rl = firstReject(sc, lim);
+    const RejectReason rm = firstReject(sc, stopMkt);
+    const RejectReason rs = firstReject(sc, stopLim);
+    if (rl != c.expected || rm != c.expected || rs != c.expected)
+    {
+      std::printf("  %s: limit %s, stop-market %s, stop-limit %s, expected %s\n", c.name, toString(rl),
+                  toString(rm), toString(rs), toString(c.expected));
+    }
+    CHECK(rl == c.expected);
+    CHECK(rm == c.expected);
+    CHECK(rs == c.expected);
+  }
+
+  // The stop-limit's own limit price is held to the tick with the same
+  // reason when only it is off the grid.
+  NewOrder offTickLimitOnly = limit(1, Side::SELL, 50.005, 5, 1);
+  offTickLimitOnly.type = OrderType::STOP_LIMIT;
+  offTickLimitOnly.triggerPrice = px(50);
+  CHECK(firstReject(sc, offTickLimitOnly) == RejectReason::TickSizeViolation);
+}
+
 }  // namespace
 
 TEST(VenueGateCoverage, EveryPathIsGated)
@@ -435,6 +510,7 @@ TEST(VenueGateCoverage, EveryPathIsGated)
   test_every_perp_fill_was_risk_checked();
   test_instrument_state_honoured_on_every_path();
   test_conditional_orders_obey_the_instrument();
+  test_conditional_reasons_match_limit_reasons();
   std::printf("\n%d checks, %d failures\n", g_checks, g_failures);
   EXPECT_EQ(g_failures, 0);
 }

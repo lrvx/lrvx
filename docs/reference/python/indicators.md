@@ -31,6 +31,7 @@ During warmup, `update()` and `.value` return `None`. Check with `if result is n
 `ATR(period)` — `update(high, low, close)`  
 `Stochastic(k_period=14, d_period=3)` — `update(high, low, close)` → `.k`, `.d`  
 `CCI(period=20)` — `update(high, low, close)`  
+`CHOP(period=14)` — `update(high, low, close)`  
 `ParkinsonVol(period)` — `update(high, low)`  
 `RogersSatchellVol(period)` — `update(open, high, low, close)`  
 `Correlation(period)` — `update(x, y)`
@@ -413,6 +414,7 @@ for v in stream:
 | `AutoCorrelation` | `lrvx.AutoCorrelation(window, lag)` | SingleInput |
 | `ATR` | `lrvx.ATR(period)` | BarInput |
 | `CCI` | `lrvx.CCI(period)` | BarInput |
+| `CHOP` | `lrvx.CHOP(period)` | BarInput |
 | `Stochastic` | `lrvx.Stochastic(k_period, d_period)` | BarInput |
 | `ParkinsonVol` | `lrvx.ParkinsonVol(period)` | HighLowInput |
 | `RogersSatchellVol` | `lrvx.RogersSatchellVol(period)` | OhlcInput |

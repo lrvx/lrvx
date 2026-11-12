@@ -208,7 +208,9 @@ class Credit
 
   // Instrument conformance for a conditional order: the trigger is a price and
   // the size is a size, so tick, band and lot apply exactly as they do to a
-  // resting limit. State and duplicate checks already ran before this point.
+  // resting limit -- with the same reasons, so a client handles an off-grid
+  // stop the way it handles an off-grid limit. State and duplicate checks
+  // already ran before this point.
   RejectReason validateConditional(const NewOrder& o, const SymbolConfig& cfg) const
   {
     if (o.quantity.raw() <= 0)
@@ -217,14 +219,14 @@ class Credit
     }
     if (!cfg.lotSize.isZero() && (o.quantity.raw() % cfg.lotSize.raw()) != 0)
     {
-      return RejectReason::InvalidQuantity;
+      return RejectReason::LotSizeViolation;
     }
     const int64_t trig = o.triggerPrice.raw();
     if (trig > 0)
     {
       if (!cfg.tickSize.isZero() && (trig % cfg.tickSize.raw()) != 0)
       {
-        return RejectReason::InvalidPrice;
+        return RejectReason::TickSizeViolation;
       }
       if (!cfg.minPrice.isZero() && trig < cfg.minPrice.raw())
       {
@@ -240,7 +242,7 @@ class Credit
     {
       if (!cfg.tickSize.isZero() && (o.price.raw() % cfg.tickSize.raw()) != 0)
       {
-        return RejectReason::InvalidPrice;
+        return RejectReason::TickSizeViolation;
       }
       if (!cfg.minPrice.isZero() && o.price.raw() < cfg.minPrice.raw())
       {
