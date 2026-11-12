@@ -324,8 +324,8 @@ stats = bt.run_csv("data.csv", "BTCUSDT")  # explicit symbol name
 | `run_bars(start_time_ns, end_time_ns, open, high, low, close, volume, symbol='', bar_type=0, bar_type_param=0)` | Replay full OHLCV bars (`Strategy.on_bar` fires) |
 | `run_tape(path)` | Run against a `.lrvx` tape directory — the canonical recorded artifact `lrvx tape record` writes. Same stats shape as `run_csv` |
 | `run_tapes(paths)` | Run against N `.lrvx` tapes merged on read. Symbols are rekeyed by `(metadata.exchange, name)`, so two captures of the same venue/symbol collapse and two venues stay distinct. `run_tapes([t])` equals `run_tape(t)` |
-| `equity_curve()` | Equity curve from the most recent run, as a dict of numpy arrays (`timestamp_ns`, `equity`, `drawdown_pct`) |
-| `trades()` | Closed trades from the most recent run, as a dict of numpy arrays (`symbol`, `side`, `entry_price`, `exit_price`, `quantity`, `pnl`, `fee`, `entry_time_ns`, `exit_time_ns`) |
+| `equity_curve()` | Equity curve from the most recent run, as a dict of numpy arrays (`timestamp_ns`, `equity`, `drawdown_pct`). One point per closed trade; a position still open at the end adds none (see [A position open at the end](#a-position-open-at-the-end)) |
+| `trades()` | Closed trades from the most recent run, as a dict of numpy arrays (`symbol`, `side`, `entry_price`, `exit_price`, `quantity`, `pnl`, `fee`, `entry_time_ns`, `exit_time_ns`). A position still open at the end is not a trade and is not listed |
 
 An empty `symbol` resolves to `"default"`.
 
@@ -346,12 +346,43 @@ Each setter takes `None` to detach.
 
 | Key | Description |
 |-----|-------------|
-| `return_pct` | Net return percentage |
-| `net_pnl` | Net P&L after fees |
+| `return_pct` | Net return percentage, `net_pnl / initial_capital * 100` |
+| `total_pnl` | Realized P&L of the closed trades, before fees |
+| `total_fees` | Fees of every fill, including the entry fill of a position still open at the end |
+| `net_pnl` | `total_pnl - total_fees`. Carries the entry fee of a position still open at the end, but not its unrealized P&L |
+| `final_capital` | `initial_capital + net_pnl` |
 | `total_trades` | Round-trip trade count |
 | `win_rate` | Winning trade fraction |
 | `sharpe_ratio` | Sharpe ratio over the returns between closed trades, scaled by sqrt(252); one period is one closed trade, not one day, so it is not annualized by time |
 | `max_drawdown_pct` | Peak-to-trough drawdown (%) |
+
+The dict carries the other `BacktestResult.stats()` keys too (`winning_trades`,
+`losing_trades`, `initial_capital`, `gross_profit`, `gross_loss`,
+`max_drawdown`, `profit_factor`, `sortino_ratio`, `calmar_ratio`).
+
+### A position open at the end
+
+A run can end with a position still open: the data ran out before the exit.
+`trades()` and `equity_curve()` hold closed trades only, and nothing values the
+open position, so its unrealized P&L is in none of the numbers. Its entry fee
+is: `total_fees` counts every fill, so `net_pnl`, `final_capital` and
+`return_pct` include it, while the closed trades do not.
+
+```
+net_pnl = sum(trades()["pnl"] - trades()["fee"]) - fee of the open entry
+```
+
+For 0.01 BTC entered at 78,000 with a 4 bp fee that is 0.312 below the closed
+trades' net, and below the last `equity_curve()` point minus `initial_capital`.
+When no trade has closed at all, the statistics are all zero, `total_fees` and
+`net_pnl` included, even though an entry was filled and charged.
+
+To tell that a run ended with a position open, read `position()` in the
+strategy's `on_stop()`, which the runner calls at the end of the run, or call
+`strategy.position(symbol)` after the run while the runner that ran it is
+still alive. A non-zero value is the open quantity. To value it, mark it at the
+last price yourself, or close it from the strategy before the data ends so it
+becomes a trade.
 
 ## Example
 

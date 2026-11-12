@@ -147,7 +147,7 @@ Reader statistics.
 | `events_read` | `int` | Total events processed |
 | `trades_read` | `int` | Trade events |
 | `book_updates_read` | `int` | Book update events |
-| `bytes_read` | `int` | Bytes read |
+| `bytes_read` | `int` | Segment-file bytes read as event data: every frame (header and payload) of an uncompressed segment, every block (header and compressed payload) of a compressed one. The segment header, the index and the directory scan are not counted, and a segment the range skips adds nothing, so a full read counts the bytes between each segment's header and its index. The same on every read path and thread count |
 | `crc_errors` | `int` | CRC checksum failures |
 | `segments_reordered` | `int` | Segments read at a different position than their file name gives them |
 | `segments_interleaved` | `int` | Segments whose events were merged with another segment's because their time ranges overlap |
@@ -186,7 +186,8 @@ Parallel mode partitions the segment at the compressed-block level. Each worker 
 
 #### `segment_files() -> list[str]`
 
-List of segment file paths.
+Segment file paths, in file-name order. Like `segments()`, it scans the
+directory on first use, so a fresh reader answers without a prior read.
 
 #### `segments() -> list[dict]`
 

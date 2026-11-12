@@ -79,6 +79,10 @@ struct ParallelReaderStats
 };
 ```
 
+`bytes_read` has the definition of `ReaderStats::bytes_read`: segment-file
+bytes consumed as event data, without segment headers or indexes. Every
+path counts it: one thread, sorted and unsorted output, and `forEachBatch`.
+
 ## Usage
 
 ### Basic Iteration

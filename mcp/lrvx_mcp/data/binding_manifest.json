@@ -15301,6 +15301,11 @@
         },
         {
           "kind": "method",
+          "name": "bytesConsumed",
+          "parent": "BinaryLogIterator"
+        },
+        {
+          "kind": "method",
           "name": "crcErrors",
           "parent": "BinaryLogIterator"
         },

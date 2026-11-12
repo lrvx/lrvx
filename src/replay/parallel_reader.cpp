@@ -152,6 +152,7 @@ std::unique_ptr<SegmentBuffer> ParallelReader::readSegment(const SegmentInfo& se
     buffer->events.push_back(std::move(event));
   }
 
+  buffer->bytes_read = iter.bytesConsumed();
   return buffer;
 }
 
@@ -263,6 +264,7 @@ uint64_t ParallelReader::forEach(EventCallback callback)
     _stats.events_read += rs.events_read;
     _stats.trades_read += rs.trades_read;
     _stats.book_updates_read += rs.book_updates_read;
+    _stats.bytes_read += rs.bytes_read;
     _stats.end_time_ns = time_utils::nowNanos();
     return count;
   }
@@ -299,6 +301,7 @@ uint64_t ParallelReader::forEach(EventCallback callback)
       if (buffer)
       {
         _stats.segments_processed++;
+        _stats.bytes_read += buffer->bytes_read;
         _stats.events_read += buffer->events.size();
         for (const auto& event : buffer->events)
         {
@@ -331,6 +334,7 @@ uint64_t ParallelReader::forEach(EventCallback callback)
   {
     // Deliver events as they become available (no sorting)
     std::atomic<uint64_t> count{0};
+    std::atomic<uint64_t> bytes_read{0};
     std::atomic<bool> stop_requested{false};
 
     std::vector<std::future<void>> futures;
@@ -341,8 +345,8 @@ uint64_t ParallelReader::forEach(EventCallback callback)
     for (const auto& segment : _segments)
     {
       futures.push_back(std::async(std::launch::async,
-                                   [this, &segment, &callback, &count, &stop_requested,
-                                    &callback_mutex]()
+                                   [this, &segment, &callback, &count, &bytes_read,
+                                    &stop_requested, &callback_mutex]()
                                    {
                                      if (stop_requested.load())
                                      {
@@ -354,6 +358,8 @@ uint64_t ParallelReader::forEach(EventCallback callback)
                                      {
                                        return;
                                      }
+                                     bytes_read.fetch_add(buffer->bytes_read,
+                                                          std::memory_order_relaxed);
 
                                      for (const auto& event : buffer->events)
                                      {
@@ -379,6 +385,7 @@ uint64_t ParallelReader::forEach(EventCallback callback)
       future.wait();
     }
 
+    _stats.bytes_read += bytes_read.load();
     _stats.end_time_ns = time_utils::nowNanos();
     return count.load();
   }
@@ -394,6 +401,7 @@ uint64_t ParallelReader::forEachBatch(BatchCallback callback)
   _stats.start_time_ns = time_utils::nowNanos();
 
   std::atomic<uint64_t> total_events{0};
+  std::atomic<uint64_t> bytes_read{0};
   std::atomic<bool> stop_requested{false};
 
   std::vector<std::future<void>> futures;
@@ -402,7 +410,8 @@ uint64_t ParallelReader::forEachBatch(BatchCallback callback)
   for (const auto& segment : _segments)
   {
     futures.push_back(std::async(std::launch::async,
-                                 [this, &segment, &callback, &total_events, &stop_requested]()
+                                 [this, &segment, &callback, &total_events, &bytes_read,
+                                  &stop_requested]()
                                  {
                                    if (stop_requested.load())
                                    {
@@ -410,6 +419,11 @@ uint64_t ParallelReader::forEachBatch(BatchCallback callback)
                                    }
 
                                    auto buffer = readSegment(segment);
+                                   if (buffer)
+                                   {
+                                     bytes_read.fetch_add(buffer->bytes_read,
+                                                          std::memory_order_relaxed);
+                                   }
                                    if (!buffer || buffer->events.empty())
                                    {
                                      return;
@@ -433,6 +447,7 @@ uint64_t ParallelReader::forEachBatch(BatchCallback callback)
 
   _stats.end_time_ns = time_utils::nowNanos();
   _stats.events_read = total_events.load();
+  _stats.bytes_read += bytes_read.load();
   return total_events.load();
 }
 

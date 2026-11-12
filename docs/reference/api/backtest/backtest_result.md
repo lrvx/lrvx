@@ -130,6 +130,31 @@ Sharpe and Sortino annualize the series with `sqrt(metricsAnnualizationFactor)`.
 
 The per-trade fee split is carried at full width. The per-side fee in quote currency times the quantity passes the int64 ceiling at about 922, which a 7 BTC round trip at four basis points already does, and the narrow form wrapped there into a negative fee: equity after a flat round trip finished above where it started while `totalFees` and `netPnl` in the same object stayed correct.
 
+### A position open after the last fill
+
+`trades()` and `equityCurve()` hold closed trades only; `totalPnl` is their
+realized PnL. `totalFees` is the fee of every recorded fill, including the
+entry fill (or the part of it not yet closed) of a position still open after
+the last fill. `netPnl = totalPnl - totalFees`, `finalCapital = initialCapital
++ netPnl` and `returnPct` therefore include that entry fee, and nothing values
+the open position, so its unrealized PnL appears nowhere:
+
+```
+netPnl = sum over trades() of (pnl - fee) - entry fee of the open position
+```
+
+The last `EquityPoint.equity` is `initialCapital` plus the closed trades' net,
+without that fee. For 0.01 BTC entered at 78,000 at 4 bp the two differ by
+0.312. When no trade has closed, `computeStats()` returns zero for every
+statistic, `totalFees` and `netPnl` included, and `finalCapital` equals
+`initialCapital`.
+
+There is no flag for an open position. `fills()` shows it: per symbol, the sum
+of `quantity` with `+` for `BUY` and `-` for `SELL` is non-zero while a
+position is open. A strategy driven by `BacktestRunner` can read its own
+position at the end of the run (`ctx.position`, or `position()` in the Python
+`on_stop()`).
+
 ## EquityPoint
 
 ```cpp
@@ -141,7 +166,7 @@ struct EquityPoint
 };
 ```
 
-One point is appended to the equity curve on every closed trade. The curve is accessible via `BacktestResult::equityCurve()` and can be written to a CSV file with header `timestamp_ns,equity,drawdown_pct` via `writeEquityCurveCsv(path)`.
+One point is appended to the equity curve on every closed trade, and none for a position still open. The curve is accessible via `BacktestResult::equityCurve()` and can be written to a CSV file with header `timestamp_ns,equity,drawdown_pct` via `writeEquityCurveCsv(path)`.
 
 ## BacktestResult
 
