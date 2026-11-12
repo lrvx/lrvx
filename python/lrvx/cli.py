@@ -764,10 +764,10 @@ def cmd_tape_view(args: argparse.Namespace) -> int:
 def cmd_archive_binance(args: argparse.Namespace) -> int:
     """Convert Binance public archives into a `.lrvx` tape.
 
-    Default product is aggTrades. Pass ``--book t1`` or
-    ``--book depth20`` to import bookTicker / bookDepth instead. The
-    two book products write to the same tape directory as trades, so a
-    single ``--out`` can carry both event streams interleaved.
+    Default product is aggTrades. Pass ``--book t1`` to import
+    bookTicker (um-futures and cm-futures) instead. Book events write
+    to the same tape directory as trades, so a single ``--out`` can
+    carry both event streams interleaved.
     """
     from . import archives  # local import keeps the CLI cheap to start
 
@@ -819,12 +819,16 @@ def cmd_archive_binance(args: argparse.Namespace) -> int:
 
 
 def _cmd_archive_binance_book(args: argparse.Namespace, archives) -> int:
-    """Implementation for `lrvx archive binance --book {t1|depth20} ...`.
+    """Implementation for `lrvx archive binance --book t1 ...`.
 
-    Mirrors `cmd_archive_binance` for the book products: --csv path for
-    one day, otherwise the date-range form with optional download
-    mirror."""
+    Mirrors `cmd_archive_binance` for bookTicker: --csv path for one
+    day, otherwise the date-range form with optional download mirror."""
     book_type = args.book
+    try:
+        archives.binance._check_book_request(book_type, args.market)
+    except ValueError as exc:
+        print(f"lrvx archive binance --book: {exc}", file=sys.stderr)
+        return 2
     book_kwargs = dict(
         symbol_id=args.symbol_id,
         symbol_name=args.symbol or "",
@@ -837,13 +841,8 @@ def _cmd_archive_binance_book(args: argparse.Namespace, archives) -> int:
     )
 
     if args.csv:
-        if book_type == "t1":
-            stats = archives.binance.t1_to_lrvx(
-                csv_path=args.csv, out_tape=args.out, **book_kwargs)
-        else:
-            stats = archives.binance.depth20_to_lrvx(
-                csv_path=args.csv, out_tape=args.out,
-                levels=args.book_levels, **book_kwargs)
+        stats = archives.binance.t1_to_lrvx(
+            csv_path=args.csv, out_tape=args.out, **book_kwargs)
     else:
         if not (args.symbol and args.date_from and args.date_to):
             print("lrvx archive binance --book: --symbol, --from and --to "
@@ -859,7 +858,6 @@ def _cmd_archive_binance_book(args: argparse.Namespace, archives) -> int:
             out_tape=args.out,
             mirror=args.mirror,
             parallel=args.parallel,
-            levels=args.book_levels,
             symbol_id=args.symbol_id,
             exchange_id=args.exchange_id,
             exchange_name=args.exchange_name,
@@ -1356,24 +1354,21 @@ def _build_parser() -> argparse.ArgumentParser:
                            choices=("none", "lz4"),
                            help="Segment compression (default: none).")
     p_binance.add_argument("--no-append", action="store_true",
-                           help="Disable agg_trade_id dedup against an "
-                                "existing tape; every row is written even "
-                                "if its trade_id was already present.")
+                           help="Disable dedup against an existing tape "
+                                "(agg_trade_id, or the book update id with "
+                                "--book); every row is written even if it "
+                                "was already present.")
     p_binance.add_argument("--skip-missing", action="store_true",
                            help="Skip days that fail to download instead of "
                                 "aborting the whole range.")
     p_binance.add_argument("--book", default=None,
-                           choices=("t1", "depth20"),
+                           choices=("t1",),
                            help="Switch to the book archive product. "
-                                "`t1` imports bookTicker (best bid/ask "
-                                "snapshots); `depth20` imports bookDepth "
-                                "(top-20 levels per side, delta-encoded "
-                                "against the previous snapshot). Without "
+                                "`t1` imports bookTicker (best bid/ask, "
+                                "delta-encoded within each day, every day "
+                                "opening with a snapshot); published for "
+                                "um-futures and cm-futures only. Without "
                                 "this flag, aggTrades is imported.")
-    p_binance.add_argument("--book-levels", dest="book_levels", type=int,
-                           default=20,
-                           help="Maximum levels per side to keep when "
-                                "importing depth20 (default: 20).")
     p_binance.set_defaults(handler=cmd_archive_binance)
 
     p_bybit = archive_sub.add_parser(

@@ -16,6 +16,8 @@ All five trade importers append by default and dedup the same way: a row is skip
 
 Each import writes new segments named by the time of the import, so a tape filled out of order lists its segments out of time order. Readers and `run_tape` order segments by their first event, so the tape still replays forward in time.
 
+The Binance bookTicker importer (`--book t1`) follows the same rule on the book record's update id, and encodes every file on its own, starting from a snapshot, so book days may be imported in any order too. See [Import Binance book archives](import-binance-book-archive.md#append-safe-and-idempotent).
+
 ## Bybit
 
 Bybit publishes daily trade ticks at `https://public.bybit.com/` going back two-plus years. The on-disk CSV layout (post-2022):
@@ -240,5 +242,5 @@ Register the new module in `archives/__init__.py`, add a `lrvx archive <exchange
 ## See also
 
 - [Import Binance public archives](import-binance-archive.md) — trade stream.
-- [Import Binance book archives](import-binance-book-archive.md) — bookTicker / bookDepth.
+- [Import Binance book archives](import-binance-book-archive.md) — bookTicker (best bid / ask) for um-futures and cm-futures.
 - [Merge multiple tapes on read](multi-tape.md) — `MergedTapeReader` semantics across multiple exchanges.
