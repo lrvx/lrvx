@@ -204,6 +204,7 @@ void BacktestRunner::resetRunState()
   }
   _nextOrderId = 1;
   _customOrders.clear();
+  _orderSymbols.clear();
   _eventCount = 0;
   _tradeCount = 0;
   _bookUpdateCount = 0;
@@ -1048,6 +1049,7 @@ void BacktestRunner::onSignal(const Signal& signal)
       {
         return;
       }
+      _orderSymbols[order.id] = order.symbol;
       // A market order never rests, so there is nothing of it to modify.
       if (_customExecutor != nullptr && order.type != OrderType::MARKET)
       {
@@ -1100,6 +1102,8 @@ void BacktestRunner::onSignal(const Signal& signal)
       {
         return;
       }
+      _orderSymbols[order1.id] = order1.symbol;
+      _orderSymbols[order2.id] = order2.symbol;
       if (_customExecutor != nullptr)
       {
         _customOrders[order1.id] = order1;
@@ -1133,7 +1137,29 @@ Order BacktestRunner::modifiedOrder(const Signal& sig)
   {
     order = *live;
   }
-  order.price = sig.newPrice;
+  // An order that already finished is no longer anywhere to copy from. Its
+  // symbol still routes the executor's refusal back to the strategy.
+  if (order.symbol == SymbolId{})
+  {
+    if (const auto it = _orderSymbols.find(sig.orderId); it != _orderSymbols.end())
+    {
+      order.symbol = it->second;
+    }
+  }
+  // The one price a Modify carries is the price the order works at: the
+  // trigger of a stop, take-profit or trailing order that fills at market,
+  // the limit of everything else (a stop-limit keeps its trigger).
+  switch (order.type)
+  {
+    case OrderType::STOP_MARKET:
+    case OrderType::TAKE_PROFIT_MARKET:
+    case OrderType::TRAILING_STOP:
+      order.triggerPrice = sig.newPrice;
+      break;
+    default:
+      order.price = sig.newPrice;
+      break;
+  }
   order.quantity = sig.newQuantity;
   // The replacement is a fresh order: newQuantity is what is left to work.
   order.filledQuantity = Quantity{};

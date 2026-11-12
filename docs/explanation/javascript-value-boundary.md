@@ -63,6 +63,25 @@ Write side: every binding that takes a nanosecond argument accepts a
 `addTrade` and the rest keep working with the literals already in your
 scripts.
 
+### The Node addon
+
+The same rule holds in Node. Besides the callback payloads and tape
+records listed above, these read as `BigInt`:
+
+- `DataReader.summary()` and `inspect()`: `firstEventNs`, `lastEventNs`
+- `validateDataset()`: `firstTimestamp`, `lastTimestamp`
+- `Partitioner` partitions: `fromNs`, `toNs`, `warmupFromNs`
+- the cursor handed to `DataReader.run`'s `onProgress`
+- `OrderJourneyTracer` rows: `tsNs` and the eight per-stage timestamps
+- execution-algo child orders: `timestampNs`
+- `RateLimitPolicy.banUntilNs()`, `FeeSchedule.tierTransitions()`
+- `TraceReader.runStartedNs()` / `runEndedNs()`, and `runTsNs` / `feedTsNs`
+  on every signal, order-event and fill record
+- `tapeDiff` mismatches: `exchangeTsNs`
+
+`FundingSchedule.tick()` payments still report `timestampNs` as a
+`Number`: the C API hands that value over as a double.
+
 ### What did not change
 
 Durations stay `Number`. A latency, a bar interval or a trade duration is

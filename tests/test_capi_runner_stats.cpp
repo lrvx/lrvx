@@ -20,6 +20,7 @@
 
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <random>
 #include <string>
 
@@ -242,4 +243,134 @@ TEST_F(CapiRunnerStats, RunTapesFailureSaysWhy)
   const char* withNull[] = {tape.c_str(), nullptr};
   EXPECT_EQ(lrvx_backtest_runner_run_tapes(_btr, withNull, 2, &stats), 0);
   EXPECT_EQ(lrvx_last_error_code(), 2);
+}
+
+TEST_F(CapiRunnerStats, RunCsvFailureSaysWhy)
+{
+  const std::string missing = (_root / "no_such.csv").string();
+  LrvxBacktestStats stats{};
+  EXPECT_EQ(lrvx_backtest_runner_run_csv(_btr, missing.c_str(), "AAA", &stats), 0);
+  EXPECT_EQ(lrvx_last_error_code(), 2);
+  std::string msg = lrvx_last_error_message();
+  EXPECT_NE(msg.find("lrvx_backtest_runner_run_csv"), std::string::npos) << msg;
+  EXPECT_NE(msg.find("cannot open"), std::string::npos) << msg;
+  EXPECT_NE(msg.find(missing), std::string::npos) << msg;
+
+  // A row that is not a bar names the file and the line it is on.
+  const std::string bad = (_root / "bad.csv").string();
+  {
+    std::ofstream f(bad);
+    f << "timestamp,open,high,low,close,volume\n"
+      << "1767225600,100,101,99,100,1\n"
+      << "not-a-timestamp,100,101,99,100,1\n";
+  }
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_backtest_runner_run_csv(_btr, bad.c_str(), "AAA", &stats), 0);
+  EXPECT_EQ(lrvx_last_error_code(), 2);
+  msg = lrvx_last_error_message();
+  EXPECT_NE(msg.find(bad), std::string::npos) << msg;
+  EXPECT_NE(msg.find("line 3"), std::string::npos) << msg;
+
+  // A readable file still runs.
+  const std::string good = (_root / "good.csv").string();
+  {
+    std::ofstream f(good);
+    f << "timestamp,open,high,low,close,volume\n"
+      << "1767225600,100,101,99,100,1\n"
+      << "1767225660,100,101,99,101,1\n";
+  }
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_backtest_runner_run_csv(_btr, good.c_str(), "AAA", &stats), 1)
+      << lrvx_last_error_message();
+  EXPECT_EQ(lrvx_last_error_code(), 0);
+}
+
+TEST_F(CapiRunnerStats, RunCsvNullPathSaysWhy)
+{
+  LrvxBacktestStats stats{};
+  EXPECT_EQ(lrvx_backtest_runner_run_csv(_btr, nullptr, "AAA", &stats), 0);
+  EXPECT_EQ(lrvx_last_error_code(), 1);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("'path'"), std::string::npos)
+      << lrvx_last_error_message();
+}
+
+TEST_F(CapiRunnerStats, RunReplaySourceFailureSaysWhy)
+{
+  LrvxBacktestStats stats{};
+  EXPECT_EQ(lrvx_backtest_runner_run_replay_source(_btr, nullptr, &stats), 0);
+  EXPECT_EQ(lrvx_last_error_code(), 1);
+  const std::string msg = lrvx_last_error_message();
+  EXPECT_NE(msg.find("lrvx_backtest_runner_run_replay_source"), std::string::npos) << msg;
+  EXPECT_NE(msg.find("'source'"), std::string::npos) << msg;
+}
+
+TEST_F(CapiRunnerStats, RunOhlcvFailureSaysWhy)
+{
+  LrvxBacktestStats stats{};
+  const int64_t ts[] = {kT0, kT0 + kSec};
+  const double closes[] = {100.0, 101.0};
+
+  EXPECT_EQ(lrvx_backtest_runner_run_ohlcv(_btr, nullptr, closes, 2, "AAA", &stats), 0);
+  EXPECT_EQ(lrvx_last_error_code(), 1);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("'timestamps_ns'"), std::string::npos)
+      << lrvx_last_error_message();
+
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_backtest_runner_run_ohlcv(_btr, ts, nullptr, 2, "AAA", &stats), 0);
+  EXPECT_EQ(lrvx_last_error_code(), 1);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("'close_prices'"), std::string::npos)
+      << lrvx_last_error_message();
+
+  // No bars need no arrays.
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_backtest_runner_run_ohlcv(_btr, nullptr, nullptr, 0, "AAA", &stats), 1)
+      << lrvx_last_error_message();
+  EXPECT_EQ(lrvx_last_error_code(), 0);
+}
+
+TEST_F(CapiRunnerStats, RunBarsFailureSaysWhy)
+{
+  LrvxBacktestStats stats{};
+  const int64_t starts[] = {kT0};
+  const int64_t ends[] = {kT0 + kSec};
+  const double px[] = {100.0};
+
+  struct Case
+  {
+    const int64_t* start;
+    const int64_t* end;
+    const double* open;
+    const double* high;
+    const double* low;
+    const double* close;
+    const char* name;
+  };
+  const Case cases[] = {
+      {nullptr, ends, px, px, px, px, "start_time_ns"},
+      {starts, nullptr, px, px, px, px, "end_time_ns"},
+      {starts, ends, nullptr, px, px, px, "open"},
+      {starts, ends, px, nullptr, px, px, "high"},
+      {starts, ends, px, px, nullptr, px, "low"},
+      {starts, ends, px, px, px, nullptr, "close"},
+  };
+  for (const Case& c : cases)
+  {
+    lrvx_clear_last_error();
+    EXPECT_EQ(lrvx_backtest_runner_run_bars(_btr, c.start, c.end, c.open, c.high, c.low, c.close,
+                                            px, 1, "AAA", 0, 0, &stats),
+              0)
+        << c.name;
+    EXPECT_EQ(lrvx_last_error_code(), 1) << c.name;
+    EXPECT_NE(std::string(lrvx_last_error_message()).find(std::string("'") + c.name + "'"),
+              std::string::npos)
+        << lrvx_last_error_message();
+  }
+
+  // The volume column is optional.
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_backtest_runner_run_bars(_btr, starts, ends, px, px, px, px, nullptr, 1, "AAA",
+                                          0, 0, &stats),
+            1)
+      << lrvx_last_error_message();
+  EXPECT_EQ(lrvx_last_error_code(), 0);
 }

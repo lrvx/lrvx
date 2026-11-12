@@ -45,7 +45,7 @@ const events = reader.readBookUpdates();
 | Method / Property | Returns | Description |
 |-------------------|---------|-------------|
 | `count` | `number` | Total event count (property) |
-| `summary()` | `{ firstEventNs, lastEventNs, totalEvents, segmentCount, totalBytes, durationSeconds }` | Dataset summary |
+| `summary()` | `{ firstEventNs, lastEventNs, totalEvents, segmentCount, totalBytes, durationSeconds }` | Dataset summary. `firstEventNs` and `lastEventNs` are `bigint`; the rest are `number` |
 | `stats()` | `{ filesRead, eventsRead, tradesRead, bookUpdatesRead, bytesRead, crcErrors }` | Read statistics |
 | `readTrades(max?)` | trade record array | Read up to `max` trades (all if omitted) |
 | `readTradesFrom(startTsNs, max?)` | trade record array | Same as `readTrades` starting from `startTsNs` |
@@ -61,7 +61,7 @@ const events = reader.readBookUpdates();
 | Field | Type | Description |
 |-------|------|-------------|
 | `nThreads` | `number` | `0` (default) auto-picks `min(blocks_per_segment/2, hardware_concurrency)`; `1` forces single-thread; `>1` sets the worker count (capped to the effective block count). |
-| `onProgress` | `(pct, tsNs) => boolean \| void` | Called from inside the run loop with the bytes-based pct (0..1) and the cursor timestamp in nanoseconds. Return `false` to cancel. Only fires on the single-thread path, so it requires `nThreads: 1`. |
+| `onProgress` | `(pct, tsNs) => boolean \| void` | Called from inside the run loop with the bytes-based pct (0..1) and the cursor timestamp in nanoseconds (a `bigint`). Return `false` to cancel. Only fires on the single-thread path, so it requires `nThreads: 1`. |
 | `progressIntervalMs` | `number` | Minimum interval between `onProgress` calls. Defaults to `1000`; `0` is treated as `1000`. |
 
 Parallel mode partitions at the compressed-block level and merges per-worker
@@ -130,7 +130,7 @@ const partitioner = new lrvx.Partitioner(dataDir);
 const partitions = partitioner.byTime(numPartitions, warmupNs);
 ```
 
-All methods return an array of partition objects `{ partitionId, fromNs, toNs, warmupFromNs, estimatedEvents, estimatedBytes }`. Pass `0` as `warmupNs` if no warmup period is needed.
+All methods return an array of partition objects `{ partitionId, fromNs, toNs, warmupFromNs, estimatedEvents, estimatedBytes }`. `fromNs`, `toNs` and `warmupFromNs` are `bigint` and go straight back into `new DataReader(dataDir, fromNs, toNs)`. Pass `0` as `warmupNs` if no warmup period is needed.
 
 | Method | Description |
 |--------|-------------|

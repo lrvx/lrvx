@@ -14,6 +14,8 @@
 #pragma once
 #include <napi.h>
 
+#include "lrvx/capi/lrvx_capi.h"
+
 #include <cstdint>
 #include <initializer_list>
 #include <string>
@@ -37,6 +39,27 @@ inline int64_t toInt64Ns(const Napi::Value& v)
     return v.As<Napi::BigInt>().Int64Value(&lossless);
   }
   return v.As<Napi::Number>().Int64Value();
+}
+
+// The trade durations, time-weighted return and time bounds every stats
+// object carries, whichever struct they were computed into. Durations are
+// differences and fit a double; the bounds are clock readings and do not.
+inline void setTradeTimeStats(Napi::Env env, Napi::Object& obj, double avgTradeDurationNs,
+                              double medianTradeDurationNs, double maxTradeDurationNs,
+                              double timeWeightedReturn, int64_t startTimeNs, int64_t endTimeNs)
+{
+  obj.Set("avgTradeDurationNs", Napi::Number::New(env, avgTradeDurationNs));
+  obj.Set("medianTradeDurationNs", Napi::Number::New(env, medianTradeDurationNs));
+  obj.Set("maxTradeDurationNs", Napi::Number::New(env, maxTradeDurationNs));
+  obj.Set("timeWeightedReturn", Napi::Number::New(env, timeWeightedReturn));
+  obj.Set("startTimeNs", Napi::BigInt::New(env, startTimeNs));
+  obj.Set("endTimeNs", Napi::BigInt::New(env, endTimeNs));
+}
+
+inline void setTradeTimeStats(Napi::Env env, Napi::Object& obj, const LrvxBacktestStats& s)
+{
+  setTradeTimeStats(env, obj, s.avgTradeDurationNs, s.medianTradeDurationNs,
+                    s.maxTradeDurationNs, s.timeWeightedReturn, s.startTimeNs, s.endTimeNs);
 }
 
 inline bool requireSameLength(Napi::Env env, const char* fnName,

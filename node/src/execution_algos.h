@@ -27,7 +27,7 @@ inline Napi::Object childToJs(Napi::Env env, const LrvxExecChildOrder& c)
 {
   Napi::Object o = Napi::Object::New(env);
   o.Set("orderId", Napi::Number::New(env, static_cast<double>(c.order_id)));
-  o.Set("timestampNs", Napi::Number::New(env, static_cast<double>(c.timestamp_ns)));
+  o.Set("timestampNs", Napi::BigInt::New(env, c.timestamp_ns));
   o.Set("qty", Napi::Number::New(env, c.qty));
   o.Set("price", Napi::Number::New(env, c.price));
   o.Set("type", Napi::String::New(env, c.type == 1 ? "limit" : "market"));
@@ -49,7 +49,7 @@ inline uint8_t parseType(const std::string& s)
 #define LRVX_EXEC_INSTANCE_METHODS(Cls)                                       \
   Napi::Value Step(const Napi::CallbackInfo& info)                            \
   {                                                                           \
-    lrvx_exec_step(_h, info[0].As<Napi::Number>().Int64Value());              \
+    lrvx_exec_step(_h, toInt64Ns(info[0]));                                   \
     auto env = info.Env();                                                    \
     const size_t n = lrvx_exec_pending_count(_h);                             \
     Napi::Array out = Napi::Array::New(env, n);                               \
@@ -243,7 +243,7 @@ class VWAPWrap : public Napi::ObjectWrap<VWAPWrap>
     for (uint32_t i = 0; i < curve.Length(); ++i)
     {
       auto entry = curve.Get(i).As<Napi::Array>();
-      ts.push_back(entry.Get(uint32_t(0)).As<Napi::Number>().Int64Value());
+      ts.push_back(toInt64Ns(entry.Get(uint32_t(0))));
       vol.push_back(entry.Get(uint32_t(1)).As<Napi::Number>().DoubleValue());
     }
     _h = lrvx_exec_vwap_create(target_qty, side, symbol, type, limit_price,

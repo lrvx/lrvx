@@ -218,8 +218,9 @@ class Strategy:
     def on_order_update(self, ctx: SymbolContext, ev):
         """Called on every order-lifecycle status change for orders
         this strategy emitted (NEW / ACCEPTED / CANCELED / REJECTED /
-        REPLACED / TRIGGERED / TRAILING_UPDATED). Includes fills
-        too — pick `on_fill` if you only want fills."""
+        REPLACED / TRIGGERED / TRAILING_UPDATED and the rest). A
+        fill does not fire here: PARTIALLY_FILLED and FILLED reach
+        `on_fill` only."""
         pass
 
     def on_queue_position_change(self, ctx: SymbolContext, ev):

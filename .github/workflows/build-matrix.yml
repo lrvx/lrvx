@@ -28,10 +28,11 @@ jobs:
   # gating the flag matrix on it bought nothing.
   matrix:
     runs-on: ubuntu-24.04
-    # Observed: 1-3 min for most entries; tests-only 14 min cold and well
-    # under that warm (with LTO on and no ccache, it ran past 20 min
-    # relinking every test binary and was cancelled).
-    timeout-minutes: 20
+    # Observed: 1-3 min for most entries. tests-only on a cold cache spends
+    # about 17.5 min in its Build step alone, and at the 20-minute limit
+    # every row had it was cancelled mid-build; it gets 35, the rest keep 20.
+    # Warm it is well under either.
+    timeout-minutes: ${{ matrix.name == 'tests-only' && 35 || 20 }}
     strategy:
       fail-fast: false
       matrix:
@@ -86,8 +87,8 @@ jobs:
 
     # One cache per row, keyed like ci.yml's jobs; restore-keys falls back
     # to the newest cache for this row, which on a PR is main's. tests-only
-    # compiled every test from scratch on every run and took 14 minutes of
-    # its 20-minute limit cold.
+    # compiled every test from scratch on every run, about 17.5 minutes of
+    # build on a cold cache.
     - name: Restore ccache
       id: ccache-restore
       uses: actions/cache/restore@v4

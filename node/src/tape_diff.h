@@ -24,7 +24,7 @@ namespace detail_diff
 inline Napi::Object tradeToJs(Napi::Env env, const LrvxTapeDiffTrade& t)
 {
   Napi::Object o = Napi::Object::New(env);
-  o.Set("exchangeTsNs", Napi::Number::New(env, static_cast<double>(t.exchange_ts_ns)));
+  o.Set("exchangeTsNs", Napi::BigInt::New(env, t.exchange_ts_ns));
   o.Set("symbolId", Napi::Number::New(env, t.symbol_id));
   o.Set("priceRaw", Napi::Number::New(env, static_cast<double>(t.price_raw)));
   o.Set("qtyRaw", Napi::Number::New(env, static_cast<double>(t.qty_raw)));

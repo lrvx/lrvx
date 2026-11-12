@@ -75,7 +75,7 @@ are the new touch.
 | Callback | Fires on |
 |----------|----------|
 | `onFill(ctx, ev, emit)` | Every fill this strategy's own orders produce (status `PARTIALLY_FILLED` or `FILLED`) |
-| `onOrderUpdate(ctx, ev, emit)` | Every order-lifecycle status change: `NEW` / `ACCEPTED` / `CANCELED` / `REJECTED` / `REPLACED` / `TRIGGERED` / `TRAILING_UPDATED`. Fills included — use `onFill` if you only want those |
+| `onOrderUpdate(ctx, ev, emit)` | Every order-lifecycle status change: `NEW` / `ACCEPTED` / `CANCELED` / `REJECTED` / `REPLACED` / `TRIGGERED` / `TRAILING_UPDATED` and the rest. A fill does not fire here: a `PARTIALLY_FILLED` or `FILLED` event reaches `onFill` only |
 | `onQueuePositionChange(ctx, ev, emit)` | A resting limit order's queue position moved with no other lifecycle transition. `ev.queueAhead` / `ev.queueTotal` carry the snapshot. Backtest only |
 | `onMarketPositionChange(ctx, ev, emit)` | A resting limit order's categorical market position transitioned (best / behind_best / mid_spread / level_empty / crossed). Backtest only |
 
@@ -85,6 +85,12 @@ are the new touch.
 `acceptedAtNs` / `firstFillAtNs` / `lastFillAtNs` / `canceledAtNs` /
 `rejectedAtNs` / `triggeredAtNs` / `expiredAtNs`, plus `isMaker`,
 `fillRole`, `marketPosition` and `distanceToBestTicks`.
+
+`exchangeTsNs` and the eight per-stage timestamps are `bigint`: they are
+clock readings, and a JS `number` steps 256 ns at a time at today's values.
+A stage the order has not reached reads `0n`. They compare against each
+other and against a `number`; for a latency, subtract first and convert the
+difference: `Number(ev.acceptedAtNs - ev.submittedAtNs)`.
 
 ### BarData (`bar`)
 
@@ -130,6 +136,7 @@ are the new touch.
 | `emit.provideLiquidity(priceLower, priceUpper, liquidity)` | Provide AMM liquidity in a price range |
 | `emit.withdrawLiquidity(liquidity)` | Withdraw AMM liquidity |
 | `emit.cancel(orderId)` | Cancel order |
+| `emit.modify(orderId, newPrice, newQty)` | Change the price and quantity of a working order. It keeps its id, symbol, side and type; `newQty` is the quantity left to work. `newPrice` is the trigger of a stop-market, take-profit-market or trailing-stop order and the limit price of every other type. `orderId` is the `ev.orderId` of the order's events. A refused modify arrives in `onOrderUpdate` as `REPLACE_REJECTED` with `rejectReason` set |
 | `emit.closePosition()` | Close position (reduce-only) |
 
 In a backtest, a `limitBuy` / `limitSell` price that is not a whole number of the symbol's `tickSize` is rejected: `onOrderUpdate` receives `status` `"REJECTED"` with `rejectReason` `"price_off_tick"`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
@@ -192,6 +199,12 @@ An order — the argument to `Executor.submit` and to every
 `bigint`. They are clock readings, and a JS `Number` is a double that steps
 256 ns at present-day magnitudes. Prices, sizes and ids on the same object
 stay `number`.
+
+`Executor.replace(oldId, order)` is called for a strategy's `emit.modify`.
+`order` is the order that modify named, as the executor was handed it --
+same id, symbol, side and type -- with the new price and quantity. A modify
+of an id the runner never handed to this executor (or has since seen
+cancelled) still arrives, under that id, with `symbol` 0.
 
 A trade handed to a `MarketDataRecorderHook`'s `onTrade` is a `TradeData`:
 `{ symbol, price, qty, isBuy, side, timestampNs }`, with `timestampNs` a

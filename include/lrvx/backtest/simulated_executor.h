@@ -437,6 +437,8 @@ class SimulatedExecutor : public IOrderExecutor
   void executeFill(Order& order, Price price, Quantity qty, bool isMaker = false);
   void emitEvent(OrderEventStatus status, const Order& order);
   void emitRejected(const Order& order, const char* reason);
+  // A refused replace: `order` is the order it named, left as it was.
+  void emitReplaceRejected(const Order& order, const Order& newOrder, const char* reason);
   void emitTrailingUpdate(const Order& order, Price newTrigger);
 
   // Emit QUEUE_POSITION_UPDATED for every resting order whose
@@ -481,7 +483,7 @@ class SimulatedExecutor : public IOrderExecutor
   // Replace-in-flight ack: enqueue pending replace, finalize when
   // ack deadline passes, reject the replace when the original
   // order fills first.
-  void enqueuePendingReplace(const Order& oldOrder, const Order& newOrder);
+  void enqueuePendingReplace(const Order& oldOrder, const Order& newOrder, bool untriggered);
   void finalizePendingReplaces();
   void resolveLateReplaceOnFill(const Order& order);
   int64_t sampleReplaceAckLatency();
@@ -501,6 +503,12 @@ class SimulatedExecutor : public IOrderExecutor
   void finishSubmission(Order accepted, bool fromAck);
 
   Order* findPendingOrder(OrderId orderId);
+  // The order while it still waits on its trigger, or nullptr.
+  Order* findConditionalOrder(OrderId orderId);
+  // Rewrites an untriggered conditional order in place. A trailing stop's
+  // trigger lives in its trailing state, so a replacement that names a
+  // trigger moves that.
+  void replaceConditionalOrder(Order& conditional, const Order& newOrder);
   void removePendingOrder(OrderId orderId);
   void drainQueueFills(SymbolId symbol);
 
@@ -616,6 +624,8 @@ class SimulatedExecutor : public IOrderExecutor
     int64_t ackAtNs;
     Order oldSnapshot;
     Order newOrder;
+    // The order was still waiting on its trigger when the replace was sent.
+    bool untriggered{false};
   };
   std::vector<PendingReplace> _pendingReplaces;
   LatencyDistribution _replaceAckDist;

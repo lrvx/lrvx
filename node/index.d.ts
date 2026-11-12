@@ -203,7 +203,7 @@ export interface OrderEventData {
   fillQty: number;
   /** Last-fill price; 0 for non-fill events. */
   fillPrice: number;
-  exchangeTsNs: number;
+  exchangeTsNs: bigint;
   /** Set only when status === "REJECTED". */
   rejectReason: string | null;
   /** Backtest only: volume ahead of this order at its price level. */
@@ -212,14 +212,14 @@ export interface OrderEventData {
   queueTotal: number;
   /** Per-lifecycle-stage timestamps. Zero means the stage has not
    *  fired yet for this order. */
-  submittedAtNs: number;
-  acceptedAtNs: number;
-  firstFillAtNs: number;
-  lastFillAtNs: number;
-  canceledAtNs: number;
-  rejectedAtNs: number;
-  triggeredAtNs: number;
-  expiredAtNs: number;
+  submittedAtNs: bigint;
+  acceptedAtNs: bigint;
+  firstFillAtNs: bigint;
+  lastFillAtNs: bigint;
+  canceledAtNs: bigint;
+  rejectedAtNs: bigint;
+  triggeredAtNs: bigint;
+  expiredAtNs: bigint;
   /** True when the fill came from the order resting in the book and
    *  being consumed by an aggressive opposite trade; false when the
    *  order arrived marketable and crossed the book. Meaningful only
@@ -262,6 +262,12 @@ export interface EmitMethods {
   ): void;
   withdrawLiquidity(liquidity: number, symbol?: Symbol | number): void;
   cancel(orderId: number): void;
+  /** Change the price and quantity of a working order. It keeps its id,
+   *  symbol, side and type; `newQty` is the quantity left to work. The id
+   *  comes from the order's events (`ev.orderId` in `onOrderUpdate`). A
+   *  refused modify arrives as a `REPLACE_REJECTED` event and leaves the
+   *  order as it was. */
+  modify(orderId: number, newPrice: number, newQty: number): void;
   closePosition(symbol?: Symbol | number): void;
   /** Most recent closed bar for `(symbol, barType, barTypeParam)`, or
    *  `null` when none has closed yet. `barType` uses the `BarData.barType`
@@ -317,7 +323,8 @@ export interface Strategy {
   onFill?(ctx: SymbolContext, ev: OrderEventData, emit: EmitMethods): void;
   /** Fires on every order-lifecycle status change: NEW / ACCEPTED /
    *  CANCELED / REJECTED / REPLACED / TRIGGERED / TRAILING_UPDATED.
-   *  Includes fills too — pick `onFill` if you only care about those. */
+   *  A fill does not fire here: PARTIALLY_FILLED and FILLED reach `onFill`
+   *  only. */
   onOrderUpdate?(ctx: SymbolContext, ev: OrderEventData, emit: EmitMethods): void;
   /** Resting limit order's queue position moved without any other
    *  lifecycle transition. `ev.queueAhead` and `ev.queueTotal` carry
@@ -489,6 +496,15 @@ export interface BacktestStats {
   sortinoRatio: number;
   calmarRatio: number;
   returnPct: number;
+  /** Mean, median and longest holding time of the closed trades, in
+   *  nanoseconds; 0 when no trade closed. */
+  avgTradeDurationNs: number;
+  medianTradeDurationNs: number;
+  maxTradeDurationNs: number;
+  timeWeightedReturn: number;
+  /** Timestamps of the run's first and last fill; `0n` when nothing filled. */
+  startTimeNs: bigint;
+  endTimeNs: bigint;
 }
 
 /** Stats returned by every `BacktestRunner.run*` method. `BacktestStats`
@@ -529,7 +545,9 @@ export interface RunnerStats {
 }
 
 /** Stats attached to a `WalkForwardFold` and to a `GridSearchResult`.
- *  `RunnerStats` minus `avgWin` / `avgLoss`. */
+ *  `RunnerStats` minus `avgWin` / `avgLoss` and the skipped-record counts.
+ *  A grid search result carries what its factory returned: a field the
+ *  factory left out reads 0 (`0n` for the two time bounds). */
 export interface FoldStats {
   totalTrades: number;
   winningTrades: number;
@@ -546,6 +564,15 @@ export interface FoldStats {
   calmarRatio: number;
   winRate: number;
   profitFactor: number;
+  /** Mean, median and longest holding time of the closed trades, in
+   *  nanoseconds; 0 when no trade closed. */
+  avgTradeDurationNs: number;
+  medianTradeDurationNs: number;
+  maxTradeDurationNs: number;
+  timeWeightedReturn: number;
+  /** Timestamps of the run's first and last fill; `0n` when nothing filled. */
+  startTimeNs: bigint;
+  endTimeNs: bigint;
 }
 
 // ── Symbol & registry ─────────────────────────────────────────────────
@@ -674,7 +701,7 @@ export class Runner {
   /** Stamp every recorded signal with this `feed_ts_ns`. The runner
    *  copies it into each `SignalView.feed_ts_ns` slot until the next
    *  call. Useful for pinning replay determinism. */
-  setTraceFeedTsNs(feedTsNs: number): void;
+  setTraceFeedTsNs(feedTsNs: number | bigint): void;
 
   /** Mirror an order event into the attached recorder. No-op when
    *  no recorder is attached. Wire from your executor wrapper after
@@ -884,9 +911,11 @@ export class BacktestRunner {
     options?: BacktestRunnerOptions,
   );
   setStrategy(strategy: Strategy): void;
-  /** Returns `null` if `path` cannot be opened. */
-  runCsv(path: string, symbol: string): RunnerStats | null;
-  /** `timestamps` holds nanosecond epochs as a `BigInt64Array`. */
+  /** Throws `LrvxError` with the reason if `path` cannot be opened or a
+   *  row cannot be parsed. */
+  runCsv(path: string, symbol: string): RunnerStats;
+  /** `timestamps` holds nanosecond epochs as a `BigInt64Array`. Throws
+   *  `LrvxError` with the reason if the run is refused, as `runBars` does. */
   runOhlcv(timestamps: BigInt64Array, closes: Float64Array, symbol: string): RunnerStats;
   /** Replay full OHLCV bars. `startNs` / `endNs` are `BigInt64Array`;
    *  the five OHLCV arrays are `Float64Array` and must match their
@@ -941,6 +970,9 @@ export class BacktestRunner {
   /** Attach a listener for order lifecycle events. Multiple listeners
    *  may be attached; each fires for every order event. */
   addExecutionListener(listener: ExecutionListener): void;
+  /** Attach an `OrderJourneyTracer`: it records every order event of the
+   *  runs that follow. */
+  addJourneyTracer(tracer: OrderJourneyTracer): void;
   /** Equity curve from the most recent run. Throws LrvxError(E_RUN_002)
    *  if no run has completed. */
   equityCurve(): EquityCurve;
@@ -964,11 +996,12 @@ export class FeeSchedule {
   addTier(minNotional30d: number, makerBps: number, takerBps: number): void;
   /** Canned: 'binance_um_futures' | 'bybit_linear' | 'okx_swap' | 'deribit'. */
   loadProfile(name: string): void;
-  recordFill(tsNs: number, notional: number): void;
-  feeFor(tsNs: number, notional: number, isMaker: boolean): number;
+  recordFill(tsNs: number | bigint, notional: number): void;
+  feeFor(tsNs: number | bigint, notional: number, isMaker: boolean): number;
   currentTierIndex(): number;
   rollingNotional30d(): number;
-  tierTransitions(): number[];
+  /** The `tsNs` of each fill that moved the schedule to another tier. */
+  tierTransitions(): bigint[];
   resetRolling(): void;
   /** Bind an Account so 30d rolling notional reads from the account's
    *  cross-symbol aggregate counter instead of this schedule's
@@ -1267,9 +1300,10 @@ export class RateLimitPolicy {
   setBan(afterConsecutiveRejects: number, banDurationNs: number): void;
   /** Canned profile: 'binance_um_futures' | 'bybit_linear' | 'okx_swap' | 'deribit'. */
   loadProfile(name: string): void;
-  banUntilNs(): number;
+  /** The clock reading the ban lifts at; `0n` when there is none. */
+  banUntilNs(): bigint;
   consecutiveRejects(): number;
-  bucketStates(nowNs: number): RateLimitBucketState[];
+  bucketStates(nowNs: number | bigint): RateLimitBucketState[];
 }
 
 export class SimulatedExecutor {
@@ -1920,19 +1954,19 @@ export interface OrderTraceRow {
   seq: number;
   status: number;
   isMaker: boolean;
-  tsNs: number;
+  tsNs: bigint;
   fillQty: number;
   fillPrice: number;
   queueAhead: number;
   queueTotal: number;
-  submittedAtNs: number;
-  acceptedAtNs: number;
-  firstFillAtNs: number;
-  lastFillAtNs: number;
-  canceledAtNs: number;
-  rejectedAtNs: number;
-  triggeredAtNs: number;
-  expiredAtNs: number;
+  submittedAtNs: bigint;
+  acceptedAtNs: bigint;
+  firstFillAtNs: bigint;
+  lastFillAtNs: bigint;
+  canceledAtNs: bigint;
+  rejectedAtNs: bigint;
+  triggeredAtNs: bigint;
+  expiredAtNs: bigint;
 }
 
 /** Execution listener that records the full event sequence of every
@@ -2140,8 +2174,8 @@ export interface DataWriterStats {
 }
 
 export interface DataReaderSummary {
-  firstEventNs: number;
-  lastEventNs: number;
+  firstEventNs: bigint;
+  lastEventNs: bigint;
   totalEvents: number;
   segmentCount: number;
   totalBytes: number;
@@ -2266,7 +2300,7 @@ export interface DataReaderRunOptions {
    *  pct (0..1) and the cursor timestamp in nanoseconds. Return `false`
    *  to cancel; any other return value keeps the run going. Only fires
    *  on the single-thread path. */
-  onProgress?: (pct: number, tsNs: number) => boolean | void;
+  onProgress?: (pct: number, tsNs: bigint) => boolean | void;
   /** Minimum interval between `onProgress` calls in milliseconds.
    *  Defaults to 1000 (1 second). 0 is treated as 1000. */
   progressIntervalMs?: number;
@@ -2494,9 +2528,9 @@ export class MergedTapeReader {
 
 export interface Partition {
   partitionId: number;
-  fromNs: number;
-  toNs: number;
-  warmupFromNs: number;
+  fromNs: bigint;
+  toNs: bigint;
+  warmupFromNs: bigint;
   estimatedEvents: number;
   estimatedBytes: number;
 }
@@ -2538,8 +2572,8 @@ export interface DatasetValidationResult {
   corruptedSegments: number;
   totalEvents: number;
   totalBytes: number;
-  firstTimestamp: number;
-  lastTimestamp: number;
+  firstTimestamp: bigint;
+  lastTimestamp: bigint;
 }
 
 /** Result of `mergeDir(dir, outputPath)`. */
@@ -2834,7 +2868,7 @@ export class EmpiricalLatency implements LatencyModel {
 
 /** One trade-record snapshot used for both sides of a diff. */
 export interface TapeDiffTrade {
-  exchangeTsNs: number;
+  exchangeTsNs: bigint;
   symbolId: number;
   priceRaw: number;
   qtyRaw: number;
@@ -3168,7 +3202,7 @@ export class MultiFeedClock {
 
 export interface ExecChildOrder {
   orderId: number;
-  timestampNs: number;
+  timestampNs: bigint;
   qty: number;
   price: number;
   type: "market" | "limit";
@@ -3191,7 +3225,7 @@ export interface TWAPOptions extends ExecAlgoCommon {
 
 export interface VWAPOptions extends ExecAlgoCommon {
   /** Array of [timestampNs, volume] rows ordered by time. */
-  volumeCurve: ReadonlyArray<[number, number]>;
+  volumeCurve: ReadonlyArray<[number | bigint, number]>;
 }
 
 export interface IcebergOptions extends ExecAlgoCommon {
@@ -3207,7 +3241,7 @@ interface ExecAlgo {
   /** Drive the state machine forward and return any newly emitted
    *  child orders. The engine clears its pending buffer before
    *  returning so the next `step` only yields fresh entries. */
-  step(nowNs: number): ReadonlyArray<ExecChildOrder>;
+  step(nowNs: number | bigint): ReadonlyArray<ExecChildOrder>;
   /** User reports a fill on a previously emitted child order. */
   reportFill(qty: number): void;
   /** POV-only. Reports observed market volume. No-op for other algos. */
@@ -3220,7 +3254,7 @@ interface ExecAlgo {
 
 export class TWAPExecutor implements ExecAlgo {
   constructor(opts: TWAPOptions);
-  step(nowNs: number): ReadonlyArray<ExecChildOrder>;
+  step(nowNs: number | bigint): ReadonlyArray<ExecChildOrder>;
   reportFill(qty: number): void;
   observeVolume(qty: number): void;
   submittedQty(): number;
@@ -3231,7 +3265,7 @@ export class TWAPExecutor implements ExecAlgo {
 
 export class VWAPExecutor implements ExecAlgo {
   constructor(opts: VWAPOptions);
-  step(nowNs: number): ReadonlyArray<ExecChildOrder>;
+  step(nowNs: number | bigint): ReadonlyArray<ExecChildOrder>;
   reportFill(qty: number): void;
   observeVolume(qty: number): void;
   submittedQty(): number;
@@ -3242,7 +3276,7 @@ export class VWAPExecutor implements ExecAlgo {
 
 export class IcebergExecutor implements ExecAlgo {
   constructor(opts: IcebergOptions);
-  step(nowNs: number): ReadonlyArray<ExecChildOrder>;
+  step(nowNs: number | bigint): ReadonlyArray<ExecChildOrder>;
   reportFill(qty: number): void;
   observeVolume(qty: number): void;
   submittedQty(): number;
@@ -3253,7 +3287,7 @@ export class IcebergExecutor implements ExecAlgo {
 
 export class POVExecutor implements ExecAlgo {
   constructor(opts: POVOptions);
-  step(nowNs: number): ReadonlyArray<ExecChildOrder>;
+  step(nowNs: number | bigint): ReadonlyArray<ExecChildOrder>;
   reportFill(qty: number): void;
   observeVolume(qty: number): void;
   submittedQty(): number;
@@ -3316,19 +3350,19 @@ export interface TraceRecorderOptions {
   path: string;
   strategyId?: string;
   strategyHash?: string;
-  runStartedNs?: number;
+  runStartedNs?: number | bigint;
 }
 
 export interface TraceTapeRefInput {
   path: string;
   contentHash?: string;
-  firstEventNs?: number;
-  lastEventNs?: number;
+  firstEventNs?: number | bigint;
+  lastEventNs?: number | bigint;
 }
 
 export interface TraceSignalInput {
-  runTsNs: number;
-  feedTsNs?: number;
+  runTsNs: number | bigint;
+  feedTsNs?: number | bigint;
   signalId?: number;
   flags?: number;
   strengthRaw?: number;
@@ -3338,8 +3372,8 @@ export interface TraceSignalInput {
 }
 
 export interface TraceOrderEventInput {
-  runTsNs: number;
-  feedTsNs?: number;
+  runTsNs: number | bigint;
+  feedTsNs?: number | bigint;
   orderId?: number;
   parentSignalId?: number;
   priceRaw?: number;
@@ -3353,8 +3387,8 @@ export interface TraceOrderEventInput {
 }
 
 export interface TraceFillInput {
-  runTsNs: number;
-  feedTsNs?: number;
+  runTsNs: number | bigint;
+  feedTsNs?: number | bigint;
   orderId?: number;
   fillId?: number;
   priceRaw?: number;
@@ -3366,8 +3400,8 @@ export interface TraceFillInput {
 }
 
 export interface TraceSignalRecord {
-  runTsNs: number;
-  feedTsNs: number;
+  runTsNs: bigint;
+  feedTsNs: bigint;
   signalId: number;
   flags: number;
   strengthRaw: number;
@@ -3377,8 +3411,8 @@ export interface TraceSignalRecord {
 }
 
 export interface TraceOrderEventRecord {
-  runTsNs: number;
-  feedTsNs: number;
+  runTsNs: bigint;
+  feedTsNs: bigint;
   orderId: number;
   parentSignalId: number;
   priceRaw: number;
@@ -3392,8 +3426,8 @@ export interface TraceOrderEventRecord {
 }
 
 export interface TraceFillRecord {
-  runTsNs: number;
-  feedTsNs: number;
+  runTsNs: bigint;
+  feedTsNs: bigint;
   orderId: number;
   fillId: number;
   priceRaw: number;
@@ -3408,7 +3442,7 @@ export interface TraceFillRecord {
 export class TraceRecorder {
   constructor(opts: TraceRecorderOptions);
   addTapeRef(opts: TraceTapeRefInput): void;
-  setRunEndedNs(ns: number): void;
+  setRunEndedNs(ns: number | bigint): void;
   writeSignal(opts: TraceSignalInput): void;
   writeOrderEvent(opts: TraceOrderEventInput): void;
   writeFill(opts: TraceFillInput): void;
@@ -3420,8 +3454,8 @@ export class TraceReader {
   constructor(path: string);
   strategyId(): string;
   strategyHash(): string;
-  runStartedNs(): number;
-  runEndedNs(): number;
+  runStartedNs(): bigint;
+  runEndedNs(): bigint;
   tapeRefs(): Array<{ path: string }>;
   readAllSignals(): TraceSignalRecord[];
   readAllOrderEvents(): TraceOrderEventRecord[];

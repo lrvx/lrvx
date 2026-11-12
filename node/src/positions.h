@@ -224,7 +224,8 @@ class OrderJourneyTracerWrap : public Napi::ObjectWrap<OrderJourneyTracerWrap>
     o.Set("seq", Napi::Number::New(env, r.seq));
     o.Set("status", Napi::Number::New(env, r.status));
     o.Set("isMaker", Napi::Boolean::New(env, r.is_maker != 0));
-    o.Set("tsNs", Napi::Number::New(env, static_cast<double>(r.ts_ns)));
+    // Clock readings cross as BigInt: a double steps 256 ns at today's values.
+    o.Set("tsNs", Napi::BigInt::New(env, r.ts_ns));
     o.Set("fillQty",
           Napi::Number::New(env, static_cast<double>(r.fill_qty_raw) / 1e8));
     o.Set("fillPrice",
@@ -233,22 +234,14 @@ class OrderJourneyTracerWrap : public Napi::ObjectWrap<OrderJourneyTracerWrap>
           Napi::Number::New(env, static_cast<double>(r.queue_ahead_raw) / 1e8));
     o.Set("queueTotal",
           Napi::Number::New(env, static_cast<double>(r.queue_total_raw) / 1e8));
-    o.Set("submittedAtNs",
-          Napi::Number::New(env, static_cast<double>(r.submitted_at_ns)));
-    o.Set("acceptedAtNs",
-          Napi::Number::New(env, static_cast<double>(r.accepted_at_ns)));
-    o.Set("firstFillAtNs",
-          Napi::Number::New(env, static_cast<double>(r.first_fill_at_ns)));
-    o.Set("lastFillAtNs",
-          Napi::Number::New(env, static_cast<double>(r.last_fill_at_ns)));
-    o.Set("canceledAtNs",
-          Napi::Number::New(env, static_cast<double>(r.canceled_at_ns)));
-    o.Set("rejectedAtNs",
-          Napi::Number::New(env, static_cast<double>(r.rejected_at_ns)));
-    o.Set("triggeredAtNs",
-          Napi::Number::New(env, static_cast<double>(r.triggered_at_ns)));
-    o.Set("expiredAtNs",
-          Napi::Number::New(env, static_cast<double>(r.expired_at_ns)));
+    o.Set("submittedAtNs", Napi::BigInt::New(env, r.submitted_at_ns));
+    o.Set("acceptedAtNs", Napi::BigInt::New(env, r.accepted_at_ns));
+    o.Set("firstFillAtNs", Napi::BigInt::New(env, r.first_fill_at_ns));
+    o.Set("lastFillAtNs", Napi::BigInt::New(env, r.last_fill_at_ns));
+    o.Set("canceledAtNs", Napi::BigInt::New(env, r.canceled_at_ns));
+    o.Set("rejectedAtNs", Napi::BigInt::New(env, r.rejected_at_ns));
+    o.Set("triggeredAtNs", Napi::BigInt::New(env, r.triggered_at_ns));
+    o.Set("expiredAtNs", Napi::BigInt::New(env, r.expired_at_ns));
     return o;
   }
   Napi::Value Result(const Napi::CallbackInfo& info)

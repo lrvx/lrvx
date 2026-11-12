@@ -14,6 +14,7 @@
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/capi/order_type_names.hpp"
 #include "lrvx/engine/symbol_registry.h"
+#include "positions.h"
 #include "run_trace.h"
 #include "tsfn_util.h"
 
@@ -428,6 +429,21 @@ struct NodeStrategyHost : TsfnHost
         h->bridge->publicEmitCancel(orderId);
         return i.Env().Undefined(); }, "cancel", this));
 
+    em.Set("modify", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
+                                         {
+        auto* h = static_cast<NodeStrategyHost*>(i.Data());
+        if (i.Length() < 3 || !i[0].IsNumber() || !i[1].IsNumber() || !i[2].IsNumber())
+        {
+          Napi::TypeError::New(i.Env(), "emit.modify(orderId, newPrice, newQty) expected")
+              .ThrowAsJavaScriptException();
+          return i.Env().Undefined();
+        }
+        uint64_t orderId = static_cast<uint64_t>(i[0].As<Napi::Number>().Int64Value());
+        lrvx_emit_modify(h->bridge.get(), orderId,
+                         lrvx_price_from_double(i[1].As<Napi::Number>().DoubleValue()),
+                         lrvx_quantity_from_double(i[2].As<Napi::Number>().DoubleValue()));
+        return i.Env().Undefined(); }, "modify", this));
+
     em.Set("closePosition", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                                 {
         auto* h  = static_cast<NodeStrategyHost*>(i.Data());
@@ -810,7 +826,8 @@ struct NodeStrategyHost : TsfnHost
     o.Set("status", Napi::String::New(env, orderEventStatusName(ev->status)));
     o.Set("fillQty", Napi::Number::New(env, lrvx_quantity_to_double(ev->fill_qty_raw)));
     o.Set("fillPrice", Napi::Number::New(env, lrvx_price_to_double(ev->fill_price_raw)));
-    o.Set("exchangeTsNs", Napi::Number::New(env, static_cast<double>(ev->exchange_ts_ns)));
+    // Clock readings cross as BigInt: a double steps 256 ns at today's values.
+    o.Set("exchangeTsNs", Napi::BigInt::New(env, ev->exchange_ts_ns));
     o.Set("queueAhead", Napi::Number::New(env, lrvx_quantity_to_double(ev->queue_ahead_raw)));
     o.Set("queueTotal", Napi::Number::New(env, lrvx_quantity_to_double(ev->queue_total_raw)));
     const char* mpName = marketPositionName(ev->market_position);
@@ -824,14 +841,14 @@ struct NodeStrategyHost : TsfnHost
     }
     o.Set("distanceToBestTicks",
           Napi::Number::New(env, static_cast<double>(ev->distance_to_best_ticks)));
-    o.Set("submittedAtNs", Napi::Number::New(env, static_cast<double>(ev->submitted_at_ns)));
-    o.Set("acceptedAtNs", Napi::Number::New(env, static_cast<double>(ev->accepted_at_ns)));
-    o.Set("firstFillAtNs", Napi::Number::New(env, static_cast<double>(ev->first_fill_at_ns)));
-    o.Set("lastFillAtNs", Napi::Number::New(env, static_cast<double>(ev->last_fill_at_ns)));
-    o.Set("canceledAtNs", Napi::Number::New(env, static_cast<double>(ev->canceled_at_ns)));
-    o.Set("rejectedAtNs", Napi::Number::New(env, static_cast<double>(ev->rejected_at_ns)));
-    o.Set("triggeredAtNs", Napi::Number::New(env, static_cast<double>(ev->triggered_at_ns)));
-    o.Set("expiredAtNs", Napi::Number::New(env, static_cast<double>(ev->expired_at_ns)));
+    o.Set("submittedAtNs", Napi::BigInt::New(env, ev->submitted_at_ns));
+    o.Set("acceptedAtNs", Napi::BigInt::New(env, ev->accepted_at_ns));
+    o.Set("firstFillAtNs", Napi::BigInt::New(env, ev->first_fill_at_ns));
+    o.Set("lastFillAtNs", Napi::BigInt::New(env, ev->last_fill_at_ns));
+    o.Set("canceledAtNs", Napi::BigInt::New(env, ev->canceled_at_ns));
+    o.Set("rejectedAtNs", Napi::BigInt::New(env, ev->rejected_at_ns));
+    o.Set("triggeredAtNs", Napi::BigInt::New(env, ev->triggered_at_ns));
+    o.Set("expiredAtNs", Napi::BigInt::New(env, ev->expired_at_ns));
     const bool isMaker = ev->is_maker != 0;
     o.Set("isMaker", Napi::Boolean::New(env, isMaker));
     const bool isFill = (ev->status == 3 /* PARTIALLY_FILLED */ ||
@@ -1042,6 +1059,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
             InstanceMethod("runTapeBarsOnTicks", &BacktestRunnerNode::runTapeBarsOnTicks),
             InstanceMethod("setExecutor", &BacktestRunnerNode::setExecutor),
             InstanceMethod("addExecutionListener", &BacktestRunnerNode::addExecutionListener),
+            InstanceMethod("addJourneyTracer", &BacktestRunnerNode::addJourneyTracer),
             InstanceMethod("equityCurve", &BacktestRunnerNode::equityCurve),
             InstanceMethod("trades", &BacktestRunnerNode::trades),
         });
@@ -1190,6 +1208,9 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
         {"lrvx_backtest_runner_run_tape_bars: ", ""},
         {"lrvx_backtest_runner_run_tapes: ", ""},
         {"lrvx_backtest_runner_run_tape: ", ""},
+        {"lrvx_backtest_runner_run_csv: ", ""},
+        {"lrvx_backtest_runner_run_ohlcv: ", ""},
+        {"lrvx_backtest_runner_run_bars: ", ""},
     };
     for (const auto& [from, to] : kNames)
     {
@@ -1350,7 +1371,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
                    });
   }
 
-  // runner.runCsv(path, symbol) → stats object
+  // runner.runCsv(path, symbol) → stats object; throws on error
   Napi::Value runCsv(const Napi::CallbackInfo& info)
   {
     return tryLrvx(info.Env(), [&]() -> Napi::Value
@@ -1361,7 +1382,9 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
       int ok = lrvx_backtest_runner_run_csv(_handle, path.c_str(), symbol.c_str(), &s);
       if (!ok)
       {
-        return info.Env().Null();
+        lrvxError(info.Env(), camelCaseNames(lrvx_last_error_message()))
+            .ThrowAsJavaScriptException();
+        return info.Env().Undefined();
       }
       return statsToJs(info.Env(), s); });
   }
@@ -1387,7 +1410,9 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
                                               n, symbol.c_str(), &s);
       if (!ok)
       {
-        return info.Env().Null();
+        lrvxError(info.Env(), camelCaseNames(lrvx_last_error_message()))
+            .ThrowAsJavaScriptException();
+        return info.Env().Undefined();
       }
       return statsToJs(info.Env(), s); });
   }
@@ -1436,7 +1461,9 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
           n, symbol.c_str(), barType, barTypeParam, &s);
       if (!ok)
       {
-        return info.Env().Null();
+        lrvxError(info.Env(), camelCaseNames(lrvx_last_error_message()))
+            .ThrowAsJavaScriptException();
+        return info.Env().Undefined();
       }
       return statsToJs(info.Env(), s); });
   }
@@ -1549,14 +1576,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     obj.Set("avgWin", Napi::Number::New(env, s.avgWin));
     obj.Set("avgLoss", Napi::Number::New(env, s.avgLoss));
     obj.Set("profitFactor", Napi::Number::New(env, s.profitFactor));
-    // Durations are differences and fit a double; the run's bounds are clock
-    // readings and do not.
-    obj.Set("avgTradeDurationNs", Napi::Number::New(env, s.avgTradeDurationNs));
-    obj.Set("medianTradeDurationNs", Napi::Number::New(env, s.medianTradeDurationNs));
-    obj.Set("maxTradeDurationNs", Napi::Number::New(env, s.maxTradeDurationNs));
-    obj.Set("timeWeightedReturn", Napi::Number::New(env, s.timeWeightedReturn));
-    obj.Set("startTimeNs", Napi::BigInt::New(env, s.startTimeNs));
-    obj.Set("endTimeNs", Napi::BigInt::New(env, s.endTimeNs));
+    setTradeTimeStats(env, obj, s);
     // Option-quote and pool-state records a tape run read and delivered to
     // nobody; 0 for a run that read no tape.
     obj.Set("skippedOptionQuotes",
@@ -1606,6 +1626,28 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     _listener_hosts.push_back(std::move(host));
     return env.Undefined();
   }
+
+  // runner.addJourneyTracer(tracer): the tracer records every order event of
+  // the runs that follow. The runner keeps the tracer object alive.
+  Napi::Value addJourneyTracer(const Napi::CallbackInfo& info)
+  {
+    auto env = info.Env();
+    if (info.Length() == 0 || !info[0].IsObject())
+    {
+      Napi::TypeError::New(env,
+                           "BacktestRunner.addJourneyTracer(tracer): expected an "
+                           "OrderJourneyTracer")
+          .ThrowAsJavaScriptException();
+      return env.Undefined();
+    }
+    auto obj = info[0].As<Napi::Object>();
+    auto* tracer = Napi::ObjectWrap<OrderJourneyTracerWrap>::Unwrap(obj);
+    lrvx_backtest_runner_add_journey_tracer(_handle, tracer->handle());
+    _tracers.push_back(Napi::Persistent(obj));
+    return env.Undefined();
+  }
+
+  std::vector<Napi::ObjectReference> _tracers;
 };
 
 // ──────────────────────────────────────────────────────────────
@@ -2328,7 +2370,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
           .ThrowAsJavaScriptException();
       return info.Env().Undefined();
     }
-    int64_t ts = info[0].As<Napi::Number>().Int64Value();
+    int64_t ts = toInt64Ns(info[0]);
     lrvx_runner_set_trace_feed_ts_ns(_runner, ts);
     return info.Env().Undefined();
   }

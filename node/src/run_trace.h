@@ -4,6 +4,7 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
 #include "error_translator.h"
 #include "lrvx/capi/lrvx_capi.h"
 
@@ -72,7 +73,7 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     std::string path = opts.Get("path").As<Napi::String>().Utf8Value();
     std::string sid = opts.Has("strategyId") ? opts.Get("strategyId").As<Napi::String>().Utf8Value() : "";
     std::string shash = opts.Has("strategyHash") ? opts.Get("strategyHash").As<Napi::String>().Utf8Value() : "";
-    int64_t started = opts.Has("runStartedNs") ? opts.Get("runStartedNs").As<Napi::Number>().Int64Value() : 0;
+    int64_t started = opts.Has("runStartedNs") ? toInt64Ns(opts.Get("runStartedNs")) : 0;
     _h = lrvx_run_recorder_create(path.c_str(), sid.c_str(), shash.c_str(), started);
     if (!_h)
     {
@@ -97,21 +98,21 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     auto opts = info[0].As<Napi::Object>();
     std::string path = opts.Get("path").As<Napi::String>().Utf8Value();
     std::string ch = opts.Has("contentHash") ? opts.Get("contentHash").As<Napi::String>().Utf8Value() : "";
-    int64_t first = opts.Has("firstEventNs") ? opts.Get("firstEventNs").As<Napi::Number>().Int64Value() : 0;
-    int64_t last = opts.Has("lastEventNs") ? opts.Get("lastEventNs").As<Napi::Number>().Int64Value() : 0;
+    int64_t first = opts.Has("firstEventNs") ? toInt64Ns(opts.Get("firstEventNs")) : 0;
+    int64_t last = opts.Has("lastEventNs") ? toInt64Ns(opts.Get("lastEventNs")) : 0;
     lrvx_run_recorder_add_tape_ref(_h, path.c_str(), ch.c_str(), first, last);
   }
 
   void SetRunEndedNs(const Napi::CallbackInfo& info)
   {
-    lrvx_run_recorder_set_run_ended_ns(_h, info[0].As<Napi::Number>().Int64Value());
+    lrvx_run_recorder_set_run_ended_ns(_h, toInt64Ns(info[0]));
   }
 
   void WriteSignal(const Napi::CallbackInfo& info)
   {
     auto opts = info[0].As<Napi::Object>();
-    int64_t run_ts = opts.Get("runTsNs").As<Napi::Number>().Int64Value();
-    int64_t feed_ts = opts.Has("feedTsNs") ? opts.Get("feedTsNs").As<Napi::Number>().Int64Value() : 0;
+    int64_t run_ts = toInt64Ns(opts.Get("runTsNs"));
+    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs")) : 0;
     uint32_t sid = opts.Has("signalId") ? opts.Get("signalId").As<Napi::Number>().Uint32Value() : 0;
     uint32_t flags = opts.Has("flags") ? opts.Get("flags").As<Napi::Number>().Uint32Value() : 0;
     int64_t strength = opts.Has("strengthRaw") ? opts.Get("strengthRaw").As<Napi::Number>().Int64Value() : 0;
@@ -135,8 +136,8 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
   void WriteOrderEvent(const Napi::CallbackInfo& info)
   {
     auto opts = info[0].As<Napi::Object>();
-    int64_t run_ts = opts.Get("runTsNs").As<Napi::Number>().Int64Value();
-    int64_t feed_ts = opts.Has("feedTsNs") ? opts.Get("feedTsNs").As<Napi::Number>().Int64Value() : 0;
+    int64_t run_ts = toInt64Ns(opts.Get("runTsNs"));
+    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs")) : 0;
     uint64_t oid = opts.Has("orderId") ? opts.Get("orderId").As<Napi::Number>().Int64Value() : 0;
     uint64_t pid = opts.Has("parentSignalId") ? opts.Get("parentSignalId").As<Napi::Number>().Int64Value() : 0;
     int64_t price = opts.Has("priceRaw") ? opts.Get("priceRaw").As<Napi::Number>().Int64Value() : 0;
@@ -155,8 +156,8 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
   void WriteFill(const Napi::CallbackInfo& info)
   {
     auto opts = info[0].As<Napi::Object>();
-    int64_t run_ts = opts.Get("runTsNs").As<Napi::Number>().Int64Value();
-    int64_t feed_ts = opts.Has("feedTsNs") ? opts.Get("feedTsNs").As<Napi::Number>().Int64Value() : 0;
+    int64_t run_ts = toInt64Ns(opts.Get("runTsNs"));
+    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs")) : 0;
     uint64_t oid = opts.Has("orderId") ? opts.Get("orderId").As<Napi::Number>().Int64Value() : 0;
     uint64_t fid = opts.Has("fillId") ? opts.Get("fillId").As<Napi::Number>().Int64Value() : 0;
     int64_t price = opts.Has("priceRaw") ? opts.Get("priceRaw").As<Napi::Number>().Int64Value() : 0;
@@ -247,12 +248,12 @@ class TraceReaderWrap : public Napi::ObjectWrap<TraceReaderWrap>
 
   Napi::Value RunStartedNs(const Napi::CallbackInfo& info)
   {
-    return Napi::Number::New(info.Env(), static_cast<double>(lrvx_run_reader_run_started_ns(_h)));
+    return Napi::BigInt::New(info.Env(), lrvx_run_reader_run_started_ns(_h));
   }
 
   Napi::Value RunEndedNs(const Napi::CallbackInfo& info)
   {
-    return Napi::Number::New(info.Env(), static_cast<double>(lrvx_run_reader_run_ended_ns(_h)));
+    return Napi::BigInt::New(info.Env(), lrvx_run_reader_run_ended_ns(_h));
   }
 
   Napi::Value TapeRefs(const Napi::CallbackInfo& info)
@@ -303,8 +304,8 @@ class TraceReaderWrap : public Napi::ObjectWrap<TraceReaderWrap>
         lrvx_run_reader_signal_payload(_h, i, payload.data(), payload_len);
       }
       Napi::Object o = Napi::Object::New(env);
-      o.Set("runTsNs", Napi::Number::New(env, static_cast<double>(run_ts)));
-      o.Set("feedTsNs", Napi::Number::New(env, static_cast<double>(feed_ts)));
+      o.Set("runTsNs", Napi::BigInt::New(env, run_ts));
+      o.Set("feedTsNs", Napi::BigInt::New(env, feed_ts));
       o.Set("signalId", Napi::Number::New(env, sid));
       o.Set("flags", Napi::Number::New(env, flags));
       o.Set("strengthRaw", Napi::Number::New(env, static_cast<double>(strength)));
@@ -341,8 +342,8 @@ class TraceReaderWrap : public Napi::ObjectWrap<TraceReaderWrap>
         lrvx_run_reader_order_event_reason(_h, i, reason.data(), reason_len);
       }
       Napi::Object o = Napi::Object::New(env);
-      o.Set("runTsNs", Napi::Number::New(env, static_cast<double>(run_ts)));
-      o.Set("feedTsNs", Napi::Number::New(env, static_cast<double>(feed_ts)));
+      o.Set("runTsNs", Napi::BigInt::New(env, run_ts));
+      o.Set("feedTsNs", Napi::BigInt::New(env, feed_ts));
       o.Set("orderId", Napi::Number::New(env, static_cast<double>(oid)));
       o.Set("parentSignalId", Napi::Number::New(env, static_cast<double>(pid)));
       o.Set("priceRaw", Napi::Number::New(env, static_cast<double>(price)));
@@ -372,8 +373,8 @@ class TraceReaderWrap : public Napi::ObjectWrap<TraceReaderWrap>
       lrvx_run_reader_fill(_h, i, &run_ts, &feed_ts, &oid, &fid, &price, &qty, &fee, &sid, &side,
                            &liq);
       Napi::Object o = Napi::Object::New(env);
-      o.Set("runTsNs", Napi::Number::New(env, static_cast<double>(run_ts)));
-      o.Set("feedTsNs", Napi::Number::New(env, static_cast<double>(feed_ts)));
+      o.Set("runTsNs", Napi::BigInt::New(env, run_ts));
+      o.Set("feedTsNs", Napi::BigInt::New(env, feed_ts));
       o.Set("orderId", Napi::Number::New(env, static_cast<double>(oid)));
       o.Set("fillId", Napi::Number::New(env, static_cast<double>(fid)));
       o.Set("priceRaw", Napi::Number::New(env, static_cast<double>(price)));

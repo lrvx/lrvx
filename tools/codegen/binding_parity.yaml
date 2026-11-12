@@ -2038,7 +2038,6 @@ allowlist_functions:
     lrvx_streaming_indicator_value: *cpp_direct
   napi:
     lrvx_backtest_result_write_equity_curve_csv: *no_napi_wrapper
-    lrvx_backtest_runner_add_journey_tracer: *no_napi_wrapper
     lrvx_backtest_runner_run_replay_source: *no_napi_wrapper
     lrvx_backtest_runner_set_kill_switch: *no_napi_wrapper
     lrvx_backtest_runner_set_order_validator: *no_napi_wrapper
@@ -2076,7 +2075,6 @@ allowlist_functions:
     lrvx_emit_limit_sell_tif: *no_napi_wrapper
     lrvx_emit_market_buy: *no_napi_wrapper
     lrvx_emit_market_sell: *no_napi_wrapper
-    lrvx_emit_modify: *no_napi_wrapper
     lrvx_emit_stop_limit: *no_napi_wrapper
     lrvx_emit_stop_market: *no_napi_wrapper
     lrvx_emit_take_profit_limit: *no_napi_wrapper

@@ -219,8 +219,9 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
   {
     auto s = lrvx_data_reader_summary(_h);
     auto o = Napi::Object::New(info.Env());
-    o.Set("firstEventNs", (double)s.first_event_ns);
-    o.Set("lastEventNs", (double)s.last_event_ns);
+    // Clock readings cross as BigInt; counts and sizes fit a double.
+    o.Set("firstEventNs", Napi::BigInt::New(info.Env(), s.first_event_ns));
+    o.Set("lastEventNs", Napi::BigInt::New(info.Env(), s.last_event_ns));
     o.Set("totalEvents", (double)s.total_events);
     o.Set("segmentCount", (double)s.segment_count);
     o.Set("totalBytes", (double)s.total_bytes);
@@ -571,8 +572,7 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
             {
               auto result =
                   c->fn.Call({Napi::Number::New(c->env, pct),
-                              Napi::Number::New(c->env,
-                                                static_cast<double>(cursor_ts_ns))});
+                              Napi::BigInt::New(c->env, cursor_ts_ns)});
               if (result.IsBoolean() && !result.As<Napi::Boolean>().Value())
               {
                 c->cancelled = true;
@@ -1046,9 +1046,9 @@ class PartitionerWrap : public Napi::ObjectWrap<PartitionerWrap>
     {
       auto o = Napi::Object::New(info.Env());
       o.Set("partitionId", parts[i].partition_id);
-      o.Set("fromNs", (double)parts[i].from_ns);
-      o.Set("toNs", (double)parts[i].to_ns);
-      o.Set("warmupFromNs", (double)parts[i].warmup_from_ns);
+      o.Set("fromNs", Napi::BigInt::New(info.Env(), parts[i].from_ns));
+      o.Set("toNs", Napi::BigInt::New(info.Env(), parts[i].to_ns));
+      o.Set("warmupFromNs", Napi::BigInt::New(info.Env(), parts[i].warmup_from_ns));
       o.Set("estimatedEvents", (double)parts[i].estimated_events);
       o.Set("estimatedBytes", (double)parts[i].estimated_bytes);
       arr.Set(i, o);
@@ -1179,8 +1179,8 @@ inline Napi::Value seg_validate_dataset(const Napi::CallbackInfo& info)
   o.Set("corruptedSegments", r.corrupted_segments);
   o.Set("totalEvents", (double)r.total_events);
   o.Set("totalBytes", (double)r.total_bytes);
-  o.Set("firstTimestamp", (double)r.first_timestamp);
-  o.Set("lastTimestamp", (double)r.last_timestamp);
+  o.Set("firstTimestamp", Napi::BigInt::New(info.Env(), r.first_timestamp));
+  o.Set("lastTimestamp", Napi::BigInt::New(info.Env(), r.last_timestamp));
   return o;
 }
 
@@ -1307,8 +1307,8 @@ inline Napi::Value seg_inspect(const Napi::CallbackInfo& info)
   auto s = lrvx_data_reader_summary(h);
   lrvx_data_reader_destroy(h);
   auto o = Napi::Object::New(info.Env());
-  o.Set("firstEventNs", (double)s.first_event_ns);
-  o.Set("lastEventNs", (double)s.last_event_ns);
+  o.Set("firstEventNs", Napi::BigInt::New(info.Env(), s.first_event_ns));
+  o.Set("lastEventNs", Napi::BigInt::New(info.Env(), s.last_event_ns));
   o.Set("totalEvents", (double)s.total_events);
   o.Set("segmentCount", (double)s.segment_count);
   o.Set("totalBytes", (double)s.total_bytes);

@@ -43,6 +43,7 @@ struct ExecState
   uint64_t last_cancel_id{0};
   uint32_t last_cancel_all_symbol{0};
   uint64_t last_replace_old_id{0};
+  LrvxOrder last_replace_order{};
 };
 
 void ex_submit(void* ud, const LrvxOrder* o)
@@ -68,11 +69,12 @@ void ex_cancel_all(void* ud, uint32_t sym)
   s->cancel_all++;
   s->last_cancel_all_symbol = sym;
 }
-void ex_replace(void* ud, uint64_t old_id, const LrvxOrder*)
+void ex_replace(void* ud, uint64_t old_id, const LrvxOrder* o)
 {
   auto* s = static_cast<ExecState*>(ud);
   s->replace++;
   s->last_replace_old_id = old_id;
+  s->last_replace_order = *o;
 }
 void ex_oco(void* ud, const LrvxOrder*, const LrvxOrder*) { static_cast<ExecState*>(ud)->oco++; }
 void ex_caps(void* ud, LrvxExchangeCapabilities* out)
@@ -264,6 +266,134 @@ TEST(CapiExecutor, RunnerForwardsCancelAndCancelAll)
 
   lrvx_runner_stop(ctx.runner);
   lrvx_executor_destroy(exec);
+}
+
+namespace
+{
+// A runner with one strategy over two symbols and the fake executor attached.
+// Orders are emitted straight from the test; nothing leaves the process.
+struct ModifyCtx : RunnerCtx
+{
+  ExecState state;
+  LrvxExecutorHandle exec{nullptr};
+  uint32_t other{0};
+
+  ModifyCtx()
+  {
+    registry = lrvx_registry_create();
+    other = lrvx_registry_add_symbol(registry, "test", "ETH", 0.01);
+    symbol = lrvx_registry_add_symbol(registry, "test", "BTC", 0.01);
+    LrvxStrategyCallbacks scb{};
+    uint32_t syms[] = {other, symbol};
+    strategy = lrvx_strategy_create(1, syms, 2, registry, scb);
+    runner = lrvx_runner_create(registry, noop_signal, nullptr);
+    lrvx_runner_add_strategy(runner, strategy);
+    exec = lrvx_executor_create(make_cb(state));
+    lrvx_runner_set_executor(runner, exec);
+    lrvx_runner_start(runner);
+  }
+  ~ModifyCtx()
+  {
+    lrvx_runner_stop(runner);
+    lrvx_executor_destroy(exec);
+  }
+};
+}  // namespace
+
+TEST(CapiExecutor, RunnerModifyCarriesTheOrderItNames)
+{
+  ModifyCtx ctx;
+  ASSERT_NE(ctx.symbol, 0u) << "the modified order must not sit on symbol 0";
+
+  const uint64_t id = lrvx_emit_limit_sell(ctx.strategy, ctx.symbol,
+                                           /*price_raw=*/10100000000LL, /*qty_raw=*/300000000LL);
+  ASSERT_NE(id, 0u);
+  lrvx_emit_modify(ctx.strategy, id, /*new_price_raw=*/10200000000LL,
+                   /*new_qty_raw=*/200000000LL);
+
+  ASSERT_EQ(ctx.state.replace.load(), 1);
+  const LrvxOrder& o = ctx.state.last_replace_order;
+  EXPECT_EQ(ctx.state.last_replace_old_id, id);
+  EXPECT_EQ(o.id, id);
+  EXPECT_EQ(o.symbol, ctx.symbol);
+  EXPECT_EQ(o.side, 1u) << "the order was a sell";
+  EXPECT_EQ(o.type, 0u) << "LIMIT";
+  EXPECT_EQ(o.price_raw, 10200000000LL);
+  EXPECT_EQ(o.quantity_raw, 200000000LL);
+  EXPECT_EQ(o.filled_quantity_raw, 0);
+}
+
+TEST(CapiExecutor, RunnerModifyKeepsAConditionalOrdersTypeAndTrigger)
+{
+  ModifyCtx ctx;
+  const uint64_t id = lrvx_emit_stop_limit(ctx.strategy, ctx.symbol, /*side=*/1,
+                                           /*trigger_raw=*/9900000000LL,
+                                           /*limit_raw=*/9890000000LL, /*qty_raw=*/100000000LL);
+  ASSERT_NE(id, 0u);
+  lrvx_emit_modify(ctx.strategy, id, 9880000000LL, 100000000LL);
+
+  ASSERT_EQ(ctx.state.replace.load(), 1);
+  const LrvxOrder& o = ctx.state.last_replace_order;
+  EXPECT_EQ(o.id, id);
+  EXPECT_EQ(o.symbol, ctx.symbol);
+  EXPECT_EQ(o.side, 1u);
+  EXPECT_EQ(o.type, 3u) << "STOP_LIMIT";
+  EXPECT_EQ(o.trigger_price_raw, 9900000000LL);
+  EXPECT_EQ(o.price_raw, 9880000000LL);
+}
+
+TEST(CapiExecutor, RunnerModifyMovesTheTriggerOfAStopThatFillsAtMarket)
+{
+  ModifyCtx ctx;
+  const uint64_t id = lrvx_emit_stop_market(ctx.strategy, ctx.symbol, /*side=*/1,
+                                            /*trigger_raw=*/9900000000LL, /*qty_raw=*/100000000LL);
+  ASSERT_NE(id, 0u);
+  lrvx_emit_modify(ctx.strategy, id, 9950000000LL, 200000000LL);
+
+  ASSERT_EQ(ctx.state.replace.load(), 1);
+  const LrvxOrder& o = ctx.state.last_replace_order;
+  EXPECT_EQ(o.id, id);
+  EXPECT_EQ(o.symbol, ctx.symbol);
+  EXPECT_EQ(o.side, 1u);
+  EXPECT_EQ(o.type, 2u) << "STOP_MARKET";
+  EXPECT_EQ(o.trigger_price_raw, 9950000000LL);
+  EXPECT_EQ(o.price_raw, 0);
+  EXPECT_EQ(o.quantity_raw, 200000000LL);
+}
+
+TEST(CapiExecutor, RunnerSecondModifySeesTheFirst)
+{
+  ModifyCtx ctx;
+  const uint64_t id = lrvx_emit_limit_sell(ctx.strategy, ctx.symbol, 10100000000LL, 300000000LL);
+  lrvx_emit_modify(ctx.strategy, id, 10200000000LL, 200000000LL);
+  lrvx_emit_modify(ctx.strategy, id, 10300000000LL, 100000000LL);
+
+  ASSERT_EQ(ctx.state.replace.load(), 2);
+  const LrvxOrder& o = ctx.state.last_replace_order;
+  EXPECT_EQ(o.id, id);
+  EXPECT_EQ(o.symbol, ctx.symbol);
+  EXPECT_EQ(o.side, 1u);
+  EXPECT_EQ(o.price_raw, 10300000000LL);
+  EXPECT_EQ(o.quantity_raw, 100000000LL);
+}
+
+TEST(CapiExecutor, RunnerModifyAfterCancelNamesNoOrder)
+{
+  ModifyCtx ctx;
+  const uint64_t a = lrvx_emit_limit_sell(ctx.strategy, ctx.symbol, 10100000000LL, 300000000LL);
+  const uint64_t b = lrvx_emit_limit_sell(ctx.strategy, ctx.other, 10100000000LL, 300000000LL);
+  lrvx_emit_cancel(ctx.strategy, a);
+  lrvx_emit_cancel_all(ctx.strategy, ctx.other);
+
+  // The request still reaches the executor under the id the strategy named;
+  // there is no order behind it any more, so no symbol or side to report.
+  lrvx_emit_modify(ctx.strategy, a, 10200000000LL, 200000000LL);
+  EXPECT_EQ(ctx.state.last_replace_order.id, a);
+  EXPECT_EQ(ctx.state.last_replace_order.symbol, 0u);
+  lrvx_emit_modify(ctx.strategy, b, 10200000000LL, 200000000LL);
+  EXPECT_EQ(ctx.state.last_replace_order.id, b);
+  EXPECT_EQ(ctx.state.last_replace_order.symbol, 0u);
+  EXPECT_EQ(ctx.state.replace.load(), 2);
 }
 
 TEST(CapiExecutor, NullDetachesExecutor)

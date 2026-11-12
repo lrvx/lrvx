@@ -88,8 +88,10 @@ Called on every fill this strategy's own orders produce (status
 #### `on_order_update(ctx: SymbolContext, event: OrderEventData)`
 
 Called on every order-lifecycle status change: `NEW`, `ACCEPTED`, `CANCELED`,
-`REJECTED`, `REPLACED`, `TRIGGERED`, `TRAILING_UPDATED`. Fills fire here too —
-use `on_fill` if you only care about those.
+`REJECTED`, `REPLACED`, `TRIGGERED`, `TRAILING_UPDATED` and the rest. A fill
+does not fire here: a `PARTIALLY_FILLED` or `FILLED` event reaches `on_fill`
+and only `on_fill`, in a backtest and in paper mode alike. A strategy that
+tracks an order to its end needs both callbacks.
 
 #### `on_queue_position_change(ctx: SymbolContext, event: OrderEventData)`
 
@@ -125,7 +127,7 @@ These methods use the first registered symbol when `symbol` is omitted. `symbol`
 | `close_position(symbol=None)` | Close position (reduce-only) |
 | `cancel_order(order_id)` | Cancel an order |
 | `cancel_all_orders(symbol=None)` | Cancel every order for a symbol |
-| `modify_order(order_id, new_price, new_qty)` | Modify a resting order. It keeps its id, symbol and side; `new_qty` is the quantity left to work |
+| `modify_order(order_id, new_price, new_qty)` | Modify a resting order, or a stop / take-profit / trailing order still waiting on its trigger. It keeps its id, symbol, side and type; `new_qty` is the quantity left to work. `new_price` is the trigger of a stop-market, take-profit-market or trailing-stop order and the limit price of every other type. A refused modify (off-tick price, an order already filled or cancelled) arrives in `on_order_update` as `REPLACE_REJECTED` with `reject_reason` set |
 
 `tif` accepts `"gtc"`, `"ioc"`, `"fok"`, `"gtd"`, `"post_only"`.
 

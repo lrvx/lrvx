@@ -391,6 +391,9 @@ class BacktestRunner : public ISignalHandler
   // entry stays until its cancel or the next run. Unused while the built-in
   // or venue executor takes the orders.
   std::unordered_map<OrderId, Order> _customOrders;
+  // The symbol of every order this run sent, by id: a Modify carries none,
+  // and one that names a finished order has no live order to read it from.
+  std::unordered_map<OrderId, SymbolId> _orderSymbols;
   // Optional externally owned SimulatedExecutor (VenueStack::executor()).
   // When non-null it receives market data and owns the run's fills.
   SimulatedExecutor* _venueExecutor{nullptr};

@@ -116,7 +116,7 @@ names and meaning of the Python runner (see
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `set_strategy(strategy)` | `None` | Attach a strategy and install its event callbacks |
-| `run_csv(path, symbol)` | `BacktestStats` | Replay a CSV file (columns: timestamp, open, high, low, close, volume) |
+| `run_csv(path, symbol)` | `BacktestStats` | Replay a CSV file (columns: timestamp, open, high, low, close, volume). Raises `ValueError` with the reason on a file that cannot be opened or a row that cannot be parsed |
 | `run_ohlcv(timestamps, closes, symbol)` | `BacktestStats` | Replay raw arrays (`List[int]` timestamps in ns, `List[float]` closes) |
 | `run_bars(start_ns, end_ns, opens, highs, lows, closes, volumes, symbol, bar_type=0, bar_type_param=0)` | `BacktestStats` | Replay full OHLCV bars. `Strategy.on_bar` fires; `on_trade` does **not** |
 | `run_tape(path)` | `BacktestStats` | Replay one `.lrvx` tape directory. Raises `ValueError` with the reason on a missing or unreadable tape |

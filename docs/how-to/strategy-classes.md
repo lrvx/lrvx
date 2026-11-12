@@ -110,7 +110,7 @@ All bindings dispatch through the same C++ `BridgeStrategy` callbacks, so behavi
 | `on_bar(ctx, bar)` | Closed OHLC bar | All bindings (since [#123](https://github.com/lrvx/lrvx/pull/123)) |
 | `on_start()` / `on_stop()` | Lifecycle hooks | All bindings |
 | `on_fill(ctx, event)` | Every fill on the strategy's own orders (`PARTIALLY_FILLED` / `FILLED`) | Python, Node.js, Codon |
-| `on_order_update(ctx, event)` | Every order-lifecycle status change — `NEW` / `ACCEPTED` / `CANCELED` / `REJECTED` / `REPLACED` / `TRIGGERED` / `TRAILING_UPDATED`, fills included | Python, Node.js, Codon |
+| `on_order_update(ctx, event)` | Every order-lifecycle status change — `NEW` / `ACCEPTED` / `CANCELED` / `REJECTED` / `REPLACED` / `TRIGGERED` / `TRAILING_UPDATED` and the rest. A fill is not one of them: it reaches `on_fill` only | Python, Node.js, Codon |
 | `on_market_position_change(ctx, event)` | Resting limit order's categorical market position moved (`best` / `behind_best` / `mid_spread` / `level_empty` / `crossed`). Backtest only | Python, Node.js, Codon |
 | `on_queue_position_change(ctx, event)` | Resting limit order's queue position moved with no other lifecycle transition; `event.queue_ahead` / `queue_total` carry the snapshot. Backtest only | Python, Node.js, Codon |
 
@@ -136,7 +136,7 @@ Names differ slightly by language (snake_case vs camelCase) but the surface is t
 | Limit sell | `limit_sell(price, qty, tif="gtc")` | `emit.limitSell(p, qty)` | `limit_sell(price, qty, tif="gtc")` | `emitLimitSell(sym, p, qty[, tif])` |
 | Cancel | `cancel_order(id)` | `emit.cancel(id)` | `cancel_order(id)` | `emitCancel(id)` |
 | Cancel all | `cancel_all_orders()` | — | `cancel_all_orders()` | `emitCancelAll(sym)` |
-| Modify / replace | `modify_order(id, new_price, new_qty)` | — | `modify_order(id, new_price, new_qty)` | `emitModify(id, newPrice, newQty)` |
+| Modify / replace | `modify_order(id, new_price, new_qty)` | `emit.modify(id, newPrice, newQty)` | `modify_order(id, new_price, new_qty)` | `emitModify(id, newPrice, newQty)` |
 | Stop market | `stop_market(side, trigger, qty)` | — | `stop_market(side, trigger, qty)` | `emitStopMarket(sym, side, trigger, qty)` |
 | Stop limit | `stop_limit(side, trigger, limit_price, qty)` | — | `stop_limit(side, trigger, limit_price, qty)` | `emitStopLimit(sym, side, trigger, limit, qty)` |
 | Take profit market | `take_profit_market(side, trigger, qty)` | — | `take_profit_market(side, trigger, qty)` | `emitTakeProfitMarket(sym, side, trigger, qty)` |

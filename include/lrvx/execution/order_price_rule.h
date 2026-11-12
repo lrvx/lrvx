@@ -35,6 +35,11 @@ inline constexpr const char* kRejectPriceOffTick = "price_off_tick";
 inline constexpr const char* kRejectTriggerOffTick = "trigger_off_tick";
 inline constexpr const char* kRejectTrailingOffsetOffTick = "trailing_offset_off_tick";
 
+// Why a replace was refused, other than its prices.
+inline constexpr const char* kRejectUnknownOrder = "unknown_order";
+inline constexpr const char* kRejectReplaceChangesType = "replace_changes_order_type";
+inline constexpr const char* kRejectLateReplaceAfterTrigger = "late_replace_after_trigger";
+
 // The tick orders on this symbol are checked against, as a raw price, or 0
 // when the symbol's tick is not known. A tick is known when it was declared:
 // tickSizeKnown is set, or tickSize differs from the registry default. A
