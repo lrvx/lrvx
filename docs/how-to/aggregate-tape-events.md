@@ -185,7 +185,7 @@ reader.run(panel)                # default n_threads=0 → auto
 - `1`: explicit single-thread. Useful for benchmarking the base path, or for environments where threading is undesirable.
 - `>1`: explicit worker count, capped to the effective block count per segment. `n_threads=100` on a 4-block segment allocates 4 panel clones.
 
-Partitioning is intra-segment at the compressed-block level. Each worker holds its own panel, cloned from the caller's via `IAggregator::cloneEmpty()`, and walks its assigned block range; results merge into the caller's originals via `IAggregator::merge()` before `finalize()`. Captures with one large active segment (md_collector style) benefit from this layout; segment-level partitioning would leave workers idle when one segment dominates.
+Partitioning is intra-segment at the compressed-block level. Each worker holds its own panel, cloned from the caller's via `IAggregator::cloneEmpty()`, and walks its assigned block range; results merge into the caller's originals via `IAggregator::merge()` before `finalize()`. Captures with one large active segment (a long-running recorder that appends to a single file) benefit from this layout; segment-level partitioning would leave workers idle when one segment dominates.
 
 Every thread count delivers events in the order `n_threads=1` does. `Sorted` segments whose time ranges overlap (two captures of one window, an archive import that overlaps a recording) are merged event by event on the calling thread and fed to the caller's aggregators directly; only the remaining segments are partitioned. A tape recorded in order has no such segments and is partitioned in full. See [BinaryLogReader, Ordering guarantee](../reference/api/replay/binary_log_reader.md#ordering-guarantee).
 
@@ -201,7 +201,7 @@ The failure is layout-dependent: the reader only partitions when a segment has e
 
 ## Out-of-order tapes and the reorder buffer
 
-For segments without the `Sorted` flag (tapes produced by external writers such as `md_collector` or third-party recorders), the reader applies two ordering stages:
+For segments without the `Sorted` flag (tapes produced by external writers or third-party recorders), the reader applies two ordering stages:
 
 1. Intra-block sort runs on decompress, removing the ~1–2 ms exchange-WS jitter that accounts for most exchange-feed reordering. Cost: one linear scan of the block buffer per Sorted=false block.
 2. Cross-block reorder buffer is a bounded min-heap of in-flight events keyed by `exchange_ts_ns`. As events arrive (each block already intra-sorted), the heap drains anything whose timestamp falls outside `watermark - reorder_window_ns`. Memory: `O(reorder_window_ns × peak_event_rate)`.
@@ -215,7 +215,7 @@ reader = lrvx.DataReader(
 )
 ```
 
-The 10s default covers ~99% of cross-block inversions observed on real `md_collector` captures (1–25s tail, p99 around 5s).
+The 10s default covers about 99% of cross-block inversions seen on live exchange captures written without sorting (1–25s tail, p99 around 5s).
 
 ### Events that arrive too late
 

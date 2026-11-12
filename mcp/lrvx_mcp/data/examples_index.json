@@ -178,8 +178,8 @@
     {
       "language": "python",
       "path": "docs/examples/python_multi_symbol.py",
-      "sha256": "72c850011685c3a18e94473bf24f3ba2b0da6751018eafb570484c6faada2879",
-      "size_bytes": 3280,
+      "sha256": "850e6d98096b63ef08afcc4002b5e1b2f6644ac571a907dacda32e18f77f872d",
+      "size_bytes": 3271,
       "topic": "strategy"
     },
     {
