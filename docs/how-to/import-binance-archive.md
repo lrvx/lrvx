@@ -18,7 +18,7 @@ The per-row work is fiddly: two layouts, two timestamp units, side mapping, and 
 pip install lrvx
 ```
 
-No extras are required. `--mirror` downloads use `urllib` from the standard library.
+No extras are required. Downloads use `urllib` from the standard library.
 
 ## Convert a single day
 
@@ -47,7 +47,7 @@ Side encoding follows the lrvx convention. `is_buyer_maker = true` becomes `Side
 
 ## Convert a date range
 
-For multi-day backfills, `range_to_lrvx` accepts a date range and optionally a local mirror cache. Missing zips are downloaded from `data.binance.vision` in parallel and reused on follow-up calls. The function signature:
+For multi-day backfills, `range_to_lrvx` takes a range of UTC days. Binance cuts its files at midnight UTC, so `--from 2024-01-15 --to 2024-01-15` is 2024-01-15T00:00Z to 2024-01-16T00:00Z. Missing zips are downloaded from `data.binance.vision` in parallel into the shared archive cache and reused on follow-up calls (see [the cache](import-multi-exchange-archives.md#shared-download-cache)). The function signature:
 
 ```text
 binance.range_to_lrvx(
@@ -57,7 +57,7 @@ binance.range_to_lrvx(
     date_to:   str | date,      # YYYY-MM-DD, inclusive
     out_tape:  str | Path,
     *,
-    mirror:    str | Path | None = None,
+    mirror:    str | Path | None = None,   # default ~/.lrvx/archive-cache/binance
     parallel:  int = 4,
     symbol_id: int = 1,
     skip_missing: bool = False,
@@ -65,7 +65,9 @@ binance.range_to_lrvx(
 ) -> ConvertStats
 ```
 
-Without `mirror`, the converter writes to a tempdir and discards it after the range is done. Set `skip_missing=True` to keep going if Binance has not published a particular day yet (common at the head of the archive). A day's file usually appears the following day.
+The symbol is checked against the form the archive uses for the market before anything is downloaded: `BTCUSDT` for spot, `BTCUSDT` or `BTCUSDT_240329` for um-futures, and for cm-futures the contract name, `BTCUSD_PERP` or `BTCUSD_240329`. A symbol of another shape (`BTCUSDT` on cm-futures, `btcusdt`, `BTC-USDT`) fails at once with an example of the expected form.
+
+A day Binance has not published answers 404; it is asked once, not retried. Without `skip_missing` such a day stops the range with an error naming its URL; with `skip_missing=True` (`--skip-missing`) the range steps over it, which is common at the head of the archive (a day's file usually appears the following day). A range in which no day is published fails either way, with a message naming the symbol, market and dates and the first URL tried. Timeouts, 5xx answers and incomplete downloads are retried; see [Downloads](import-multi-exchange-archives.md#downloads).
 
 ## CLI
 
@@ -77,9 +79,16 @@ lrvx archive binance \
   --market um-futures \
   --from 2024-01-01 --to 2024-01-31 \
   --out ./tapes/binance-um-BTCUSDT \
-  --mirror ./.cache/binance \
   --parallel 4
 ```
+
+The summary line ends with the first and last trade written, in UTC:
+
+```text
+lrvx archive binance: trades_written=... rows_read=... rows_skipped=0 rows_invalid=0 files=31 first_trade=2024-01-01T00:00:00.112Z last_trade=2024-01-31T23:59:59.870Z
+```
+
+`first_trade=- last_trade=-` means nothing new was written (every trade was on the tape already).
 
 For one-off conversions of a file already on disk, pass `--csv` instead of the date range:
 

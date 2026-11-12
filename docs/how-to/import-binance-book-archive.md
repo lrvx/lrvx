@@ -38,7 +38,7 @@ binance.range_book_to_lrvx(
 ) -> BookConvertStats
 ```
 
-`book_type` is `"t1"`; `market` is `"um-futures"` or `"cm-futures"` (for coin-margined contracts the symbol is the contract name, e.g. `BTCUSD_PERP`). Anything else raises `ValueError` before any download. The range form downloads missing zips from `data.binance.vision`, caches them under `mirror` when set, and runs the converter on the local files serially so the writer stays append-safe.
+`book_type` is `"t1"`; `market` is `"um-futures"` or `"cm-futures"` (for coin-margined contracts the symbol is the contract name, e.g. `BTCUSD_PERP`). Anything else, or a symbol of the wrong shape for the market, raises `ValueError` before any download. Days are UTC days. The range form downloads missing zips from `data.binance.vision` into the shared archive cache, `~/.lrvx/archive-cache/binance/<market>/<symbol>/` (or `mirror` in place of `~/.lrvx/archive-cache/binance`), next to the aggTrades files of the same symbol, and runs the converter on the local files serially so the writer stays append-safe. Missing days, retries and the cache work as for aggTrades; see [Import multi-exchange archives](import-multi-exchange-archives.md#downloads).
 
 ## Example
 
@@ -72,9 +72,10 @@ lrvx archive binance --book t1 \
   --symbol BTCUSDT --market um-futures \
   --from 2024-01-01 --to 2024-01-07 \
   --out ./tapes/binance-um-BTCUSDT \
-  --mirror ./.cache/binance \
   --parallel 2
 ```
+
+The summary line ends with `first_update=` and `last_update=`, the first and last book record written, in UTC.
 
 `--market spot` with `--book` exits with status 2 and an error naming the supported markets, as does any `--book` value other than `t1`. An unrecognised header or a file with no parsable row exits with status 1 and a one-line error.
 

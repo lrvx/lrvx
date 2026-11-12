@@ -240,16 +240,33 @@ class BitgetPartsTests(unittest.TestCase):
         self.assertEqual((again.trades_written, again.rows_skipped), (0, 3))
 
     def test_missing_day(self) -> None:
+        """A range whose only day is missing produced no files, with or
+        without skip_missing; each naming is asked once per run."""
         patcher, asked = self._serve({})
         with patcher:
-            with self.assertRaises(FileNotFoundError):
-                bitget.range_to_lrvx("BTCUSDT", "umcbl", self.day, self.day,
+            for skip in (False, True):
+                with self.assertRaises(FileNotFoundError) as cm:
+                    bitget.range_to_lrvx("BTCUSDT", "umcbl", self.day, self.day,
+                                         self.tmp / "tape", mirror=self.mirror,
+                                         skip_missing=skip)
+                self.assertIn("produced no files", str(cm.exception))
+        self.assertEqual(len(asked), 6)
+        self.assertFalse((self.tmp / "tape").exists())
+
+    def test_skip_missing_steps_over_a_missing_day(self) -> None:
+        published = {bitget._part_url("BTCUSDT", "umcbl", self.day,
+                                      bitget._PART_NAMES[2], 1): _ROWS}
+        patcher, _asked = self._serve(published)
+        later = date.fromordinal(self.day.toordinal() + 1)
+        with patcher:
+            with self.assertRaises(FileNotFoundError) as cm:
+                bitget.range_to_lrvx("BTCUSDT", "umcbl", self.day, later,
                                      self.tmp / "tape", mirror=self.mirror)
-            stats = bitget.range_to_lrvx("BTCUSDT", "umcbl", self.day, self.day,
+            self.assertIn(later.strftime("%Y%m%d"), str(cm.exception))
+            stats = bitget.range_to_lrvx("BTCUSDT", "umcbl", self.day, later,
                                          self.tmp / "tape", mirror=self.mirror,
                                          skip_missing=True)
-        self.assertEqual(stats.files_processed, 0)
-        self.assertEqual(len(asked), 6)
+        self.assertEqual((stats.files_processed, stats.trades_written), (1, 3))
 
 
 _DAY1_START_MS = 1_705_248_000_000  # 2024-01-15T00:00:00+08:00

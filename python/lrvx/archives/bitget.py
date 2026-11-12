@@ -25,7 +25,15 @@ The importer tries them in that order and downloads parts until the
 next one is missing (the CDN answers 403 for a missing file). These
 names are what the download page hands out; Bitget does not document
 them as an API, so a future renaming shows up as a day that cannot be
-found. A day is a UTC+8 calendar day, as the download page states.
+found. A day is a UTC+8 calendar day, as the download page states: the
+file for 2024-01-15 holds trades from 2024-01-14T16:00Z to
+2024-01-15T16:00Z, and ``date_from`` / ``date_to`` name such days.
+
+Symbols carry no product suffix: ``BTCUSDT`` for spot and umcbl,
+``BTCPERP`` for cmcbl, ``BTCUSD`` for dmcbl. The range form caches the
+parts under ``<cache_root>/bitget/<market>/<symbol>/`` (``mirror``
+replaces ``<cache_root>/bitget``), with the download policy of
+``_download``.
 
 The CSV inside each part is
 
@@ -43,17 +51,15 @@ with ``UnknownLayoutError``.
 from __future__ import annotations
 
 import json
-import shutil
-import time
-import urllib.error
-import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+import os
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple, Union
 
-from . import _cache, _dedup, _layout
+from . import _cache, _dedup, _layout, _range
+from ._download import NotPublished, evict_if_corrupt
+from ._download import fetch as _download
 
 
 _BASE_URL = "https://img.bitgetimg.com/online/trades"
@@ -90,6 +96,17 @@ _LAYOUTS = (
 
 DateLike = Union[str, date]
 
+# The archive's days start at midnight UTC+8.
+DAY_UTC_OFFSET_HOURS = 8
+
+# Symbol suffix and example per market.
+_SYMBOL_FORM = {
+    "spot":  ("", "BTCUSDT"),
+    "umcbl": ("USDT", "BTCUSDT"),
+    "cmcbl": ("PERP", "BTCPERP"),
+    "dmcbl": ("USD", "BTCUSD"),
+}
+
 
 @dataclass
 class ConvertStats:
@@ -109,6 +126,24 @@ def _code(market: str) -> str:
             f"unknown market '{market}'. expected one of {sorted(_MARKETS)}"
         )
     return _CODES[market]
+
+
+def check_symbol(symbol: str, market: str) -> None:
+    """Raise ValueError unless ``symbol`` has the shape of a Bitget
+    ``market`` symbol as the archive names it. A local check; no
+    request is made."""
+    _code(market)
+    suffix, example = _SYMBOL_FORM[market]
+    ok = (_range.is_upper_alnum(symbol) and symbol.endswith(suffix)
+          and len(symbol) > len(suffix))
+    if not ok:
+        if "_" in symbol:
+            expected = "the symbol without a product suffix such as _UMCBL"
+        elif suffix:
+            expected = f"<COIN>{suffix} in upper case"
+        else:
+            expected = "the pair in upper case with no separator"
+        raise _range.bad_symbol("Bitget", market, symbol, expected, example)
 
 
 def _part_url(symbol: str, market: str, day: date, pattern: str,
@@ -140,42 +175,22 @@ def _manifest_path(mirror: Path, symbol: str, market: str, day: date) -> Path:
     return _mirror_dir(mirror, symbol, market) / f"{symbol}-{day.isoformat()}.parts"
 
 
-def _fetch(url: str, dest: Path, *, retries: int = 3,
-           backoff: float = 2.0) -> bool:
-    """Download ``url`` to ``dest``. False when the file does not exist
-    (403 or 404); raises on any other failure."""
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + ".tmp")
-    last_err: Optional[BaseException] = None
-    for attempt in range(retries):
-        try:
-            with urllib.request.urlopen(url, timeout=60) as resp, open(tmp, "wb") as f:
-                shutil.copyfileobj(resp, f)
-            tmp.replace(dest)
-            return True
-        except urllib.error.HTTPError as e:
-            if tmp.exists():
-                tmp.unlink()
-            if e.code in (403, 404):
-                return False
-            last_err = e
-        except (urllib.error.URLError, OSError, TimeoutError) as e:
-            last_err = e
-            if tmp.exists():
-                try:
-                    tmp.unlink()
-                except OSError:
-                    pass
-        if attempt < retries - 1:
-            time.sleep(backoff * (2 ** attempt))
-    raise RuntimeError(f"failed to download {url}: {last_err}") from last_err
+def _fetch(url: str, dest: Path) -> bool:
+    """Download ``url`` to ``dest``. False when the archive does not
+    publish the file; raises on any other failure."""
+    try:
+        _download(url, dest)
+    except NotPublished:
+        return False
+    return True
 
 
 def _download_day(mirror: Path, symbol: str, market: str,
                   day: date) -> List[Path]:
     """Every part of ``day`` in the mirror, downloading what is missing.
     The part list is kept in a manifest once complete. Raises
-    FileNotFoundError when the archive has no file for the day."""
+    NotPublished, naming the first URL tried, when the archive has no
+    file for the day under any part naming."""
     manifest = _manifest_path(mirror, symbol, market, day)
     folder = _mirror_dir(mirror, symbol, market)
     if manifest.exists():
@@ -191,12 +206,15 @@ def _download_day(mirror: Path, symbol: str, market: str,
                 break
             paths.append(dest)
         if paths:
-            manifest.write_text("\n".join(p.name for p in paths) + "\n")
+            tmp = manifest.with_name(f".{manifest.name}.{os.getpid()}.part")
+            tmp.write_text("\n".join(p.name for p in paths) + "\n")
+            os.replace(tmp, manifest)
             return paths
-    raise FileNotFoundError(
+    first = _part_url(symbol, market, day, _PART_NAMES[0], 1)
+    raise NotPublished(
+        first, None,
         f"Bitget archive has no {market} trade file for {symbol} on "
-        f"{day.isoformat()} (tried {_part_url(symbol, market, day, _PART_NAMES[0], 1)} "
-        f"and the other part namings)")
+        f"{day.isoformat()} (tried {first} and the other part namings)")
 
 
 def _iter_rows(src: _layout.CsvFile) -> Iterator[Tuple[int, float, float, int, int]]:
@@ -378,18 +396,6 @@ def trades_to_lrvx(
     return stats
 
 
-def _coerce_day(d: DateLike) -> date:
-    return d if isinstance(d, date) else date.fromisoformat(d)
-
-
-def _iter_days(date_from: DateLike, date_to: DateLike) -> Iterator[date]:
-    cur = _coerce_day(date_from)
-    end = _coerce_day(date_to)
-    while cur <= end:
-        yield cur
-        cur += timedelta(days=1)
-
-
 def range_to_lrvx(
     symbol: str,
     market: str,
@@ -408,42 +414,39 @@ def range_to_lrvx(
     skip_missing: bool = False,
 ) -> ConvertStats:
     """Convert a range of Bitget days (UTC+8 dates, inclusive), every
-    part of each, into lrvx. Uses the shared archive cache
-    (``~/.lrvx/archive-cache/bitget``) when ``mirror`` is omitted. A day
-    with no file raises FileNotFoundError unless ``skip_missing``."""
-    _code(market)
-    days = list(_iter_days(date_from, date_to))
+    part of each, into lrvx: ``date_from="2024-01-15"`` starts at
+    2024-01-14T16:00Z.
+
+    Parts are taken from, and missing ones downloaded into, the cache:
+    ``<cache_root>/bitget`` (``~/.lrvx/archive-cache/bitget`` unless
+    ``LRVX_ARCHIVE_CACHE`` says otherwise), or ``mirror`` when given,
+    laid out as ``<market>/<symbol>/<part name>``.
+
+    The symbol's shape is checked before any request. A range in which
+    no day is published raises ``NoFilesError``; a missing day raises
+    ``FileNotFoundError`` unless ``skip_missing``."""
+    check_symbol(symbol, market)
+    days = _range.days_between(date_from, date_to)
     if not days:
         return ConvertStats()
+    mirror = _cache.exchange_dir("bitget", mirror)
 
-    if mirror is None:
-        mirror = _cache.cache_root() / "bitget"
-    mirror = Path(mirror).expanduser()
-    mirror.mkdir(parents=True, exist_ok=True)
-
-    def _ensure(day: date) -> Tuple[date, List[Path]]:
-        try:
-            return day, _download_day(mirror, symbol, market, day)
-        except FileNotFoundError:
-            if skip_missing:
-                return day, []
-            raise
-
-    pairs: List[Tuple[date, List[Path]]] = []
-    with ThreadPoolExecutor(max_workers=max(1, int(parallel))) as ex:
-        for pair in ex.map(_ensure, days):
-            pairs.append(pair)
+    pairs = _range.fetch_days(
+        days, lambda day: _download_day(mirror, symbol, market, day),
+        parallel=parallel, skip_missing=skip_missing,
+        what=f"bitget {market} trades {symbol}")
 
     agg = ConvertStats()
     for day, paths in pairs:
-        for path in paths:
-            s = trades_to_lrvx(
-                path, out_tape,
-                symbol_id=symbol_id, symbol_name=symbol, market=market,
-                exchange_id=exchange_id, exchange_name=exchange_name,
-                append=append, max_segment_mb=max_segment_mb,
-                compression=compression, write_metadata=False,
-            )
+        for path in paths or ():
+            with evict_if_corrupt(path):
+                s = trades_to_lrvx(
+                    path, out_tape,
+                    symbol_id=symbol_id, symbol_name=symbol, market=market,
+                    exchange_id=exchange_id, exchange_name=exchange_name,
+                    append=append, max_segment_mb=max_segment_mb,
+                    compression=compression, write_metadata=False,
+                )
             agg.trades_written += s.trades_written
             agg.rows_read += s.rows_read
             agg.rows_skipped += s.rows_skipped
@@ -473,6 +476,7 @@ NothingParsedError = _layout.NothingParsedError
 __all__ = [
     "ConvertStats",
     "NothingParsedError",
+    "check_symbol",
     "UnknownLayoutError",
     "trades_to_lrvx",
     "range_to_lrvx",

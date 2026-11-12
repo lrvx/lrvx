@@ -38,6 +38,13 @@ Side encoding follows the existing lrvx convention:
   * ``is_buyer_maker = false`` → seller rests as maker → active flow is
     buying  → ``Side::BUY``  (0)
 
+Days are UTC days: the file for 2024-01-15 holds the trades from
+2024-01-15T00:00Z to 2024-01-16T00:00Z.
+
+The range form caches the downloaded files under
+``<cache_root>/binance/<market>/<symbol>/`` (``mirror`` replaces
+``<cache_root>/binance``), with the download policy of ``_download``.
+
 The converter writes through ``lrvx.DataWriter`` and is append-safe:
 a row is skipped when its ``agg_trade_id`` (stable, exchange-assigned)
 is already on the tape for the same symbol within the incoming file's
@@ -51,18 +58,14 @@ tapes — exchange = "binance", instrument_type derived from ``market``.
 from __future__ import annotations
 
 import json
-import shutil
-import tempfile
-import time
-import urllib.error
-import urllib.request
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Iterator, List, Optional, Tuple, Union
 
-from . import _dedup, _layout
+from . import _cache, _dedup, _layout, _range
+from ._download import evict_if_corrupt
+from ._download import fetch as _download
 
 # Market identifier → URL path prefix on data.binance.vision for the
 # trade stream (aggTrades) and the book stream (bookTicker). Layout in
@@ -112,6 +115,9 @@ _INSTRUMENT_TYPE = {
 
 DateLike = Union[str, date]
 
+# The archive's days start at midnight UTC.
+DAY_UTC_OFFSET_HOURS = 0
+
 
 @dataclass
 class ConvertStats:
@@ -144,31 +150,30 @@ def _mirror_path(mirror: Path, symbol: str, market: str, day: date) -> Path:
     return mirror / market / symbol / f"{symbol}-aggTrades-{day.isoformat()}.zip"
 
 
-def _download(url: str, dest: Path, *, retries: int = 3, backoff: float = 2.0) -> None:
-    """Download ``url`` to ``dest`` atomically with retry.
-
-    Uses a ``.tmp`` sibling and ``rename`` so a partial fetch does not
-    poison a long-running mirror.
-    """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + ".tmp")
-    last_err: Optional[BaseException] = None
-    for attempt in range(retries):
-        try:
-            with urllib.request.urlopen(url, timeout=60) as resp, open(tmp, "wb") as f:
-                shutil.copyfileobj(resp, f)
-            tmp.replace(dest)
-            return
-        except (urllib.error.URLError, OSError, TimeoutError) as e:
-            last_err = e
-            if tmp.exists():
-                try:
-                    tmp.unlink()
-                except OSError:
-                    pass
-            if attempt < retries - 1:
-                time.sleep(backoff * (2 ** attempt))
-    raise RuntimeError(f"failed to download {url}: {last_err}") from last_err
+def check_symbol(symbol: str, market: str) -> None:
+    """Raise ValueError unless ``symbol`` has the shape of a Binance
+    ``market`` symbol as the archive names it. A local check; no
+    request is made."""
+    if market not in _MARKET_SEGMENTS:
+        raise ValueError(
+            f"unknown market '{market}'. expected one of {sorted(_MARKET_SEGMENTS)}")
+    head, sep, tail = symbol.partition("_")
+    if market == "spot":
+        ok = _range.is_upper_alnum(symbol)
+        expected, example = "the pair in upper case with no separator", "BTCUSDT"
+    elif market == "um-futures":
+        ok = _range.is_upper_alnum(head) and (
+            not sep or (len(tail) == 6 and tail.isdigit()))
+        expected = ("the contract in upper case, optionally with a delivery "
+                    "date suffix")
+        example = "BTCUSDT or BTCUSDT_240329"
+    else:
+        ok = (_range.is_upper_alnum(head) and head.endswith("USD") and len(head) > 3
+              and (tail == "PERP" or (len(tail) == 6 and tail.isdigit())))
+        expected = "a coin-margined contract name, <COIN>USD_PERP or <COIN>USD_<YYMMDD>"
+        example = "BTCUSD_PERP or BTCUSD_240329"
+    if not ok:
+        raise _range.bad_symbol("Binance", market, symbol, expected, example)
 
 
 # ── CSV parsing ─────────────────────────────────────────────────────
@@ -400,18 +405,6 @@ def aggtrades_to_lrvx(
 # ── Multi-day conversion ────────────────────────────────────────────
 
 
-def _coerce_day(d: DateLike) -> date:
-    return d if isinstance(d, date) else date.fromisoformat(d)
-
-
-def _iter_days(date_from: DateLike, date_to: DateLike) -> Iterator[date]:
-    cur = _coerce_day(date_from)
-    end = _coerce_day(date_to)
-    while cur <= end:
-        yield cur
-        cur += timedelta(days=1)
-
-
 def range_to_lrvx(
     symbol: str,
     market: str,
@@ -430,63 +423,48 @@ def range_to_lrvx(
     skip_missing: bool = False,
     qty_multiplier: float = 1.0,
 ) -> ConvertStats:
-    """Convert a date range from a local mirror or HTTP into lrvx.
+    """Convert a range of UTC days (inclusive) into lrvx.
 
-    With ``mirror`` set, missing zips are downloaded into the mirror
-    layout (``<mirror>/<market>/<symbol>/<symbol>-aggTrades-<YYYY-MM-DD>.zip``)
-    so a follow-up call reuses the cached files. Without ``mirror``, a
-    tempdir is used and discarded.
+    Files are taken from, and missing ones downloaded into, the cache:
+    ``<cache_root>/binance`` (``~/.lrvx/archive-cache/binance`` unless
+    ``LRVX_ARCHIVE_CACHE`` says otherwise), or ``mirror`` when given,
+    laid out as ``<market>/<symbol>/<symbol>-aggTrades-<YYYY-MM-DD>.zip``.
 
-    Downloads run up to ``parallel`` connections in flight; the
-    lrvx write step is serial so the writer stays append-safe.
+    The symbol's shape is checked before any request. A range in which
+    no day is published raises ``NoFilesError``; a missing day raises
+    ``FileNotFoundError`` unless ``skip_missing``. Downloads run up to
+    ``parallel`` connections in flight; the write step is serial so
+    the writer stays append-safe.
     """
-    days = list(_iter_days(date_from, date_to))
+    check_symbol(symbol, market)
+    days = _range.days_between(date_from, date_to)
     if not days:
         return ConvertStats()
+    mirror = _cache.exchange_dir("binance", mirror)
 
-    cleanup = False
-    if mirror is None:
-        mirror = Path(tempfile.mkdtemp(prefix="binance_archive_"))
-        cleanup = True
-    mirror = Path(mirror).expanduser()
-
-    def _ensure(day: date) -> Tuple[date, Optional[Path]]:
+    def _ensure(day: date) -> Path:
         local = _mirror_path(mirror, symbol, market, day)
-        if local.exists():
-            return day, local
-        try:
+        if not local.exists():
             _download(_aggtrades_url(symbol, market, day), local)
-        except Exception:
-            if skip_missing:
-                return day, None
-            raise
-        return day, local
+        return local
 
-    pairs: List[Tuple[date, Optional[Path]]] = []
-    with ThreadPoolExecutor(max_workers=max(1, int(parallel))) as ex:
-        for pair in ex.map(_ensure, days):
-            pairs.append(pair)
+    pairs = _range.fetch_days(days, _ensure, parallel=parallel,
+                              skip_missing=skip_missing,
+                              what=f"binance {market} aggTrades {symbol}")
 
     agg = ConvertStats()
     for day, path in pairs:
         if path is None:
             continue
-        s = aggtrades_to_lrvx(
-            path,
-            out_tape,
-            symbol_id=symbol_id,
-            symbol_name=symbol,
-            market=market,
-            exchange_id=exchange_id,
-            exchange_name=exchange_name,
-            append=append,
-            max_segment_mb=max_segment_mb,
-            compression=compression,
-            # Skip per-day metadata; one final write at the end captures
-            # the full range range and total count.
-            write_metadata=False,
-            qty_multiplier=qty_multiplier,
-        )
+        with evict_if_corrupt(path):
+            # Per-day metadata is skipped; one write at the end records
+            # the whole range and total count.
+            s = aggtrades_to_lrvx(
+                path, out_tape, symbol_id=symbol_id, symbol_name=symbol,
+                market=market, exchange_id=exchange_id,
+                exchange_name=exchange_name, append=append,
+                max_segment_mb=max_segment_mb, compression=compression,
+                write_metadata=False, qty_multiplier=qty_multiplier)
         agg.trades_written += s.trades_written
         agg.rows_read += s.rows_read
         agg.rows_skipped += s.rows_skipped
@@ -511,9 +489,6 @@ def range_to_lrvx(
         qty_multiplier=qty_multiplier,
     )
 
-    if cleanup:
-        shutil.rmtree(mirror, ignore_errors=True)
-
     return agg
 
 
@@ -526,6 +501,7 @@ __all__ = [
     "NothingParsedError",
     "UnknownLayoutError",
     "aggtrades_to_lrvx",
+    "check_symbol",
     "range_to_lrvx",
     "t1_to_lrvx",
     "range_book_to_lrvx",
@@ -608,7 +584,7 @@ def _book_archive_url(symbol: str, market: str, book_type: str, day: date) -> st
 def _book_mirror_path(mirror: Path, symbol: str, market: str,
                       book_type: str, day: date) -> Path:
     product = _BOOK_PRODUCT_NAMES[book_type]
-    return mirror / market / product / symbol / f"{symbol}-{product}-{day.isoformat()}.zip"
+    return mirror / market / symbol / f"{symbol}-{product}-{day.isoformat()}.zip"
 
 
 def _file_ts_range_ms(path: Path, *, ts_col: int) -> Optional[Tuple[int, int]]:
@@ -999,54 +975,47 @@ def range_book_to_lrvx(
     compression: str = "none",
     skip_missing: bool = False,
 ) -> BookConvertStats:
-    """Convert a multi-day book range from a local mirror or HTTP into
-    lrvx book events. Downloads run up to ``parallel`` connections
-    in flight (default 2); conversion is serial so the writer stays
-    append-safe.
+    """Convert a range of UTC days (inclusive) of a book archive into
+    lrvx book events. Files are cached like the aggTrades range form's,
+    in ``<cache_root>/binance`` or ``mirror``, as
+    ``<market>/<symbol>/<symbol>-bookTicker-<YYYY-MM-DD>.zip``. Downloads
+    run up to ``parallel`` connections in flight (default 2); conversion
+    is serial so the writer stays append-safe.
 
     ``book_type`` is ``"t1"`` (bookTicker) and ``market`` is
-    ``"um-futures"`` or ``"cm-futures"``; anything else raises
-    ValueError before any download."""
+    ``"um-futures"`` or ``"cm-futures"``; anything else, or a symbol of
+    the wrong shape, raises ValueError before any download. Missing
+    days are handled as in ``range_to_lrvx``."""
     _check_book_request(book_type, market)
+    check_symbol(symbol, market)
 
-    days = list(_iter_days(date_from, date_to))
+    days = _range.days_between(date_from, date_to)
     if not days:
         return BookConvertStats()
+    mirror = _cache.exchange_dir("binance", mirror)
 
-    cleanup = False
-    if mirror is None:
-        mirror = Path(tempfile.mkdtemp(prefix="binance_book_archive_"))
-        cleanup = True
-    mirror = Path(mirror).expanduser()
-
-    def _ensure(day: date) -> Tuple[date, Optional[Path]]:
+    def _ensure(day: date) -> Path:
         local = _book_mirror_path(mirror, symbol, market, book_type, day)
-        if local.exists():
-            return day, local
-        try:
+        if not local.exists():
             _download(_book_archive_url(symbol, market, book_type, day), local)
-        except Exception:
-            if skip_missing:
-                return day, None
-            raise
-        return day, local
+        return local
 
-    pairs: List[Tuple[date, Optional[Path]]] = []
-    with ThreadPoolExecutor(max_workers=max(1, int(parallel))) as ex:
-        for pair in ex.map(_ensure, days):
-            pairs.append(pair)
+    pairs = _range.fetch_days(
+        days, _ensure, parallel=parallel, skip_missing=skip_missing,
+        what=f"binance {market} {_BOOK_PRODUCT_NAMES[book_type]} {symbol}")
 
     agg = BookConvertStats()
     for day, path in pairs:
         if path is None:
             continue
-        stats = t1_to_lrvx(
-            path, out_tape,
-            symbol_id=symbol_id, symbol_name=symbol, market=market,
-            exchange_id=exchange_id, exchange_name=exchange_name,
-            append=append, max_segment_mb=max_segment_mb,
-            compression=compression, write_metadata=False,
-        )
+        with evict_if_corrupt(path):
+            stats = t1_to_lrvx(
+                path, out_tape,
+                symbol_id=symbol_id, symbol_name=symbol, market=market,
+                exchange_id=exchange_id, exchange_name=exchange_name,
+                append=append, max_segment_mb=max_segment_mb,
+                compression=compression, write_metadata=False,
+            )
         _aggregate_book_stats(agg, stats)
 
     if agg.snapshots_written + agg.deltas_written > 0:
@@ -1061,8 +1030,5 @@ def range_book_to_lrvx(
             updates_added=agg.snapshots_written + agg.deltas_written,
             depth=1,
         )
-
-    if cleanup:
-        shutil.rmtree(mirror, ignore_errors=True)
 
     return agg

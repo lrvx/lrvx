@@ -763,9 +763,9 @@ def cmd_tape_view(args: argparse.Namespace) -> int:
 
 def _archive_command(label: str):
     """Report an import that cannot proceed (unknown CSV layout, a file
-    with no parsable row, a day missing from the archive, a failed
-    download, a bad market or symbol) as one line on stderr and exit 1,
-    instead of a traceback."""
+    with no parsable row, a day missing from the archive, a range with
+    no file at all, a failed download, a bad market or symbol) as one
+    line on stderr and exit 1, instead of a traceback."""
     def wrap(fn):
         def run(args: argparse.Namespace) -> int:
             try:
@@ -777,6 +777,26 @@ def _archive_command(label: str):
         run.__doc__ = fn.__doc__
         return run
     return wrap
+
+
+def _archive_summary(label: str, venue: str, counts: str, stats, module,
+                     args: argparse.Namespace, *, record: str = "trade") -> str:
+    """The one-line summary of an import: the counters, the first and
+    last record written (UTC, ``-`` when nothing was written), and, for
+    a date range from an exchange whose days are not UTC days, the UTC
+    span those days cover."""
+    from .archives import _range
+
+    line = (f"lrvx archive {label}: {counts} "
+            f"first_{record}={_range.ns_to_iso(stats.first_ts_ns)} "
+            f"last_{record}={_range.ns_to_iso(stats.last_ts_ns)}")
+    offset = module.DAY_UTC_OFFSET_HOURS
+    if offset and not args.csv:
+        start, end = _range.utc_span(args.date_from, args.date_to, offset)
+        line += (f" ({venue} days are UTC+{offset} days: "
+                 f"{args.date_from} to {args.date_to} covers "
+                 f"{start:%Y-%m-%dT%H:%M:%SZ} to {end:%Y-%m-%dT%H:%M:%SZ})")
+    return line
 
 
 @_archive_command("binance")
@@ -831,11 +851,12 @@ def cmd_archive_binance(args: argparse.Namespace) -> int:
             qty_multiplier=args.qty_multiplier,
         )
 
-    print(
-        f"lrvx archive binance: trades_written={stats.trades_written} "
-        f"rows_read={stats.rows_read} rows_skipped={stats.rows_skipped} "
-        f"rows_invalid={stats.rows_invalid} files={stats.files_processed}"
-    )
+    print(_archive_summary(
+        "binance", "Binance",
+        f"trades_written={stats.trades_written} rows_read={stats.rows_read} "
+        f"rows_skipped={stats.rows_skipped} rows_invalid={stats.rows_invalid} "
+        f"files={stats.files_processed}",
+        stats, archives.binance, args))
     return 0
 
 
@@ -888,13 +909,12 @@ def _cmd_archive_binance_book(args: argparse.Namespace, archives) -> int:
             skip_missing=args.skip_missing,
         )
 
-    print(
-        f"lrvx archive binance --book {book_type}: "
-        f"snapshots={stats.snapshots_written} "
-        f"deltas={stats.deltas_written} "
+    print(_archive_summary(
+        f"binance --book {book_type}", "Binance",
+        f"snapshots={stats.snapshots_written} deltas={stats.deltas_written} "
         f"rows_read={stats.rows_read} rows_skipped={stats.rows_skipped} "
-        f"rows_invalid={stats.rows_invalid} files={stats.files_processed}"
-    )
+        f"rows_invalid={stats.rows_invalid} files={stats.files_processed}",
+        stats, archives.binance, args, record="update"))
     return 0
 
 
@@ -938,11 +958,12 @@ def cmd_archive_bybit(args: argparse.Namespace) -> int:
             skip_missing=args.skip_missing,
         )
 
-    print(
-        f"lrvx archive bybit: trades_written={stats.trades_written} "
-        f"rows_read={stats.rows_read} rows_skipped={stats.rows_skipped} "
-        f"rows_invalid={stats.rows_invalid} files={stats.files_processed}"
-    )
+    print(_archive_summary(
+        "bybit", "Bybit",
+        f"trades_written={stats.trades_written} rows_read={stats.rows_read} "
+        f"rows_skipped={stats.rows_skipped} rows_invalid={stats.rows_invalid} "
+        f"files={stats.files_processed}",
+        stats, archives.bybit, args))
     return 0
 
 
@@ -988,13 +1009,13 @@ def cmd_archive_okx(args: argparse.Namespace) -> int:
             qty_multiplier=args.qty_multiplier,
         )
 
-    print(
-        f"lrvx archive okx: trades_written={stats.trades_written} "
-        f"rows_read={stats.rows_read} rows_skipped={stats.rows_skipped} "
-        f"rows_invalid={stats.rows_invalid} "
+    print(_archive_summary(
+        "okx", "OKX",
+        f"trades_written={stats.trades_written} rows_read={stats.rows_read} "
+        f"rows_skipped={stats.rows_skipped} rows_invalid={stats.rows_invalid} "
         f"rows_other_instruments={stats.rows_other_instruments} "
-        f"files={stats.files_processed}"
-    )
+        f"files={stats.files_processed}",
+        stats, archives.okx, args))
     return 0
 
 
@@ -1038,11 +1059,12 @@ def cmd_archive_bitget(args: argparse.Namespace) -> int:
             skip_missing=args.skip_missing,
         )
 
-    print(
-        f"lrvx archive bitget: trades_written={stats.trades_written} "
-        f"rows_read={stats.rows_read} rows_skipped={stats.rows_skipped} "
-        f"rows_invalid={stats.rows_invalid} files={stats.files_processed}"
-    )
+    print(_archive_summary(
+        "bitget", "Bitget",
+        f"trades_written={stats.trades_written} rows_read={stats.rows_read} "
+        f"rows_skipped={stats.rows_skipped} rows_invalid={stats.rows_invalid} "
+        f"files={stats.files_processed}",
+        stats, archives.bitget, args))
     return 0
 
 
@@ -1290,7 +1312,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Convert Binance public aggTrades zip archives, or "
              "bookTicker archives with --book t1, into a `.lrvx` tape "
              "(single day via --csv, or a date range via "
-             "--symbol/--from/--to).",
+             "--symbol/--from/--to). Days are UTC days.",
     )
     p_binance.add_argument(
         "--csv", default=None,
@@ -1300,7 +1322,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_binance.add_argument(
         "--symbol", default=None,
-        help="Symbol (e.g. BTCUSDT). Required for the date-range form.",
+        help="Symbol as the archive names it: BTCUSDT for spot and "
+             "um-futures (BTCUSDT_240329 for a dated um contract), the "
+             "contract name for cm-futures (BTCUSD_PERP, BTCUSD_240329). "
+             "Required for the date-range form; its shape is checked "
+             "before any download.",
     )
     p_binance.add_argument(
         "--market", default="um-futures",
@@ -1310,17 +1336,21 @@ def _build_parser() -> argparse.ArgumentParser:
              "and in contracts for cm-futures.",
     )
     p_binance.add_argument("--from", dest="date_from", default=None,
-                           help="Start date YYYY-MM-DD (inclusive).")
+                           help="First UTC day YYYY-MM-DD (inclusive); "
+                                "Binance files are cut at midnight UTC.")
     p_binance.add_argument("--to", dest="date_to", default=None,
-                           help="End date YYYY-MM-DD (inclusive).")
+                           help="Last UTC day YYYY-MM-DD (inclusive).")
     p_binance.add_argument(
         "--out", required=True,
         help="Output `.lrvx` directory.",
     )
     p_binance.add_argument(
         "--mirror", default=None,
-        help="Local mirror cache for downloaded zips. Without this a "
-             "tempdir is used and discarded.",
+        help="Cache directory for downloaded files, in place of the shared "
+             "cache `~/.lrvx/archive-cache/binance` (root overridable with "
+             "LRVX_ARCHIVE_CACHE). Files are laid out as "
+             "`<market>/<symbol>/<file>`, written under a temporary name and "
+             "renamed once complete; delete the directory to clear it.",
     )
     p_binance.add_argument(
         "--parallel", type=int, default=4,
@@ -1345,8 +1375,10 @@ def _build_parser() -> argparse.ArgumentParser:
                                 "--book); every row is written even if it "
                                 "was already present.")
     p_binance.add_argument("--skip-missing", action="store_true",
-                           help="Skip days that fail to download instead of "
-                                "aborting the whole range.")
+                           help="Skip days the archive does not publish (HTTP "
+                                "403, 404, 410) instead of aborting; a download that"
+                                " fails for another reason still aborts, and a"
+                                " range with no published day at all fails.")
     p_binance.add_argument("--book", default=None,
                            choices=("t1",),
                            help="Switch to the book archive product. "
@@ -1369,31 +1401,38 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Convert Bybit public archive trade files into a `.lrvx` "
              "tape: `public.bybit.com/trading/<SYM>/<SYM><DATE>.csv.gz` "
              "for linear and inverse, `public.bybit.com/spot/<SYM>/"
-             "<SYM>_<DATE>.csv.gz` for spot, UTC days. Single day via "
-             "`--csv` or a date range via `--symbol/--from/--to`.",
+             "<SYM>_<DATE>.csv.gz` for spot. Days are UTC days. Single "
+             "day via `--csv` or a date range via `--symbol/--from/--to`.",
     )
     p_bybit.add_argument("--csv", default=None,
                          help="Path to a single Bybit archive `.csv.gz` "
                               "or extracted `.csv`. When set, --from / "
                               "--to are ignored.")
     p_bybit.add_argument("--symbol", default=None,
-                         help="Symbol in Bybit naming (e.g. BTCUSDT for "
-                              "linear, BTCUSD for inverse, BTCUSDT for spot).")
+                         help="Symbol in Bybit naming: BTCUSDT, BTCPERP or "
+                              "BTC-27DEC24 for linear, BTCUSD or BTCUSDZ24 "
+                              "for inverse, BTCUSDT for spot. Its shape is "
+                              "checked before any download.")
     p_bybit.add_argument("--market", default="linear",
                          choices=("spot", "linear", "inverse"),
                          help="Bybit market segment (default: linear). "
                               "Quantities are in the base coin for spot and "
                               "linear, in USD contracts for inverse.")
     p_bybit.add_argument("--from", dest="date_from", default=None,
-                         help="Start date YYYY-MM-DD (inclusive).")
+                         help="First UTC day YYYY-MM-DD (inclusive); Bybit "
+                              "files are cut at midnight UTC.")
     p_bybit.add_argument("--to", dest="date_to", default=None,
-                         help="End date YYYY-MM-DD (inclusive).")
+                         help="Last UTC day YYYY-MM-DD (inclusive).")
     p_bybit.add_argument("--out", required=True,
                          help="Output `.lrvx` directory.")
     p_bybit.add_argument("--mirror", default=None,
-                         help="Local mirror cache for downloaded files. "
-                              "Defaults to the shared archive cache "
-                              "(`~/.lrvx/archive-cache/bybit`).")
+                         help="Cache directory for downloaded files, in place "
+                              "of the shared cache "
+                              "`~/.lrvx/archive-cache/bybit` (root overridable"
+                              " with LRVX_ARCHIVE_CACHE). Files are laid out "
+                              "as `<market>/<symbol>/<file>`, written under a "
+                              "temporary name and renamed once complete; "
+                              "delete the directory to clear it.")
     p_bybit.add_argument("--parallel", type=int, default=4,
                          help="Concurrent downloads (default: 4). "
                               "Conversion stays serial.")
@@ -1412,15 +1451,19 @@ def _build_parser() -> argparse.ArgumentParser:
     p_bybit.add_argument("--no-append", action="store_true",
                          help="Disable trade_id dedup against an existing tape.")
     p_bybit.add_argument("--skip-missing", action="store_true",
-                         help="Skip days that fail to download.")
+                         help="Skip days the archive does not publish (HTTP "
+                              "403, 404, 410) instead of aborting; a download that "
+                              "fails for another reason still aborts, and a "
+                              "range with no published day at all fails.")
     p_bybit.set_defaults(handler=cmd_archive_bybit)
 
     p_okx = archive_sub.add_parser(
         "okx",
         help="Convert OKX public trade files (`static.okx.com/cdn/okex/"
              "traderecords/trades/daily/`) into a `.lrvx` tape. Days are "
-             "UTC+8 dates. Single file via `--csv` or a date range via "
-             "`--symbol/--from/--to`.",
+             "UTC+8 days: 2024-01-15 runs from 2024-01-14T16:00Z to "
+             "2024-01-15T16:00Z. Single file via `--csv` or a date range "
+             "via `--symbol/--from/--to`.",
     )
     p_okx.add_argument("--csv", default=None,
                        help="Path to a single OKX archive `.zip` / `.csv.gz` "
@@ -1429,21 +1472,29 @@ def _build_parser() -> argparse.ArgumentParser:
     p_okx.add_argument("--symbol", default=None,
                        help="Instrument in OKX naming (e.g. BTC-USDT for "
                             "spot, BTC-USDT-SWAP for swap, BTC-USD-240329 for "
-                            "futures, BTC-USD-240329-50000-C for options).")
+                            "futures, BTC-USD-240329-50000-C for options). "
+                            "Its shape is checked before any download.")
     p_okx.add_argument("--market", default="swap",
                        choices=("spot", "swap", "futures", "option"),
                        help="OKX market segment (default: swap). "
                             "Quantities are in the base currency for spot "
                             "and in contracts otherwise.")
     p_okx.add_argument("--from", dest="date_from", default=None,
-                       help="Start date YYYY-MM-DD (inclusive).")
+                       help="First UTC+8 day YYYY-MM-DD (inclusive); OKX "
+                            "files are cut at midnight UTC+8, so the day "
+                            "starts at 16:00 UTC the day before.")
     p_okx.add_argument("--to", dest="date_to", default=None,
-                       help="End date YYYY-MM-DD (inclusive).")
+                       help="Last UTC+8 day YYYY-MM-DD (inclusive); it ends "
+                            "at 16:00 UTC that day.")
     p_okx.add_argument("--out", required=True,
                        help="Output `.lrvx` directory.")
     p_okx.add_argument("--mirror", default=None,
-                       help="Local mirror cache for downloads. Defaults to "
-                            "the shared archive cache (`~/.lrvx/archive-cache/okx`).")
+                       help="Cache directory for downloaded files, in place of"
+                            " the shared cache `~/.lrvx/archive-cache/okx` "
+                            "(root overridable with LRVX_ARCHIVE_CACHE). Files"
+                            " are laid out as `<market>/<symbol>/<file>`, "
+                            "written under a temporary name and renamed once "
+                            "complete; delete the directory to clear it.")
     p_okx.add_argument("--parallel", type=int, default=4,
                        help="Concurrent downloads (default: 4). "
                             "Conversion stays serial.")
@@ -1462,7 +1513,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_okx.add_argument("--no-append", action="store_true",
                        help="Disable trade_id dedup against an existing tape.")
     p_okx.add_argument("--skip-missing", action="store_true",
-                       help="Skip days that fail to download.")
+                       help="Skip days the archive does not publish (HTTP "
+                            "403, 404, 410) instead of aborting; a download that "
+                            "fails for another reason still aborts, and a "
+                            "range with no published day at all fails.")
     p_okx.add_argument("--qty-multiplier", dest="qty_multiplier",
                        type=float, default=1.0,
                        help="Multiply every size by this constant, e.g. 0.01 "
@@ -1474,17 +1528,19 @@ def _build_parser() -> argparse.ArgumentParser:
         "bitget",
         help="Convert Bitget public trade files (`img.bitgetimg.com/"
              "online/trades/`, the files of bitget.com/data-download) into "
-             "a `.lrvx` tape. Days are UTC+8 dates, each in one or more "
-             "parts. One part via `--csv` or a date range via "
+             "a `.lrvx` tape. Days are UTC+8 days, each in one or more "
+             "parts: 2024-01-15 runs from 2024-01-14T16:00Z to "
+             "2024-01-15T16:00Z. One part via `--csv` or a date range via "
              "`--symbol/--from/--to`.",
     )
     p_bitget.add_argument("--csv", default=None,
                           help="Path to one Bitget archive part `.zip` / "
                                "`.csv.gz` / `.csv`.")
     p_bitget.add_argument("--symbol", default=None,
-                          help="Symbol in Bitget naming (e.g. BTCUSDT for "
-                               "spot and umcbl, BTCPERP for cmcbl, BTCUSD "
-                               "for dmcbl).")
+                          help="Symbol in Bitget naming, with no product "
+                               "suffix: BTCUSDT for spot and umcbl, BTCPERP "
+                               "for cmcbl, BTCUSD for dmcbl. Its shape is "
+                               "checked before any download.")
     p_bitget.add_argument("--market", default="umcbl",
                           choices=("spot", "umcbl", "cmcbl", "dmcbl"),
                           help="Bitget market: spot, umcbl (USDT-margined "
@@ -1492,14 +1548,23 @@ def _build_parser() -> argparse.ArgumentParser:
                                "(coin-margined); default umcbl. Quantities "
                                "are in the base coin.")
     p_bitget.add_argument("--from", dest="date_from", default=None,
-                          help="Start date YYYY-MM-DD (inclusive).")
+                          help="First UTC+8 day YYYY-MM-DD (inclusive); "
+                               "Bitget files are cut at midnight UTC+8, so "
+                               "the day starts at 16:00 UTC the day before.")
     p_bitget.add_argument("--to", dest="date_to", default=None,
-                          help="End date YYYY-MM-DD (inclusive).")
+                          help="Last UTC+8 day YYYY-MM-DD (inclusive); it "
+                               "ends at 16:00 UTC that day.")
     p_bitget.add_argument("--out", required=True,
                           help="Output `.lrvx` directory.")
     p_bitget.add_argument("--mirror", default=None,
-                          help="Local mirror cache. Defaults to "
-                               "`~/.lrvx/archive-cache/bitget`.")
+                          help="Cache directory for downloaded files, in place"
+                               " of the shared cache "
+                               "`~/.lrvx/archive-cache/bitget` (root "
+                               "overridable with LRVX_ARCHIVE_CACHE). Files "
+                               "are laid out as `<market>/<symbol>/<file>`, "
+                               "written under a temporary name and renamed "
+                               "once complete; delete the directory to clear "
+                               "it.")
     p_bitget.add_argument("--parallel", type=int, default=4,
                           help="Concurrent downloads (default: 4).")
     p_bitget.add_argument("--symbol-id", dest="symbol_id", type=int, default=1,
@@ -1517,7 +1582,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p_bitget.add_argument("--no-append", action="store_true",
                           help="Disable trade_id dedup against an existing tape.")
     p_bitget.add_argument("--skip-missing", action="store_true",
-                          help="Skip days that fail to download.")
+                          help="Skip days the archive does not publish (HTTP "
+                               "403, 404, 410) instead of aborting; a download that "
+                               "fails for another reason still aborts, and a "
+                               "range with no published day at all fails.")
     p_bitget.set_defaults(handler=cmd_archive_bitget)
 
     # ── lint (lookahead) ────────────────────────────────────────────
