@@ -153,7 +153,22 @@ std::unique_ptr<SegmentBuffer> ParallelReader::readSegment(const SegmentInfo& se
   }
 
   buffer->bytes_read = iter.bytesConsumed();
+  buffer->crc_errors = iter.crcErrors();
+  buffer->unknown_frames_skipped = iter.unknownFramesSkipped();
   return buffer;
+}
+
+void ParallelReader::addSegmentStats(const SegmentBuffer& buffer)
+{
+  ++_stats.segments_processed;
+  _stats.bytes_read += buffer.bytes_read;
+  _stats.crc_errors += buffer.crc_errors;
+  _stats.unknown_frames_skipped += buffer.unknown_frames_skipped;
+  _stats.events_read += buffer.events.size();
+  for (const auto& event : buffer.events)
+  {
+    event.type == EventType::Trade ? ++_stats.trades_read : ++_stats.book_updates_read;
+  }
 }
 
 void ParallelReader::mergeBuffers(std::vector<std::unique_ptr<SegmentBuffer>>& buffers,
@@ -265,6 +280,8 @@ uint64_t ParallelReader::forEach(EventCallback callback)
     _stats.trades_read += rs.trades_read;
     _stats.book_updates_read += rs.book_updates_read;
     _stats.bytes_read += rs.bytes_read;
+    _stats.crc_errors += rs.crc_errors;
+    _stats.unknown_frames_skipped += rs.unknown_frames_skipped;
     _stats.end_time_ns = time_utils::nowNanos();
     return count;
   }
@@ -300,20 +317,7 @@ uint64_t ParallelReader::forEach(EventCallback callback)
       }
       if (buffer)
       {
-        _stats.segments_processed++;
-        _stats.bytes_read += buffer->bytes_read;
-        _stats.events_read += buffer->events.size();
-        for (const auto& event : buffer->events)
-        {
-          if (event.type == EventType::Trade)
-          {
-            _stats.trades_read++;
-          }
-          else
-          {
-            _stats.book_updates_read++;
-          }
-        }
+        addSegmentStats(*buffer);
       }
       buffers.push_back(std::move(buffer));
     }
@@ -334,19 +338,21 @@ uint64_t ParallelReader::forEach(EventCallback callback)
   {
     // Deliver events as they become available (no sorting)
     std::atomic<uint64_t> count{0};
-    std::atomic<uint64_t> bytes_read{0};
     std::atomic<bool> stop_requested{false};
 
     std::vector<std::future<void>> futures;
     futures.reserve(_segments.size());
 
+    // Held while delivering a segment's events and while adding its stats, so
+    // the callback is never entered concurrently and _stats is written by one
+    // thread at a time.
     std::mutex callback_mutex;
 
     for (const auto& segment : _segments)
     {
       futures.push_back(std::async(std::launch::async,
-                                   [this, &segment, &callback, &count, &bytes_read,
-                                    &stop_requested, &callback_mutex]()
+                                   [this, &segment, &callback, &count, &stop_requested,
+                                    &callback_mutex]()
                                    {
                                      if (stop_requested.load())
                                      {
@@ -358,8 +364,10 @@ uint64_t ParallelReader::forEach(EventCallback callback)
                                      {
                                        return;
                                      }
-                                     bytes_read.fetch_add(buffer->bytes_read,
-                                                          std::memory_order_relaxed);
+                                     {
+                                       std::lock_guard lock(callback_mutex);
+                                       addSegmentStats(*buffer);
+                                     }
 
                                      for (const auto& event : buffer->events)
                                      {
@@ -385,7 +393,6 @@ uint64_t ParallelReader::forEach(EventCallback callback)
       future.wait();
     }
 
-    _stats.bytes_read += bytes_read.load();
     _stats.end_time_ns = time_utils::nowNanos();
     return count.load();
   }
@@ -401,8 +408,8 @@ uint64_t ParallelReader::forEachBatch(BatchCallback callback)
   _stats.start_time_ns = time_utils::nowNanos();
 
   std::atomic<uint64_t> total_events{0};
-  std::atomic<uint64_t> bytes_read{0};
   std::atomic<bool> stop_requested{false};
+  std::mutex stats_mutex;
 
   std::vector<std::future<void>> futures;
   futures.reserve(_segments.size());
@@ -410,8 +417,8 @@ uint64_t ParallelReader::forEachBatch(BatchCallback callback)
   for (const auto& segment : _segments)
   {
     futures.push_back(std::async(std::launch::async,
-                                 [this, &segment, &callback, &total_events, &bytes_read,
-                                  &stop_requested]()
+                                 [this, &segment, &callback, &total_events, &stop_requested,
+                                  &stats_mutex]()
                                  {
                                    if (stop_requested.load())
                                    {
@@ -419,12 +426,15 @@ uint64_t ParallelReader::forEachBatch(BatchCallback callback)
                                    }
 
                                    auto buffer = readSegment(segment);
-                                   if (buffer)
+                                   if (!buffer)
                                    {
-                                     bytes_read.fetch_add(buffer->bytes_read,
-                                                          std::memory_order_relaxed);
+                                     return;
                                    }
-                                   if (!buffer || buffer->events.empty())
+                                   {
+                                     std::lock_guard lock(stats_mutex);
+                                     addSegmentStats(*buffer);
+                                   }
+                                   if (buffer->events.empty())
                                    {
                                      return;
                                    }
@@ -446,8 +456,6 @@ uint64_t ParallelReader::forEachBatch(BatchCallback callback)
   }
 
   _stats.end_time_ns = time_utils::nowNanos();
-  _stats.events_read = total_events.load();
-  _stats.bytes_read += bytes_read.load();
   return total_events.load();
 }
 

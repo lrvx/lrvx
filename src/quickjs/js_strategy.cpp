@@ -450,16 +450,23 @@ void LrvxJsStrategy::loadStdlib()
     }
 
     class DataReader {
+      // dirOrOpts: a directory, or { dir, fromNs?, toNs?, symbols?,
+      // reorderWindowNs?, strictOrdering?, orderSegmentsByTime? (default
+      // true), skipSegmentsByTime? (default true) }.
       constructor(dirOrOpts) {
         if (typeof dirOrOpts === "string") {
           this._h = __lrvx_dr_create(dirOrOpts);
         } else {
           var o = dirOrOpts || {};
-          this._h = __lrvx_dr_create_filtered(
+          this._h = __lrvx_dr_create_ex(
             o.dir || "",
             o.fromNs || 0,
             o.toNs || 0,
-            o.symbols || []
+            o.symbols || [],
+            o.reorderWindowNs || 0,
+            o.strictOrdering,
+            o.orderSegmentsByTime,
+            o.skipSegmentsByTime
           );
         }
       }

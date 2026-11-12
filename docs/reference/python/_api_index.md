@@ -27,7 +27,7 @@ Surface: 118 classes, 82 functions, 41 constants.
 - `BookOnly: MarkImpactModel = ...`
 - `Bybit: AdlRanking = ...`
 - `CANCELLED: OrderGroupState = ...`
-- `CAPI_ABI_VERSION: int = 5`
+- `CAPI_ABI_VERSION: int = 6`
 - `Cross: MarginMode = ...`
 - `FAILED: OrderGroupState = ...`
 - `FILLED: OrderGroupState = ...`
@@ -485,7 +485,7 @@ Returns the same nanoseconds every call. Useful as a baseline.
 
 **Constructor**
 
-- `DataReader(data_dir: str, from_ns: typing.Any = None, to_ns: typing.Any = None, symbols: typing.Any = None, reorder_window_ns: typing.Any = None, strict_ordering: bool = False, order_segments_by_time: bool = True) -> None`
+- `DataReader(data_dir: str, from_ns: typing.Any = None, to_ns: typing.Any = None, symbols: typing.Any = None, reorder_window_ns: typing.Any = None, strict_ordering: bool = False, order_segments_by_time: bool = True, skip_segments_by_time: bool = True) -> None`
 
 **Members**
 

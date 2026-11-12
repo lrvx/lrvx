@@ -126,7 +126,7 @@ Preprocessor switches follow the same rule: a `FLOX_*` define on the compiler co
 
 The binary formats are the same under both names and the segment sentinel spells `FLOX`, so nothing needs converting.
 
-- Directories of `.floxlog` segments read as they are. Every reader, the validator, the index builders, merge and split, and `lrvx tape view` accept `.floxlog` next to `.lrvx`, and a directory that mixes the two reads as one tape in filename order. New segments are written as `.lrvx`. See the [`.lrvx` spec](../spec/lrvx.md).
+- Directories of `.floxlog` segments read as they are. Every reader, the validator, the index builders, merge and split, and `lrvx tape view` accept `.floxlog` next to `.lrvx`, and a directory that mixes the two reads as one tape, in time order wherever the segments prove it, whatever their extension ([read order](../spec/lrvx.md#read-order)). New segments are written as `.lrvx`. See the [`.lrvx` spec](../spec/lrvx.md).
 - A `.floxrun` trace directory opens like any other: `TraceReader` takes the directory path whatever its suffix, `lrvx tape view` accepts `.floxrun`, and bundle validation reads `expected.floxrun/` from bundles packed under the old name. See the [`.lrvxrun` spec](../spec/lrvxrun.md).
 - A global index written as `index.floxidx` loads by path with `GlobalIndexBuilder::load`; rebuilding writes `index.lrvxidx`. Per-segment indexes live inside the segment files and need nothing.
 

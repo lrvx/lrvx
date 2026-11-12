@@ -2094,6 +2094,15 @@ export interface DataReaderStats {
   /** Frames whose record type this build does not know. The tape format is
    *  additive, so they are stepped over rather than ending the read. */
   unknownFramesSkipped: number;
+  /** Segments not decoded at all because their proven time bounds lie
+   *  outside `[fromNs, toNs]` (see `skipSegmentsByTime`). */
+  segmentsSkipped: number;
+  /** Segments visited at a different position than their file name gives
+   *  them (see `orderSegmentsByTime`). */
+  segmentsReordered: number;
+  /** Segments whose events were merged with another segment's because
+   *  their time ranges overlap. */
+  segmentsInterleaved: number;
 }
 
 export interface DataReaderOptions {
@@ -2107,6 +2116,14 @@ export interface DataReaderOptions {
    *  rather than a thrown error; the message (symbol, event type, file,
    *  offset) is written to the engine log. */
   strictOrdering?: boolean;
+  /** Read segments in time order of their first event and merge Sorted
+   *  segments whose ranges overlap event by event. Defaults to `true`;
+   *  `false` reads them in file-name order. */
+  orderSegmentsByTime?: boolean;
+  /** With `fromNs` or `toNs` set, leave out the segments whose proven time
+   *  bounds lie outside the range. Defaults to `true`; `false` decodes every
+   *  segment. The events delivered are the same either way. */
+  skipSegmentsByTime?: boolean;
 }
 
 export class DataWriter {
@@ -2160,7 +2177,11 @@ export class DataReader {
    *  or an options object. `onProgress(pct, tsNs)` fires from inside
    *  the run loop at most once per `progressIntervalMs`; returning
    *  `false` cancels the walk and returns `false` from `run`. Progress
-   *  is reported only on the single-thread path (nThreads=1). */
+   *  is reported only on the single-thread path (nThreads=1).
+   *
+   *  Every thread count delivers in time order wherever nThreads=1 does:
+   *  Sorted segments whose ranges overlap are merged event by event on one
+   *  thread, and only the rest is partitioned across workers. */
   run(aggregators: Array<EventTypeStatsAggregator | BinCountAggregator | VolumeBinAggregator | OHLCBinAggregator | PeakAggregator | QuantileAggregator | BookSnapshotBinAggregator>, options?: number | DataReaderRunOptions): boolean;
 }
 

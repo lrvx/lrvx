@@ -149,6 +149,11 @@ struct DatasetSummary
 {
   std::filesystem::path data_dir;
 
+  // Earliest and latest non-zero exchange_ts_ns. Exact for every Sorted
+  // segment; a segment without the Sorted flag contributes the first and last
+  // event it wrote (arrival order), unless the summary came from a walk of
+  // every event (inspectWithSymbols), which is exact throughout. See
+  // BinaryLogReader::timeRange.
   int64_t first_event_ns{0};
   int64_t last_event_ns{0};
 
@@ -196,6 +201,10 @@ struct ReaderStats
   // per segment, the bytes between its header and its index, whichever read
   // path or thread count delivered it.
   uint64_t bytes_read{0};
+  // Frames skipped because their payload failed its CRC, or (a known type)
+  // was too short to parse. The read goes on with the next frame. An
+  // uncompressed frame claiming more than 10 MiB is counted here too and ends
+  // its segment, since the next frame cannot be found.
   uint64_t crc_errors{0};
   // Events discarded because they arrived past reorder_window_ns.
   // Always 0 when ReaderConfig::strict_ordering is set (the reader
@@ -252,6 +261,9 @@ struct ReplayEvent
 struct SegmentInfo
 {
   std::filesystem::path path;
+  // The header's first and last event written (recovered from the blocks
+  // while the header is still zero): arrival order, so on a compressed or
+  // unsorted segment not necessarily its earliest and latest.
   int64_t first_event_ns{0};
   int64_t last_event_ns{0};
   uint32_t event_count{0};
@@ -283,17 +295,18 @@ class BinaryLogReader
   static DatasetSummary inspect(const std::filesystem::path& data_dir);
   static DatasetSummary inspectWithSymbols(const std::filesystem::path& data_dir);
 
-  DatasetSummary summary();
+  DatasetSummary summary() const;
   uint64_t count();
   std::set<uint32_t> availableSymbols();
 
   using EventCallback = std::function<bool(const ReplayEvent&)>;
 
-  // Progress reporter invoked from inside `run()` at most once per
-  // `interval`. `pct` is in [0.0, 1.0] based on bytes-of-segments
-  // processed / total bytes (events-per-tape is not known up front).
-  // `cursor_ts_ns` is the exchange timestamp of the most recent
-  // dispatched event. Returning `false` requests cancellation —
+  // Progress reporter invoked from inside `run(aggregators, 1)` at most
+  // once per `interval`. `pct` is in [0.0, 1.0]: events dispatched over
+  // the segments' event counts. `cursor_ts_ns` is the exchange timestamp
+  // of the most recent dispatched event. A run that completes ends with
+  // one more call at 1.0 and that same cursor. Returning `false`
+  // requests cancellation —
   // `run()` stops the walk, calls `finalize()` once on every
   // aggregator with whatever partial state has been accumulated, and
   // returns `false` so the caller can distinguish a cancelled run
@@ -345,12 +358,19 @@ class BinaryLogReader
   //                    count internally — surplus workers are
   //                    not allocated.
   //
-  // Multi-threaded path partitions the segment list across that
-  // many worker threads. Each worker clones the panel via
-  // `IAggregator::cloneEmpty()`, runs its segment slice, and the
-  // reader then merges every worker's panel into the caller's
-  // original instances via `IAggregator::merge()` before calling
-  // finalize() once on each.
+  // Multi-threaded path: segments are visited in read order. A run of
+  // Sorted segments whose time ranges overlap is merged event by event
+  // on the calling thread straight into the caller's aggregators, as
+  // n_threads = 1 delivers it. Every other compressed segment with
+  // enough blocks is split into contiguous block ranges, one per
+  // worker; each worker clones the panel via
+  // `IAggregator::cloneEmpty()` and feeds it its range in time order,
+  // and the clones are merged into the caller's instances via
+  // `IAggregator::merge()` before the next segment. finalize() runs
+  // once on each caller instance at the end. So every aggregator
+  // instance sees non-decreasing timestamps wherever n_threads = 1
+  // delivers them so, and a tape recorded in order is partitioned in
+  // full.
   //
   // Sliding-window aggregators (Peak / Quantile) cannot observe
   // windows that straddle worker boundaries. See
@@ -358,6 +378,13 @@ class BinaryLogReader
   bool run(std::span<IAggregator* const> aggregators,
            std::size_t n_threads = 0);
 
+  // Earliest and latest non-zero exchange_ts_ns over the segments, or
+  // nullopt when there are none. Exact for every Sorted segment: an
+  // uncompressed one from its header, a compressed one from its index and
+  // its last block (one block decompressed per segment, once per reader).
+  // A segment without the Sorted flag, or without a usable index,
+  // contributes the first and last event it wrote; its real extremes
+  // would take a walk of the whole segment. summary() reports the same.
   std::optional<std::pair<int64_t, int64_t>> timeRange() const;
   ReaderStats stats() const;
   // Segments in file-name order.
@@ -378,6 +405,14 @@ class BinaryLogReader
     bool merge{false};
   };
 
+  // A segment's earliest and latest non-zero event (detail::segmentSpan).
+  struct Span
+  {
+    int64_t first_ns{0};
+    int64_t last_ns{0};
+    bool exact{false};
+  };
+
   bool scanSegments();
 
   // Build the segment index exactly once, safely, from a const context.
@@ -385,6 +420,11 @@ class BinaryLogReader
   // concurrently; without this the first scan could race a reader on another
   // thread (a replay loop scanning lazily while the owner asks for timeRange).
   bool ensureScanned() const;
+  // Filled once, by up to `threads` threads.
+  const std::vector<Span>& segmentSpans(std::size_t threads = 1) const;
+  // For run(n): marks each slice of _read_order that starts a run of Sorted
+  // segments whose time ranges overlap, by the read position it ends at.
+  std::vector<size_t> overlappingRuns(std::size_t threads) const;
   bool readSegment(const std::filesystem::path& path, EventCallback& callback);
   bool readSegmentFrom(const SegmentInfo& segment, int64_t start_ts_ns, EventCallback& callback);
   bool readSegmentStreaming(const std::filesystem::path& path, EventCallback& callback);
@@ -429,6 +469,15 @@ class BinaryLogReader
   std::vector<SegmentInfo> _segments;
   std::vector<size_t> _read_order;
   std::vector<ReadGroup> _read_groups;
+  // Per segment (file-name index): the lower bound a merged run sorts and
+  // opens it by. min_event_ns for a time-bounded segment; for one with no
+  // events, the key of the segment before it in the run.
+  std::vector<int64_t> _order_key;
+  // Per segment (file-name index): earliest and latest non-zero event, as
+  // detail::segmentSpan reads them, and whether they are exact. Filled on
+  // first use by segmentSpans().
+  mutable std::vector<Span> _spans;
+  mutable std::once_flag _span_once;
   bool _scanned{false};
   mutable std::once_flag _scan_once;
   ProgressCallback _progress_cb;

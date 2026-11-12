@@ -119,6 +119,11 @@ struct ExportConfig
 struct RangeExtractStats
 {
   uint64_t events_written{0};
+  // Earliest and latest non-zero event of the input: exact for a Sorted
+  // segment (read off its header, or its index and last block) and for one
+  // without the Sorted flag (taken from the extraction's walk, which visits
+  // every event of such a segment). A Sorted segment without a usable index
+  // reports the first and last event it wrote.
   int64_t input_first_ns{0};
   int64_t input_last_ns{0};
   bool requested_from_before_data{false};

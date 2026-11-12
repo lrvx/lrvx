@@ -8,6 +8,7 @@
  */
 
 #include "lrvx/replay/ops/index_builder.h"
+#include "segment_bounds.h"
 
 #include <algorithm>
 #include <chrono>
@@ -321,6 +322,19 @@ GlobalIndexBuildResult GlobalIndexBuilder::build(const std::filesystem::path& da
     SegmentHeader header;
     if (std::fread(&header, sizeof(header), 1, file) == 1 && header.isValid())
     {
+      // The global index reports each segment's earliest and latest event
+      // where the segment proves them (detail::segmentSpan); the header's
+      // fields are the first and last events written.
+      SegmentInfo info;
+      info.path = entry.path();
+      info.first_event_ns = header.first_event_ns;
+      info.last_event_ns = header.last_event_ns;
+      info.event_count = header.event_count;
+      info.sorted = header.isSorted();
+      info.compressed = header.isCompressed();
+      const auto span = detail::segmentSpan(info);
+      header.first_event_ns = span.first_ns;
+      header.last_event_ns = span.last_ns;
       segments.emplace_back(entry.path(), header);
     }
     std::fclose(file);

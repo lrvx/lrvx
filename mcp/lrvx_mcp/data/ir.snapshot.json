@@ -3218,6 +3218,49 @@
     },
     {
       "group": "datareader",
+      "name": "lrvx_data_reader_create_ex",
+      "params": [
+        {
+          "name": "data_dir",
+          "type": "const char *"
+        },
+        {
+          "name": "from_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "to_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "symbols",
+          "type": "const uint32_t *"
+        },
+        {
+          "name": "num_symbols",
+          "type": "uint32_t"
+        },
+        {
+          "name": "reorder_window_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "strict_ordering",
+          "type": "int32_t"
+        },
+        {
+          "name": "order_segments_by_time",
+          "type": "int32_t"
+        },
+        {
+          "name": "skip_segments_by_time",
+          "type": "int32_t"
+        }
+      ],
+      "return_type": "LrvxDataReaderHandle"
+    },
+    {
+      "group": "datareader",
       "name": "lrvx_data_reader_create_filtered",
       "params": [
         {
@@ -15144,7 +15187,7 @@
     {
       "group": "abi_version",
       "name": "LRVX_CAPI_ABI_VERSION",
-      "value": "5"
+      "value": "6"
     },
     {
       "group": "feature_flags",
@@ -16716,6 +16759,18 @@
         },
         {
           "name": "unknown_frames_skipped",
+          "type": "uint64_t"
+        },
+        {
+          "name": "segments_skipped",
+          "type": "uint64_t"
+        },
+        {
+          "name": "segments_reordered",
+          "type": "uint64_t"
+        },
+        {
+          "name": "segments_interleaved",
           "type": "uint64_t"
         }
       ],

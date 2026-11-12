@@ -154,7 +154,7 @@ struct DatasetValidationResult
 };
 ```
 
-`SegmentValidator` looks at one file at a time and cannot see a fault that lives between files. `DatasetValidator` adds the cross-segment pass: two segments whose `[actual_first_ts, actual_last_ts]` ranges intersect mean the same window was recorded twice, and since readers walk segments in filename order, such a dataset replays with events duplicated, reordered, or -- through the streaming reorder buffer's late drop -- missing. Each segment on its own is well formed, so the finding lands on `DatasetValidationResult::issues` as a `SegmentRangeOverlap` error and `valid` is false. Segments that merely touch at the seam (`a.last == b.first`) are the normal output of rotation and are not reported.
+`SegmentValidator` looks at one file at a time and cannot see a fault that lives between files. `DatasetValidator` adds the cross-segment pass: two segments whose `[actual_first_ts, actual_last_ts]` ranges intersect mean the same window was recorded twice, and such a dataset replays with that window's events duplicated. Readers merge overlapping `Sorted` segments event by event, so those arrive in time order; segments without the `Sorted` flag keep their file-name position, so overlapping ones replay reordered or -- through the streaming reorder buffer's late drop -- with events missing (see [BinaryLogReader, Ordering guarantee](binary_log_reader.md#ordering-guarantee)). Each segment on its own is well formed, so the finding lands on `DatasetValidationResult::issues` as a `SegmentRangeOverlap` error and `valid` is false. Segments that merely touch at the seam (`a.last == b.first`) are the normal output of rotation and are not reported.
 
 ## Usage
 

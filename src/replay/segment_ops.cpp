@@ -10,6 +10,7 @@
 #include "lrvx/replay/ops/segment_ops.h"
 
 #include "lrvx/log/log.h"
+#include "segment_bounds.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -964,30 +965,29 @@ uint64_t SegmentOps::extractTimeRange(const std::filesystem::path& input_path,
   // What the input actually spans. Segment filenames are stamped by whatever
   // wrote them and routinely disagree with the contents, so a caller asking
   // for a window this file cannot cover deserves to hear about it instead of
-  // getting a quietly short result.
+  // getting a quietly short result. The header's first/last_event_ns are the
+  // first and last events written, which on a compressed or unsorted segment
+  // need not be the earliest and latest: a Sorted segment's real extremes are
+  // read off its header or index here, an unsorted one's are taken from the
+  // walk below, which visits every event of such a segment anyway.
+  bool span_exact = false;
   {
     BinaryLogIterator probe(input_path);
     if (probe.isValid())
     {
-      out.input_first_ns = probe.header().first_event_ns;
-      out.input_last_ns = probe.header().last_event_ns;
+      const SegmentHeader& h = probe.header();
+      SegmentInfo info;
+      info.path = input_path;
+      info.first_event_ns = h.first_event_ns;
+      info.last_event_ns = h.last_event_ns;
+      info.event_count = h.event_count;
+      info.sorted = h.isSorted();
+      info.compressed = h.isCompressed();
+      const auto span = detail::segmentSpan(info);
+      out.input_first_ns = span.first_ns;
+      out.input_last_ns = span.last_ns;
+      span_exact = span.exact;
     }
-  }
-
-  if (out.input_first_ns > 0 && from_ns < out.input_first_ns)
-  {
-    out.requested_from_before_data = true;
-  }
-  if (out.input_last_ns > 0 && to_ns > out.input_last_ns)
-  {
-    out.requested_to_after_data = true;
-  }
-  if (out.requested_from_before_data || out.requested_to_after_data)
-  {
-    LRVX_LOG_WARN("extractTimeRange: requested ["
-                  << from_ns << ", " << to_ns << "] reaches outside " << input_path.string()
-                  << ", which holds [" << out.input_first_ns << ", " << out.input_last_ns
-                  << "]. The result covers the overlap only.");
   }
 
   WriterConfig single_file = config;
@@ -1013,9 +1013,18 @@ uint64_t SegmentOps::extractTimeRange(const std::filesystem::path& input_path,
   BinaryLogWriter writer(single_file);
   uint64_t count = 0;
 
+  // Without the Sorted flag nothing below ends the walk early, so it sees
+  // every event and gives the segment's real extremes.
+  int64_t walk_first = 0;
+  int64_t walk_last = 0;
   ReplayEvent event;
   while (iter.next(event))
   {
+    if (!span_exact && event.timestamp_ns > 0)
+    {
+      walk_first = walk_first == 0 ? event.timestamp_ns : std::min(walk_first, event.timestamp_ns);
+      walk_last = std::max(walk_last, event.timestamp_ns);
+    }
     if (event.timestamp_ns < from_ns)
     {
       continue;
@@ -1035,6 +1044,27 @@ uint64_t SegmentOps::extractTimeRange(const std::filesystem::path& input_path,
 
   writer.close();
   out.events_written = count;
+
+  if (!span_exact && !iter.header().isSorted() && walk_last > 0)
+  {
+    out.input_first_ns = walk_first;
+    out.input_last_ns = walk_last;
+  }
+  if (out.input_first_ns > 0 && from_ns < out.input_first_ns)
+  {
+    out.requested_from_before_data = true;
+  }
+  if (out.input_last_ns > 0 && to_ns > out.input_last_ns)
+  {
+    out.requested_to_after_data = true;
+  }
+  if (out.requested_from_before_data || out.requested_to_after_data)
+  {
+    LRVX_LOG_WARN("extractTimeRange: requested ["
+                  << from_ns << ", " << to_ns << "] reaches outside " << input_path.string()
+                  << ", which holds [" << out.input_first_ns << ", " << out.input_last_ns
+                  << "]. The result covers the overlap only.");
+  }
   return count;
 }
 

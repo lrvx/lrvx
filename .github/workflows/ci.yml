@@ -567,6 +567,7 @@ jobs:
                    codon_backtest_run_tape_bars_smoke \
                    codon_composite_dsl_smoke codon_feed_clock_smoke \
                    codon_merged_tape_smoke codon_multi_tf_helpers_smoke \
+                   codon_reader_segments_smoke \
                    codon_order_group_smoke codon_run_trace_smoke \
                    codon_strategy_e2e_smoke codon_targets_smoke \
                    codon_trace_attach_smoke codon_sma_crossover \

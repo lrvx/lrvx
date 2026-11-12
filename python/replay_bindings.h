@@ -216,7 +216,8 @@ inline PyTrade tradeRecordToPyTrade(const lrvx::replay::TradeRecord& tr)
 inline ReaderConfig makeReaderConfig(const std::string& dataDir, py::object fromNs,
                                      py::object toNs, py::object symbols,
                                      py::object reorderWindowNs, bool strictOrdering,
-                                     bool orderSegmentsByTime = true)
+                                     bool orderSegmentsByTime = true,
+                                     bool skipSegmentsByTime = true)
 {
   ReaderConfig cfg;
   cfg.data_dir = dataDir;
@@ -240,6 +241,7 @@ inline ReaderConfig makeReaderConfig(const std::string& dataDir, py::object from
   }
   cfg.strict_ordering = strictOrdering;
   cfg.order_segments_by_time = orderSegmentsByTime;
+  cfg.skip_segments_by_time = skipSegmentsByTime;
 
   return cfg;
 }
@@ -284,9 +286,9 @@ class PyDataReader
  public:
   PyDataReader(const std::string& dataDir, py::object fromNs, py::object toNs,
                py::object symbols, py::object reorderWindowNs, bool strictOrdering,
-               bool orderSegmentsByTime)
+               bool orderSegmentsByTime, bool skipSegmentsByTime)
       : _reader(makeReaderConfig(dataDir, fromNs, toNs, symbols, reorderWindowNs,
-                                 strictOrdering, orderSegmentsByTime))
+                                 strictOrdering, orderSegmentsByTime, skipSegmentsByTime))
   {
     if (!toNs.is_none())
     {
@@ -1402,7 +1404,7 @@ inline void bindReplay(py::module_& m)
   // DataReader
   py::class_<PyDataReader>(m, "DataReader")
       .def(py::init<const std::string&, py::object, py::object, py::object,
-                    py::object, bool, bool>(),
+                    py::object, bool, bool, bool>(),
            "Create a DataReader for a binary log data directory. "
            "`reorder_window_ns` controls the bounded reorder buffer applied "
            "to segments without the Sorted flag (default 10s). An event that "
@@ -1413,22 +1415,34 @@ inline void bindReplay(py::module_& m)
            "exclusive for option-quote reads -- see read_option_quotes. "
            "Segments are read in time order of their first event, and Sorted "
            "segments whose ranges overlap are merged event by event; "
-           "`order_segments_by_time=False` reads them in file-name order.",
+           "`order_segments_by_time=False` reads them in file-name order. "
+           "With `from_ns` or `to_ns` set, segments whose proven time bounds "
+           "lie outside the range are not decoded; "
+           "`skip_segments_by_time=False` decodes every segment (the events "
+           "delivered are the same).",
            py::arg("data_dir"),
            py::arg("from_ns") = py::none(),
            py::arg("to_ns") = py::none(),
            py::arg("symbols") = py::none(),
            py::arg("reorder_window_ns") = py::none(),
            py::arg("strict_ordering") = false,
-           py::arg("order_segments_by_time") = true)
+           py::arg("order_segments_by_time") = true,
+           py::arg("skip_segments_by_time") = true)
       .def("summary", &PyDataReader::summary,
-           "Return a dict summarizing the dataset")
+           "Return a dict summarizing the dataset. first_event_ns and "
+           "last_event_ns are the earliest and latest event of every Sorted "
+           "segment (exact; a compressed one costs one block read); a "
+           "segment without the Sorted flag contributes the first and last "
+           "event it wrote, which need not be its extremes.")
       .def("count", &PyDataReader::count,
            "Return the total number of events")
       .def("symbols", &PyDataReader::symbols,
            "Return the set of available symbol IDs")
       .def("time_range", &PyDataReader::timeRange,
-           "Return (start_ns, end_ns) tuple or None")
+           "Return (start_ns, end_ns) or None: the earliest and latest "
+           "non-zero event timestamp, exact for Sorted segments; a segment "
+           "without the Sorted flag contributes the first and last event it "
+           "wrote. Same values as summary().")
       .def("read_trades", &PyDataReader::readTrades,
            "Read all trades as a numpy structured array (PyTrade dtype). The "
            "reader's to_ns bound is INCLUSIVE here: a trade stamped exactly "
@@ -1475,7 +1489,10 @@ inline void bindReplay(py::module_& m)
            "forces explicit single-thread; n_threads>1 partitions each "
            "segment at the compressed-block level via "
            "IAggregator::cloneEmpty()/merge() and is capped to the "
-           "effective block count. "
+           "effective block count. Every thread count delivers in time "
+           "order wherever n_threads=1 does: Sorted segments whose ranges "
+           "overlap are merged event by event on one thread, and only the "
+           "rest is partitioned. "
            "progress_callback, when set, fires inside the run loop at most "
            "once per progress_interval_ms with (pct: float in [0,1], "
            "cursor_ts_ns: int). Return False to cancel; raising stops the "

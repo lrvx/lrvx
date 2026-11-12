@@ -15,13 +15,20 @@ print(f"Events: {info['total_events']}, Duration: {info['duration_seconds']:.0f}
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `first_event_ns` | `int` | First event timestamp |
-| `last_event_ns` | `int` | Last event timestamp |
+| `first_event_ns` | `int` | Earliest event timestamp (see below) |
+| `last_event_ns` | `int` | Latest event timestamp (see below) |
 | `total_events` | `int` | Total event count |
 | `segment_count` | `int` | Number of segment files |
 | `total_bytes` | `int` | Total data size |
-| `duration_seconds` | `float` | Time span in seconds |
+| `duration_seconds` | `float` | `last_event_ns - first_event_ns`, in seconds |
 | `fully_indexed` | `bool` | Whether all segments have indexes |
+
+`first_event_ns` / `last_event_ns` are exact for every segment flagged
+`Sorted` (a compressed one costs reading its index and one block). A segment
+without the `Sorted` flag contributes the first and last event it *wrote*,
+which need not be its earliest and latest: finding those would take a walk of
+the whole segment. `DataReader.summary()` and `DataReader.time_range()` report
+the same values. See [Reported time range](../api/replay/binary_log_reader.md#reported-time-range).
 
 ---
 
@@ -37,10 +44,13 @@ reader = lrvx.DataReader(
     symbols=None,             # list of symbol IDs to filter
     reorder_window_ns=None,   # cross-block reorder window (default 10s)
     order_segments_by_time=True,  # False: read segments in file-name order
+    skip_segments_by_time=True,   # False: decode every segment of a ranged read
 )
 ```
 
 Segments are read in time order of their first event, not in file-name order, so a tape filled out of order (day 3 imported before day 1) still reads forward in time. `Sorted` segments whose ranges overlap are merged event by event, with equal timestamps going to the segment whose file name sorts first. A segment without the `Sorted` flag, such as one still being written, keeps its file-name position. See [Ordering guarantee](../api/replay/binary_log_reader.md#ordering-guarantee).
+
+With `from_ns` or `to_ns` set, segments whose proven time bounds lie outside the range are not decoded (`stats()["segments_skipped"]`); `skip_segments_by_time=False` decodes every segment. The events returned are the same either way. See [Time-ranged reads](../api/replay/binary_log_reader.md#time-ranged-reads).
 
 `reorder_window_ns` controls the bounded reorder buffer used by `run()` and `streamForEach` on segments without the `Sorted` flag. Events arriving more than `reorder_window_ns` past the watermark raise `LrvxError(code="E_DATA_002")`. See [Aggregate tape events](../../how-to/aggregate-tape-events.md#out-of-order-tapes-and-the-reorder-buffer) for details.
 
@@ -60,7 +70,9 @@ Set of available symbol IDs.
 
 #### `time_range() -> tuple[int, int] | None`
 
-`(start_ns, end_ns)` tuple, or `None` if empty.
+`(start_ns, end_ns)`: the earliest and latest event timestamp, the same values
+as `summary()["first_event_ns"]` / `["last_event_ns"]` (exact for `Sorted`
+segments; see [inspect()](#inspect)). `None` if empty.
 
 #### `read_trades() -> ndarray`
 
@@ -148,9 +160,14 @@ Reader statistics.
 | `trades_read` | `int` | Trade events |
 | `book_updates_read` | `int` | Book update events |
 | `bytes_read` | `int` | Segment-file bytes read as event data: every frame (header and payload) of an uncompressed segment, every block (header and compressed payload) of a compressed one. The segment header, the index and the directory scan are not counted, and a segment the range skips adds nothing, so a full read counts the bytes between each segment's header and its index. The same on every read path and thread count |
-| `crc_errors` | `int` | CRC checksum failures |
+| `crc_errors` | `int` | Frames skipped because their payload failed its CRC (or, of a known type, was too short to parse). The read goes on with the next frame |
+| `late_dropped` | `int` | Events dropped for arriving past `reorder_window_ns` |
+| `unknown_frames_skipped` | `int` | Frames of a record type this build does not know, stepped over by their length |
 | `segments_reordered` | `int` | Segments read at a different position than their file name gives them |
 | `segments_interleaved` | `int` | Segments whose events were merged with another segment's because their time ranges overlap |
+
+Counters accumulate over the reader's lifetime, on every read path and thread
+count.
 
 #### `run(aggregators, n_threads=0, progress_callback=None, progress_interval_ms=1000) -> bool`
 
@@ -169,8 +186,15 @@ reader.run([stats], n_threads=1, progress_callback=on_progress,
            progress_interval_ms=500)
 ```
 
+Every `n_threads` delivers events in the order `n_threads=1` does: `Sorted`
+segments whose time ranges overlap are merged event by event on one thread,
+and only the other segments are partitioned across workers. See
+[Parallel execution](../../how-to/aggregate-tape-events.md#parallel-execution).
+
 `progress_callback` fires inside the run loop at most once per
-`progress_interval_ms` with `(pct: float in [0, 1], cursor_ts_ns: int)`.
+`progress_interval_ms` with `(pct: float in [0, 1], cursor_ts_ns: int)`, the
+cursor being the last event delivered. A run that completes ends with one
+more call at `1.0` and that same cursor.
 Returning `False` cancels the run; raising stops it and re-raises after
 `finalize()`. Progress is reported only on the single-thread path — multi-thread
 runs ignore the callback, because per-event GIL re-acquisition would defeat the

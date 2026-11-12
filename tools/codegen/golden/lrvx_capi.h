@@ -90,7 +90,7 @@ extern "C"
   // ============================================================
 
   // ABI version
-#define LRVX_CAPI_ABI_VERSION 5
+#define LRVX_CAPI_ABI_VERSION 6
 
   // Feature Flags
 #define LRVX_HAS_OPTIONAL_RAW_BEST_QUOTE 1
@@ -403,6 +403,9 @@ extern "C"
     uint64_t crc_errors;
     uint64_t late_dropped;
     uint64_t unknown_frames_skipped;
+    uint64_t segments_skipped;
+    uint64_t segments_reordered;
+    uint64_t segments_interleaved;
   } LrvxReaderStats;
 
   typedef struct
@@ -1257,6 +1260,12 @@ extern "C"
                                                        uint32_t num_symbols,
                                                        int64_t reorder_window_ns,
                                                        int32_t strict_ordering);
+  LrvxDataReaderHandle lrvx_data_reader_create_ex(const char* data_dir, int64_t from_ns,
+                                                  int64_t to_ns, const uint32_t* symbols,
+                                                  uint32_t num_symbols, int64_t reorder_window_ns,
+                                                  int32_t strict_ordering,
+                                                  int32_t order_segments_by_time,
+                                                  int32_t skip_segments_by_time);
   LrvxDatasetSummary lrvx_data_reader_summary(LrvxDataReaderHandle reader);
   LrvxReaderStats lrvx_data_reader_stats(LrvxDataReaderHandle reader);
   uint64_t lrvx_data_reader_read_trades(LrvxDataReaderHandle reader, LrvxTradeRecord* trades_out,

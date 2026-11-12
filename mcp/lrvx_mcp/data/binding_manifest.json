@@ -620,6 +620,11 @@
         {
           "group": "datareader",
           "kind": "function",
+          "name": "lrvx_data_reader_create_ex"
+        },
+        {
+          "group": "datareader",
+          "kind": "function",
           "name": "lrvx_data_reader_create_filtered"
         },
         {
@@ -5730,6 +5735,11 @@
         },
         {
           "kind": "method",
+          "name": "create_ex",
+          "parent": "DataReader"
+        },
+        {
+          "kind": "method",
           "name": "create_filtered",
           "parent": "DataReader"
         },
@@ -9184,6 +9194,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_data_reader_create"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_data_reader_create_ex"
         },
         {
           "kind": "c_import",
@@ -15524,6 +15538,11 @@
         },
         {
           "kind": "method",
+          "name": "overlappingRuns",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
           "name": "passesFilter",
           "parent": "BinaryLogReader"
         },
@@ -15575,6 +15594,11 @@
         {
           "kind": "method",
           "name": "segmentOutsideRange",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
+          "name": "segmentSpans",
           "parent": "BinaryLogReader"
         },
         {
@@ -22659,6 +22683,11 @@
         },
         {
           "kind": "method",
+          "name": "addSegmentStats",
+          "parent": "ParallelReader"
+        },
+        {
+          "kind": "method",
           "name": "forEach",
           "parent": "ParallelReader"
         },
@@ -29366,7 +29395,17 @@
         },
         {
           "kind": "method",
+          "name": "orderSegmentsByTime",
+          "parent": "DataReaderOptions"
+        },
+        {
+          "kind": "method",
           "name": "reorderWindowNs",
+          "parent": "DataReaderOptions"
+        },
+        {
+          "kind": "method",
+          "name": "skipSegmentsByTime",
           "parent": "DataReaderOptions"
         },
         {
@@ -29417,6 +29456,21 @@
         {
           "kind": "method",
           "name": "lateDropped",
+          "parent": "DataReaderStats"
+        },
+        {
+          "kind": "method",
+          "name": "segmentsInterleaved",
+          "parent": "DataReaderStats"
+        },
+        {
+          "kind": "method",
+          "name": "segmentsReordered",
+          "parent": "DataReaderStats"
+        },
+        {
+          "kind": "method",
+          "name": "segmentsSkipped",
           "parent": "DataReaderStats"
         },
         {
@@ -40264,6 +40318,10 @@
         },
         {
           "kind": "global",
+          "name": "__lrvx_dr_create_ex"
+        },
+        {
+          "kind": "global",
           "name": "__lrvx_dr_create_filtered"
         },
         {
@@ -42689,6 +42747,7 @@
       "capi_functions": [
         "lrvx_data_reader_count_book_updates",
         "lrvx_data_reader_count_book_updates_from",
+        "lrvx_data_reader_create_ex",
         "lrvx_data_reader_create_filtered",
         "lrvx_data_reader_create_ordered",
         "lrvx_data_reader_read_bbo",
@@ -42721,6 +42780,7 @@
       "quickjs": {
         "classes": [],
         "functions": [
+          "__lrvx_dr_create_ex",
           "__lrvx_dr_create_filtered",
           "__lrvx_dr_read_bbo",
           "__lrvx_dr_read_bbo_from",
