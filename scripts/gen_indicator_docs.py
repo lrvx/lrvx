@@ -329,9 +329,10 @@ def quickjs_block(indicators: list[dict]) -> str:
     lines = [
         "Every indicator below is a **global class**: the embedded runtime evaluates",
         "`quickjs/lrvx/indicators.js` at global scope, so there is no `require()` and no",
-        "namespace prefix. Streaming is `update()` / `value` / `ready` / `reset()` on the",
-        "instance; batch is a **static** `compute()`. Only some classes also carry an",
-        "instance `compute()` — see the `Batch` column.",
+        "namespace prefix. Streaming is `update()` / `value` / `ready` / `count` /",
+        "`reset()` on the instance, one kernel step of the C++ class per update, and",
+        "`destroy()` releases the instance's C handle. Batch is a **static** `compute()`.",
+        "Only some classes also carry an instance `compute()` — see the `Batch` column.",
         "",
         "```js",
         "const ema = new EMA(10);                    // global class, no require()",
@@ -464,7 +465,8 @@ def codon_block(indicators: list[dict]) -> str:
 
     lines = [
         "Every indicator below is **one Codon class** with streaming `update()` / `value` /",
-        "`ready` / `reset()`. A batch `compute()` is **not** on every class — the `Batch`",
+        "`ready` / `count` / `reset()`, one kernel step of the C++ class per update, and",
+        "`close()` to release its C handle. A batch `compute()` is **not** on every class — the `Batch`",
         "column says what each class actually exposes. Classes and the batch free functions",
         "both come from `lrvx.indicators`.",
         "",

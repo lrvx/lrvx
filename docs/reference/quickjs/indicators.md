@@ -9,8 +9,10 @@ Classes are injected as globals by the embedded runtime. There is no `require()`
 ```javascript
 // Single value
 const ema = new EMA(20);
-ema.update(price);        // returns current value (NaN during warmup)
+ema.update(price);        // returns current value (null during warmup)
+ema.count;                // updates since construction or the last reset()
 ema.reset();
+ema.destroy();            // optional: frees the C handle now instead of at GC
 
 // Multi-output
 const macd = new MACD(12, 26, 9);
@@ -38,6 +40,18 @@ adxResult.adx; adxResult.plusDi; adxResult.minusDi;
 
 const skewArr = Skewness.compute(prices, 20);
 ```
+
+**Cost and lifetime.** Each streaming instance holds one C handle (`lrvx_streaming_indicator_*`)
+that owns the C++ streaming indicator. `update()` is one call that runs one step of it; no history
+is kept in JavaScript or in C, so the cost of an update depends only on the indicator's window,
+not on how many values it has seen: O(1) for SMA, EMA, RMA, RSI, DEMA, TEMA, Slope, ATR and MACD,
+O(period) for the others. Values, `ready` and the NaN behaviour are the C++ class's, bit for bit,
+with NaN shown as `null`; `Stochastic.ready` needs both `.k` and `.d`. `destroy()` frees the handle
+at once and a second call does nothing; an instance dropped without it is freed by the QuickJS
+finalizer when it is collected, and every remaining one when the runtime is torn down. After
+`destroy()` the value reads `null`, `ready` is false and `count` is 0. `CHOP` is the exception: it has
+no C++ streaming class, so its `update()` still re-runs the batch function over the bars it has
+kept, at a cost that grows with history.
 
 **Single value** — `update(value)`:
 
@@ -69,9 +83,10 @@ const skewArr = Skewness.compute(prices, 20);
 
 Every indicator below is a **global class**: the embedded runtime evaluates
 `quickjs/lrvx/indicators.js` at global scope, so there is no `require()` and no
-namespace prefix. Streaming is `update()` / `value` / `ready` / `reset()` on the
-instance; batch is a **static** `compute()`. Only some classes also carry an
-instance `compute()` — see the `Batch` column.
+namespace prefix. Streaming is `update()` / `value` / `ready` / `count` /
+`reset()` on the instance, one kernel step of the C++ class per update, and
+`destroy()` releases the instance's C handle. Batch is a **static** `compute()`.
+Only some classes also carry an instance `compute()` — see the `Batch` column.
 
 ```js
 const ema = new EMA(10);                    // global class, no require()

@@ -192,7 +192,9 @@ ema = EMA(12)
 val = ema.update(price)
 ```
 
-`update()` is not an O(1) online recurrence. Each class accumulates the full history and re-runs the batch C-API function over it, which keeps results identical to `compute()` by construction but costs one FFI call over the whole history per tick. For tick-rate hot paths, buffer and call `compute()` on the batch instead.
+Each instance holds one C handle (`lrvx_streaming_indicator_*`) that owns the C++ streaming indicator, and `update()` is one FFI call that runs one step of that indicator. No history is kept: the cost of an update depends on the indicator's window, never on how many values it has seen, and the values, `ready` and NaN behaviour are the C++ class's, bit for bit. `count` is the number of updates since construction or `reset()`.
+
+`close()` releases the handle at once; an instance that is never closed is released by `__del__` when the collector reclaims it. One still reachable at program exit is not finalized and its memory goes back with the process. After `close()`, `value` is NaN, `ready` is False and `count` is 0.
 
 Batch indicators via C API (`ema`, `sma`, `rsi`, `atr`, `macd`, `bollinger`) — see [Codon Indicators](../reference/codon/indicators.md).
 

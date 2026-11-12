@@ -14038,6 +14038,220 @@
       "return_type": "const double *"
     },
     {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_count",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        }
+      ],
+      "return_type": "uint64_t"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_create",
+      "params": [
+        {
+          "name": "name",
+          "type": "const char *"
+        },
+        {
+          "name": "args",
+          "type": "const double *"
+        },
+        {
+          "name": "num_args",
+          "type": "uint32_t"
+        }
+      ],
+      "return_type": "LrvxStreamingIndicatorHandle"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_destroy",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_input_count",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        }
+      ],
+      "return_type": "uint32_t"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_output",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        },
+        {
+          "name": "index",
+          "type": "uint32_t"
+        }
+      ],
+      "return_type": "double"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_output_count",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        }
+      ],
+      "return_type": "uint32_t"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_ready",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        }
+      ],
+      "return_type": "uint8_t"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_reset",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_update",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        },
+        {
+          "name": "value",
+          "type": "double"
+        }
+      ],
+      "return_type": "double"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_update_bar",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        },
+        {
+          "name": "high",
+          "type": "double"
+        },
+        {
+          "name": "low",
+          "type": "double"
+        },
+        {
+          "name": "close",
+          "type": "double"
+        }
+      ],
+      "return_type": "double"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_update_high_low",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        },
+        {
+          "name": "high",
+          "type": "double"
+        },
+        {
+          "name": "low",
+          "type": "double"
+        }
+      ],
+      "return_type": "double"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_update_ohlc",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        },
+        {
+          "name": "open",
+          "type": "double"
+        },
+        {
+          "name": "high",
+          "type": "double"
+        },
+        {
+          "name": "low",
+          "type": "double"
+        },
+        {
+          "name": "close",
+          "type": "double"
+        }
+      ],
+      "return_type": "double"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_update_pair",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        },
+        {
+          "name": "x",
+          "type": "double"
+        },
+        {
+          "name": "y",
+          "type": "double"
+        }
+      ],
+      "return_type": "double"
+    },
+    {
+      "group": "streaming_indicator",
+      "name": "lrvx_streaming_indicator_value",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxStreamingIndicatorHandle"
+        }
+      ],
+      "return_type": "double"
+    },
+    {
       "group": "tape_diff",
       "name": "lrvx_tape_diff_copy_mismatches",
       "params": [
@@ -14837,6 +15051,11 @@
     {
       "group": "feature_flags",
       "name": "LRVX_HAS_OPTIONAL_RAW_BEST_QUOTE",
+      "value": "1"
+    },
+    {
+      "group": "feature_flags",
+      "name": "LRVX_HAS_STREAMING_INDICATOR_HANDLES",
       "value": "1"
     },
     {
@@ -17187,6 +17406,10 @@
     {
       "alias_of": "LrvxIndicatorGraphHandle",
       "name": "LrvxStreamingGraphHandle"
+    },
+    {
+      "name": "LrvxStreamingIndicatorHandle",
+      "target": "void*"
     },
     {
       "name": "LrvxTapeDiffHandle",

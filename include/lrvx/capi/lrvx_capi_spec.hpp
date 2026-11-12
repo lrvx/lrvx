@@ -462,6 +462,95 @@ extern "C"
                                       double* output);
 
   // ============================================================
+  // Streaming indicators
+  //
+  // One handle per streaming indicator instance. Each handle owns an
+  // instance of the C++ indicator class and forwards to it, so values,
+  // readiness and NaN behaviour are those of the class, and one update is
+  // one kernel step: its cost does not depend on how many values the
+  // handle has seen, and update / value / output / ready / count never
+  // allocate.
+  //
+  // Every row of include/lrvx/indicator/registry.def can be created here by
+  // its snake_case name ("sma", "macd", "rogers_satchell_vol", ...), with
+  // the constructor arguments of that row in order, passed as doubles. An
+  // integer (size_t) argument must be a non-negative whole number. An
+  // unknown name, a wrong argument count or an argument that does not fit
+  // returns NULL, with code 2 and the reason in lrvx_last_error_message.
+  //
+  //   double args[] = {12, 26, 9};
+  //   LrvxStreamingIndicatorHandle h = lrvx_streaming_indicator_create("macd", args, 3);
+  //   lrvx_streaming_indicator_update(h, price);
+  //   if (lrvx_streaming_indicator_ready(h))
+  //     use(lrvx_streaming_indicator_value(h), lrvx_streaming_indicator_output(h, 1));
+  //   lrvx_streaming_indicator_destroy(h);
+  //
+  // An indicator takes exactly one of the five update functions, the one
+  // matching its inputs: _update (one series: the SingleInput rows, MACD,
+  // Bollinger), _update_bar (high, low, close: ATR, CCI, Stochastic),
+  // _update_high_low (ParkinsonVol), _update_ohlc (RogersSatchellVol) and
+  // _update_pair (Correlation). The others do not step the indicator; they
+  // return 0 and record code 2. Every update returns the indicator's value
+  // after the step, NaN while it is not ready.
+  // ============================================================
+
+  typedef void* LrvxStreamingIndicatorHandle;
+
+  /* Defined by a header that declares lrvx_streaming_indicator_*, so a
+   * binding can compile against a header with or without them. */
+  // lrvx::export_macro(group="feature_flags")
+  #define LRVX_HAS_STREAMING_INDICATOR_HANDLES 1
+
+  LRVX_EXPORT(group = "streaming_indicator")
+  LrvxStreamingIndicatorHandle lrvx_streaming_indicator_create(const char* name,
+                                                               const double* args,
+                                                               uint32_t num_args);
+  LRVX_EXPORT(group = "streaming_indicator")
+  void lrvx_streaming_indicator_destroy(LrvxStreamingIndicatorHandle h);
+
+  // Number of inputs one update takes: 1 for _update, 2 for _update_high_low
+  // and _update_pair, 3 for _update_bar, 4 for _update_ohlc.
+  LRVX_EXPORT(group = "streaming_indicator")
+  uint32_t lrvx_streaming_indicator_input_count(LrvxStreamingIndicatorHandle h);
+  // Number of outputs: 3 for MACD and Bollinger, 2 for Stochastic, 1 otherwise.
+  LRVX_EXPORT(group = "streaming_indicator")
+  uint32_t lrvx_streaming_indicator_output_count(LrvxStreamingIndicatorHandle h);
+
+  LRVX_EXPORT(group = "streaming_indicator")
+  double lrvx_streaming_indicator_update(LrvxStreamingIndicatorHandle h, double value);
+  LRVX_EXPORT(group = "streaming_indicator")
+  double lrvx_streaming_indicator_update_bar(LrvxStreamingIndicatorHandle h, double high,
+                                             double low, double close);
+  LRVX_EXPORT(group = "streaming_indicator")
+  double lrvx_streaming_indicator_update_high_low(LrvxStreamingIndicatorHandle h, double high,
+                                                  double low);
+  LRVX_EXPORT(group = "streaming_indicator")
+  double lrvx_streaming_indicator_update_ohlc(LrvxStreamingIndicatorHandle h, double open,
+                                              double high, double low, double close);
+  LRVX_EXPORT(group = "streaming_indicator")
+  double lrvx_streaming_indicator_update_pair(LrvxStreamingIndicatorHandle h, double x,
+                                              double y);
+
+  // The class's value(): NaN before the first update and while not ready.
+  LRVX_EXPORT(group = "streaming_indicator")
+  double lrvx_streaming_indicator_value(LrvxStreamingIndicatorHandle h);
+  // Output `index` of a multi-output indicator. Index 0 is value(). MACD:
+  // 0 line, 1 signal, 2 histogram. Bollinger: 0 middle, 1 upper, 2 lower.
+  // Stochastic: 0 %K, 1 %D. An index past output_count returns 0 and records
+  // code 2.
+  LRVX_EXPORT(group = "streaming_indicator")
+  double lrvx_streaming_indicator_output(LrvxStreamingIndicatorHandle h, uint32_t index);
+  // The class's ready().
+  LRVX_EXPORT(group = "streaming_indicator")
+  uint8_t lrvx_streaming_indicator_ready(LrvxStreamingIndicatorHandle h);
+  // Updates since creation or the last reset.
+  LRVX_EXPORT(group = "streaming_indicator")
+  uint64_t lrvx_streaming_indicator_count(LrvxStreamingIndicatorHandle h);
+  // Back to the freshly created state, same parameters.
+  LRVX_EXPORT(group = "streaming_indicator")
+  void lrvx_streaming_indicator_reset(LrvxStreamingIndicatorHandle h);
+
+  // ============================================================
   // Targets (forward-looking labels, batch only)
   //
   // Targets read into the future relative to t. They are intentionally
