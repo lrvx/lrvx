@@ -456,7 +456,6 @@ jobs:
         docs/examples/python_bybit_archive.py
         docs/examples/python_okx_archive.py
         docs/examples/python_bitget_archive.py
-        docs/examples/python_deribit_archive.py
         docs/examples/python_orderbook_iterator.py
         docs/examples/python_rolling_top_k.py
         docs/examples/python_xs_panel.py
@@ -500,9 +499,6 @@ jobs:
 
     - name: Run Python Bitget archive importer example
       run: PYTHONPATH=build/python python3 docs/examples/python_bitget_archive.py
-
-    - name: Run Python Deribit archive importer example
-      run: PYTHONPATH=build/python python3 docs/examples/python_deribit_archive.py
 
     - name: Run Python OrderBookIterator example
       run: PYTHONPATH=build/python python3 docs/examples/python_orderbook_iterator.py

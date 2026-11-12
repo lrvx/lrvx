@@ -1,8 +1,8 @@
 """Tests for ``lrvx.archives.binance.{t1_to_lrvx, range_book_to_lrvx}``.
 
-No network: synthetic bookTicker CSVs in the layout published on
-``data.binance.vision`` are built in-memory and fed through the
-converter. The resulting `.lrvx` directory is read back via
+No network by default: bookTicker CSVs in the layout published on
+``data.binance.vision`` (header and row shapes copied from real files)
+are built in-memory and fed through the converter. The resulting `.lrvx` directory is read back via
 ``lrvx.DataReader.read_book_updates`` and asserted ladder-by-ladder.
 
 Covers:
@@ -12,6 +12,8 @@ Covers:
   * Unsupported requests: a book_type other than ``t1`` and the spot
     market fail with a clear error, in the library and on the CLI,
     before anything is downloaded or written.
+  * An unknown header raises UnknownLayoutError; a file whose rows all
+    fail to parse raises NothingParsedError.
   * Co-existence: aggTrades + book events sit in one tape, monotonic
     on `exchange_ts_ns` (the existing reader interleaves them).
   * `metadata.json`: `has_book_snapshots` / `has_book_deltas` /
@@ -20,6 +22,8 @@ Covers:
     overlapping ranges, out-of-order days, a gap fill and a day cut
     short each give the tape one in-order import of the same days
     gives, and the dedup read covers only the incoming day's time range.
+  * With LRVX_ARCHIVE_NETWORK_TESTS=1, a real day downloaded from
+    data.binance.vision.
 
 Run from repo root:
     PYTHONPATH=build/python python3 python/tests/test_binance_book_archive.py
@@ -43,9 +47,11 @@ for cand in ("build/python", "build-py312/python"):
     if p.is_dir():
         sys.path.insert(0, str(p))
         break
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import lrvx  # noqa: E402
 
+from support import archive_network as net  # noqa: E402
 from lrvx import orderbook  # noqa: E402
 from lrvx.archives import binance as bnc  # noqa: E402
 
@@ -60,8 +66,13 @@ _T1_ROWS = [
 ]
 
 
+_T1_HEADER = ("update_id,best_bid_price,best_bid_qty,best_ask_price,"
+              "best_ask_qty,transaction_time,event_time")
+
+
 def _build_t1_zip(dest: Path) -> Path:
     buf = io.StringIO()
+    buf.write(_T1_HEADER + "\n")
     for r in _T1_ROWS:
         buf.write(",".join(str(x) for x in r) + "\n")
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -143,6 +154,39 @@ class T1Tests(unittest.TestCase):
         self.assertEqual(second.rows_skipped, 3)
         events = _read_events(self.tape)
         self.assertEqual(len(events), 2)  # unchanged from first run
+
+
+class T1LayoutTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp(prefix="binance-t1-layout-"))
+        self.zip_path = self.tmp / "BTCUSDT-bookTicker-2024-01-15.zip"
+        self.tape = self.tmp / "tape"
+
+    def _zip(self, text: str) -> Path:
+        with zipfile.ZipFile(self.zip_path, "w") as zf:
+            zf.writestr("x.csv", text)
+        return self.zip_path
+
+    def test_unknown_header_is_rejected(self) -> None:
+        z = self._zip("update_id,bid,ask,time\n1,1.0,2.0,1700000000000\n")
+        for append in (True, False):
+            with self.assertRaises(bnc.UnknownLayoutError) as ctx:
+                bnc.t1_to_lrvx(z, self.tape, market="um-futures", append=append)
+            self.assertIn(_T1_HEADER, str(ctx.exception))
+        self.assertFalse(self.tape.exists())
+
+    def test_nothing_parsed_is_an_error(self) -> None:
+        z = self._zip(_T1_HEADER + "\n"
+                      "1,n/a,1.0,2.0,1.0,1700000000000,1700000000000\n"
+                      "2,1.0,1.0,2.0,1.0,soon,1700000000001\n")
+        with self.assertRaises(bnc.NothingParsedError):
+            bnc.t1_to_lrvx(z, self.tape, market="um-futures")
+        self.assertFalse(self.tape.exists())
+
+    def test_header_only_file_is_empty_not_an_error(self) -> None:
+        z = self._zip(_T1_HEADER + "\n")
+        stats = bnc.t1_to_lrvx(z, self.tape, market="um-futures")
+        self.assertEqual((stats.rows_read, stats.snapshots_written), (0, 0))
 
 
 class UnsupportedBookRequestTests(unittest.TestCase):
@@ -246,10 +290,12 @@ class CoexistenceTests(unittest.TestCase):
         # aggTrades archive
         agg_zip = self.tmp / "BTCUSDT-aggTrades-2024-01-15.zip"
         buf = io.StringIO()
-        # (agg_id, price, qty, first_id, last_id, ts_ms, maker, best)
+        # (agg_id, price, qty, first_id, last_id, ts_ms, maker)
+        buf.write("agg_trade_id,price,quantity,first_trade_id,last_trade_id,"
+                  "transact_time,is_buyer_maker\n")
         for i in range(3):
             buf.write(f"{1000+i},42000.0,0.01,{i},{i},"
-                      f"{1_700_000_000_500 + i * 1000},True,True\n")
+                      f"{1_700_000_000_500 + i * 1000},true\n")
         with zipfile.ZipFile(agg_zip, "w") as z:
             z.writestr(agg_zip.with_suffix(".csv").name, buf.getvalue())
 
@@ -326,6 +372,7 @@ def _t1_days() -> list:
 def _write_zip(dest: Path, rows) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     buf = io.StringIO()
+    buf.write(_T1_HEADER + "\n")
     for r in rows:
         buf.write(",".join(str(x) for x in r) + "\n")
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -510,6 +557,44 @@ class T1MultiDayTests(unittest.TestCase):
             self.assertEqual(kwargs.get("from_ns"), min(ts))
             self.assertEqual(kwargs.get("to_ns"), max(ts))
             self.assertEqual(kwargs.get("symbols"), [_SYM])
+
+
+@unittest.skipUnless(net.ENABLED, net.SKIP_REASON)
+class T1RealArchiveTests(unittest.TestCase):
+    """A real bookTicker day, downloaded from data.binance.vision: every
+    row parses, and the top of book after the first, a middle and the
+    last record equals the CSV row of that update id."""
+
+    def test_um_futures_day(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="binance-t1-net-") as tmp:
+            tmp = Path(tmp)
+            day = date(2024, 1, 15)
+            stats = bnc.range_book_to_lrvx("ETHBTC", "um-futures", "t1", day, day,
+                                           tmp / "tape", mirror=tmp / "mirror",
+                                           parallel=1)
+            self.assertGreater(stats.snapshots_written + stats.deltas_written, 0)
+            self.assertEqual(stats.rows_invalid, 0)
+            rows = net.csv_rows(bnc._book_mirror_path(tmp / "mirror", "ETHBTC",
+                                                      "um-futures", "t1", day))
+            self.assertEqual(",".join(rows[0]), _T1_HEADER)
+            by_id = {int(r[0]): r for r in rows[1:]}
+            events = _read_events(tmp / "tape")
+            book: dict = {}
+            for i, ev in enumerate(events):
+                if ev["is_snapshot"]:
+                    book = {"b": dict(ev["bids"]), "a": dict(ev["asks"])}
+                else:
+                    for side, levels in (("b", ev["bids"]), ("a", ev["asks"])):
+                        for px, q in levels:
+                            if q:
+                                book[side][px] = q
+                            else:
+                                book[side].pop(px, None)
+                if i in (0, len(events) // 2, len(events) - 1):
+                    r = by_id[ev["seq"]]
+                    self.assertEqual(ev["ts_ns"], int(r[5]) * 1_000_000)
+                    self.assertEqual(book["b"], {round(float(r[1]) * 1e8): round(float(r[2]) * 1e8)})
+                    self.assertEqual(book["a"], {round(float(r[3]) * 1e8): round(float(r[4]) * 1e8)})
 
 
 if __name__ == "__main__":

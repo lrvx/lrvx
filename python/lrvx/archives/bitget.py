@@ -1,67 +1,92 @@
 """Bitget public archive → lrvx converter.
 
-Bitget publishes daily trade ticks on their S3 / CDN mirror. The
-on-disk CSV layout is:
+Bitget publishes daily trade files behind its "History data download"
+page (https://www.bitget.com/data-download, "Transaction history",
+daily). The files sit on its CDN at
 
-    trade_id, price, size, side, timestamp_ms
+    https://img.bitgetimg.com/online/trades/<CODE>/<SYMBOL>/<NAME>.zip
 
-`trade_id` is an integer exchange-assigned id, used directly as the
-lrvx ``trade_id`` for append-safe dedup. `side` is the active flow
-as ``buy`` / ``sell`` lowercase strings; the importer maps to
-lrvx's ``Side::BUY`` / ``Side::SELL``. `timestamp_ms` is Unix
-milliseconds.
+where ``<CODE>`` is Bitget's product code for the market:
 
-Markets use Bitget's native codes:
+  * ``spot``  → ``SPBL``   spot pairs (``BTCUSDT``)
+  * ``umcbl`` → ``UMCBL``  USDT-margined perpetuals (``BTCUSDT``)
+  * ``cmcbl`` → ``CMCBL``  USDC-margined perpetuals (``BTCPERP``)
+  * ``dmcbl`` → ``DMCBL``  coin-margined perpetuals (``BTCUSD``)
 
-  * ``spot``   — spot pairs (``BTCUSDT``)
-  * ``umcbl``  — USDT-margined perpetuals (``BTCUSDT``)
-  * ``cmcbl``  — coin-margined perpetuals (``BTCUSD``)
+A day is split into numbered parts of at most 100,000 trades,
+``_001``, ``_002``, ... The part name has changed over time; a day uses
+exactly one of
 
-The codes are awkward but they are what Bitget's own API uses, so
-the importer keeps them verbatim. Cross-exchange normalisation is a
-connectors concern.
+    <SYMBOL>_<CODE>_<YYYYMMDD>_<NNN>     (older days)
+    <YYYYMMDD>_<NNN>                     (later days)
+    <SYMBOL>_<YYYYMMDD>_<NNN>            (recent days)
 
-URL layout per market on the public archive:
+The importer tries them in that order and downloads parts until the
+next one is missing (the CDN answers 403 for a missing file). These
+names are what the download page hands out; Bitget does not document
+them as an API, so a future renaming shows up as a day that cannot be
+found. A day is a UTC+8 calendar day, as the download page states.
 
-  * spot:   ``<BASE>/spot/<SYMBOL>/<SYMBOL>-trades-<YYYY-MM-DD>.zip``
-  * umcbl:  ``<BASE>/umcbl/<SYMBOL>/<SYMBOL>-trades-<YYYY-MM-DD>.zip``
-  * cmcbl:  ``<BASE>/cmcbl/<SYMBOL>/<SYMBOL>-trades-<YYYY-MM-DD>.zip``
+The CSV inside each part is
 
-Both ``.zip`` and ``.csv.gz`` packaging are accepted on disk.
+    trade_id,timestamp,price,side,volume(quote),size(base)
+
+``timestamp`` is Unix milliseconds (recent files carry whole seconds).
+``side`` is the taker side, ``buy`` / ``sell``. ``trade_id`` is a
+19-digit integer, used as the lrvx ``trade_id`` for append dedup.
+``size(base)`` is the quantity in the base coin for every market,
+coin-margined included, and is what the tape stores (the live Bitget
+connector also reports trade size in the base coin). ``volume(quote)``
+is the quote notional and is not stored. Any other header is rejected
+with ``UnknownLayoutError``.
 """
 from __future__ import annotations
 
-import csv
-import gzip
-import io
 import json
 import shutil
-import tempfile
 import time
 import urllib.error
 import urllib.request
-import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple, Union
 
-from . import _cache, _dedup
+from . import _cache, _dedup, _layout
 
 
-_BASE_URL = "https://img.bitgetimg.com/online/bitget/archive"
+_BASE_URL = "https://img.bitgetimg.com/online/trades"
 
-_MARKETS = {"spot", "umcbl", "cmcbl"}
+_CODES = {
+    "spot":  "SPBL",
+    "umcbl": "UMCBL",
+    "cmcbl": "CMCBL",
+    "dmcbl": "DMCBL",
+}
+_MARKETS = set(_CODES)
 
 _INSTRUMENT_TYPE = {
     "spot":  "spot",
     "umcbl": "perpetual",
     "cmcbl": "perpetual",
+    "dmcbl": "perpetual",
 }
 
-_SIDE_BUY = 0
-_SIDE_SELL = 1
+_PART_NAMES = (
+    "{symbol}_{code}_{day}_{part:03d}",
+    "{day}_{part:03d}",
+    "{symbol}_{day}_{part:03d}",
+)
+
+# Parts per day are numbered from 001; a day with more than this many is
+# not something the archive has produced.
+_MAX_PARTS = 999
+
+_LAYOUTS = (
+    _layout.Layout("trades", ("trade_id", "timestamp", "price", "side",
+                              "volume(quote)", "size(base)")),
+)
 
 DateLike = Union[str, date]
 
@@ -71,26 +96,54 @@ class ConvertStats:
     trades_written: int = 0
     rows_read: int = 0
     rows_skipped: int = 0
+    rows_invalid: int = 0
     files_processed: int = 0
     first_ts_ns: int = 0
     last_ts_ns: int = 0
     last_trade_id: int = 0
 
 
-def _archive_url(symbol: str, market: str, day: date) -> str:
-    if market not in _MARKETS:
+def _code(market: str) -> str:
+    if market not in _CODES:
         raise ValueError(
             f"unknown market '{market}'. expected one of {sorted(_MARKETS)}"
         )
-    return f"{_BASE_URL}/{market}/{symbol}/{symbol}-trades-{day.isoformat()}.zip"
+    return _CODES[market]
 
 
-def _mirror_path(mirror: Path, symbol: str, market: str, day: date) -> Path:
-    return mirror / market / symbol / f"{symbol}-trades-{day.isoformat()}.zip"
+def _part_url(symbol: str, market: str, day: date, pattern: str,
+              part: int) -> str:
+    code = _code(market)
+    name = pattern.format(symbol=symbol, code=code,
+                          day=day.strftime("%Y%m%d"), part=part)
+    return f"{_BASE_URL}/{code}/{symbol}/{name}.zip"
 
 
-def _download(url: str, dest: Path, *, retries: int = 3,
-              backoff: float = 2.0) -> None:
+def _archive_url(symbol: str, market: str, day: date) -> str:
+    """URL of the first part of ``day`` in the newest naming."""
+    return _part_url(symbol, market, day, _PART_NAMES[-1], 1)
+
+
+def _mirror_dir(mirror: Path, symbol: str, market: str) -> Path:
+    return mirror / market / symbol
+
+
+def _mirror_path(mirror: Path, symbol: str, market: str, day: date,
+                 part: int = 1) -> Path:
+    """Where part ``part`` of ``day`` sits in the mirror, named as in the
+    first part naming."""
+    url = _part_url(symbol, market, day, _PART_NAMES[0], part)
+    return _mirror_dir(mirror, symbol, market) / url.rsplit("/", 1)[1]
+
+
+def _manifest_path(mirror: Path, symbol: str, market: str, day: date) -> Path:
+    return _mirror_dir(mirror, symbol, market) / f"{symbol}-{day.isoformat()}.parts"
+
+
+def _fetch(url: str, dest: Path, *, retries: int = 3,
+           backoff: float = 2.0) -> bool:
+    """Download ``url`` to ``dest``. False when the file does not exist
+    (403 or 404); raises on any other failure."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".tmp")
     last_err: Optional[BaseException] = None
@@ -99,7 +152,13 @@ def _download(url: str, dest: Path, *, retries: int = 3,
             with urllib.request.urlopen(url, timeout=60) as resp, open(tmp, "wb") as f:
                 shutil.copyfileobj(resp, f)
             tmp.replace(dest)
-            return
+            return True
+        except urllib.error.HTTPError as e:
+            if tmp.exists():
+                tmp.unlink()
+            if e.code in (403, 404):
+                return False
+            last_err = e
         except (urllib.error.URLError, OSError, TimeoutError) as e:
             last_err = e
             if tmp.exists():
@@ -107,56 +166,50 @@ def _download(url: str, dest: Path, *, retries: int = 3,
                     tmp.unlink()
                 except OSError:
                     pass
-            if attempt < retries - 1:
-                time.sleep(backoff * (2 ** attempt))
+        if attempt < retries - 1:
+            time.sleep(backoff * (2 ** attempt))
     raise RuntimeError(f"failed to download {url}: {last_err}") from last_err
 
 
-def _open_csv(path: Path) -> Tuple[io.TextIOBase, "object"]:
-    name = path.name.lower()
-    if name.endswith(".zip"):
-        zf = zipfile.ZipFile(path)
-        members = [n for n in zf.namelist() if n.lower().endswith(".csv")]
-        if not members:
-            zf.close()
-            raise ValueError(f"no CSV member inside {path}")
-        raw = zf.open(members[0])
-        return io.TextIOWrapper(raw, encoding="utf-8", newline=""), zf
-    if name.endswith(".gz"):
-        f = gzip.open(path, "rt", encoding="utf-8", newline="")
-        return f, f
-    f = open(path, "r", encoding="utf-8", newline="")
-    return f, f
+def _download_day(mirror: Path, symbol: str, market: str,
+                  day: date) -> List[Path]:
+    """Every part of ``day`` in the mirror, downloading what is missing.
+    The part list is kept in a manifest once complete. Raises
+    FileNotFoundError when the archive has no file for the day."""
+    manifest = _manifest_path(mirror, symbol, market, day)
+    folder = _mirror_dir(mirror, symbol, market)
+    if manifest.exists():
+        paths = [folder / n for n in manifest.read_text().split()]
+        if paths and all(p.exists() for p in paths):
+            return paths
+    for pattern in _PART_NAMES:
+        paths: List[Path] = []
+        for part in range(1, _MAX_PARTS + 1):
+            url = _part_url(symbol, market, day, pattern, part)
+            dest = folder / url.rsplit("/", 1)[1]
+            if not dest.exists() and not _fetch(url, dest):
+                break
+            paths.append(dest)
+        if paths:
+            manifest.write_text("\n".join(p.name for p in paths) + "\n")
+            return paths
+    raise FileNotFoundError(
+        f"Bitget archive has no {market} trade file for {symbol} on "
+        f"{day.isoformat()} (tried {_part_url(symbol, market, day, _PART_NAMES[0], 1)} "
+        f"and the other part namings)")
 
 
-def _iter_rows(path: Path) -> Iterator[Tuple[int, float, float, int, int]]:
-    """Yield ``(trade_id, price, qty, ts_ns, side)`` rows from a Bitget
-    archive CSV. Skips a leading header row when present."""
-    stream, ctx = _open_csv(path)
-    try:
-        reader = csv.reader(stream)
-        for row in reader:
-            if not row:
-                continue
-            try:
-                trade_id = int(row[0])
-            except (ValueError, IndexError):
-                continue
-            try:
-                price = float(row[1])
-                size = float(row[2])
-                side_token = row[3].strip().lower() if len(row) > 3 else ""
-                ts_ms = int(row[4])
-            except (ValueError, IndexError):
-                continue
-            side = _SIDE_BUY if side_token == "buy" else _SIDE_SELL
-            ts_ns = ts_ms * 1_000_000
-            yield (trade_id, price, size, ts_ns, side)
-    finally:
+def _iter_rows(src: _layout.CsvFile) -> Iterator[Tuple[int, float, float, int, int]]:
+    """Yield ``(trade_id, price, qty, ts_ms, side)`` rows of a Bitget
+    trade file."""
+    for row in src.rows():
         try:
-            ctx.close()
-        except Exception:
-            pass
+            side = _layout.side_of(row[3])
+            if side is None:
+                raise ValueError(row[3])
+            yield (int(row[0]), float(row[2]), float(row[5]), int(row[1]), side)
+        except (ValueError, IndexError):
+            src.counts.bad(row)
 
 
 def _ns_to_iso(ns: int) -> str:
@@ -168,6 +221,8 @@ def _ns_to_iso(ns: int) -> str:
 
 
 def _base_quote(name: str) -> Tuple[str, str]:
+    if name.endswith("PERP") and len(name) > 4:
+        return name[:-4], "USDC"
     for quote in ("USDT", "USDC", "USD", "BTC", "ETH"):
         if name.endswith(quote) and len(name) > len(quote):
             return name[: -len(quote)], quote
@@ -212,7 +267,7 @@ def _write_metadata(out_tape: Path, *,
         "hostname": "",
         "timezone": "UTC",
         "lrvx_version": "",
-        "custom": {},
+        "custom": {"qty_unit": "base"},
     }
 
     meta_path = out_tape / "metadata.json"
@@ -237,12 +292,27 @@ def _write_metadata(out_tape: Path, *,
                       "timezone"):
                 if not existing.get(k):
                     existing[k] = meta[k]
+            custom = existing.get("custom") or {}
+            custom.update(meta["custom"])
+            existing["custom"] = custom
             meta = existing
         except (OSError, ValueError, KeyError):
             pass
 
     out_tape.mkdir(parents=True, exist_ok=True)
     meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True))
+
+
+def _symbol_from_file(path: Path) -> str:
+    """``BTCUSDT_UMCBL_20240115_001.zip`` / ``BTCUSDT_20261109_001.zip`` →
+    ``BTCUSDT``; empty for ``20250115_001.zip``, which names no symbol."""
+    stem = path.name
+    for ext in (".csv.gz", ".csv", ".zip"):
+        if stem.endswith(ext):
+            stem = stem[: -len(ext)]
+            break
+    head = stem.split("_", 1)[0]
+    return "" if head.isdigit() else head
 
 
 def trades_to_lrvx(
@@ -259,62 +329,53 @@ def trades_to_lrvx(
     compression: str = "none",
     write_metadata: bool = True,
 ) -> ConvertStats:
-    """Convert one Bitget archive CSV (zipped, gzipped, or extracted) into lrvx."""
+    """Convert one Bitget archive part (zipped, gzipped, or extracted)
+    into lrvx.
+
+    ``symbol_name`` defaults to the symbol in the file name; parts named
+    ``<YYYYMMDD>_<NNN>.zip`` carry none, so pass it. Raises
+    ``UnknownLayoutError`` for a header Bitget does not publish and
+    ``NothingParsedError`` when the file has rows and none parse. A part
+    whose trades are all on the tape already returns
+    ``trades_written=0`` with ``rows_skipped`` set."""
+    _code(market)
     csv_path = Path(csv_path).expanduser()
     out_tape = Path(out_tape).expanduser()
     if not csv_path.exists():
         raise FileNotFoundError(csv_path)
     if not symbol_name:
-        stem = csv_path.name
-        for ext in (".csv.gz", ".csv", ".zip"):
-            if stem.endswith(ext):
-                stem = stem[: -len(ext)]
-                break
-        marker = "-trades-"
-        idx = stem.find(marker)
-        if idx > 0:
-            symbol_name = stem[:idx]
-        else:
-            symbol_name = stem
+        symbol_name = _symbol_from_file(csv_path)
+        if not symbol_name:
+            raise ValueError(
+                f"{csv_path.name} does not name its symbol; pass symbol_name")
 
-    with _dedup.TradeFile(_iter_rows(csv_path), _dedup.trade_dtype(),
+    src = _layout.CsvFile(csv_path, _LAYOUTS, source="Bitget trade")
+    with _dedup.TradeFile(_iter_rows(src), _dedup.trade_dtype(),
                           sort=True) as rows:
+        src.check(rows.rows_read)
         done = _dedup.write_trade_file(
             rows, out_tape, append=append, symbol_id=symbol_id,
             exchange_id=exchange_id, max_segment_mb=max_segment_mb,
-            compression=compression)
-        rows_read, rows_skipped = rows.rows_read, rows.rows_skipped
-        kept, last_seen_id = rows.rows_kept, rows.id_max
+            compression=compression, ts_ns_per_unit=1_000_000)
+        stats = ConvertStats(
+            trades_written=done.count,
+            rows_read=rows.rows_read,
+            rows_skipped=rows.rows_skipped,
+            rows_invalid=src.counts.invalid,
+            files_processed=1,
+            first_ts_ns=done.first_ts_ns,
+            last_ts_ns=done.last_ts_ns,
+            last_trade_id=done.last_id if done.count else rows.id_max,
+        )
 
-    if not kept:
-        if write_metadata and rows_read:
-            _write_metadata(
-                out_tape, exchange_name=exchange_name, market=market,
-                symbol_id=symbol_id, symbol_name=symbol_name,
-                first_ts_ns=0, last_ts_ns=0, trades_added=0,
-            )
-        return ConvertStats(rows_read=rows_read,
-                            rows_skipped=rows_skipped,
-                            files_processed=1,
-                            last_trade_id=last_seen_id)
-
-    if write_metadata:
+    if write_metadata and (stats.trades_written or stats.rows_read):
         _write_metadata(
             out_tape, exchange_name=exchange_name, market=market,
             symbol_id=symbol_id, symbol_name=symbol_name,
-            first_ts_ns=done.first_ts_ns, last_ts_ns=done.last_ts_ns,
-            trades_added=done.count,
+            first_ts_ns=stats.first_ts_ns, last_ts_ns=stats.last_ts_ns,
+            trades_added=stats.trades_written,
         )
-
-    return ConvertStats(
-        trades_written=done.count,
-        rows_read=rows_read,
-        rows_skipped=rows_skipped,
-        files_processed=1,
-        first_ts_ns=done.first_ts_ns,
-        last_ts_ns=done.last_ts_ns,
-        last_trade_id=done.last_id,
-    )
+    return stats
 
 
 def _coerce_day(d: DateLike) -> date:
@@ -346,9 +407,11 @@ def range_to_lrvx(
     compression: str = "none",
     skip_missing: bool = False,
 ) -> ConvertStats:
-    """Convert a multi-day Bitget range into lrvx. Uses the shared
-    archive cache (``~/.lrvx/archive-cache/bitget``) when ``mirror`` is
-    omitted."""
+    """Convert a range of Bitget days (UTC+8 dates, inclusive), every
+    part of each, into lrvx. Uses the shared archive cache
+    (``~/.lrvx/archive-cache/bitget``) when ``mirror`` is omitted. A day
+    with no file raises FileNotFoundError unless ``skip_missing``."""
+    _code(market)
     days = list(_iter_days(date_from, date_to))
     if not days:
         return ConvertStats()
@@ -358,47 +421,43 @@ def range_to_lrvx(
     mirror = Path(mirror).expanduser()
     mirror.mkdir(parents=True, exist_ok=True)
 
-    def _ensure(day: date) -> Tuple[date, Optional[Path]]:
-        local = _mirror_path(mirror, symbol, market, day)
-        if local.exists():
-            return day, local
+    def _ensure(day: date) -> Tuple[date, List[Path]]:
         try:
-            _download(_archive_url(symbol, market, day), local)
-        except Exception:
+            return day, _download_day(mirror, symbol, market, day)
+        except FileNotFoundError:
             if skip_missing:
-                return day, None
+                return day, []
             raise
-        return day, local
 
-    pairs: List[Tuple[date, Optional[Path]]] = []
+    pairs: List[Tuple[date, List[Path]]] = []
     with ThreadPoolExecutor(max_workers=max(1, int(parallel))) as ex:
         for pair in ex.map(_ensure, days):
             pairs.append(pair)
 
     agg = ConvertStats()
-    for day, path in pairs:
-        if path is None:
-            continue
-        s = trades_to_lrvx(
-            path, out_tape,
-            symbol_id=symbol_id, symbol_name=symbol, market=market,
-            exchange_id=exchange_id, exchange_name=exchange_name,
-            append=append, max_segment_mb=max_segment_mb,
-            compression=compression, write_metadata=False,
-        )
-        agg.trades_written += s.trades_written
-        agg.rows_read += s.rows_read
-        agg.rows_skipped += s.rows_skipped
-        agg.files_processed += s.files_processed
-        if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
-            agg.first_ts_ns = s.first_ts_ns
-        if s.last_ts_ns > agg.last_ts_ns:
-            agg.last_ts_ns = s.last_ts_ns
-        if s.last_trade_id > agg.last_trade_id:
-            agg.last_trade_id = s.last_trade_id
+    for day, paths in pairs:
+        for path in paths:
+            s = trades_to_lrvx(
+                path, out_tape,
+                symbol_id=symbol_id, symbol_name=symbol, market=market,
+                exchange_id=exchange_id, exchange_name=exchange_name,
+                append=append, max_segment_mb=max_segment_mb,
+                compression=compression, write_metadata=False,
+            )
+            agg.trades_written += s.trades_written
+            agg.rows_read += s.rows_read
+            agg.rows_skipped += s.rows_skipped
+            agg.rows_invalid += s.rows_invalid
+            agg.files_processed += s.files_processed
+            if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
+                agg.first_ts_ns = s.first_ts_ns
+            if s.last_ts_ns > agg.last_ts_ns:
+                agg.last_ts_ns = s.last_ts_ns
+            if s.last_trade_id > agg.last_trade_id:
+                agg.last_trade_id = s.last_trade_id
 
     _write_metadata(
-        Path(out_tape),
+        Path(out_tape).expanduser(),
         exchange_name=exchange_name, market=market,
         symbol_id=symbol_id, symbol_name=symbol,
         first_ts_ns=agg.first_ts_ns, last_ts_ns=agg.last_ts_ns,
@@ -408,8 +467,13 @@ def range_to_lrvx(
     return agg
 
 
+UnknownLayoutError = _layout.UnknownLayoutError
+NothingParsedError = _layout.NothingParsedError
+
 __all__ = [
     "ConvertStats",
+    "NothingParsedError",
+    "UnknownLayoutError",
     "trades_to_lrvx",
     "range_to_lrvx",
 ]

@@ -1,8 +1,8 @@
 """Trade archive importers: memory bounded by a batch, same tape as a
 straightforward whole-file import.
 
-For each of the five trade importers (binance aggTrades, bybit, okx,
-bitget, deribit) a synthetic day is written in the venue's CSV layout
+For each of the four trade importers (binance aggTrades, bybit, okx,
+bitget) a synthetic day is written in the venue's published CSV layout
 and imported. The tape is decoded segment by segment, frame by frame,
 straight from the bytes, and compared with what an independent,
 whole-file reading of the same CSV says the tape must hold:
@@ -10,9 +10,7 @@ whole-file reading of the same CSV says the tape must hold:
   * the rows whose trade id is not already on the tape for the symbol
     within the file's time range,
   * stably sorted by timestamp (binance keeps file order),
-  * one new segment per import that writes anything,
-  * for deribit options, every trade frame first, then the option-quote
-    frames of the written rows that carry a mark / iv / index.
+  * one new segment per import that writes anything.
 
 Files come newest-first, shuffled with tied timestamps, and in order,
 so the bounded path that merges sorted runs is exercised alongside the
@@ -51,7 +49,7 @@ for cand in ("build/python", "build-py312/python"):
 
 import lrvx  # noqa: E402,F401
 
-from lrvx.archives import _dedup, binance, bitget, bybit, deribit, okx  # noqa: E402
+from lrvx.archives import _dedup, binance, bitget, bybit, okx  # noqa: E402
 
 _DAY0 = date(2024, 1, 15)
 _SYMBOL_ID = 7
@@ -68,7 +66,8 @@ def _day_ms(day: date) -> int:
 
 def _make_day(seed: int, day_index: int, n: int, order: str) -> list:
     """Rows ``(trade_id, ts_ms, price, qty, side, mark, iv, index)`` for
-    one day, in the order the file will list them."""
+    one day, in the order the file will list them. The last three are
+    random extras the layouts here do not carry."""
     rng = random.Random(seed * 1_000 + day_index)
     base = _day_ms(_DAY0 + timedelta(days=day_index))
     stamps = []
@@ -107,10 +106,6 @@ def _fold(token: str) -> int:
     return int.from_bytes(hashlib.md5(token.encode("ascii")).digest()[:8], "big")
 
 
-def _opt(v) -> str:
-    return "" if v is None else repr(v)
-
-
 def _zip(dest: Path, text: str) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -142,7 +137,6 @@ class _Venue:
     market = ""
     sorts = True               # stable sort by timestamp before writing
     empty_last_id_is_max = True
-    writes_quotes = False
 
     def write_file(self, dest: Path, rows: list) -> Path:
         raise NotImplementedError
@@ -181,10 +175,10 @@ class _Binance(_Venue):
 
     def write_file(self, dest, rows):
         body = (f"{r[0]},{r[2]!r},{r[3]!r},{r[0]},{r[0]},{r[1]},"
-                f"{'true' if r[4] else 'false'},true" for r in rows)
+                f"{'true' if r[4] else 'false'}" for r in rows)
         return _zip(dest, _lines(
             "agg_trade_id,price,quantity,first_trade_id,last_trade_id,"
-            "transact_time,is_buyer_maker,is_best_match", body))
+            "transact_time,is_buyer_maker", body))
 
     def import_file(self, path, tape):
         return binance.aggtrades_to_lrvx(
@@ -218,8 +212,10 @@ class _Okx(_Venue):
 
     def write_file(self, dest, rows):
         side = ("buy", "sell")
-        body = (f"{r[0]},{side[r[4]]},{r[3]!r},{r[2]!r},{r[1]}" for r in rows)
-        return _zip(dest, _lines("trade_id,side,size,price,timestamp_ms", body))
+        body = (f"{self.symbol},{r[0]},{side[r[4]]},{r[2]!r},{r[3]!r},{r[1]}"
+                for r in rows)
+        return _zip(dest, _lines(
+            "instrument_name,trade_id,side,price,size,created_time", body))
 
 
 class _Bitget(_Venue):
@@ -227,25 +223,21 @@ class _Bitget(_Venue):
     symbol = "BTCUSDT"
     market = "umcbl"
 
-    def write_file(self, dest, rows):
-        side = ("buy", "sell")
-        body = (f"{r[0]},{r[2]!r},{r[3]!r},{side[r[4]]},{r[1]}" for r in rows)
-        return _zip(dest, _lines("trade_id,price,size,side,timestamp_ms", body))
-
-
-class _Deribit(_Venue):
-    module = deribit
-    symbol = "BTC-29MAR24-50000-C"
-    market = "option"
-    writes_quotes = True
+    def mirror_path(self, mirror: Path, day: date) -> Path:
+        # One part per day, listed in the day's manifest so a range
+        # import finds it without a download.
+        path = bitget._mirror_path(mirror, self.symbol, self.market, day)
+        manifest = bitget._manifest_path(mirror, self.symbol, self.market, day)
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(path.name + "\n")
+        return path
 
     def write_file(self, dest, rows):
         side = ("buy", "sell")
-        body = (f"{r[0]},{r[1]},{self.symbol},{side[r[4]]},{r[2]!r},{r[3]!r},"
-                f"{_opt(r[5])},{_opt(r[6])},{_opt(r[7])}" for r in rows)
-        return _gz(dest, _lines(
-            "trade_id,timestamp,instrument_name,direction,price,amount,"
-            "mark_price,iv,index_price", body))
+        body = (f"{r[0]},{r[1]},{r[2]!r},{side[r[4]]},{r[2] * r[3]!r},{r[3]!r}"
+                for r in rows)
+        return _zip(dest, _lines(
+            "trade_id,timestamp,price,side,volume(quote),size(base)", body))
 
 
 def _raw(v: float) -> int:
@@ -285,13 +277,6 @@ class _Model:
                      last_trade_id=v.tape_id(kept[-1]))
         frames = [("trade", v.ts_ns(r), v.ts_ns(r), _raw(r[2]), _raw(r[3]),
                    v.tape_id(r), _SYMBOL_ID, v.side(r)) for r in kept]
-        if v.writes_quotes:
-            for r in kept:
-                if r[5] is None and r[6] is None and r[7] is None:
-                    continue
-                frames.append(("quote", v.ts_ns(r), _raw(r[5] or 0.0),
-                               _raw(r[7] or 0.0), int((r[6] or 0.0) * 1e8),
-                               _SYMBOL_ID))
         self.segments.append(frames)
         self.on_tape.extend((v.tape_id(r), v.ts_ns(r)) for r in kept)
         return stats
@@ -303,7 +288,6 @@ class _Model:
 _SEGMENT_HEADER = struct.Struct("<IHBBqqqIIQB15x")
 _FRAME_HEADER = struct.Struct("<IIBBH")
 _TRADE = struct.Struct("<qqqqQIBBH")
-_QUOTE = struct.Struct("<qqqqqqqqqqqqqIBBH")
 
 
 def _decode_tape(tape: Path) -> list:
@@ -322,9 +306,6 @@ def _decode_tape(tape: Path) -> list:
             if kind == 1:
                 t = _TRADE.unpack_from(data, pos)
                 frames.append(("trade",) + t[:7])
-            elif kind == 4:
-                q = _QUOTE.unpack_from(data, pos)
-                frames.append(("quote", q[0], q[2], q[3], q[5], q[13]))
             else:
                 frames.append(("other", kind))
             pos += size
@@ -407,7 +388,7 @@ class _StreamingImportTests:
         self._import(path, mixed)
 
     def _suffix(self) -> str:
-        return "csv.gz" if isinstance(self.venue, (_Bybit, _Deribit)) else "zip"
+        return "csv.gz" if isinstance(self.venue, _Bybit) else "zip"
 
     def test_peak_memory_is_bounded_by_the_batch(self) -> None:
         # A day of 30k rows held as tuples peaks at 7 MB or more; batches
@@ -440,10 +421,6 @@ class OkxStreamingImportTests(_StreamingImportTests, unittest.TestCase):
 
 class BitgetStreamingImportTests(_StreamingImportTests, unittest.TestCase):
     venue = _Bitget()
-
-
-class DeribitStreamingImportTests(_StreamingImportTests, unittest.TestCase):
-    venue = _Deribit()
 
 
 class DefaultBatchTests(unittest.TestCase):

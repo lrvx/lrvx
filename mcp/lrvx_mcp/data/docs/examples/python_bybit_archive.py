@@ -1,5 +1,5 @@
-"""Bybit public archive round-trip — build a synthetic gzipped CSV
-matching Bybit's published column layout, push it through
+"""Bybit public archive round-trip — build a gzipped CSV in the layout
+Bybit publishes for linear and inverse contracts, push it through
 `bybit.trades_to_lrvx`, and read the resulting `.lrvx` tape
 back via `DataReader` to confirm the trade stream round-trips.
 
@@ -23,13 +23,15 @@ import lrvx
 from lrvx.archives import bybit
 
 
+# timestamp, symbol, side, size, price, tickDirection, trdMatchID,
+# grossValue, homeNotional, foreignNotional
 _ROWS = [
-    (1_700_000_000.500, "BTCUSDT", "Buy",  0.01, 42_100.5,
-     "ZeroPlusTick",  "abc123", "", "", ""),
-    (1_700_000_001.250, "BTCUSDT", "Sell", 0.02, 42_101.0,
-     "ZeroMinusTick", "def456", "", "", ""),
-    (1_700_000_002.000, "BTCUSDT", "Buy",  0.03, 42_100.7,
-     "PlusTick",      "789012", "", "", ""),
+    ("1700000000.5000", "BTCUSDT", "Buy",  0.01, 42_100.5, "ZeroPlusTick",
+     "08ff9568-cb50-55d6-b497-13727eec09dc", 4.21005e+10, 0.01, 421.005),
+    ("1700000001.2500", "BTCUSDT", "Sell", 0.02, 42_101.0, "ZeroMinusTick",
+     "3f1d562a-57d4-5755-b305-2ade260deeaf", 8.4202e+10, 0.02, 842.02),
+    ("1700000002.0000", "BTCUSDT", "Buy",  0.03, 42_100.7, "PlusTick",
+     "f0039dc6-a46b-5c4d-b550-cad3be2fca6e", 1.263021e+11, 0.03, 1263.021),
 ]
 
 

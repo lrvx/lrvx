@@ -1,6 +1,7 @@
-"""Bitget public archive round-trip — build a synthetic Bitget-format
-CSV in memory, run `bitget.trades_to_lrvx`, then read the
-resulting `.lrvx` back through `DataReader`.
+"""Bitget public archive round-trip — build one part of a Bitget trade
+day in the layout Bitget publishes (`trade_id,timestamp,price,side,
+volume(quote),size(base)`) in memory, run `bitget.trades_to_lrvx`,
+then read the resulting `.lrvx` back through `DataReader`.
 
 CI-runnable companion to
 [Import multi-exchange archives](../how-to/import-multi-exchange-archives.md).
@@ -22,16 +23,17 @@ import lrvx
 from lrvx.archives import bitget
 
 
+# (trade_id, timestamp_ms, price, side, volume(quote), size(base))
 _ROWS = [
-    (100, 42_100.5, 0.01, "buy",  1_700_000_000_500),
-    (101, 42_101.0, 0.02, "sell", 1_700_000_001_250),
-    (102, 42_100.7, 0.03, "buy",  1_700_000_002_000),
+    (1503354649689448450, 1_794_153_600_000, 75943.5, "buy",  7.59435,   0.0001),
+    (1503354771215212544, 1_794_153_629_000, 75941.9, "sell", 25576.832, 0.3368),
+    (1503354771215212546, 1_794_153_629_000, 75941.8, "buy",  721.44710, 0.0095),
 ]
 
 
 def _build_zip(dest: Path) -> Path:
     buf = io.StringIO()
-    buf.write("trade_id,price,size,side,timestamp_ms\n")
+    buf.write("trade_id,timestamp,price,side,volume(quote),size(base)\n")
     for r in _ROWS:
         buf.write(",".join(str(x) for x in r) + "\n")
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -42,7 +44,7 @@ def _build_zip(dest: Path) -> Path:
 def main() -> None:
     workdir = Path(tempfile.mkdtemp(prefix="lrvx-bitget-"))
     try:
-        z = workdir / "BTCUSDT-trades-2024-01-15.zip"
+        z = workdir / "BTCUSDT_UMCBL_20261109_001.zip"
         _build_zip(z)
 
         tape = workdir / "tape"

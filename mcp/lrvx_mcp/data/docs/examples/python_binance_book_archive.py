@@ -33,6 +33,8 @@ _T1_ROWS = [
 
 def _build_zip(dest: Path, rows) -> Path:
     buf = io.StringIO()
+    buf.write("update_id,best_bid_price,best_bid_qty,best_ask_price,"
+              "best_ask_qty,transaction_time,event_time\n")
     for r in rows:
         buf.write(",".join(str(x) for x in r) + "\n")
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:

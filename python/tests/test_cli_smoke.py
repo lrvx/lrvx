@@ -206,7 +206,6 @@ def test_lint_lookahead_accepts_a_clean_strategy(strategy_file: Path) -> None:
     ["archive", "bybit", "/nonexistent/data.zip", "--output", "/nonexistent/o"],
     ["archive", "okx", "/nonexistent/data.zip", "--output", "/nonexistent/o"],
     ["archive", "bitget", "/nonexistent/data.zip", "--output", "/nonexistent/o"],
-    ["archive", "deribit", "/nonexistent/data.zip", "--output", "/nonexistent/o"],
 ], ids=lambda a: " ".join(a[:2]))
 def test_verb_reaches_its_own_validation(argv: list[str]) -> None:
     r = _run(argv)
@@ -216,6 +215,18 @@ def test_verb_reaches_its_own_validation(argv: list[str]) -> None:
         f"`lrvx {' '.join(argv)}` reported success on nonexistent inputs")
     assert (r.stderr.strip() or r.stdout.strip()), (
         f"`lrvx {' '.join(argv)}` failed with no explanation at all")
+
+
+def test_archive_without_a_public_archive_is_not_offered() -> None:
+    """Deribit publishes no public trade file archive, so `lrvx archive`
+    offers no Deribit importer: the request fails in argument parsing,
+    naming the importers that exist."""
+    r = _run(["archive", "deribit", "--symbol", "BTC-PERPETUAL",
+              "--from", "2024-01-15", "--to", "2024-01-15", "--out", "/nonexistent/o"])
+    assert r.returncode == 2
+    assert "invalid choice: 'deribit'" in r.stderr
+    for name in ("binance", "bybit", "okx", "bitget"):
+        assert name in r.stderr.split("invalid choice", 1)[1]
 
 
 def test_engine_sim_runs_a_tape_and_stops(tape: Path, strategy_file: Path) -> None:
