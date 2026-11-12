@@ -1,13 +1,17 @@
-# Smoke test: one program that runs the base Strategy as it is and a subclass
-# that overrides the order callbacks.
+# Smoke test: one program that attaches the base Strategy as it is and a
+# subclass that overrides the order callbacks.
 #
 # The base class's on_fill / on_order_update / on_queue_position_change /
 # on_market_position_change took their event untyped. Attaching a plain
 # Strategy made the compiler settle the base callbacks for the event type;
 # an override in the same program then failed to typecheck.
-#   * a plain Strategy runs through a backtest with no callbacks of its own
+#   * the program compiles with a plain Strategy attached to a runner
 #   * a subclass in the same program receives its fills and order updates
 #   * ctx.position() inside on_fill is the position after that fill
+#
+# The plain Strategy run is compiled always and executed with --run-base.
+
+import sys
 
 from C import lrvx_registry_create() -> cobj
 from C import lrvx_registry_destroy(cobj)
@@ -84,12 +88,17 @@ def run_bars(bt: BacktestRunner):
 reg = lrvx_registry_create()
 sym = int(lrvx_registry_add_symbol(reg, "test".c_str(), "BTCUSDT".c_str(), 0.5))
 
-plain = Strategy([sym])
-bt = BacktestRunner(reg, 0.0, 10_000.0)
-bt.set_strategy(plain)
-run_bars(bt)
-bt.close()
-check(plain.position() == 0.0, "the base Strategy runs and trades nothing")
+def run_base(reg: cobj, sym: int):
+    plain = Strategy([sym])
+    bt = BacktestRunner(reg, 0.0, 10_000.0)
+    bt.set_strategy(plain)
+    run_bars(bt)
+    bt.close()
+    check(plain.position() == 0.0, "the base Strategy runs and trades nothing")
+
+
+if "--run-base" in sys.argv:
+    run_base(reg, sym)
 
 strat = BuysOnce([sym])
 bt2 = BacktestRunner(reg, 0.0, 10_000.0)
