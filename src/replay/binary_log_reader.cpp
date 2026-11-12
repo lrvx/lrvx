@@ -652,22 +652,79 @@ std::optional<detail::IndexWindow> detail::indexWindow(std::span<const IndexEntr
   return w;
 }
 
+detail::SegmentSpan detail::segmentSpan(const SegmentInfo& segment)
+{
+  SegmentSpan span{segment.first_event_ns, segment.last_event_ns, false};
+  if (!segment.sorted || segment.event_count == 0)
+  {
+    return span;
+  }
+  if (!segment.compressed)
+  {
+    // In non-decreasing order the first non-zero event written is the earliest
+    // and the last one written the latest.
+    span.exact = true;
+    return span;
+  }
+
+  BinaryLogIterator iter(segment.path);
+  if (!iter.isValid() || !iter.hasIndex() || !iter.loadIndex())
+  {
+    return span;
+  }
+  const auto idx = iter.indexEntries();
+  // indexWindow validates the index the way every range read does, and turns
+  // down a compressed segment whose first block minimum is not positive.
+  if (!indexWindow(idx, iter.header(), std::numeric_limits<int64_t>::min(),
+                   std::numeric_limits<int64_t>::max()))
+  {
+    return span;
+  }
+  // No block starts below the previous block's maximum, so the last block
+  // holds the latest event.
+  if (!iter.seekToBlockOffset(idx.back().file_offset))
+  {
+    return span;
+  }
+  iter.setStopAtBlockEnd(true);
+  int64_t last = 0;
+  ReplayEvent ev;
+  while (iter.next(ev))
+  {
+    last = std::max(last, ev.timestamp_ns);
+  }
+  if (last <= 0)
+  {
+    return span;
+  }
+  span.first_ns = idx.front().timestamp_ns;
+  span.last_ns = last;
+  span.exact = true;
+  return span;
+}
+
 namespace
 {
 
 using detail::IndexWindow;
 using detail::indexWindow;
 
-// Adds what an iterator consumed to ReaderStats::bytes_read when the segment
-// read ends, on every return path including a callback that stops the walk.
-class BytesReadTally
+// Adds the iterator's own counters -- bytes consumed, frames failing their CRC,
+// frames of an unknown type -- to ReaderStats when the segment read ends, on
+// every return path including a callback that stops the walk.
+class IteratorTally
 {
  public:
-  BytesReadTally(const BinaryLogIterator& iter, ReaderStats& stats) : _iter(iter), _stats(stats) {}
-  ~BytesReadTally() { _stats.bytes_read += _iter.bytesConsumed(); }
+  IteratorTally(const BinaryLogIterator& iter, ReaderStats& stats) : _iter(iter), _stats(stats) {}
+  ~IteratorTally()
+  {
+    _stats.bytes_read += _iter.bytesConsumed();
+    _stats.crc_errors += _iter.crcErrors();
+    _stats.unknown_frames_skipped += _iter.unknownFramesSkipped();
+  }
 
-  BytesReadTally(const BytesReadTally&) = delete;
-  BytesReadTally& operator=(const BytesReadTally&) = delete;
+  IteratorTally(const IteratorTally&) = delete;
+  IteratorTally& operator=(const IteratorTally&) = delete;
 
  private:
   const BinaryLogIterator& _iter;
@@ -885,7 +942,7 @@ bool streamBlockRangeImpl(const std::filesystem::path& path,
   {
     return false;
   }
-  BytesReadTally tally(iter, stats);
+  IteratorTally tally(iter, stats);
   iter.setStopAtBlockEnd(true);
 
   ++stats.files_read;
@@ -955,6 +1012,7 @@ BinaryLogReader::BinaryLogReader(BinaryLogReader&& other) noexcept
       _segments(std::move(other._segments)),
       _read_order(std::move(other._read_order)),
       _read_groups(std::move(other._read_groups)),
+      _order_key(std::move(other._order_key)),
       _scanned(other._scanned),
       _progress_cb(std::move(other._progress_cb)),
       _progress_interval(other._progress_interval)
@@ -970,6 +1028,7 @@ BinaryLogReader& BinaryLogReader::operator=(BinaryLogReader&& other) noexcept
     _segments = std::move(other._segments);
     _read_order = std::move(other._read_order);
     _read_groups = std::move(other._read_groups);
+    _order_key = std::move(other._order_key);
     _scanned = other._scanned;
     _progress_cb = std::move(other._progress_cb);
     _progress_interval = other._progress_interval;
@@ -1086,13 +1145,24 @@ void BinaryLogReader::planReadOrder()
   const size_t n = _segments.size();
   _read_order.reserve(n);
 
+  _order_key.assign(n, 0);
+
   // Time-bounded segments between two unbounded ones form a run, sorted by
   // first event and merged. An unbounded segment proves nothing about where
   // its events fall, so it stays where its file name puts it and ends the run.
+  //
+  // A segment with no events bounds nothing either, but has nothing to place:
+  // it joins the run it sits in, keyed like the segment before it so it keeps
+  // its file-name position. Ending the run there instead split a run of
+  // overlapping segments in two that were then no longer merged.
+  auto joins_run = [this](size_t k)
+  {
+    return _segments[k].time_bounded || _segments[k].event_count == 0;
+  };
   size_t i = 0;
   while (i < n)
   {
-    if (!_config.order_segments_by_time || !_segments[i].time_bounded)
+    if (!_config.order_segments_by_time || !joins_run(i))
     {
       _read_groups.push_back({_read_order.size(), _read_order.size() + 1, false});
       _read_order.push_back(i);
@@ -1100,13 +1170,19 @@ void BinaryLogReader::planReadOrder()
       continue;
     }
     const size_t begin = _read_order.size();
-    for (; i < n && _segments[i].time_bounded; ++i)
+    int64_t key = std::numeric_limits<int64_t>::min();
+    for (; i < n && joins_run(i); ++i)
     {
+      if (_segments[i].time_bounded)
+      {
+        key = _segments[i].min_event_ns;
+      }
+      _order_key[i] = key;
       _read_order.push_back(i);
     }
     std::stable_sort(_read_order.begin() + static_cast<std::ptrdiff_t>(begin), _read_order.end(),
                      [this](size_t a, size_t b)
-                     { return _segments[a].min_event_ns < _segments[b].min_event_ns; });
+                     { return _order_key[a] < _order_key[b]; });
     _read_groups.push_back({begin, _read_order.size(), true});
   }
 }
@@ -1211,7 +1287,7 @@ bool BinaryLogReader::readSegment(const std::filesystem::path& path, EventCallba
   {
     return false;
   }
-  BytesReadTally tally(iter, _stats);
+  IteratorTally tally(iter, _stats);
 
   bool stop_past_to = false;
   if (!narrowToRange(iter, stop_past_to))
@@ -1296,7 +1372,7 @@ bool BinaryLogReader::readSegmentFrom(const SegmentInfo& segment, int64_t start_
   {
     return false;
   }
-  BytesReadTally tally(iter, _stats);
+  IteratorTally tally(iter, _stats);
 
   ++_stats.files_read;
 
@@ -1428,7 +1504,7 @@ struct SortedCursor
   }
 
   BinaryLogIterator iter;
-  BytesReadTally tally;
+  IteratorTally tally;
   ReplayEvent head;
   size_t file_index{0};
   bool stop_past_to{false};
@@ -1476,8 +1552,8 @@ bool BinaryLogReader::mergeSortedRun(const ReadGroup& run, std::optional<int64_t
   for (;;)
   {
     // Open each pending segment that may hold an event ordered before the
-    // earliest head. Pending segments are sorted by min_event_ns, a lower
-    // bound on all their events, so the first one that cannot ends the scan.
+    // earliest head. Pending segments are sorted by _order_key, a lower bound
+    // on all their events, so the first one that cannot ends the scan.
     // On a tape recorded in order the next segment opens only once the
     // current one is exhausted, exactly as a plain walk would.
     while (next < run.end)
@@ -1487,8 +1563,8 @@ bool BinaryLogReader::mergeSortedRun(const ReadGroup& run, std::optional<int64_t
       if (!heap.empty())
       {
         const SortedCursor& top = *heap.front();
-        if (segment.min_event_ns > top.head.timestamp_ns ||
-            (segment.min_event_ns == top.head.timestamp_ns && index > top.file_index))
+        if (_order_key[index] > top.head.timestamp_ns ||
+            (_order_key[index] == top.head.timestamp_ns && index > top.file_index))
         {
           break;
         }
@@ -1569,7 +1645,7 @@ bool BinaryLogReader::mergeSortedRun(const ReadGroup& run, std::optional<int64_t
       const size_t next_index = next < run.end ? _read_order[next] : 0;
       // Past this timestamp the next pending segment must be opened; on
       // reaching it exactly, only when that segment's file sorts first.
-      const int64_t open_above = next < run.end ? _segments[next_index].min_event_ns
+      const int64_t open_above = next < run.end ? _order_key[next_index]
                                                 : std::numeric_limits<int64_t>::max();
       const bool open_at = next < run.end && next_index < only.file_index;
       const int64_t to = only.stop_past_to ? *_config.to_ns : std::numeric_limits<int64_t>::max();
@@ -1667,6 +1743,7 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
     }
 
     uint64_t seen_events = 0;
+    int64_t last_dispatched_ns = 0;
     auto last_progress = std::chrono::steady_clock::now();
     bool cancelled = false;
     const bool walked = streamForEach(
@@ -1682,6 +1759,7 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
           if (cb_ptr != nullptr)
           {
             ++seen_events;
+            last_dispatched_ns = ev.timestamp_ns;
             const auto now = std::chrono::steady_clock::now();
             if (now - last_progress >= _progress_interval)
             {
@@ -1711,13 +1789,12 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
 
     if (cb_ptr != nullptr && walked && !cancelled)
     {
-      // One final 100% tick so progress UIs reach the end frame. Use
-      // the last segment's last_event_ns (we already scanned for the
-      // total event count) so the timestamp is exact, not just the
-      // most recent intra-walk dispatch.
-      const int64_t end_ts =
-          _read_order.empty() ? int64_t{0} : _segments[_read_order.back()].last_event_ns;
-      (*cb_ptr)(1.0, end_ts);
+      // One final 100% tick so progress UIs reach the end frame, at the
+      // cursor every other tick reports: the last event dispatched. The last
+      // segment's header named the last event that segment wrote, which is
+      // neither where a time-ranged run stops nor, with segments merged or
+      // blocks re-sorted, the last event delivered.
+      (*cb_ptr)(1.0, last_dispatched_ns);
     }
 
     return walked && !cancelled;
@@ -1837,11 +1914,42 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
     return streamSegmentWithStats(path, cb, _stats);
   };
 
-  // Segments in read order, each partitioned on its own: segments whose
-  // ranges overlap are not interleaved here, any more than the blocks a
-  // segment is split into are.
+  // A walk of its own: the streaming watermark a previous walk left behind
+  // would judge this one's first events late.
+  _stream_watermark = std::numeric_limits<int64_t>::min();
+
+  // Segments in read order, each partitioned on its own. Splitting a segment
+  // keeps time order inside every worker's slice, and the slices are
+  // contiguous in time, so merging them is what IAggregator::merge expects.
+  // Splitting two segments whose ranges overlap would not be: delivering one
+  // after the other sends the panel back in time. Such a run is delivered by
+  // the ordered single-threaded merge instead, exactly as run(1) delivers
+  // it; a tape recorded in order has no such run and is partitioned as
+  // before.
+  const std::vector<size_t> overlapping = overlappingRuns(max_threads);
   for (size_t read_pos = 0; read_pos < _read_order.size(); ++read_pos)
   {
+    if (overlapping[read_pos] != 0)
+    {
+      EventCallback cb = [&aggregators](const ReplayEvent& ev) -> bool
+      {
+        for (auto* agg : aggregators)
+        {
+          if (agg != nullptr)
+          {
+            agg->onEvent(ev);
+          }
+        }
+        return true;
+      };
+      if (!mergeSortedRun(ReadGroup{read_pos, overlapping[read_pos], true}, std::nullopt, cb))
+      {
+        return false;
+      }
+      read_pos = overlapping[read_pos] - 1;
+      continue;
+    }
+
     const SegmentInfo& segment = _segments[_read_order[read_pos]];
     noteVisited(read_pos);
     if (segmentOutsideRange(segment))
@@ -1996,6 +2104,8 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
       _stats.book_updates_read += s.book_updates_read;
       _stats.bytes_read += s.bytes_read;
       _stats.crc_errors += s.crc_errors;
+      _stats.late_dropped += s.late_dropped;
+      _stats.unknown_frames_skipped += s.unknown_frames_skipped;
     }
   }
 
@@ -2046,7 +2156,7 @@ bool BinaryLogReader::streamSegmentWithStats(const std::filesystem::path& path,
   {
     return false;
   }
-  BytesReadTally tally(iter, stats);
+  IteratorTally tally(iter, stats);
 
   bool stop_past_to = false;
   if (!narrowToRange(iter, stop_past_to))
@@ -2128,7 +2238,7 @@ bool BinaryLogReader::readSegmentStreamingFrom(const SegmentInfo& segment,
   {
     return false;
   }
-  BytesReadTally tally(iter, _stats);
+  IteratorTally tally(iter, _stats);
 
   ++_stats.files_read;
 
@@ -2192,6 +2302,107 @@ bool BinaryLogReader::forEachFrom(int64_t start_ts_ns, EventCallback callback)
   return walk(/*buffered=*/true, start_ts_ns, callback);
 }
 
+const std::vector<BinaryLogReader::Span>& BinaryLogReader::segmentSpans(std::size_t threads) const
+{
+  ensureScanned();
+  std::call_once(_span_once,
+                 [this, threads]
+                 {
+                   // One segment's span is a file open and, for a compressed
+                   // segment, one block decompressed; run(n) reads them for
+                   // every segment before it starts, so it spreads them over
+                   // the threads it is about to use anyway.
+                   _spans.resize(_segments.size());
+                   auto fill = [this](std::size_t from, std::size_t step)
+                   {
+                     for (std::size_t i = from; i < _segments.size(); i += step)
+                     {
+                       const auto span = detail::segmentSpan(_segments[i]);
+                       _spans[i] = Span{span.first_ns, span.last_ns, span.exact};
+                     }
+                   };
+                   const std::size_t n = std::min(threads, _segments.size());
+                   if (n <= 1)
+                   {
+                     fill(0, 1);
+                     return;
+                   }
+                   std::vector<std::thread> workers;
+                   workers.reserve(n - 1);
+                   for (std::size_t t = 1; t < n; ++t)
+                   {
+                     workers.push_back(
+                         makeThread("lrvx.replay.span", [&fill, t, n]()
+                                    { fill(t, n); }));
+                   }
+                   fill(0, n);
+                   for (auto& w : workers)
+                   {
+                     w.join();
+                   }
+                 });
+  return _spans;
+}
+
+std::vector<size_t> BinaryLogReader::overlappingRuns(std::size_t threads) const
+{
+  std::vector<size_t> run_end(_read_order.size(), 0);
+  if (!_config.order_segments_by_time)
+  {
+    return run_end;
+  }
+  const std::vector<Span>& spans = segmentSpans(threads);
+  // The latest event a segment can hold: its exact maximum where the segment
+  // proves one, nothing for an empty segment, and no limit otherwise.
+  auto reach_of = [this, &spans](size_t pos)
+  {
+    const size_t index = _read_order[pos];
+    if (_segments[index].event_count == 0)
+    {
+      return std::numeric_limits<int64_t>::min();
+    }
+    const Span& span = spans[index];
+    return span.exact ? span.last_ns : std::numeric_limits<int64_t>::max();
+  };
+  for (const auto& group : _read_groups)
+  {
+    if (!group.merge || group.end - group.begin < 2)
+    {
+      continue;
+    }
+    // A segment overlaps the run before it when it can start strictly before
+    // the latest event of that run; touching at a timestamp is the ordinary
+    // seam rotation leaves and needs no interleaving. A segment with no
+    // events rides along with the run it sits in and counts for nothing: a
+    // run is marked only when two segments that hold events overlap.
+    auto holds_events = [this](size_t pos)
+    { return _segments[_read_order[pos]].event_count > 0; };
+    size_t start = group.begin;
+    int64_t reach = reach_of(start);
+    size_t members = holds_events(start) ? 1 : 0;
+    for (size_t pos = group.begin + 1; pos <= group.end; ++pos)
+    {
+      if (pos < group.end && _order_key[_read_order[pos]] < reach)
+      {
+        reach = std::max(reach, reach_of(pos));
+        members += holds_events(pos) ? 1 : 0;
+        continue;
+      }
+      if (members >= 2)
+      {
+        run_end[start] = pos;
+      }
+      if (pos < group.end)
+      {
+        start = pos;
+        reach = reach_of(pos);
+        members = holds_events(pos) ? 1 : 0;
+      }
+    }
+  }
+  return run_end;
+}
+
 std::optional<std::pair<int64_t, int64_t>> BinaryLogReader::timeRange() const
 {
   if (!ensureScanned() || _segments.empty())
@@ -2202,15 +2413,15 @@ std::optional<std::pair<int64_t, int64_t>> BinaryLogReader::timeRange() const
   int64_t min_ts = INT64_MAX;
   int64_t max_ts = INT64_MIN;
 
-  for (const auto& segment : _segments)
+  for (const Span& span : segmentSpans())
   {
-    if (segment.first_event_ns > 0)
+    if (span.first_ns > 0)
     {
-      min_ts = std::min(min_ts, segment.first_event_ns);
+      min_ts = std::min(min_ts, span.first_ns);
     }
-    if (segment.last_event_ns > 0)
+    if (span.last_ns > 0)
     {
-      max_ts = std::max(max_ts, segment.last_event_ns);
+      max_ts = std::max(max_ts, span.last_ns);
     }
   }
 
@@ -2258,86 +2469,8 @@ const std::vector<SegmentInfo>& BinaryLogReader::segments() const
 
 DatasetSummary BinaryLogReader::inspect(const std::filesystem::path& data_dir)
 {
-  DatasetSummary summary;
-  summary.data_dir = data_dir;
-
-  namespace fs = std::filesystem;
-
-  if (!fs::exists(data_dir))
-  {
-    return summary;
-  }
-
-  std::vector<std::filesystem::path> paths;
-  for (const auto& entry : fs::directory_iterator(data_dir))
-  {
-    if (entry.is_regular_file() && isSegmentExtension(entry.path().extension().string()))
-    {
-      paths.push_back(entry.path());
-    }
-  }
-
-  std::sort(paths.begin(), paths.end());
-
-  for (const auto& path : paths)
-  {
-    std::FILE* f = std::fopen(path.string().c_str(), "rb");
-    if (!f)
-    {
-      continue;
-    }
-
-    SegmentHeader header;
-    if (std::fread(&header, sizeof(header), 1, f) == 1 && header.isValid())
-    {
-      ++summary.segment_count;
-
-      int64_t first_ns = header.first_event_ns;
-      int64_t last_ns = header.last_event_ns;
-      uint32_t ev_count = header.event_count;
-
-      if (ev_count == 0)
-      {
-        if (header.isCompressed())
-        {
-          recoverCompressedSegmentMeta(f, header, ev_count, first_ns, last_ns);
-        }
-        else
-        {
-          recoverUncompressedSegmentMeta(f, header, ev_count, first_ns, last_ns);
-        }
-      }
-
-      summary.total_events += ev_count;
-
-      // Get file size
-      std::fseek(f, 0, SEEK_END);
-      summary.total_bytes += static_cast<uint64_t>(std::ftell(f));
-
-      // Update time range
-      if (first_ns > 0 && (summary.first_event_ns == 0 || first_ns < summary.first_event_ns))
-      {
-        summary.first_event_ns = first_ns;
-      }
-      if (last_ns > summary.last_event_ns)
-      {
-        summary.last_event_ns = last_ns;
-      }
-
-      // Index status
-      if (header.hasIndex())
-      {
-        ++summary.segments_with_index;
-      }
-      else
-      {
-        ++summary.segments_without_index;
-      }
-    }
-    std::fclose(f);
-  }
-
-  return summary;
+  BinaryLogReader reader(ReaderConfig{.data_dir = data_dir});
+  return reader.summary();
 }
 
 DatasetSummary BinaryLogReader::inspectWithSymbols(const std::filesystem::path& data_dir)
@@ -2345,42 +2478,60 @@ DatasetSummary BinaryLogReader::inspectWithSymbols(const std::filesystem::path& 
   // First get basic info
   DatasetSummary summary = inspect(data_dir);
 
-  // Then scan all events to collect symbols
+  // Then walk every event to collect symbols. The walk sees every timestamp
+  // as well, so the time range it reports is the exact one whatever the
+  // segments' flags.
   ReaderConfig config{.data_dir = data_dir, .verify_crc = false};  // Skip CRC for speed
   BinaryLogReader reader(std::move(config));
 
-  reader.forEach([&summary](const ReplayEvent& event)
-                 {
-    uint32_t symbol_id = event.symbolId();
-    summary.symbols.insert(symbol_id);
-    return true; });
+  int64_t first = 0;
+  int64_t last = 0;
+  reader.forEach(
+      [&](const ReplayEvent& event)
+      {
+        summary.symbols.insert(event.symbolId());
+        if (event.timestamp_ns > 0)
+        {
+          first = first == 0 ? event.timestamp_ns : std::min(first, event.timestamp_ns);
+          last = std::max(last, event.timestamp_ns);
+        }
+        return true;
+      });
+  if (last > 0)
+  {
+    summary.first_event_ns = first;
+    summary.last_event_ns = last;
+  }
 
   return summary;
 }
 
-DatasetSummary BinaryLogReader::summary()
+DatasetSummary BinaryLogReader::summary() const
 {
   ensureScanned();
 
   DatasetSummary result;
   result.data_dir = _config.data_dir;
 
-  for (const auto& segment : _segments)
+  const auto& spans = segmentSpans();
+  for (size_t i = 0; i < _segments.size(); ++i)
   {
+    const auto& segment = _segments[i];
+    const int64_t first = spans[i].first_ns;
+    const int64_t last = spans[i].last_ns;
     ++result.segment_count;
     result.total_events += segment.event_count;
 
     // Update time range. A segment whose first timestamp is still unknown
     // (zero) would otherwise pull the dataset's start back to 1970 and make
     // every duration computed off the summary meaningless.
-    if (segment.first_event_ns > 0 &&
-        (result.first_event_ns == 0 || segment.first_event_ns < result.first_event_ns))
+    if (first > 0 && (result.first_event_ns == 0 || first < result.first_event_ns))
     {
-      result.first_event_ns = segment.first_event_ns;
+      result.first_event_ns = first;
     }
-    if (segment.last_event_ns > result.last_event_ns)
+    if (last > result.last_event_ns)
     {
-      result.last_event_ns = segment.last_event_ns;
+      result.last_event_ns = last;
     }
 
     // Index status

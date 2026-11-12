@@ -15514,6 +15514,11 @@
         },
         {
           "kind": "method",
+          "name": "overlappingRuns",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
           "name": "passesFilter",
           "parent": "BinaryLogReader"
         },
@@ -15565,6 +15570,11 @@
         {
           "kind": "method",
           "name": "segmentOutsideRange",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
+          "name": "segmentSpans",
           "parent": "BinaryLogReader"
         },
         {
@@ -22646,6 +22656,11 @@
           "kind": "method",
           "name": "step",
           "parent": "POVExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "addSegmentStats",
+          "parent": "ParallelReader"
         },
         {
           "kind": "method",

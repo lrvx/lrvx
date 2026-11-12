@@ -40,6 +40,10 @@ struct ManifestHeader
 struct ManifestSegmentEntry
 {
   char filename[256];
+  // The segment's earliest and latest non-zero event. build() takes them from
+  // a walk of every event, so they are exact whatever the segment's flags; a
+  // manifest saved by an older build holds the header's first and last event
+  // written instead.
   int64_t first_event_ns{0};
   int64_t last_event_ns{0};
   uint64_t event_count{0};

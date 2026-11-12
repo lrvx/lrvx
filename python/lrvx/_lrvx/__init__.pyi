@@ -572,9 +572,9 @@ class DEMA:
     def value(self) -> float | None:
         ...
 class DataReader:
-    def __init__(self, data_dir: str, from_ns: typing.Any = None, to_ns: typing.Any = None, symbols: typing.Any = None, reorder_window_ns: typing.Any = None, strict_ordering: bool = False, order_segments_by_time: bool = True) -> None:
+    def __init__(self, data_dir: str, from_ns: typing.Any = None, to_ns: typing.Any = None, symbols: typing.Any = None, reorder_window_ns: typing.Any = None, strict_ordering: bool = False, order_segments_by_time: bool = True, skip_segments_by_time: bool = True) -> None:
         """
-        Create a DataReader for a binary log data directory. `reorder_window_ns` controls the bounded reorder buffer applied to segments without the Sorted flag (default 10s). An event that arrives past that window is dropped and counted in stats()['late_dropped'], with one warning logged per segment; set `strict_ordering=True` to raise LrvxError E_DATA_002 on the first such event instead. `to_ns` is inclusive for trade reads and exclusive for option-quote reads -- see read_option_quotes. Segments are read in time order of their first event, and Sorted segments whose ranges overlap are merged event by event; `order_segments_by_time=False` reads them in file-name order.
+        Create a DataReader for a binary log data directory. `reorder_window_ns` controls the bounded reorder buffer applied to segments without the Sorted flag (default 10s). An event that arrives past that window is dropped and counted in stats()['late_dropped'], with one warning logged per segment; set `strict_ordering=True` to raise LrvxError E_DATA_002 on the first such event instead. `to_ns` is inclusive for trade reads and exclusive for option-quote reads -- see read_option_quotes. Segments are read in time order of their first event, and Sorted segments whose ranges overlap are merged event by event; `order_segments_by_time=False` reads them in file-name order. With `from_ns` or `to_ns` set, segments whose proven time bounds lie outside the range are not decoded; `skip_segments_by_time=False` decodes every segment (the events delivered are the same).
         """
     def count(self) -> int:
         """
@@ -610,7 +610,7 @@ class DataReader:
         """
     def run(self, aggregators: list, n_threads: typing.SupportsInt | typing.SupportsIndex = 0, progress_callback: typing.Any = None, progress_interval_ms: typing.SupportsInt | typing.SupportsIndex = 1000) -> bool:
         """
-        Run a panel of streaming aggregators over the tape in a single decompression pass. Each aggregator's onEvent fires once per event, then finalize() fires once at the end. An empty list is a no-op (no decompression). GIL released for the whole walk. n_threads=0 (default) is auto, resolved to min(blocks_per_segment/2, hardware_concurrency); n_threads=1 forces explicit single-thread; n_threads>1 partitions each segment at the compressed-block level via IAggregator::cloneEmpty()/merge() and is capped to the effective block count. progress_callback, when set, fires inside the run loop at most once per progress_interval_ms with (pct: float in [0,1], cursor_ts_ns: int). Return False to cancel; raising stops the run and re-raises after finalize. Progress is reported only on the single-thread path (n_threads=1); multi-thread runs ignore the callback because per-event GIL re-acquisition would defeat the parallelism.
+        Run a panel of streaming aggregators over the tape in a single decompression pass. Each aggregator's onEvent fires once per event, then finalize() fires once at the end. An empty list is a no-op (no decompression). GIL released for the whole walk. n_threads=0 (default) is auto, resolved to min(blocks_per_segment/2, hardware_concurrency); n_threads=1 forces explicit single-thread; n_threads>1 partitions each segment at the compressed-block level via IAggregator::cloneEmpty()/merge() and is capped to the effective block count. Every thread count delivers in time order wherever n_threads=1 does: Sorted segments whose ranges overlap are merged event by event on one thread, and only the rest is partitioned. progress_callback, when set, fires inside the run loop at most once per progress_interval_ms with (pct: float in [0,1], cursor_ts_ns: int). Return False to cancel; raising stops the run and re-raises after finalize. Progress is reported only on the single-thread path (n_threads=1); multi-thread runs ignore the callback because per-event GIL re-acquisition would defeat the parallelism.
         """
     def segment_files(self) -> list:
         """
@@ -626,7 +626,7 @@ class DataReader:
         """
     def summary(self) -> dict:
         """
-        Return a dict summarizing the dataset
+        Return a dict summarizing the dataset. first_event_ns and last_event_ns are the earliest and latest event of every Sorted segment (exact; a compressed one costs one block read); a segment without the Sorted flag contributes the first and last event it wrote, which need not be its extremes.
         """
     def symbols(self) -> set:
         """
@@ -634,7 +634,7 @@ class DataReader:
         """
     def time_range(self) -> typing.Any:
         """
-        Return (start_ns, end_ns) tuple or None
+        Return (start_ns, end_ns) or None: the earliest and latest non-zero event timestamp, exact for Sorted segments; a segment without the Sorted flag contributes the first and last event it wrote. Same values as summary().
         """
 class DataWriter:
     def __init__(self, output_dir: str, max_segment_mb: typing.SupportsInt | typing.SupportsIndex = 256, exchange_id: typing.SupportsInt | typing.SupportsIndex = 0, compression: str = 'none') -> None:

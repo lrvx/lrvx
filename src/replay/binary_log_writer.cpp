@@ -320,10 +320,14 @@ bool BinaryLogWriter::writeFrameToBlock(EventType type, const void* payload, siz
     // recovery all see the file, and none of them can know the uncompressed
     // size. The overshoot is therefore at most one block plus the index the
     // closing segment appends.
+    //
+    // The next segment is opened by the next event (every write path calls
+    // ensureOpen first), not here: opening it here left a segment with no
+    // events behind whenever a recording's last event completed the block
+    // that crossed the bound.
     if (_segment_bytes >= _config.max_segment_bytes)
     {
       closeInternal();
-      return ensureOpen();
     }
   }
 

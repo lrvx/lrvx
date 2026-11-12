@@ -79,22 +79,50 @@ SegmentManifest SegmentManifest::build(const std::filesystem::path& data_dir)
   SegmentManifest manifest;
   manifest._data_dir = data_dir;
 
-  // Use BinaryLogReader to scan
   ReaderConfig config{.data_dir = data_dir};
   BinaryLogReader reader(config);
+  const DatasetSummary summary = reader.summary();
 
-  // Force scanning by calling summary()
-  reader.summary();
-
-  // Get summary with symbols
-  auto summary = BinaryLogReader::inspectWithSymbols(data_dir);
-
+  // Every event is walked once, segment by segment, for the symbol set. The
+  // same walk gives each segment its earliest and latest event, which is what
+  // segmentsInRange and the Partitioner take first/last_event_ns for: the
+  // header records the first and last event written, and on a compressed or
+  // unsorted segment those are not its extremes.
   manifest._segments = reader.segments();
-  manifest._symbols = summary.symbols;
+  int64_t first_ts = 0;
+  int64_t last_ts = 0;
+  for (auto& seg : manifest._segments)
+  {
+    BinaryLogIterator iter(seg.path);
+    if (!iter.isValid())
+    {
+      continue;
+    }
+    int64_t seg_first = 0;
+    int64_t seg_last = 0;
+    ReplayEvent event;
+    while (iter.next(event))
+    {
+      manifest._symbols.insert(event.symbolId());
+      if (event.timestamp_ns > 0)
+      {
+        seg_first = seg_first == 0 ? event.timestamp_ns : std::min(seg_first, event.timestamp_ns);
+        seg_last = std::max(seg_last, event.timestamp_ns);
+      }
+    }
+    if (seg_last > 0)
+    {
+      seg.first_event_ns = seg_first;
+      seg.last_event_ns = seg_last;
+      first_ts = first_ts == 0 ? seg_first : std::min(first_ts, seg_first);
+      last_ts = std::max(last_ts, seg_last);
+    }
+  }
+
   manifest._total_events = summary.total_events;
   manifest._total_bytes = summary.total_bytes;
-  manifest._first_ts = summary.first_event_ns;
-  manifest._last_ts = summary.last_event_ns;
+  manifest._first_ts = first_ts;
+  manifest._last_ts = last_ts;
   manifest._build_time = std::filesystem::file_time_type::clock::now();
 
   // Sort segments by timestamp

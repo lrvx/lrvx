@@ -43,9 +43,10 @@ struct ParallelReaderStats
   uint64_t events_read{0};
   uint64_t trades_read{0};
   uint64_t book_updates_read{0};
-  // Same definition as ReaderStats::bytes_read.
+  // Same definitions as the ReaderStats fields of the same names.
   uint64_t bytes_read{0};
   uint64_t crc_errors{0};
+  uint64_t unknown_frames_skipped{0};
 
   int64_t start_time_ns{0};
   int64_t end_time_ns{0};
@@ -78,6 +79,9 @@ struct SegmentBuffer
   size_t current_index{0};
   // Event-data bytes read from the segment file (BinaryLogIterator::bytesConsumed).
   uint64_t bytes_read{0};
+  // Frames the iterator skipped: payload CRC mismatch, unknown record type.
+  uint64_t crc_errors{0};
+  uint64_t unknown_frames_skipped{0};
 
   bool empty() const { return current_index >= events.size(); }
   const ReplayEvent& front() const { return events[current_index]; }
@@ -114,6 +118,9 @@ class ParallelReader
   std::unique_ptr<SegmentBuffer> readSegment(const SegmentInfo& segment);
   void mergeBuffers(std::vector<std::unique_ptr<SegmentBuffer>>& buffers, const EventCallback& callback);
   bool passesFilter(const ReplayEvent& event) const;
+  // Adds one segment read to _stats: the segment, its bytes and skipped
+  // frames, and the events it delivered.
+  void addSegmentStats(const SegmentBuffer& buffer);
 
   ParallelReaderConfig _config;
   uint32_t _num_threads;

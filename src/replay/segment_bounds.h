@@ -72,4 +72,24 @@ struct IndexWindow
 std::optional<IndexWindow> indexWindow(std::span<const IndexEntry> idx, const SegmentHeader& hdr,
                                        int64_t from, int64_t to);
 
+// Earliest and latest non-zero exchange_ts_ns of a segment, for reporting
+// (time ranges, summaries), not for pruning. `exact` says whether they are the
+// segment's real extremes:
+//   - uncompressed Sorted: the header's first/last_event_ns, exact, free;
+//   - compressed Sorted with a usable index: the first index entry (the
+//     smallest block minimum) and the maximum of the last block, exact, at the
+//     cost of reading the index and decompressing that one block;
+//   - anything else (no Sorted flag, no usable index, no events): the first
+//     and last event the segment wrote, from its header or the recovery scan,
+//     not exact. Finding the extremes there takes a walk of the whole segment.
+// Defined in binary_log_reader.cpp.
+struct SegmentSpan
+{
+  int64_t first_ns{0};
+  int64_t last_ns{0};
+  bool exact{false};
+};
+
+SegmentSpan segmentSpan(const SegmentInfo& segment);
+
 }  // namespace lrvx::replay::detail

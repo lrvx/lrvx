@@ -21,9 +21,20 @@ my-tape.lrvx/
 
 Segment files are named `<created_ns>.lrvx`, where `created_ns` is the wall-clock nanosecond timestamp at which the writer opened the segment. A custom rotation callback can override the naming. There is **no** per-type split: trades, book snapshots, book deltas and the side-channel record types all live interleaved in the same frame stream, ordered by timestamp.
 
-Segments named `<created_ns>.floxlog`, the extension tapes recorded under the FLOX name carry, are segments too: every directory scan (reader, inspector, validator, manifest, index builder, merge, `lrvx tape view`) accepts both extensions, so a directory mixing `.floxlog` and `.lrvx` segments reads as one tape in filename order. Writers always produce `.lrvx`.
+Segments named `<created_ns>.floxlog`, the extension tapes recorded under the FLOX name carry, are segments too: every directory scan (reader, inspector, validator, manifest, index builder, merge, `lrvx tape view`) accepts both extensions, so a directory mixing `.floxlog` and `.lrvx` segments reads as one tape. The extension plays no part in the order: segments are listed by file name and read by time wherever their bounds prove it (see [Read order](#read-order)). Writers always produce `.lrvx`.
 
-A writer rotates when the segment reaches its size bound, measured on the bytes written to the file. An uncompressed segment rotates between frames; a compressed one rotates between blocks, since a block is the unit the reader decompresses. A segment may therefore overshoot the bound by at most one block plus the index appended when it closes.
+A writer rotates when the segment reaches its size bound, measured on the bytes written to the file. An uncompressed segment rotates between frames; a compressed one rotates between blocks, since a block is the unit the reader decompresses. A segment may therefore overshoot the bound by at most one block plus the index appended when it closes. The next segment is opened by the next event, so a writer closes no segment without events. (Compressed writers before this rule opened the next segment as soon as a block crossed the bound, and left a header-only segment behind when the recording's last event completed that block. Readers and tools treat such a segment, like one a writer was killed in before its first frame, as holding nothing.)
+
+### Read order
+
+Readers list a directory's segments by file name, which for writer-named segments is the order they were opened, and deliver them in time order wherever a segment proves where its events lie:
+
+* A `Sorted` segment proves its first event: an uncompressed one by its first frame, a compressed one by the smallest entry of its block index (a compressed `Sorted` segment without a usable index proves nothing).
+* Segments that prove their first event are read in that order, and those whose ranges overlap are merged event by event, ties going to the file name that sorts first.
+* A segment that proves nothing (no `Sorted` flag, still being written, no usable index) keeps its file-name position, and the ordering resumes after it. Its own events are put in order by the reader (whole-segment sort or the bounded reorder buffer).
+* A segment with no events takes no position at all.
+
+A tape recorded in order therefore reads exactly as in file-name order. Readers expose the plain file-name order as an option (`order_segments_by_time = false`).
 
 Segments are independently parseable; both sidecars are conveniences, not requirements.
 
@@ -217,8 +228,8 @@ A header whose `magic` or `version` does not match is treated as absent; the rea
 | Size | Field | Notes |
 |---:|---|---|
 | 256 | `filename[256]` | NUL-padded, relative to the tape directory. |
-| 8 | `first_event_ns` | |
-| 8 | `last_event_ns` | |
+| 8 | `first_event_ns` | Earliest non-zero `exchange_ts_ns` in the segment. |
+| 8 | `last_event_ns` | Latest `exchange_ts_ns` in the segment. Builders before this revision copied both from the segment header (first and last event written), which on a compressed or unsorted segment are not the extremes; rebuild the manifest to get exact values. |
 | 8 | `event_count` | |
 | 8 | `file_size` | |
 | 4 | `flags` | `0x01` = segment has an index, `0x02` = segment is compressed. |

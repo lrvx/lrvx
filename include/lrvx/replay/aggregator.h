@@ -42,6 +42,8 @@ class IAggregator
   virtual ~IAggregator() = default;
 
   // Called once per ReplayEvent in (exchange_ts_ns, segment-order) order.
+  // On a partitioned run(panel, n) each clone is called for a contiguous
+  // slice of one segment, in that order (see BinaryLogReader::run).
   // The event reference is only valid for the duration of the call.
   virtual void onEvent(const ReplayEvent& ev) = 0;
 

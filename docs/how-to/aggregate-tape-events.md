@@ -187,6 +187,8 @@ reader.run(panel)                # default n_threads=0 → auto
 
 Partitioning is intra-segment at the compressed-block level. Each worker holds its own panel, cloned from the caller's via `IAggregator::cloneEmpty()`, and walks its assigned block range; results merge into the caller's originals via `IAggregator::merge()` before `finalize()`. Captures with one large active segment (md_collector style) benefit from this layout; segment-level partitioning would leave workers idle when one segment dominates.
 
+Every thread count delivers events in the order `n_threads=1` does. `Sorted` segments whose time ranges overlap (two captures of one window, an archive import that overlaps a recording) are merged event by event on the calling thread and fed to the caller's aggregators directly; only the remaining segments are partitioned. A tape recorded in order has no such segments and is partitioned in full. See [BinaryLogReader, Ordering guarantee](../reference/api/replay/binary_log_reader.md#ordering-guarantee).
+
 Aggregators with associative state (`EventTypeStats`, `BinCount`, `VolumeBin`, `Quantile`) produce identical results between single-thread and parallel runs.
 
 `BookSnapshotBinAggregator` cannot run partitioned at all. Book reconstruction is order-dependent across the whole tape: a worker that starts mid-stream would apply deltas to a ladder whose snapshot it never saw. `cloneEmpty()` and `merge()` therefore throw, and a parallel run fails with "book reconstruction is order-dependent across the whole tape". Pass `n_threads=1`.

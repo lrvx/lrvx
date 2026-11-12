@@ -81,9 +81,9 @@ public:
 | `count()`          | Returns total event count across all segments            |
 | `forEach()`        | Iterate all events matching filters                      |
 | `forEachFrom()`    | Iterate events starting from a timestamp                 |
-| `setProgressCallback()` | Install a progress callback, invoked at most once per `interval`. Return `false` from it to cancel; `forEach` then returns `false` |
+| `setProgressCallback()` | Install a progress callback for `run(aggregators, 1)`, invoked at most once per `interval` with the fraction of events delivered and the timestamp of the last event delivered. A run that completes ends with one more call at `1.0` and that same timestamp. Return `false` from it to cancel; `run` then returns `false` |
 | `clearProgressCallback()` | Remove the progress callback                        |
-| `timeRange()`      | Returns (first_event_ns, last_event_ns) pair             |
+| `timeRange()`      | Returns the earliest and latest event timestamp; see [Reported time range](#reported-time-range) |
 | `stats()`          | Returns read statistics (events, bytes, errors)          |
 | `segmentFiles()`   | Returns segment file paths in file-name order            |
 | `segments()`       | Returns detailed segment information                     |
@@ -118,6 +118,33 @@ struct DatasetSummary
   bool fullyIndexed() const;
 };
 ```
+
+#### Reported time range
+
+`first_event_ns` / `last_event_ns` of `summary()` and `inspect()`, and the
+pair `timeRange()` returns, are the earliest and latest non-zero
+`exchange_ts_ns` over the segments, taken per segment as cheaply as the
+segment allows:
+
+* **Uncompressed segment flagged `Sorted`:** its header, which is exact (its
+  events are in non-decreasing order). No extra I/O.
+* **Compressed segment flagged `Sorted`, with a usable index:** the first
+  index entry (the smallest block minimum) and the maximum of its last block,
+  which is exact. Costs reading the index and decompressing that one block,
+  once per segment per reader.
+* **Any other segment** (no `Sorted` flag, no usable index): the first and
+  last event it *wrote*, from its header (or recovered from its blocks while
+  the header is still zero). Arrival order, not its extremes: those would take
+  a walk of the whole segment.
+
+So on a tape whose segments are all `Sorted` the range is exact. A segment
+header's own `first_event_ns` / `last_event_ns` (what `SegmentInfo` carries)
+are always the first and last event written, which on a compressed segment can
+sit inside the segment's range, because the writer sorts each block before
+writing it.
+
+`inspectWithSymbols()` walks every event to collect the symbols, and reports
+the exact range from that walk whatever the segments' flags.
 
 ### ReplayEvent
 
@@ -154,15 +181,30 @@ Read the symbol through `symbolId()` rather than reaching into a per-type record
 ```cpp
 struct ReaderStats
 {
-  uint64_t files_read{0};        // segments decoded, wholly or in part
-  uint64_t segments_skipped{0};  // segments not decoded: outside [from_ns, to_ns]
+  uint64_t files_read{0};             // segments decoded, wholly or in part
+  uint64_t segments_skipped{0};       // segments not decoded: outside [from_ns, to_ns]
   uint64_t events_read{0};
   uint64_t trades_read{0};
   uint64_t book_updates_read{0};
-  uint64_t bytes_read{0};        // event-data bytes read from segment files
-  uint64_t crc_errors{0};
+  uint64_t bytes_read{0};             // event-data bytes read from segment files
+  uint64_t crc_errors{0};             // frames skipped: CRC mismatch or unparseable payload
+  uint64_t late_dropped{0};           // events past reorder_window_ns, dropped
+  uint64_t unknown_frames_skipped{0}; // frames of a record type this build does not know
+  uint64_t segments_reordered{0};     // see Ordering guarantee
+  uint64_t segments_interleaved{0};   // see Ordering guarantee
 };
 ```
+
+A frame whose payload does not match its CRC is skipped and counted in
+`crc_errors`, and the read goes on with the next frame; nothing is thrown. A
+frame of a known type whose payload is too short to parse is counted the same
+way. A frame of a type this build does not know is stepped over by its length
+and counted in `unknown_frames_skipped`. Two faults end the segment instead,
+silently, since no next frame can be found: on an uncompressed segment a frame
+length above 10 MiB (counted in `crc_errors`), and on a compressed segment a
+block that fails to decompress or carries an invalid header. The CRC is
+checked on every read; `ReaderConfig::verify_crc` is not consulted by these
+readers. Every read path counts these, at any thread count.
 
 `bytes_read` counts the segment-file bytes a read consumed as event data:
 every frame (header and payload) of an uncompressed segment, every block
@@ -318,7 +360,14 @@ Either way, events sharing a timestamp keep the order they have in the segment.
 
 Nothing orders such a segment against the runs around it. If an unsorted segment or a later run starts before the previous run ends, time steps back at that boundary. A live recording by one writer is not affected: the segment still being written is the newest file and holds the newest events, so it stays last.
 
-`run(aggregators, n)` with more than one thread visits segments in the same order, but partitions each segment across workers and merges their panels. Overlapping segments are not interleaved there, any more than one segment's blocks are.
+`run(aggregators, n)` with more than one thread (and `n = 0`, the default, which picks the thread count) visits segments in the same order and delivers in the same order guarantee as `run(aggregators, 1)`:
+
+* A run of `Sorted` segments whose ranges overlap is merged event by event, on the calling thread, straight into the caller's aggregators, as `run(aggregators, 1)` merges it. Overlap is judged on proven bounds: a segment overlaps when its first event lies strictly before the latest event of the segments before it in the run (exact for every `Sorted` segment; costs one block read per compressed one). Segments that only touch, the last event of one stamped like the first of the next, are not merged.
+* Every other segment is partitioned: its blocks are split into contiguous ranges, one per worker, each worker feeds a clone of the panel (`IAggregator::cloneEmpty`) its range in time order, and the clones are merged into the caller's aggregators (`IAggregator::merge`) before the next segment. A segment with fewer than two blocks per worker, and any uncompressed segment, is read on the calling thread.
+
+So every aggregator instance sees its events in non-decreasing time order wherever `run(aggregators, 1)` delivers them that way, and the caller's instances receive the clones' partial results in time order of their slices. A tape recorded in order has no overlapping run and is partitioned exactly as before. What partitioning still changes is documented at `IAggregator::merge`: a sliding-window aggregator does not see windows that straddle a slice boundary.
+
+A segment holding no events (left by a writer killed right after opening it, or by an older compressed writer that rotated on its last block) takes no place in the order: it sits in the run around it, at its file-name position, and neither ends nor splits it.
 
 `stats().segments_reordered` counts the segments visited at a different position than their file name gives them. `stats().segments_interleaved` counts the segments whose events were merged with another segment's. `order_segments_by_time = false` restores plain file-name order. `segmentsInReadOrder()` lists the segments in the order they are visited; `segments()` keeps file-name order.
 
