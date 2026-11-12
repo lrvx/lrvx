@@ -723,6 +723,14 @@ limits during volatility without a restart:
 | Fat finger | `maxOrderQty`, `maxOrderNotional` | `setFatFinger` |
 | LULD volatility band | `luldBps`, `luldHaltNs` | `setLuldBps` |
 
+The reason names the rule that failed: a price off the tick grid is
+`TickSizeViolation`, a size off the lot is `LotSizeViolation`, a price outside
+the collar is `InvalidPrice`, and a zero or below-minimum size is
+`InvalidQuantity`. A conditional order is held to the same tick, lot and
+collar on its trigger price (and, for a stop-limit or take-profit-limit, on
+its limit price) and refused with the same reasons, so a client that rounds an
+off-grid limit and resends it can treat an off-grid stop the same way.
+
 `maxOrderNotional` is measured at the symbol's own `priceScale`/`qtyScale`,
 the same arithmetic reservations, margin and fees use, so the gate means the
 same thing on every instrument. Reading the two raws under the compile-time

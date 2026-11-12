@@ -167,7 +167,7 @@ TEST(EngineCredit, ConditionalTriggerObeysTickLotAndBand)
 
   NewOrder offTick = ok;
   offTick.triggerPrice = Price::fromRaw(Price::fromDouble(100.0).raw() + 1);
-  EXPECT_EQ(c.validateConditional(offTick, cfg), RejectReason::InvalidPrice);
+  EXPECT_EQ(c.validateConditional(offTick, cfg), RejectReason::TickSizeViolation);
 
   NewOrder outOfBand = ok;
   outOfBand.triggerPrice = Price::fromDouble(200.0);
@@ -175,7 +175,7 @@ TEST(EngineCredit, ConditionalTriggerObeysTickLotAndBand)
 
   NewOrder subLot = ok;
   subLot.quantity = Quantity::fromRaw(Quantity::fromDouble(0.001).raw() / 2);
-  EXPECT_EQ(c.validateConditional(subLot, cfg), RejectReason::InvalidQuantity);
+  EXPECT_EQ(c.validateConditional(subLot, cfg), RejectReason::LotSizeViolation);
 
   NewOrder zero = ok;
   zero.quantity = Quantity::fromRaw(0);
@@ -186,6 +186,8 @@ TEST(EngineCredit, ConditionalTriggerObeysTickLotAndBand)
   stopLimit.type = OrderType::STOP_LIMIT;
   stopLimit.price = Price::fromDouble(200.0);
   EXPECT_EQ(c.validateConditional(stopLimit, cfg), RejectReason::InvalidPrice);
+  stopLimit.price = Price::fromRaw(Price::fromDouble(101.0).raw() + 1);
+  EXPECT_EQ(c.validateConditional(stopLimit, cfg), RejectReason::TickSizeViolation);
   stopLimit.price = Price::fromDouble(101.0);
   EXPECT_EQ(c.validateConditional(stopLimit, cfg), RejectReason::None);
 }
