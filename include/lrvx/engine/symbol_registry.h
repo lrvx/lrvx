@@ -10,9 +10,11 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <expected>
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
@@ -96,6 +98,80 @@ inline std::expected<void, std::string> validateSymbolScale(const SymbolInfo& in
   return {};
 }
 
+// What SymbolRegistry::applyVenueTick did to an existing entry.
+enum class VenueTickOutcome : uint8_t
+{
+  // The entry's tick was not declared; it now holds the venue's, known.
+  Applied,
+  // The entry already declares the venue's tick.
+  Unchanged,
+  // The entry declares a different tick. It keeps it: a declared tick is the
+  // caller's, and only the caller changes it.
+  Conflict,
+  // No entry has this id.
+  UnknownSymbol,
+  // The venue tick is not positive; nothing changed.
+  InvalidTick,
+};
+
+struct VenueTickResult
+{
+  VenueTickOutcome outcome{VenueTickOutcome::UnknownSymbol};
+  // The tick the entry holds after the call (zero for UnknownSymbol).
+  Price heldTick{};
+};
+
+// The venue ticks applyVenueTick wrote into existing entries, for whoever
+// copied an entry before the venue's tick was known. A Strategy sizes each
+// symbol's book on the tick it read in its constructor, usually before any
+// connector has started; it holds this log, not the registry, so the registry
+// does not have to outlive it, and on its next event for a symbol it re-sizes
+// that book when the revision moved.
+class VenueTickLog
+{
+ public:
+  // Bumped on every applied tick and on clear(). An acquire load: a reader
+  // that sees the new revision sees the tick written before it.
+  uint64_t revision() const noexcept { return _revision.load(std::memory_order_acquire); }
+
+  // The venue tick applied to this symbol, if one was.
+  std::optional<Price> tickFor(SymbolId id) const
+  {
+    std::lock_guard lock(_mutex);
+    auto it = _ticks.find(id);
+    if (it == _ticks.end())
+    {
+      return std::nullopt;
+    }
+    return it->second;
+  }
+
+ private:
+  friend class SymbolRegistry;
+
+  void record(SymbolId id, Price tick)
+  {
+    {
+      std::lock_guard lock(_mutex);
+      _ticks[id] = tick;
+    }
+    _revision.fetch_add(1, std::memory_order_release);
+  }
+
+  void reset()
+  {
+    {
+      std::lock_guard lock(_mutex);
+      _ticks.clear();
+    }
+    _revision.fetch_add(1, std::memory_order_release);
+  }
+
+  std::atomic<uint64_t> _revision{0};
+  mutable std::mutex _mutex;
+  std::unordered_map<SymbolId, Price> _ticks;
+};
+
 class SymbolRegistry : public ISubsystem
 {
  public:
@@ -141,6 +217,21 @@ class SymbolRegistry : public ISubsystem
                                       const std::string& symbol) const;
   std::optional<SymbolInfo> getSymbolInfo(SymbolId id) const;
   std::pair<std::string, std::string> getSymbolName(SymbolId id) const;
+
+  // Writes a venue's price tick into an entry registered before the venue's
+  // instrument info was read (a connector calls it from start()). Only
+  // tickSize and tickSizeKnown can change, and only when the entry's tick is
+  // not declared (see orderTickRaw in execution/order_price_rule.h: neither
+  // tickSizeKnown nor a value other than the 0.01 default). The id, names,
+  // type, scales and everything else stay as registered, since consumers
+  // index by them. A declared tick is never overwritten: a different venue
+  // tick is reported as Conflict and the entry keeps the caller's value.
+  // Atomic with respect to every other registry call; an applied tick is
+  // recorded in venueTickLog().
+  VenueTickResult applyVenueTick(SymbolId id, Price venueTick);
+
+  // Shared, so a holder may outlive the registry.
+  std::shared_ptr<const VenueTickLog> venueTickLog() const noexcept { return _venueTicks; }
 
   // Symbol registration (ExchangeId-based API)
   SymbolId registerSymbol(ExchangeId exchange, std::string_view symbol);
@@ -199,6 +290,8 @@ class SymbolRegistry : public ISubsystem
   // [sym * kMaxEquivalentsPerSymbol ... (sym+1) * kMaxEquivalentsPerSymbol)
   std::vector<SymbolId> _equivalents;
   std::vector<uint8_t> _equivalentCounts;
+
+  std::shared_ptr<VenueTickLog> _venueTicks{std::make_shared<VenueTickLog>()};
 };
 
 }  // namespace lrvx

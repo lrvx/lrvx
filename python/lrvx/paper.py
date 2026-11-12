@@ -1,30 +1,38 @@
 """Paper / sandbox trading mode — drive a strategy against a live
-market data feed but route orders to ``lrvx.SimulatedExecutor``
-instead of a real exchange.
+market data feed with orders filled by the backtest's simulator instead
+of a real exchange.
 
-The recipe is the same one a backtest uses for fills, applied to a
-live source. Slippage and queue position behave the same as in
-backtest, so a strategy that looks plausible in backtest can be
-rehearsed against current market conditions before any real capital
-is at stake.
+Paper mode is a backtest run fed live. The broker owns an
+``lrvx.BacktestRunner`` and opens a live session on it: each trade or
+book snapshot you observe goes where a tick replay (``run_tape``) sends
+it — the runner's clock, the built-in ``SimulatedExecutor``, then the
+strategy. So paper mode has the backtest's semantics, not an
+approximation of them:
 
-Wiring:
+* every order type the simulator supports is routed (market, limit,
+  stop / take-profit market and limit, trailing stops, modify, cancel,
+  cancel-all, OCO), through the same pre-trade gate;
+* order events reach the strategy through the same callbacks with the
+  same fields and in the same order (``on_order_update``, ``on_fill``,
+  ``on_queue_position_change``, ``on_market_position_change``), after
+  the runner's position tracker has seen them, so ``ctx.position``
+  inside ``on_fill`` is the position after the fill, as in a backtest;
+* the registry's ticks are applied: an order priced off a declared tick
+  is rejected with ``price_off_tick`` / ``trigger_off_tick`` /
+  ``trailing_offset_off_tick``.
 
-    market data (ccxt) ──► runner.on_trade ──► SimulatedExecutor
-                                                 │
-                                                 ▼
-                                              fills
-                                                 │
-              strategy.on_order_update ◄─── on_fill callback
+Wiring::
 
-The ``PaperBroker`` does the teeing: every trade the runner sees is
-also fed into the simulator so its queue tracker stays current. Limit
-fills, stop triggers, slippage, and TIF rules are all handled by
-``SimulatedExecutor`` — the broker is a thin transport.
+    your feed ──► broker.observe_trade ──► runner clock ─► SimulatedExecutor ─► strategy
+                                                              │
+    strategy ──► signal ──► BacktestRunner.onSignal ──► SimulatedExecutor
+                                                              │
+                       position tracker ◄── order events ◄────┘
+                              │
+                              └─► strategy.on_order_update / on_fill
 """
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
@@ -39,64 +47,65 @@ class PaperBrokerStats:
     error: Optional[str] = None
 
 
+_SLIPPAGE_MODELS = {"none", "fixed_ticks", "fixed_bps", "volume_impact"}
+
+# Signal types that put an order into the simulator (as opposed to
+# cancel / modify / liquidity, which act on one).
+_ORDER_SIGNALS = {
+    "market", "limit", "stop_market", "stop_limit", "take_profit_market",
+    "take_profit_limit", "trailing_stop", "oco",
+}
+
+
 def _slippage_kwargs(model: str, **params: float) -> dict:
-    """Translate a friendly model name + params dict into the args
-    ``SimulatedExecutor.set_default_slippage`` expects."""
-    allowed = {"none", "fixed_ticks", "fixed_bps", "volume_impact"}
-    if model not in allowed:
+    """Translate a friendly model name + params dict into the
+    ``lrvx.BacktestRunner`` slippage keywords."""
+    if model not in _SLIPPAGE_MODELS:
         raise ValueError(
-            f"slippage model {model!r} not in {sorted(allowed)}"
+            f"slippage model {model!r} not in {sorted(_SLIPPAGE_MODELS)}"
         )
     return {
-        "model": model,
-        "ticks": int(params.get("ticks", 0)),
-        "tick_size": float(params.get("tick_size", 0.0)),
-        "bps": float(params.get("bps", 0.0)),
-        "impact_coeff": float(params.get("impact_coeff", 0.0)),
+        "slippage_model": model,
+        "slippage_ticks": int(params.get("ticks", 0)),
+        "slippage_tick_size": float(params.get("tick_size", 0.0)),
+        "slippage_bps": float(params.get("bps", 0.0)),
+        "slippage_impact_coeff": float(params.get("impact_coeff", 0.0)),
     }
 
 
-_SIDE_BUY = "buy"
-_SIDE_SELL = "sell"
+class _StrategySlot:
+    """``broker.runner``: where the strategy is attached.
 
+    A paper session runs one strategy, as a backtest does: the runner's
+    position tracker and order ids belong to it.
+    """
 
-def _normalize_side(raw: Any) -> str:
-    s = (raw or "").lower()
-    if s in (_SIDE_BUY, _SIDE_SELL):
-        return s
-    raise ValueError(f"unknown side {raw!r}; expected buy / sell")
+    def __init__(self, broker: "PaperBroker") -> None:
+        self._broker = broker
 
-
-def _normalize_order_type(raw: Any) -> str:
-    t = (raw or "").lower()
-    # SimulatedExecutor.submit_order accepts 'market' or 'limit'. Other
-    # signal types are passed through to user post-routing callbacks
-    # so the user can observe / log; only market and limit reach the
-    # simulator in this build.
-    return t
+    def add_strategy(self, strategy: Any) -> None:
+        self._broker.set_strategy(strategy)
 
 
 @dataclass
 class PaperBroker:
-    """Drive a strategy off a live market data source while routing
-    orders to a simulator. Looks like a broker to the runner; routes
-    nothing to a real exchange.
+    """Drive a strategy off a live market data source with orders filled
+    by the backtest's simulator. Routes nothing to a real exchange.
 
-    Pass the same ``Registry`` your strategy uses. The broker creates
-    a ``SimulatedExecutor``, attaches it via the runner's signal
-    callback, and tees observed trades into the simulator's queue
-    tracker. Use ``set_default_slippage`` / ``set_symbol_slippage``
-    to dial fill realism; the defaults are no-slip (model ``none``).
+    Pass the same ``SymbolRegistry`` your strategy uses; its ticks are
+    applied to order prices as in a backtest. Attach the strategy with
+    ``broker.set_strategy(s)`` (or ``broker.runner.add_strategy(s)``),
+    call ``start()``, feed market data with ``observe_trade`` /
+    ``observe_book_snapshot`` from your feed loop, and ``stop()``.
 
-    The broker is intentionally headless — it does not own a market
-    data source. The user wires the source (ccxt, replay, synthetic)
-    and calls ``broker.observe_trade(symbol_id, price, qty, is_buy,
-    ts_ns)`` from inside their feed loop. This keeps the abstraction
-    independent of any one feed library.
+    The broker does not own a market data source: wire ccxt, a replay or
+    a synthetic feed yourself. ``on_signal`` is an optional callback that
+    receives each ``lrvx.Signal`` after the simulator has taken it.
 
-    ``on_signal`` is an optional user callback that fires *after* the
-    simulator has accepted a signal — useful for logging or wiring up
-    your own paper-mode dashboards.
+    ``default_slippage_model`` / ``default_slippage_params`` and
+    ``runner_options`` (any other ``lrvx.BacktestRunner`` keyword, e.g.
+    ``submit_ack_latency_ns``) configure the simulator before
+    ``start()``; ``set_symbol_slippage`` works at any time.
     """
 
     registry: Any
@@ -105,95 +114,109 @@ class PaperBroker:
     # Configurable slippage; default = no slip.
     default_slippage_model: str = "none"
     default_slippage_params: dict = field(default_factory=dict)
+    fee_rate: float = 0.0
+    initial_capital: float = 100_000.0
+    runner_options: dict = field(default_factory=dict)
 
-    # Set after __post_init__.
     _runner: Any = field(default=None, init=False, repr=False)
-    _sim: Any = field(default=None, init=False, repr=False)
-    _next_order_id: int = field(default=1, init=False, repr=False)
+    _strategy: Any = field(default=None, init=False, repr=False)
+    _symbol_slippage: list = field(default_factory=list, init=False, repr=False)
+    _started: bool = field(default=False, init=False, repr=False)
+    _result: Optional[dict] = field(default=None, init=False, repr=False)
     stats: PaperBrokerStats = field(default_factory=PaperBrokerStats, init=False)
 
     def __post_init__(self) -> None:
-        import lrvx
+        # Validated here so a bad model fails at construction.
+        _slippage_kwargs(self.default_slippage_model, **self.default_slippage_params)
 
-        self._sim = lrvx.SimulatedExecutor()
-        self._sim.set_symbol_registry(self.registry)
-        self._sim.set_default_slippage(
-            **_slippage_kwargs(
-                self.default_slippage_model,
-                **self.default_slippage_params,
+    # ── Strategy ──────────────────────────────────────────────────────
+
+    @property
+    def runner(self) -> _StrategySlot:
+        return _StrategySlot(self)
+
+    def set_strategy(self, strategy: Any) -> None:
+        if self._started:
+            raise RuntimeError("PaperBroker.set_strategy: the session has started")
+        if self._strategy is not None and self._strategy is not strategy:
+            raise RuntimeError(
+                "PaperBroker runs one strategy, as a backtest does; run a "
+                "second broker for a second strategy"
             )
-        )
-        # Internal signal callback routes to the simulator first, then
-        # optionally fans out to the user's callback for observability.
-        self._runner = lrvx.Runner(
-            self.registry, on_signal=self._route_signal
-        )
-
-    def _route_signal(self, sig: Any) -> None:
-        """Default runner.on_signal: send orders to the simulator,
-        then call the user's on_signal callback if set."""
-        try:
-            order_type = _normalize_order_type(getattr(sig, "order_type", ""))
-            if order_type in ("market", "limit"):
-                side = _normalize_side(getattr(sig, "side", ""))
-                qty = float(getattr(sig, "quantity", 0.0))
-                price = float(getattr(sig, "price", 0.0))
-                sym = int(getattr(sig, "symbol", 1))
-                order_id = int(getattr(sig, "order_id", 0) or 0)
-                if order_id == 0:
-                    order_id = self._next_order_id
-                    self._next_order_id += 1
-                self._sim.submit_order(
-                    order_id, side, price, qty,
-                    type=order_type, symbol=sym,
-                )
-                self.stats.orders_simulated += 1
-            elif order_type == "cancel":
-                order_id = int(getattr(sig, "order_id", 0) or 0)
-                if order_id:
-                    self._sim.cancel_order(order_id)
-            elif order_type == "cancel_all":
-                sym = int(getattr(sig, "symbol", 0))
-                self._sim.cancel_all(sym)
-            # Other order types (stop/take-profit/trailing) aren't
-            # handled by SimulatedExecutor's submit_order surface.
-            # They fall through to the user callback so they can be
-            # logged / approximated externally.
-        except Exception as exc:  # surface to stats; do not crash runner
-            self.stats.error = f"signal-route failed: {type(exc).__name__}: {exc}"
-        if self.on_signal is not None:
-            self.on_signal(sig)
+        self._strategy = strategy
 
     @property
-    def runner(self) -> Any:
+    def backtest_runner(self) -> Any:
+        """The ``lrvx.BacktestRunner`` the session runs on (after start())."""
         return self._runner
-
-    @property
-    def simulated_executor(self) -> Any:
-        return self._sim
 
     # ── Lifecycle ─────────────────────────────────────────────────────
 
     def start(self) -> None:
-        self._runner.start()
+        import lrvx
 
-    def stop(self) -> None:
-        self._runner.stop()
+        if self._started:
+            raise RuntimeError("PaperBroker.start: already started")
+        if self._strategy is None:
+            raise RuntimeError("PaperBroker.start: attach a strategy first")
+        kwargs = dict(self.runner_options)
+        kwargs.update(
+            _slippage_kwargs(self.default_slippage_model, **self.default_slippage_params)
+        )
+        self._runner = lrvx.BacktestRunner(
+            self.registry, self.fee_rate, self.initial_capital, **kwargs
+        )
+        for args in self._symbol_slippage:
+            self._runner.set_symbol_slippage(*args)
+        self._runner.set_strategy(self._strategy)
+        self._runner.begin_session(self._route_signal)
+        self._started = True
+
+    def stop(self) -> Optional[dict]:
+        """End the session; returns its stats dict (``run_tape``'s shape)."""
+        if not self._started or not self._runner.session_open:
+            return self._result
+        self._result = self._runner.end_session()
+        self.stats.fills_emitted = len(self._runner.session_fills_list())
+        return self._result
+
+    def _route_signal(self, sig: Any) -> None:
+        # The runner has already routed the signal; this only counts it and
+        # hands it to the user's callback.
+        if getattr(sig, "order_type", "") in _ORDER_SIGNALS:
+            self.stats.orders_simulated += 1
+        if self.on_signal is not None:
+            try:
+                self.on_signal(sig)
+            except Exception as exc:  # the session must not die in user code
+                self.stats.error = f"on_signal raised {type(exc).__name__}: {exc}"
 
     # ── Slippage tuning ───────────────────────────────────────────────
 
     def set_default_slippage(self, model: str, **params: float) -> None:
-        self._sim.set_default_slippage(**_slippage_kwargs(model, **params))
+        if self._started:
+            raise RuntimeError(
+                "PaperBroker.set_default_slippage: set it before start(); "
+                "set_symbol_slippage works during the session"
+            )
+        _slippage_kwargs(model, **params)
+        self.default_slippage_model = model
+        self.default_slippage_params = dict(params)
 
-    def set_symbol_slippage(
-        self, symbol_id: int, model: str, **params: float
-    ) -> None:
-        self._sim.set_symbol_slippage(
-            int(symbol_id),
-            **_slippage_kwargs(model, **params),
-        )
+    def set_symbol_slippage(self, symbol_id: int, model: str, **params: float) -> None:
+        kw = _slippage_kwargs(model, **params)
+        args = (int(symbol_id), model, kw["slippage_ticks"], kw["slippage_tick_size"],
+                kw["slippage_bps"], kw["slippage_impact_coeff"])
+        if self._started:
+            self._runner.set_symbol_slippage(*args)
+        else:
+            self._symbol_slippage.append(args)
 
-    # ── Market data tee ──────────────────────────────────────────────
+    # ── Market data ───────────────────────────────────────────────────
+
+    def _require_session(self, method: str) -> None:
+        if not self._started or not self._runner.session_open:
+            raise RuntimeError(f"PaperBroker.{method}: call start() first")
 
     def observe_trade(
         self,
@@ -203,12 +226,12 @@ class PaperBroker:
         is_buy: bool,
         ts_ns: int = 0,
     ) -> None:
-        """Forward a live trade into both the runner (so strategies
-        see it) and the simulator (so its queue tracker stays
-        current). Wire this into your feed callback."""
-        self._sim.advance_clock(int(ts_ns))
-        self._sim.on_trade_qty(int(symbol_id), float(price), float(qty), bool(is_buy))
-        self._runner.on_trade(int(symbol_id), float(price), float(qty), bool(is_buy), int(ts_ns))
+        """Forward a live trade: the simulator matches resting orders
+        against it, then the strategy sees it. Wire this into your feed."""
+        self._require_session("observe_trade")
+        self._runner.session_trade(
+            int(symbol_id), float(price), float(qty), bool(is_buy), int(ts_ns)
+        )
         self.stats.trades_observed += 1
 
     def observe_book_snapshot(
@@ -218,26 +241,29 @@ class PaperBroker:
         ask_levels,
         ts_ns: int = 0,
     ) -> None:
-        """Forward a book snapshot. ``bid_levels`` / ``ask_levels``
-        are sequences of ``(price, qty)`` tuples."""
-        self._sim.advance_clock(int(ts_ns))
-        self._sim.on_book_snapshot(int(symbol_id), bid_levels, ask_levels)
-        # Runner takes parallel arrays; unpack.
-        bp = [float(p) for p, _ in bid_levels]
-        bq = [float(q) for _, q in bid_levels]
-        ap = [float(p) for p, _ in ask_levels]
-        aq = [float(q) for _, q in ask_levels]
-        self._runner.on_book_snapshot(int(symbol_id), bp, bq, ap, aq, int(ts_ns))
+        """Forward a book snapshot. ``bid_levels`` / ``ask_levels`` are
+        sequences of ``(price, qty)`` tuples, best first."""
+        self._require_session("observe_book_snapshot")
+        self._runner.session_book_snapshot(
+            int(symbol_id),
+            [(float(p), float(q)) for p, q in bid_levels],
+            [(float(p), float(q)) for p, q in ask_levels],
+            int(ts_ns),
+        )
 
     # ── Fill access ──────────────────────────────────────────────────
 
     def fills(self):
         """Return all simulated fills as a numpy structured array."""
-        return self._sim.fills()
+        if self._runner is None:
+            raise RuntimeError("PaperBroker.fills: no session has started")
+        return self._runner.session_fills()
 
     def fills_list(self):
         """Return all simulated fills as a list of dicts."""
-        return self._sim.fills_list()
+        if self._runner is None:
+            return []
+        return self._runner.session_fills_list()
 
 
 __all__ = [

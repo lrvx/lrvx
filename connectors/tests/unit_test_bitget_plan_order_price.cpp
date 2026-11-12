@@ -285,12 +285,32 @@ TEST(BitgetPlanOrderPrice, PosTpslTriggerSurvivesOnALowPricedSymbol)
   h.transport->nextResponse = kPosTpslResponse;
   SymbolId sym = registerSymbol(h.registry, "DOGEUSDT", 0.0001);
 
-  h.executor->placePosTpsl(sym, HoldSide::Short, 0.08423, 0.0, 22);
+  h.executor->placePosTpsl(sym, HoldSide::Short, 0.0842, 0.0, 22);
 
   ASSERT_EQ(h.transport->calls.size(), 1u);
   const std::string& body = h.transport->calls[0].body;
   EXPECT_NE(body.find(R"("stopLossTriggerPrice":"0.0842")"), std::string::npos)
       << "a trigger below the hardcoded 0.1 granularity is rounded away entirely: " << body;
+}
+
+// A trigger off the instrument's tick is refused with the simulator's reason,
+// not rounded: 0.08423 used to go out as 0.0842, a stop the strategy did not
+// place, and for this short's stop-loss (a buy) one that fires earlier.
+TEST(BitgetPlanOrderPrice, PosTpslTriggerOffTheTickIsRefusedNotRounded)
+{
+  Harness h;
+  h.transport->nextResponse = kPosTpslResponse;
+  SymbolId sym = registerSymbol(h.registry, "DOGEUSDT", 0.0001);
+
+  h.executor->placePosTpsl(sym, HoldSide::Short, 0.08423, 0.0, 26);
+  h.bus.flush();
+
+  EXPECT_EQ(h.transport->calls.size(), 0u)
+      << (h.transport->calls.empty() ? std::string{} : h.transport->calls[0].body);
+  const auto rejected = h.watcher.rejected();
+  ASSERT_EQ(rejected.size(), 1u);
+  EXPECT_EQ(rejected[0].id, 26u);
+  EXPECT_EQ(rejected[0].reason, "trigger_off_tick");
 }
 
 TEST(BitgetPlanOrderPrice, ModifyPosTpslTriggerKeepsInstrumentPrecision)
@@ -306,20 +326,36 @@ TEST(BitgetPlanOrderPrice, ModifyPosTpslTriggerKeepsInstrumentPrecision)
       << "walking a stop to a price the instrument supports must not round it: " << body;
 }
 
-// Control, green today: on an instrument that really does quote to 0.1 the
-// wire format is unchanged. Precision must come from the registry, not be
-// widened for everyone.
+// Control: on an instrument that really does quote to 0.1 an on-tick trigger
+// goes out at that precision, unchanged.
 TEST(BitgetPlanOrderPrice, PosTpslTriggerOnACoarseInstrumentIsUnchanged)
 {
   Harness h;
   h.transport->nextResponse = kPosTpslResponse;
   SymbolId sym = registerSymbol(h.registry, "BTCUSDT", 0.1);
 
-  h.executor->placePosTpsl(sym, HoldSide::Long, 67123.45678901, 0.0, 23);
+  h.executor->placePosTpsl(sym, HoldSide::Long, 67123.5, 0.0, 23);
 
   ASSERT_EQ(h.transport->calls.size(), 1u);
   const std::string& body = h.transport->calls[0].body;
   EXPECT_NE(body.find(R"("stopLossTriggerPrice":"67123.5")"), std::string::npos) << body;
+}
+
+// The same trigger with eight decimals on that instrument used to be rounded
+// to 67123.5; it is refused with trigger_off_tick instead.
+TEST(BitgetPlanOrderPrice, PosTpslTriggerOffACoarseTickIsRefused)
+{
+  Harness h;
+  h.transport->nextResponse = kPosTpslResponse;
+  SymbolId sym = registerSymbol(h.registry, "BTCUSDT", 0.1);
+
+  h.executor->placePosTpsl(sym, HoldSide::Long, 67123.45678901, 0.0, 27);
+  h.bus.flush();
+
+  EXPECT_EQ(h.transport->calls.size(), 0u);
+  const auto rejected = h.watcher.rejected();
+  ASSERT_EQ(rejected.size(), 1u);
+  EXPECT_EQ(rejected[0].reason, "trigger_off_tick");
 }
 
 // A conditional limit order with no limit price cannot be represented: the
@@ -418,4 +454,32 @@ TEST(BitgetPlanOrderPrice, UnsetTickKeepsFullFixedPointPrecision)
   const std::string& body = h.transport->calls[0].body;
   EXPECT_NE(body.find(R"("stopLossTriggerPrice":"67123.45678901")"), std::string::npos)
       << "an instrument with no registered tick fell back to a hardcoded digit count: " << body;
+}
+
+// Every live symbol used to be registered with the registry's 0.01
+// placeholder, and the plan path rounded triggers to the placeholder's two
+// digits: a DOGE stop at 0.08423 went out as 0.08. With the tick unknown the
+// trigger now goes out exactly as given; the venue applies its own rule.
+TEST(BitgetPlanOrderPrice, PlaceholderTickDoesNotRoundAPlanTrigger)
+{
+  Harness h;
+  SymbolInfo info;
+  info.exchange = "bitget";
+  info.symbol = "DOGEUSDT";
+  info.type = InstrumentType::Future;
+  const SymbolId sym = h.registry.registerSymbol(info);
+
+  Order order;
+  order.id = 41;
+  order.symbol = sym;
+  order.side = Side::SELL;
+  order.type = OrderType::STOP_MARKET;
+  order.quantity = Quantity::fromDouble(100.0);
+  order.triggerPrice = Price::fromDouble(0.08423);
+  order.flags.reduceOnly = 1;
+  h.executor->submitOrder(order);
+
+  ASSERT_EQ(h.transport->calls.size(), 1u);
+  const std::string& body = h.transport->calls[0].body;
+  EXPECT_NE(body.find(R"("triggerPrice":"0.08423")"), std::string::npos) << body;
 }

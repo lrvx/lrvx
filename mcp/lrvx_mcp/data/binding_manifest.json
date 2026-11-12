@@ -14165,6 +14165,16 @@
           "name": "VenueStack"
         },
         {
+          "header": "include/lrvx/engine/symbol_registry.h",
+          "kind": "type",
+          "name": "VenueTickLog"
+        },
+        {
+          "header": "include/lrvx/engine/symbol_registry.h",
+          "kind": "type",
+          "name": "VenueTickResult"
+        },
+        {
           "header": "include/lrvx/pricing/svi.h",
           "kind": "type",
           "name": "VolSliceFit"
@@ -25876,6 +25886,11 @@
         },
         {
           "kind": "method",
+          "name": "followVenueTick",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "getOrder",
           "parent": "Strategy"
         },
@@ -26176,6 +26191,11 @@
         },
         {
           "kind": "method",
+          "name": "applyVenueTick",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
           "name": "clear",
           "parent": "SymbolRegistry"
         },
@@ -26282,6 +26302,11 @@
         {
           "kind": "method",
           "name": "size",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
+          "name": "venueTickLog",
           "parent": "SymbolRegistry"
         },
         {
@@ -27148,6 +27173,26 @@
           "kind": "method",
           "name": "venueName",
           "parent": "VenueStack"
+        },
+        {
+          "kind": "method",
+          "name": "record",
+          "parent": "VenueTickLog"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "VenueTickLog"
+        },
+        {
+          "kind": "method",
+          "name": "revision",
+          "parent": "VenueTickLog"
+        },
+        {
+          "kind": "method",
+          "name": "tickFor",
+          "parent": "VenueTickLog"
         },
         {
           "kind": "method",
@@ -35749,6 +35794,16 @@
         },
         {
           "kind": "method",
+          "name": "begin_session",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "end_session",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "equity_curve",
           "parent": "BacktestRunner"
         },
@@ -35789,6 +35844,31 @@
         },
         {
           "kind": "method",
+          "name": "session_book_snapshot",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "session_fills",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "session_fills_list",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "session_open",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "session_trade",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "set_executor",
           "parent": "BacktestRunner"
         },
@@ -35815,6 +35895,11 @@
         {
           "kind": "method",
           "name": "set_strategy",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "set_symbol_slippage",
           "parent": "BacktestRunner"
         },
         {

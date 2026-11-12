@@ -60,6 +60,10 @@ void PolymarketExchangeConnector::start()
     return;
   }
 
+  // Before the tokens are resolved below, so each one is registered with the
+  // venue's tick.
+  loadInstrumentSpecs();
+
   _wsMarket = std::make_unique<IxWebSocketClient>(_config.wsEndpoint, POLYMARKET_ORIGIN,
                                                   _config.reconnectDelayMs, _logger.get(),
                                                   _config.pingIntervalSec);
@@ -151,6 +155,64 @@ void PolymarketExchangeConnector::pollFeedHealth(MonoNanos now)
   checkStaleFeeds(now, _config.staleDataTimeoutMs);
 }
 
+void PolymarketExchangeConnector::loadInstrumentSpecs()
+{
+  _specs.clear();
+  if (_config.instrumentInfoUrl.empty() || !_registry)
+  {
+    return;
+  }
+  const InstrumentFetch fetch =
+      _config.instrumentFetch ? _config.instrumentFetch : defaultInstrumentFetch();
+  std::string unreachable;
+
+  for (const auto& tokenId : _config.tokenIds)
+  {
+    // One unreachable venue is enough to know: the rest would each wait out
+    // the same timeout inside start().
+    if (!unreachable.empty())
+    {
+      _specs.addError(tokenId + ": not requested, " + unreachable);
+      continue;
+    }
+    auto body = fetch(_config.instrumentInfoUrl + "/tick-size?token_id=" + tokenId, "");
+    if (!body)
+    {
+      _specs.addError(tokenId + ": " + body.error());
+      unreachable = "the previous request failed";
+      continue;
+    }
+    auto spec = instrument_info::parsePolymarketTickSize(*body);
+    if (!spec)
+    {
+      _specs.addError(tokenId + ": " + spec.error());
+      continue;
+    }
+    _specs.add(tokenId, *spec);
+  }
+  reportInstrumentLoad(_specs, "Polymarket", _logger.get());
+
+  // Past the token cache, which a previous start() already filled: every
+  // load brings the registry entry to the venue's tick.
+  if (!_registry)
+  {
+    return;
+  }
+  for (const auto& tokenId : _config.tokenIds)
+  {
+    _tokenToSymbol[tokenId] = registerToken(tokenId);
+  }
+}
+
+SymbolId PolymarketExchangeConnector::registerToken(const std::string& tokenId)
+{
+  SymbolInfo info;
+  info.exchange = "polymarket";
+  info.symbol = tokenId;
+  info.type = InstrumentType::Spot;  // TODO: Add PredictionMarket type
+  return registerVenueSymbol(*_registry, info, _specs, _logger.get());
+}
+
 SymbolId PolymarketExchangeConnector::resolveSymbolId(std::string_view tokenId)
 {
   std::string key(tokenId);
@@ -163,19 +225,7 @@ SymbolId PolymarketExchangeConnector::resolveSymbolId(std::string_view tokenId)
 
   if (_registry)
   {
-    auto existing = _registry->getSymbolId("polymarket", key);
-    if (existing)
-    {
-      _tokenToSymbol[key] = *existing;
-      return *existing;
-    }
-
-    SymbolInfo info;
-    info.exchange = "polymarket";
-    info.symbol = key;
-    info.type = InstrumentType::Spot;  // TODO: Add PredictionMarket type
-
-    SymbolId id = _registry->registerSymbol(info);
+    SymbolId id = registerToken(key);
     _tokenToSymbol[key] = id;
     return id;
   }

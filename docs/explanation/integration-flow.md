@@ -383,7 +383,7 @@ flowchart LR
     BR -->|live| EXCH[Exchange]
 ```
 
-`lrvx.paper.PaperBroker` routes signals into its own in-process `SimulatedExecutor`. `lrvx.ccxt.CcxtBroker` routes them to a real exchange. Each broker owns its `Runner`; the strategy class is untouched — only the broker swaps. One strategy class runs backtest, paper, and live.
+`lrvx.paper.PaperBroker` runs a `BacktestRunner` session fed live, so signals reach its in-process `SimulatedExecutor` and order events come back exactly as in a backtest. `lrvx.ccxt.CcxtBroker` routes them to a real exchange. Each broker owns its runner; the strategy class is untouched — only the broker swaps. One strategy class runs backtest, paper, and live.
 
 See [Paper trading](../how-to/paper-trading.md) and [Connect lrvx to a CCXT exchange](../how-to/ccxt-adapter.md).
 

@@ -91,6 +91,7 @@ struct Buses
 BybitConfig bybitConfig(bool withPrivate)
 {
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = test::refusingUrl();
   cfg.reconnectDelayMs = 5000;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
@@ -107,6 +108,7 @@ BybitConfig bybitConfig(bool withPrivate)
 BitgetConfig bitgetConfig(bool withPrivate)
 {
   BitgetConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = test::refusingUrl();
   cfg.reconnectDelayMs = 5000;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BitgetConfig::BookDepth::Depth15}};
@@ -124,6 +126,7 @@ BitgetConfig bitgetConfig(bool withPrivate)
 PolymarketConfig polymarketConfig()
 {
   PolymarketConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.wsEndpoint = test::refusingUrl();
   cfg.reconnectDelayMs = 5000;
   cfg.tokenIds = {"TOKEN"};

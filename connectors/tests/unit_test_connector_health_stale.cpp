@@ -232,6 +232,7 @@ TEST(ConnectorHealthStale, BybitReportsAQuietFeed)
   SymbolRegistry registry;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = "wss://unused.invalid";
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
   cfg.staleDataTimeoutMs = kWindowMs;
@@ -265,6 +266,7 @@ TEST(ConnectorHealthStale, BitgetReportsAQuietFeed)
   SymbolRegistry registry;
 
   BitgetConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = "wss://unused.invalid";
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BitgetConfig::BookDepth::Depth15}};
   cfg.staleDataTimeoutMs = kWindowMs;
@@ -297,6 +299,7 @@ TEST(ConnectorHealthStale, HyperliquidReportsAQuietFeed)
   SymbolRegistry registry;
 
   HyperliquidConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.wsEndpoint = "wss://unused.invalid";
   cfg.symbols = {"BTC"};
   cfg.staleDataTimeoutMs = kWindowMs;
@@ -329,6 +332,7 @@ TEST(ConnectorHealthStale, PolymarketReportsAQuietFeed)
   SymbolRegistry registry;
 
   PolymarketConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.wsEndpoint = "wss://unused.invalid";
   cfg.tokenIds = {"TOKEN"};
   cfg.staleDataTimeoutMs = kWindowMs;
@@ -366,6 +370,7 @@ TEST(ConnectorHealthStale, ZeroWindowDisablesTheCheck)
   SymbolRegistry registry;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = kUnreachable;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
   cfg.staleDataTimeoutMs = 0;
@@ -393,6 +398,7 @@ TEST(ConnectorHealthStale, AQuietFeedIsReportedOncePerEpisode)
   SymbolRegistry registry;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = kUnreachable;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
   cfg.staleDataTimeoutMs = kWindowMs;
@@ -422,6 +428,7 @@ TEST(ConnectorHealthStale, FreshDataReArmsTheReport)
   SymbolRegistry registry;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = kUnreachable;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
   cfg.staleDataTimeoutMs = kWindowMs;
@@ -459,6 +466,7 @@ TEST(ConnectorHealthStale, TheConfiguredWindowIsTheBoundary)
   SymbolRegistry registry;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = kUnreachable;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
   cfg.staleDataTimeoutMs = kWindowMs;
@@ -490,6 +498,7 @@ TEST(ConnectorHealthStale, TheReportCarriesTheLastUpdateInMilliseconds)
   SymbolRegistry registry;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = kUnreachable;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
   cfg.staleDataTimeoutMs = kWindowMs;
@@ -524,6 +533,7 @@ TEST(ConnectorHealthStale, EverySymbolThatWentQuietIsReported)
   SymbolRegistry registry;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = kUnreachable;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50},
                  {"ETHUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
@@ -562,6 +572,7 @@ TEST(ConnectorHealthStale, BybitStartSeedsEverySubscribedSymbol)
   SymbolRegistry registry;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = kUnreachable;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
   cfg.staleDataTimeoutMs = kWindowMs;
@@ -597,6 +608,7 @@ TEST(ConnectorHealthStale, BitgetStampsTheArrivalTimeNotThePostParseTime)
   SymbolRegistry registry;
 
   BitgetConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = kUnreachable;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BitgetConfig::BookDepth::Depth15}};
   cfg.staleDataTimeoutMs = kWindowMs;
@@ -644,6 +656,7 @@ TEST(ConnectorHealthStale, PolymarketPriceChangesStampActivity)
   SymbolRegistry registry;
 
   PolymarketConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.wsEndpoint = kUnreachable;
   cfg.tokenIds = {"TOKEN"};
   cfg.staleDataTimeoutMs = kWindowMs;

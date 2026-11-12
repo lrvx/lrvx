@@ -115,6 +115,14 @@ class BybitOrderExecutorT : public IOrderExecutor
 
   void publishRejection(const Order& order, const std::string& reason);
   void publishRateLimited(const Order& order);
+  // A cancel the venue refused, or that never reached it. Published as
+  // REJECTED on the order the cancel targeted, as the simulator does for a
+  // cancel it cannot carry out; the tracker is left alone, because the order
+  // is still live.
+  void publishCancelRejected(const Order& order, const std::string& reason);
+  // An amend the venue refused, or that never reached it: REPLACE_REJECTED
+  // with the order that stays live and the replacement that was refused.
+  void publishReplaceRejected(const Order& order, const Order& newOrder, const std::string& reason);
 
   std::unique_ptr<AuthenticatedRestClient> _client;
   SymbolRegistry* _registry;

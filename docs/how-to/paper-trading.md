@@ -1,6 +1,6 @@
 # Paper trading with `PaperBroker`
 
-`PaperBroker` runs your strategy against a live market data feed but routes orders to a `SimulatedExecutor` instead of a real exchange. The fill model is the same one backtests use: configurable slippage, queue position tracking, top-of-book or full-depth modes. A strategy that survives backtest gets to rehearse against current market conditions before any real capital is at stake.
+`PaperBroker` runs your strategy against a live market data feed with its orders filled by the backtest's simulator instead of a real exchange. Paper mode is a backtest run fed live: the broker owns an `lrvx.BacktestRunner` and pushes each observed trade through it the way a tick replay (`run_tape`) does, so routing, fills, order events, positions and the tick rule are the backtest's own. A strategy that survives backtest gets to rehearse against current market conditions before any real capital is at stake, and behaves the same while it does.
 
 ## Install
 
@@ -36,7 +36,7 @@ class MyStrategy(lrvx.Strategy):
         if ctx.is_flat():
             self.market_buy(0.01)
 
-broker.runner.add_strategy(MyStrategy([int(sym)]))
+broker.set_strategy(MyStrategy([int(sym)]))   # or broker.runner.add_strategy(...)
 broker.start()
 
 # In your feed loop, forward each trade:
@@ -50,26 +50,24 @@ print(broker.fills_list())
 ## How the wiring works
 
 ```
-your feed ──► broker.observe_trade ──┬─► runner.on_trade ──► strategy
-                                     │
-                                     └─► sim.on_trade_qty (queue tracker)
+your feed ──► broker.observe_trade ──► runner clock ──► SimulatedExecutor ──► strategy.on_trade
 
-strategy ──► self.market_buy() ──► broker._route_signal ──► sim.submit_order
-                                                                  │
-                                                                  ▼
-                                                                fill
+strategy ──► signal ──► BacktestRunner.onSignal ──► SimulatedExecutor
+                                                          │
+                     position tracker ◄── order events ◄──┘
+                            │
+                            └──► listeners ──► strategy.on_order_update / on_fill
 ```
 
-Every observed trade goes both into the runner (so strategies see it) and into the simulator (so its queue tracker stays current). When the strategy emits a signal, the broker's signal callback maps it to `SimulatedExecutor.submit_order`. No network call, no exchange. The fill comes back through `sim.fills_list()` once the simulator's matching engine settles it against subsequent observed trades.
+`start()` builds the runner and opens a live session on it (`BacktestRunner.begin_session`). Each `observe_trade` moves the runner's clock to the trade's `ts_ns`, lets the simulator match resting and conditional orders against it, then shows it to the strategy — the order a tick replay uses. A signal the strategy emits goes to the runner's own signal handler, so it is turned into an order and gated exactly as in a backtest. Every order event comes back through the runner's listener chain: the position tracker first, then attached listeners, then the strategy's `on_order_update` / `on_fill` / `on_queue_position_change` / `on_market_position_change`. No network call, no exchange. `stop()` ends the session and returns its stats in `run_tape`'s shape; `fills_list()` reads the simulator's fills.
+
+Because it is the same run, a strategy fed the same trades produces the same order events (status, fields, order), the same `ctx.position` and `position()` inside each callback, and the same final position in paper mode as in `run_tape`. `python/tests/test_paper_backtest_equivalence.py` holds that against a strategy that arms a stop and a take-profit from `on_fill`, modifies and cancels a resting limit, and sends an off-tick limit.
+
+`ts_ns` is the simulator's clock, and the clock that ack latency, time-in-force expiry and order timestamps run on: pass the venue's trade time.
 
 ## Slippage and queue model
 
-`PaperBroker` exposes the same slippage / queue knobs the backtest engine uses. Defaults are:
-
-- Slippage: `none`
-- Queue model: whatever `SimulatedExecutor`'s default is (typically TOB)
-
-Override per-broker at construction:
+`PaperBroker` takes the backtest runner's slippage settings. The default is no slippage. Set the model at construction (or with `set_default_slippage` before `start()`):
 
 ```python
 broker = PaperBroker(
@@ -79,30 +77,21 @@ broker = PaperBroker(
 )
 ```
 
-Or per-symbol after construction:
+Or per symbol, at any time:
 
 ```python
 broker.set_symbol_slippage(int(sym), "fixed_bps", bps=10.0)
 ```
 
-## What works, what does not
+`fee_rate`, `initial_capital` and `runner_options` (any other `lrvx.BacktestRunner` keyword, such as `submit_ack_latency_ns`) configure the runner the same way.
 
-Routed to the simulator:
+## What is routed
 
-- `MARKET` (`market_buy`, `market_sell`)
-- `LIMIT` (`limit_buy`, `limit_sell`)
-- `CANCEL` for a known `order_id`
-- `CANCEL_ALL` for a symbol
+Everything a backtest routes: market and limit orders (with their time in force and flags), stop and take-profit orders (market and limit), trailing stops (offset and percent), `close_position`, `modify_order`, `cancel_order`, `cancel_all_orders` and OCO. The registry's ticks apply: an order priced off a declared tick is rejected with `price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`, and a modify with `REPLACE_REJECTED`, exactly as in a backtest and as the live connectors refuse it.
 
-Not routed (yet). These signal types fall through to the user's optional `on_signal` callback so you can log or approximate them externally:
+`on_signal`, when given, receives each `lrvx.Signal` after the runner has routed it; an exception it raises is recorded in `broker.stats.error` rather than stopping the session.
 
-- `STOP_MARKET` / `STOP_LIMIT`
-- `TAKE_PROFIT_MARKET` / `TAKE_PROFIT_LIMIT`
-- `TRAILING_STOP` / `TRAILING_STOP_PERCENT`
-- `CLOSE_POSITION`
-- `MODIFY`
-
-The gap is in the broker, not the simulator. `SimulatedExecutor.submit_order` already accepts `stop_market`, `stop_limit`, `tp_market`, `tp_limit`, and `trailing_stop` with `trigger` / `trailing_offset` / `trailing_bps` kwargs — `PaperBroker._route_signal` just does not map those signal types onto it yet. `lrvx.bundle` shows the full mapping if you want to route them yourself; otherwise keep paper-mode strategies on market and limit.
+One broker runs one strategy, as a backtest does: the runner's position tracker and order ids belong to it. Run a second broker for a second strategy.
 
 ## Hooking in ccxt for a live feed
 

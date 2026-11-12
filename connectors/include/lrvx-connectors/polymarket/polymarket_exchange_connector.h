@@ -23,6 +23,7 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -43,6 +44,24 @@ class PolymarketExchangeConnector : public IExchangeConnector
 
   SymbolId resolveSymbolId(std::string_view tokenId);
 
+  // Reads every configured token's tick size (see
+  // PolymarketConfig::instrumentInfoUrl) and registers the tokens with it.
+  // start() calls it; public so a test can drive it with a recorded response.
+  void loadInstrumentSpecs();
+
+  // What the venue reported for a token, when it was loaded.
+  std::optional<InstrumentSpec> instrumentSpec(std::string_view tokenId) const
+  {
+    return _specs.find(tokenId);
+  }
+
+  // Why some configured symbol does not carry the venue's tick: its info
+  // could not be read, or the registry entry declares a different tick,
+  // which it keeps (see registerVenueSymbol). Empty means that, by the time
+  // start() returns, every configured symbol -- including one registered
+  // before start() with no tick declared -- holds the venue's tick, known.
+  std::string instrumentInfoError() const { return _specs.error(); }
+
   // Public so protocol behaviour (snapshot vs incremental price_change) is
   // testable offline by feeding raw frames without a live socket.
   void handleMessage(std::string_view payload);
@@ -54,6 +73,8 @@ class PolymarketExchangeConnector : public IExchangeConnector
   void pollFeedHealth(MonoNanos now) override;
 
  private:
+  SymbolId registerToken(const std::string& tokenId);
+
   // exchangeTs is the venue-supplied timestamp for this message (read once,
   // outside these functions, via a fresh re-parse so field access here stays
   // forward-only regardless of where "timestamp" sits in the payload).
@@ -82,6 +103,8 @@ class PolymarketExchangeConnector : public IExchangeConnector
   pool::Pool<BookUpdateEvent, config::DEFAULT_CONNECTOR_POOL_CAPACITY> _bookPool;
 
   std::unordered_map<std::string, SymbolId> _tokenToSymbol;
+
+  InstrumentSpecTable _specs;
 };
 
 }  // namespace lrvx

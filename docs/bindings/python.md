@@ -121,7 +121,7 @@ Full pattern and pieces: [Realistic backtest in one call](../how-to/realistic-ba
 
 ### Paper trading
 
-Same strategy class, live feed, simulated fills. `PaperBroker` lives in `lrvx.paper`. It constructs its own `SimulatedExecutor` and its own `Runner`; you attach strategies to `broker.runner` and tee market data in through `broker.observe_trade(...)`.
+Same strategy class, live feed, simulated fills. `PaperBroker` lives in `lrvx.paper`. It runs a `BacktestRunner` session fed live: you attach the strategy with `broker.set_strategy(...)` (or `broker.runner.add_strategy(...)`) and push market data through `broker.observe_trade(...)`, which goes where a tick replay sends it, so orders, order events and positions behave as in `run_tape`.
 
 ```python
 from lrvx.paper import PaperBroker
@@ -137,7 +137,7 @@ broker.stop()
 print(broker.fills_list(), broker.stats)
 ```
 
-`PaperBroker` is a dataclass; `on_signal=` is an optional user callback that fires *after* the simulator has accepted a signal, not a routing method. Slippage is tunable via `set_default_slippage(model, **params)` / `set_symbol_slippage(symbol_id, model, **params)`.
+`PaperBroker` is a dataclass; `on_signal=` is an optional user callback that fires *after* the runner has routed a signal, not a routing method. Slippage is tunable via `set_default_slippage(model, **params)` before `start()` and `set_symbol_slippage(symbol_id, model, **params)` at any time.
 
 See [Paper trading](../how-to/paper-trading.md) for the full feed-wiring pattern.
 

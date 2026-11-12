@@ -8,6 +8,7 @@
  */
 
 #include "lrvx/engine/symbol_registry.h"
+#include "lrvx/execution/order_price_rule.h"
 #include "lrvx/util/performance/profile.h"
 
 #include <algorithm>
@@ -401,9 +402,38 @@ std::optional<SymbolInfo> SymbolRegistry::getSymbolInfo(SymbolId id) const
   return std::nullopt;
 }
 
+VenueTickResult SymbolRegistry::applyVenueTick(SymbolId id, Price venueTick)
+{
+  std::lock_guard lock(_mutex);
+  auto it = _symbols.find(id);
+  if (it == _symbols.end())
+  {
+    return {VenueTickOutcome::UnknownSymbol, Price{}};
+  }
+  SymbolInfo& info = it->second;
+  if (venueTick.raw() <= 0)
+  {
+    return {VenueTickOutcome::InvalidTick, info.tickSize};
+  }
+  const int64_t declared = orderTickRaw(info);
+  if (declared == venueTick.raw())
+  {
+    return {VenueTickOutcome::Unchanged, info.tickSize};
+  }
+  if (declared != 0)
+  {
+    return {VenueTickOutcome::Conflict, info.tickSize};
+  }
+  info.tickSize = venueTick;
+  info.tickSizeKnown = true;
+  _venueTicks->record(id, venueTick);
+  return {VenueTickOutcome::Applied, info.tickSize};
+}
+
 void SymbolRegistry::clear()
 {
   std::lock_guard lock(_mutex);
+  _venueTicks->reset();
   _symbols.clear();
   _map.clear();
   _reverse.clear();
@@ -914,6 +944,7 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
   const auto fail = [this]()
   {
     std::lock_guard lock(_mutex);
+    _venueTicks->reset();
     _symbols.clear();
     _map.clear();
     _reverse.clear();
@@ -1025,6 +1056,7 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
   }
 
   std::lock_guard lock(_mutex);
+  _venueTicks->reset();
   _symbols = std::move(loaded);
   _map.clear();
   for (const auto& [sid, info] : _symbols)
@@ -1281,6 +1313,7 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
   uint32_t count = read_u32();
 
   std::lock_guard lock(_mutex);
+  _venueTicks->reset();
   _symbols.clear();
   _map.clear();
   _reverse.clear();

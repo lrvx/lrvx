@@ -28,8 +28,9 @@ RNG sampling shares `cancelAckSeed`.
 `BacktestRunner` takes the pair as constructor arguments
 (`submit_ack_latency_ns`, `submit_ack_jitter_ns`; Node
 `submitAckLatencyNs`, `submitAckJitterNs`) and applies them to its built-in
-executor. A `SimulatedExecutor` you drive yourself -- a standalone one, or
-`PaperBroker.simulated_executor` -- takes them through
+executor; `PaperBroker` passes them on from
+`runner_options={"submit_ack_latency_ns": ..., "submit_ack_jitter_ns": ...}`.
+A `SimulatedExecutor` you drive yourself takes them through
 `set_submit_ack_latency(latency_ns, jitter_ns=0)`.
 
 === "Python"

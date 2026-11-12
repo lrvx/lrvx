@@ -8,6 +8,7 @@
  */
 
 #include "lrvx-connectors/bybit/bybit_exchange_connector.h"
+#include "lrvx-connectors/bybit/bybit_order_executor.h"
 #include "lrvx-connectors/net/ix_websocket_client.h"
 #include "lrvx-connectors/util/safe_parse.h"
 #include "lrvx/engine/symbol_registry.h"
@@ -322,6 +323,10 @@ void BybitExchangeConnector::start()
   {
     return;
   }
+
+  // Before the socket opens, so the first frame already finds every
+  // configured symbol registered with the venue's tick.
+  loadInstrumentSpecs();
 
   // stop() releases the public client, so a start() after it builds a fresh
   // one.
@@ -1144,6 +1149,70 @@ void BybitExchangeConnector::handlePrivateMessage(std::string_view payload)
   }
 }
 
+void BybitExchangeConnector::loadInstrumentSpecs()
+{
+  _specs.clear();
+  if (_config.instrumentInfoUrl.empty() || !_registry)
+  {
+    return;
+  }
+  const InstrumentFetch fetch =
+      _config.instrumentFetch ? _config.instrumentFetch : defaultInstrumentFetch();
+  std::string unreachable;
+
+  for (const auto& entry : _config.symbols)
+  {
+    const std::string url = _config.instrumentInfoUrl + "/v5/market/instruments-info?category=" +
+                            std::string(Bybit::toString(entry.type)) + "&symbol=" + entry.name;
+    // One unreachable venue is enough to know: the rest would each wait out
+    // the same timeout inside start().
+    if (!unreachable.empty())
+    {
+      _specs.addError(entry.name + ": not requested, " + unreachable);
+      continue;
+    }
+    auto body = fetch(url, "");
+    if (!body)
+    {
+      _specs.addError(entry.name + ": " + body.error());
+      unreachable = "the previous request failed";
+      continue;
+    }
+    auto specs = instrument_info::parseBybit(*body);
+    if (!specs)
+    {
+      _specs.addError(entry.name + ": " + specs.error());
+      continue;
+    }
+    auto it = specs->find(entry.name);
+    if (it == specs->end())
+    {
+      _specs.addError(entry.name + ": not listed in the instruments-info response");
+      continue;
+    }
+    _specs.add(entry.name, it->second);
+  }
+  reportInstrumentLoad(_specs, "Bybit", _logger.get());
+
+  // A symbol the caller registered before start() keeps its id and entry,
+  // and the venue's tick goes into it unless the caller declared one (see
+  // registerVenueSymbol).
+  for (const auto& entry : _config.symbols)
+  {
+    if (_registry->getSymbolId("bybit", entry.name))
+    {
+      SymbolInfo held;
+      held.exchange = "bybit";
+      held.symbol = entry.name;
+      registerVenueSymbol(*_registry, held, _specs, _logger.get());
+    }
+    else
+    {
+      resolveSymbolId(entry.name);
+    }
+  }
+}
+
 SymbolId BybitExchangeConnector::resolveSymbolId(std::string_view symbol)
 {
   auto existing = _registry->getSymbolId("bybit", std::string(symbol));
@@ -1159,7 +1228,7 @@ SymbolId BybitExchangeConnector::resolveSymbolId(std::string_view symbol)
   // Try to parse as option
   if (auto parsed = parseOptionSymbol(symbol, "bybit"))
   {
-    return _registry->registerSymbol(*parsed);
+    return registerVenueSymbol(*_registry, *parsed, _specs, _logger.get());
   }
 
   auto it = std::find_if(_config.symbols.begin(), _config.symbols.end(),
@@ -1174,14 +1243,14 @@ SymbolId BybitExchangeConnector::resolveSymbolId(std::string_view symbol)
   }
   else if (auto parsed = parseOptionSymbol(symbol))
   {
-    return _registry->registerSymbol(*parsed);
+    return registerVenueSymbol(*_registry, *parsed, _specs, _logger.get());
   }
   else
   {
     info.type = InstrumentType::Spot;
   }
 
-  return _registry->registerSymbol(info);
+  return registerVenueSymbol(*_registry, info, _specs, _logger.get());
 }
 
 bool BybitConfig::isValid() const

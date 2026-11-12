@@ -8,12 +8,16 @@
  */
 
 #include "lrvx/engine/symbol_registry.h"
+#include "lrvx/execution/order_price_rule.h"
+#include "lrvx/strategy/strategy.h"
 
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <filesystem>
+#include <memory>
+#include <optional>
 #include <thread>
 #include <unordered_set>
 #include <vector>
@@ -790,6 +794,230 @@ TEST(SymbolRegistryTest, ConcurrentReadersSurviveSymbolTableGrowth)
 
   EXPECT_GE(reads.load(), kMinReads);
   EXPECT_EQ(wrong.load(), 0);
+}
+
+// ------------------------------------------------------------------ venue tick
+
+namespace
+{
+
+SymbolInfo undeclared(const std::string& exchange, const std::string& symbol)
+{
+  SymbolInfo info;
+  info.exchange = exchange;
+  info.symbol = symbol;
+  info.type = InstrumentType::Future;
+  return info;
+}
+
+}  // namespace
+
+// A connector that starts after the symbol was registered writes the venue's
+// tick into the entry it finds. Nothing else about the entry moves: the id,
+// names, type and scales are what consumers index by.
+TEST(SymbolRegistryVenueTick, AnUndeclaredTickTakesTheVenues)
+{
+  SymbolRegistry registry;
+  registry.registerExchange("bybit");
+  SymbolInfo info = undeclared("bybit", "BTCUSDT");
+  info.priceScale = 1'000'000;
+  info.contractMultiplier = 2.0;
+  const SymbolId id = registry.registerSymbol(info);
+  const auto before = *registry.getSymbolInfo(id);
+  const uint64_t rev = registry.venueTickLog()->revision();
+
+  const auto r = registry.applyVenueTick(id, Price::fromDouble(0.1));
+  EXPECT_EQ(r.outcome, VenueTickOutcome::Applied);
+  EXPECT_EQ(r.heldTick.raw(), Price::fromDouble(0.1).raw());
+
+  const auto after = *registry.getSymbolInfo(id);
+  EXPECT_TRUE(after.tickSizeKnown);
+  EXPECT_EQ(after.tickSize.raw(), Price::fromDouble(0.1).raw());
+  EXPECT_EQ(orderTickRaw(after), Price::fromDouble(0.1).raw());
+  EXPECT_EQ(after.id, before.id);
+  EXPECT_EQ(after.exchange, before.exchange);
+  EXPECT_EQ(after.symbol, before.symbol);
+  EXPECT_EQ(after.type, before.type);
+  EXPECT_EQ(after.exchangeId, before.exchangeId);
+  EXPECT_EQ(after.priceScale, before.priceScale);
+  EXPECT_EQ(after.qtyScale, before.qtyScale);
+  EXPECT_EQ(after.contractMultiplier, before.contractMultiplier);
+  EXPECT_EQ(*registry.getSymbolId("bybit", "BTCUSDT"), id);
+  EXPECT_EQ(registry.getExchangeForSymbol(id), before.exchangeId);
+
+  EXPECT_GT(registry.venueTickLog()->revision(), rev);
+  ASSERT_TRUE(registry.venueTickLog()->tickFor(id));
+  EXPECT_EQ(registry.venueTickLog()->tickFor(id)->raw(), Price::fromDouble(0.1).raw());
+}
+
+// A tick the caller declared is the caller's. The same value is a no-op; a
+// different one is kept and reported back, never overwritten.
+TEST(SymbolRegistryVenueTick, ADeclaredTickIsKept)
+{
+  SymbolRegistry registry;
+  SymbolInfo same = undeclared("bybit", "BTCUSDT");
+  same.tickSize = Price::fromDouble(0.1);
+  same.tickSizeKnown = true;
+  const SymbolId sameId = registry.registerSymbol(same);
+
+  SymbolInfo other = undeclared("bybit", "ETHUSDT");
+  other.tickSize = Price::fromDouble(0.05);  // declared by value, flag unset
+  const SymbolId otherId = registry.registerSymbol(other);
+
+  SymbolInfo flagged = undeclared("bybit", "SOLUSDT");
+  flagged.tickSize = kDefaultTickSize;  // an explicit 0.01, declared by the flag
+  flagged.tickSizeKnown = true;
+  const SymbolId flaggedId = registry.registerSymbol(flagged);
+
+  const uint64_t rev = registry.venueTickLog()->revision();
+
+  auto r = registry.applyVenueTick(sameId, Price::fromDouble(0.1));
+  EXPECT_EQ(r.outcome, VenueTickOutcome::Unchanged);
+  r = registry.applyVenueTick(otherId, Price::fromDouble(0.01));
+  EXPECT_EQ(r.outcome, VenueTickOutcome::Conflict);
+  EXPECT_EQ(r.heldTick.raw(), Price::fromDouble(0.05).raw());
+  r = registry.applyVenueTick(flaggedId, Price::fromDouble(0.001));
+  EXPECT_EQ(r.outcome, VenueTickOutcome::Conflict);
+  EXPECT_EQ(r.heldTick.raw(), kDefaultTickSize.raw());
+
+  EXPECT_EQ(registry.getSymbolInfo(otherId)->tickSize.raw(), Price::fromDouble(0.05).raw());
+  EXPECT_EQ(registry.getSymbolInfo(flaggedId)->tickSize.raw(), kDefaultTickSize.raw());
+  EXPECT_EQ(registry.venueTickLog()->revision(), rev) << "nothing changed, nothing to follow";
+}
+
+TEST(SymbolRegistryVenueTick, UnknownIdsAndNonPositiveTicksAreRefused)
+{
+  SymbolRegistry registry;
+  const SymbolId id = registry.registerSymbol(undeclared("bybit", "BTCUSDT"));
+  EXPECT_EQ(registry.applyVenueTick(id + 100, Price::fromDouble(0.1)).outcome,
+            VenueTickOutcome::UnknownSymbol);
+  EXPECT_EQ(registry.applyVenueTick(id, Price{}).outcome, VenueTickOutcome::InvalidTick);
+  EXPECT_FALSE(registry.getSymbolInfo(id)->tickSizeKnown);
+}
+
+// The log is shared, so a holder that outlives the registry reads no freed
+// memory.
+TEST(SymbolRegistryVenueTick, TheLogOutlivesTheRegistry)
+{
+  std::shared_ptr<const VenueTickLog> log;
+  SymbolId id = 0;
+  {
+    SymbolRegistry registry;
+    id = registry.registerSymbol(undeclared("bybit", "BTCUSDT"));
+    log = registry.venueTickLog();
+    registry.applyVenueTick(id, Price::fromDouble(0.5));
+  }
+  ASSERT_TRUE(log->tickFor(id));
+  EXPECT_EQ(log->tickFor(id)->raw(), Price::fromDouble(0.5).raw());
+}
+
+// Readers on other threads see the old entry or the updated one, never half
+// of each.
+TEST(SymbolRegistryVenueTick, ConcurrentReadersSeeAWholeEntry)
+{
+  SymbolRegistry registry;
+  std::vector<SymbolId> ids;
+  for (int i = 0; i < 64; ++i)
+  {
+    ids.push_back(registry.registerSymbol(undeclared("bybit", "S" + std::to_string(i))));
+  }
+  std::atomic<bool> stop{false};
+  std::atomic<int> wrong{0};
+  std::thread reader(
+      [&]
+      {
+        while (!stop.load(std::memory_order_relaxed))
+        {
+          for (SymbolId id : ids)
+          {
+            const auto info = registry.getSymbolInfo(id);
+            const bool old = !info->tickSizeKnown && info->tickSize == kDefaultTickSize;
+            const bool updated =
+                info->tickSizeKnown && info->tickSize.raw() == Price::fromDouble(0.5).raw();
+            if (!old && !updated)
+            {
+              wrong.fetch_add(1);
+            }
+          }
+        }
+      });
+  for (SymbolId id : ids)
+  {
+    registry.applyVenueTick(id, Price::fromDouble(0.5));
+  }
+  stop.store(true);
+  reader.join();
+  EXPECT_EQ(wrong.load(), 0);
+}
+
+namespace
+{
+
+class TickReader final : public Strategy
+{
+ public:
+  TickReader(std::vector<SymbolId> syms, const SymbolRegistry& registry)
+      : Strategy(3, std::move(syms), registry)
+  {
+  }
+  Price bookTick(SymbolId sym) const { return ctx(sym).book.tickSize(); }
+  std::optional<Price> tickInTrade;
+
+ protected:
+  void onSymbolTrade(SymbolContext& c, const TradeEvent&) override
+  {
+    tickInTrade = c.book.tickSize();
+  }
+};
+
+void trade(TickReader& s, SymbolId sym)
+{
+  TradeEvent ev{};
+  ev.trade.symbol = sym;
+  ev.trade.price = Price::fromDouble(100);
+  ev.trade.quantity = Quantity::fromDouble(1);
+  s.onTrade(ev);
+}
+
+}  // namespace
+
+// A strategy built before the venue's tick is applied reads it from the
+// symbol's first event on, in whatever callback reads it. Other symbols keep
+// their books.
+TEST(SymbolRegistryVenueTick, AStrategyBuiltEarlierFollowsTheAppliedTick)
+{
+  SymbolRegistry registry;
+  const SymbolId a = registry.registerSymbol(undeclared("bybit", "AUSDT"));
+  const SymbolId b = registry.registerSymbol(undeclared("bybit", "BUSDT"));
+  TickReader strategy({a, b}, registry);
+  EXPECT_EQ(strategy.bookTick(a).raw(), kDefaultTickSize.raw());
+
+  registry.applyVenueTick(a, Price::fromDouble(0.0001));
+  trade(strategy, a);
+  ASSERT_TRUE(strategy.tickInTrade);
+  EXPECT_EQ(strategy.tickInTrade->raw(), Price::fromDouble(0.0001).raw());
+  EXPECT_EQ(strategy.bookTick(a).raw(), Price::fromDouble(0.0001).raw());
+
+  trade(strategy, b);
+  EXPECT_EQ(strategy.bookTick(b).raw(), kDefaultTickSize.raw());
+  // The construction-time copy stays as documented.
+  EXPECT_FALSE(strategy.symbolInfos()[0].tickSizeKnown);
+}
+
+// The strategy holds the log, not the registry: a registry gone before the
+// strategy's next event is not touched.
+TEST(SymbolRegistryVenueTick, AStrategyMayOutliveTheRegistry)
+{
+  std::unique_ptr<TickReader> strategy;
+  SymbolId a = 0;
+  {
+    SymbolRegistry registry;
+    a = registry.registerSymbol(undeclared("bybit", "AUSDT"));
+    strategy = std::make_unique<TickReader>(std::vector<SymbolId>{a}, registry);
+    registry.applyVenueTick(a, Price::fromDouble(0.5));
+  }
+  trade(*strategy, a);
+  EXPECT_EQ(strategy->bookTick(a).raw(), Price::fromDouble(0.5).raw());
 }
 
 // Names are written as JSON strings: quotes, backslashes and control

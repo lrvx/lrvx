@@ -246,6 +246,7 @@ TEST(ConnectorHealthDisconnect, BybitReportsATransportClose)
   SymbolRegistry registry;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = "wss://unused.invalid";
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
 
@@ -267,6 +268,7 @@ TEST(ConnectorHealthDisconnect, BitgetReportsATransportClose)
   SymbolRegistry registry;
 
   BitgetConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = "wss://unused.invalid";
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BitgetConfig::BookDepth::Depth15}};
 
@@ -288,6 +290,7 @@ TEST(ConnectorHealthDisconnect, HyperliquidReportsATransportClose)
   SymbolRegistry registry;
 
   HyperliquidConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.wsEndpoint = "wss://unused.invalid";
   cfg.symbols = {"BTC"};
 
@@ -309,6 +312,7 @@ TEST(ConnectorHealthDisconnect, PolymarketReportsATransportClose)
   SymbolRegistry registry;
 
   PolymarketConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.wsEndpoint = "wss://unused.invalid";
   cfg.tokenIds = {"TOKEN"};
 
@@ -336,6 +340,7 @@ TEST(ConnectorHealthDisconnect, BybitReportsAPrivateStreamClose)
   HandshakeThenCloseListener listener;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = kUnreachable;
   cfg.privateEndpoint = listener.url();
   cfg.enablePrivate = true;
@@ -363,6 +368,7 @@ TEST(ConnectorHealthDisconnect, BitgetReportsAPrivateStreamClose)
   HandshakeThenCloseListener listener;
 
   BitgetConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = kUnreachable;
   cfg.privateEndpoint = listener.url();
   cfg.enablePrivate = true;
@@ -393,6 +399,7 @@ TEST(ConnectorHealthDisconnect, CloseWithNoCallbacksInstalledIsHarmless)
   SymbolRegistry registry;
 
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.publicEndpoint = "wss://unused.invalid";
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
 

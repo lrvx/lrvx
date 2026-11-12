@@ -661,7 +661,7 @@ TEST(HyperliquidPrecision, PricesAndSizesFollowSzDecimalsAndFiveSigFigs)
   eth.symbol = h.eth;
   eth.side = Side::BUY;
   eth.type = OrderType::LIMIT;
-  eth.price = Price::fromDouble(3456.789);        // 5 sig figs -> 3456.8
+  eth.price = Price::fromDouble(3456.8);          // 5 sig figs, on the grid
   eth.quantity = Quantity::fromDouble(0.123456);  // szDecimals 4, truncated
   h.executor->submitOrder(eth);
 
@@ -670,7 +670,7 @@ TEST(HyperliquidPrecision, PricesAndSizesFollowSzDecimalsAndFiveSigFigs)
   pepe.symbol = h.pepe;
   pepe.side = Side::SELL;
   pepe.type = OrderType::LIMIT;
-  pepe.price = Price::fromDouble(0.0001234567);  // 6 - 0 = 6 decimals max
+  pepe.price = Price::fromDouble(0.000123);      // 6 - 0 = 6 decimals max
   pepe.quantity = Quantity::fromDouble(1000.9);  // szDecimals 0
   h.executor->submitOrder(pepe);
 
@@ -678,6 +678,67 @@ TEST(HyperliquidPrecision, PricesAndSizesFollowSzDecimalsAndFiveSigFigs)
   EXPECT_NE(h.transport->calls[0].find(R"("p":"3456.8","s":"0.1234")"), std::string::npos)
       << h.transport->calls[0];
   EXPECT_NE(h.transport->calls[1].find(R"("p":"0.000123","s":"1000")"), std::string::npos)
+      << h.transport->calls[1];
+}
+
+// A limit price off HL's grid -- six significant figures, or more decimals
+// than 6 - szDecimals -- used to be rounded to nearest, which for a buy can
+// be a better price than the strategy asked for. It is refused with the
+// simulator's reason instead, before anything is signed or sent.
+TEST(HyperliquidPrecision, LimitPriceOffTheGridIsRefusedNotRounded)
+{
+  Harness h("hl_prec_off.log");
+  Order eth;
+  eth.id = 53;
+  eth.symbol = h.eth;
+  eth.side = Side::BUY;
+  eth.type = OrderType::LIMIT;
+  eth.price = Price::fromDouble(3456.789);  // six significant figures
+  eth.quantity = Quantity::fromDouble(0.1);
+  h.executor->submitOrder(eth);
+
+  Order pepe;
+  pepe.id = 54;
+  pepe.symbol = h.pepe;
+  pepe.side = Side::SELL;
+  pepe.type = OrderType::LIMIT;
+  pepe.price = Price::fromDouble(0.0001234);  // seven decimals at szDecimals 0
+  pepe.quantity = Quantity::fromDouble(1000);
+  h.executor->submitOrder(pepe);
+
+  EXPECT_TRUE(h.transport->calls.empty());
+  auto evs = h.events();
+  ASSERT_EQ(statusesFor(evs, 53), (std::vector<OrderEventStatus>{OrderEventStatus::REJECTED}));
+  ASSERT_EQ(statusesFor(evs, 54), (std::vector<OrderEventStatus>{OrderEventStatus::REJECTED}));
+  for (const auto& e : evs)
+  {
+    EXPECT_EQ(e.rejectReason, "price_off_tick");
+  }
+}
+
+// The IOC limit of a market order only bounds the fill, so it is moved onto
+// the grid on the side worse for the owner instead of refused: up for a buy.
+TEST(HyperliquidPrecision, MarketOrderBoundIsMovedAgainstTheOwner)
+{
+  Harness h("hl_prec_mkt.log");
+  Order o;
+  o.id = 55;
+  o.symbol = h.eth;
+  o.side = Side::BUY;
+  o.type = OrderType::MARKET;
+  o.price = Price::fromDouble(3456.71);
+  o.quantity = Quantity::fromDouble(0.1);
+  h.executor->submitOrder(o);
+
+  Order s = o;
+  s.id = 56;
+  s.side = Side::SELL;
+  h.executor->submitOrder(s);
+
+  ASSERT_EQ(h.transport->calls.size(), 2u);
+  EXPECT_NE(h.transport->calls[0].find(R"("b":true,"p":"3456.8")"), std::string::npos)
+      << h.transport->calls[0];
+  EXPECT_NE(h.transport->calls[1].find(R"("b":false,"p":"3456.7")"), std::string::npos)
       << h.transport->calls[1];
 }
 
@@ -1069,6 +1130,25 @@ TEST(HyperliquidPrecision, SizeJustBelowAStepIsNeverRoundedUp)
       << h.transport->calls[2];
 }
 
+TEST(HyperliquidPrecision, TriggerPriceOffTheGridIsRefused)
+{
+  Harness h("hl_trig_off.log");
+  Order o;
+  o.id = 104;
+  o.symbol = h.eth;
+  o.side = Side::SELL;
+  o.type = OrderType::STOP_MARKET;
+  o.triggerPrice = Price::fromDouble(1234.567);  // six significant figures
+  o.quantity = Quantity::fromDouble(0.5);
+  o.flags.reduceOnly = 1;
+  h.executor->submitOrder(o);
+
+  EXPECT_TRUE(h.transport->calls.empty());
+  auto evs = h.events();
+  ASSERT_EQ(statusesFor(evs, 104), (std::vector<OrderEventStatus>{OrderEventStatus::REJECTED}));
+  EXPECT_EQ(evs[0].rejectReason, "trigger_off_tick");
+}
+
 TEST(HyperliquidPrecision, TriggerPriceBelow100000KeepsItsDecimals)
 {
   Harness h("hl_trig_decimals.log");
@@ -1077,13 +1157,13 @@ TEST(HyperliquidPrecision, TriggerPriceBelow100000KeepsItsDecimals)
   o.symbol = h.eth;
   o.side = Side::SELL;
   o.type = OrderType::STOP_MARKET;
-  o.triggerPrice = Price::fromDouble(1234.567);  // 5 sig figs -> 1234.6
+  o.triggerPrice = Price::fromDouble(1234.6);
   o.quantity = Quantity::fromDouble(0.5);
   o.flags.reduceOnly = 1;
   h.executor->submitOrder(o);
 
   ASSERT_EQ(h.transport->calls.size(), 1u);
-  // p = 1234.567 * 0.9 = 1111.1103 -> 1111.1.
+  // p = 1234.6 * 0.9 = 1111.14 -> 1111.1, down for a sell.
   EXPECT_EQ(maskCloids(actionOf(h.transport->calls[0])),
             R"({"type":"order","orders":[{"a":1,"b":false,"p":"1111.1","s":"0.5","r":true,)"
             R"("t":{"trigger":{"isMarket":true,"triggerPx":"1234.6","tpsl":"sl"}},)"
@@ -1136,7 +1216,11 @@ TEST(HyperliquidModify, TriggerReplacementIsRejectedLocally)
   EXPECT_EQ(h.transport->calls.size(), 1u);
   EXPECT_EQ(gSignedActions.size(), 1u);
   auto evs = h.events();
-  EXPECT_EQ(statusesFor(evs, 11), (std::vector<OrderEventStatus>{OrderEventStatus::REJECTED}));
+  // Reported on the order that stays live, with the refused replacement.
+  const auto onOld = statusesFor(evs, 10);
+  ASSERT_FALSE(onOld.empty());
+  EXPECT_EQ(onOld.back(), OrderEventStatus::REPLACE_REJECTED);
+  EXPECT_EQ(evs.back().newOrder.id, 11u);
   EXPECT_TRUE(h.tracker.isActive(10)) << "the resting stop is untouched";
 }
 
@@ -1153,7 +1237,10 @@ TEST(HyperliquidModify, NeitherOidNorCloidRejectsTheReplacement)
   EXPECT_TRUE(h.transport->calls.empty());
   EXPECT_TRUE(gSignedActions.empty());
   auto evs = h.events();
-  EXPECT_EQ(statusesFor(evs, 114), (std::vector<OrderEventStatus>{OrderEventStatus::REJECTED}));
+  EXPECT_EQ(statusesFor(evs, 113),
+            (std::vector<OrderEventStatus>{OrderEventStatus::REPLACE_REJECTED}));
+  ASSERT_EQ(evs.size(), 1u);
+  EXPECT_EQ(evs[0].newOrder.id, 114u);
 }
 
 // ---------------------------------------------------------------- leverage outcomes

@@ -9,6 +9,7 @@
 
 #include "lrvx-connectors/hyperliquid/hyperliquid_order_executor.h"
 #include "lrvx-connectors/execution/order_tif.h"
+#include "lrvx-connectors/execution/venue_price.h"
 #include "lrvx-connectors/hyperliquid/hl_signer.h"
 #include "lrvx-connectors/net/curl_transport.h"
 #include "lrvx-connectors/util/safe_parse.h"
@@ -51,28 +52,6 @@ HyperliquidOrderExecutorT<Policies>::~HyperliquidOrderExecutorT()
 
 namespace
 {
-
-std::string tidy(double v, int prec)
-{
-  char buf[64];
-  std::snprintf(buf, sizeof(buf), "%.*f", prec, v);
-  std::string s(buf);
-  // Only a fractional part has zeros to drop: at prec 0 "%.0f" of 1000 is
-  // "1000", and stripping it would send a size or price a thousand times off.
-  if (s.find('.') == std::string::npos)
-  {
-    return s;
-  }
-  while (!s.empty() && s.back() == '0')
-  {
-    s.pop_back();
-  }
-  if (!s.empty() && s.back() == '.')
-  {
-    s.pop_back();
-  }
-  return s;
-}
 
 std::string genCloid128()
 {
@@ -128,26 +107,99 @@ std::string_view hlTifToken(NormalizedTif tif)
 // Precision (docs: for-developers/api/tick-and-lot-size): a size has at most
 // szDecimals decimals (szDecimals comes from the meta response); a perp
 // price has at most 5 significant figures and at most 6 - szDecimals
-// decimals, except that an integer price is always accepted. HL rejects
-// anything finer, so prices are rounded to that grid here (to nearest, the
-// SDK's _slippage_price rounding) and sizes are truncated toward zero, never
+// decimals, except that an integer price is always accepted. HL refuses
+// anything finer. That grid is HL's tick, and it is applied the way the
+// simulator applies a tick (execution/order_price_rule.h): a limit or trigger
+// price the strategy chose that is off the grid is refused here with
+// price_off_tick / trigger_off_tick, never rounded to a price it did not ask
+// for; a price this connector computes (the limit of a market order or of a
+// market trigger, which only bounds the fill) is moved onto the grid on the
+// side worse for the order's owner. With szDecimals unknown only the
+// significant-figure half is checked. Sizes are truncated toward zero, never
 // up, so a reduce-only close cannot grow past what was asked; an order
-// whose size truncates to zero is rejected. SymbolInfo::tickSize is not used:
-// HL has no fixed tick, the significant-figure rule above is the tick.
+// whose size truncates to zero is rejected. SymbolInfo::tickSize is not used
+// here: the registry can hold one increment, and HL's depends on the price.
 constexpr int kPerpMaxDecimals = 6;
 constexpr int kUnknownPrecisionDecimals = 8;
+constexpr int kMaxSigFigs = 5;
+
+int maxPriceDecimals(int szDecimals)
+{
+  return szDecimals >= 0 ? std::max(0, kPerpMaxDecimals - szDecimals) : -1;
+}
+
+int64_t pow10Raw(int exp)
+{
+  int64_t v = 1;
+  for (int i = 0; i < exp; ++i)
+  {
+    v *= 10;
+  }
+  return v;
+}
+
+int decimalDigits(int64_t v)
+{
+  int n = 1;
+  while (v >= 10)
+  {
+    v /= 10;
+    ++n;
+  }
+  return n;
+}
+
+// Whether HL accepts this price as it is.
+bool onHlGrid(Price p, int szDecimals)
+{
+  int64_t raw = p.raw();
+  if (raw <= 0)
+  {
+    return false;
+  }
+  if (raw % Price::Scale == 0)
+  {
+    return true;
+  }
+  int decimals = venue_price::kScaleDigits;
+  while (raw % 10 == 0)
+  {
+    raw /= 10;
+    --decimals;
+  }
+  const int maxDec = maxPriceDecimals(szDecimals);
+  if (maxDec >= 0 && decimals > maxDec)
+  {
+    return false;
+  }
+  return decimalDigits(raw) <= kMaxSigFigs;
+}
+
+// A computed price moved onto HL's grid at its magnitude, up for a buy and
+// down for a sell, so the bound it sets is never tighter than the one asked
+// for.
+Price snapToHlGrid(Price p, int szDecimals, Side side)
+{
+  const int64_t raw = p.raw();
+  if (raw <= 0 || onHlGrid(p, szDecimals))
+  {
+    return p;
+  }
+  int64_t step = pow10Raw(std::max(0, decimalDigits(raw) - kMaxSigFigs));
+  step = std::min<int64_t>(step, Price::Scale);
+  const int maxDec = maxPriceDecimals(szDecimals);
+  if (maxDec >= 0)
+  {
+    step = std::max(step, pow10Raw(venue_price::kScaleDigits - maxDec));
+  }
+  return Price::fromRaw(snapAgainstOwner(raw, step, side));
+}
 
 // Market TP/SL on HL carries a 10% slippage tolerance (docs: trading/
 // take-profit-and-stop-loss-orders-tp-sl). A market trigger still needs a
 // limit price on the wire; the SDK's own TP/SL example passes one with room
 // on the far side of the trigger, and this is that room.
 constexpr double kTriggerMarketSlippage = 0.10;
-
-double roundToDecimals(double v, int decimals)
-{
-  const double scale = std::pow(10.0, decimals);
-  return std::round(v * scale) / scale;
-}
 
 // 5 significant figures, or an integer from 100000 up (HL accepts any
 // integer price).
@@ -162,12 +214,9 @@ double roundPxSigFigs(double px)
   return std::strtod(buf, nullptr);
 }
 
-std::string formatHlPx(double px, int szDecimals)
-{
-  const int maxDecimals =
-      szDecimals >= 0 ? std::max(0, kPerpMaxDecimals - szDecimals) : kUnknownPrecisionDecimals;
-  return tidy(roundToDecimals(roundPxSigFigs(px), maxDecimals), maxDecimals);
-}
+// Only called on a price already on HL's grid, so the exact decimal is the
+// venue's own form.
+std::string formatHlPx(Price px) { return venue_price::trimmedDecimal(px); }
 
 // Truncated on the fixed-point value itself, so no floating-point rounding
 // can carry a size up to the next step.
@@ -259,21 +308,33 @@ OrderWire buildOrderWire(const Order& order, int asset, int szDecimals, const st
     const bool isMarket =
         order.type == OrderType::STOP_MARKET || order.type == OrderType::TAKE_PROFIT_MARKET;
     const bool isStop = order.type == OrderType::STOP_MARKET || order.type == OrderType::STOP_LIMIT;
+    if (!onHlGrid(order.triggerPrice, szDecimals))
+    {
+      out.error = kRejectTriggerOffTick;
+      return out;
+    }
     if (isMarket)
     {
       // Always derived from the trigger, never taken from order.price: a
       // caller that sets price = trigger for a stop-market (which the
       // backtester ignores) would otherwise send a stop with no room to fill.
-      limitPx = marketPriceWithSlippage(order.triggerPrice, order.side, kTriggerMarketSlippage);
+      limitPx = snapToHlGrid(
+          marketPriceWithSlippage(order.triggerPrice, order.side, kTriggerMarketSlippage),
+          szDecimals, order.side);
     }
     else if (order.price.raw() <= 0)
     {
       out.error = "conditional limit order without a limit price";
       return out;
     }
+    else if (!onHlGrid(order.price, szDecimals))
+    {
+      out.error = kRejectPriceOffTick;
+      return out;
+    }
     typeObj = std::string("{\"trigger\":{\"isMarket\":") + (isMarket ? "true" : "false") +
-              ",\"triggerPx\":\"" + formatHlPx(order.triggerPrice.toDouble(), szDecimals) +
-              "\",\"tpsl\":\"" + (isStop ? "sl" : "tp") + "\"}}";
+              ",\"triggerPx\":\"" + formatHlPx(order.triggerPrice) + "\",\"tpsl\":\"" +
+              (isStop ? "sl" : "tp") + "\"}}";
   }
   else
   {
@@ -290,6 +351,17 @@ OrderWire buildOrderWire(const Order& order, int asset, int szDecimals, const st
                       ? "market order without a price: Hyperliquid has no market primitive, "
                         "set order.price (marketPriceWithSlippage) for the IOC limit"
                       : "limit order without a price";
+      return out;
+    }
+    if (order.type == OrderType::MARKET)
+    {
+      // The IOC limit of a market order bounds the fill; it is not a price
+      // the order rests at, so it is moved onto the grid rather than refused.
+      limitPx = snapToHlGrid(order.price, szDecimals, order.side);
+    }
+    else if (!onHlGrid(order.price, szDecimals))
+    {
+      out.error = kRejectPriceOffTick;
       return out;
     }
     typeObj = "{\"limit\":{\"tif\":\"" + std::string(*tif) + "\"}}";
@@ -311,11 +383,67 @@ OrderWire buildOrderWire(const Order& order, int asset, int szDecimals, const st
   out.wire.reserve(192);
   out.wire += "{\"a\":" + std::to_string(asset);
   out.wire += ",\"b\":" + std::string(order.side == Side::BUY ? "true" : "false");
-  out.wire += ",\"p\":\"" + formatHlPx(limitPx.toDouble(), szDecimals) + "\"";
+  out.wire += ",\"p\":\"" + formatHlPx(limitPx) + "\"";
   out.wire += ",\"s\":\"" + sz + "\"";
   out.wire += ",\"r\":" + std::string(order.flags.reduceOnly ? "true" : "false");
   out.wire += ",\"t\":" + typeObj;
   out.wire += ",\"c\":\"" + cloid + "\"}";
+  return out;
+}
+
+// The answer to a cancel or modify action. HL answers HTTP 200 whatever
+// happens: {"status":"err","response":"..."} for an action refused as a
+// whole, and {"status":"ok","response":{"type":...,"data":{"statuses":[...]}}}
+// otherwise, where a status may itself be {"error":"..."} -- a cancel of an
+// order that already filled answers that way (exchange endpoint docs, "Cancel
+// order(s)"). A body of neither shape is reported as a refusal: the action's
+// fate is then unknown.
+struct HlActionAck
+{
+  bool ok{false};
+  std::string reason;
+};
+
+HlActionAck readHlActionAck(std::string_view resp)
+{
+  HlActionAck out;
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded(resp);
+  auto parsed = parser.parse(padded);
+  if (parsed.error())
+  {
+    out.reason = "unparseable response: " + std::string(resp.substr(0, 200));
+    return out;
+  }
+  auto doc = parsed.value();
+  std::string_view status;
+  if (doc["status"].get_string().get(status) || status != "ok")
+  {
+    std::string_view why;
+    if (doc["response"].get_string().get(why) || why.empty())
+    {
+      out.reason = std::string(resp.substr(0, 200));
+    }
+    else
+    {
+      out.reason = std::string(why);
+    }
+    return out;
+  }
+  auto statuses = doc["response"]["data"]["statuses"].get_array();
+  if (!statuses.error())
+  {
+    for (auto st : statuses.value_unsafe())
+    {
+      std::string_view err;
+      if (!st["error"].get_string().get(err))
+      {
+        out.reason = std::string(err);
+        return out;
+      }
+    }
+  }
+  out.ok = true;
   return out;
 }
 
@@ -649,6 +777,42 @@ void HyperliquidOrderExecutorT<Policies>::publishRejection(const Order& order,
   OrderEvent ev;
   ev.status = OrderEventStatus::REJECTED;
   ev.order = order;
+  ev.rejectReason = reason;
+  ev.publishNs = nowMonoNanos();
+  _orderBus->publish(std::move(ev));
+}
+
+template <typename Policies>
+void HyperliquidOrderExecutorT<Policies>::publishCancelRejected(const Order& order,
+                                                                const std::string& reason)
+{
+  LRVX_LOG_ERROR("[HL] cancel rejected: " << reason << " (orderId=" << order.id << ")");
+  if (!_orderBus)
+  {
+    return;
+  }
+  OrderEvent ev;
+  ev.status = OrderEventStatus::REJECTED;
+  ev.order = order;
+  ev.rejectReason = "cancel rejected: " + reason;
+  ev.publishNs = nowMonoNanos();
+  _orderBus->publish(std::move(ev));
+}
+
+template <typename Policies>
+void HyperliquidOrderExecutorT<Policies>::publishReplaceRejected(const Order& order,
+                                                                 const Order& newOrder,
+                                                                 const std::string& reason)
+{
+  LRVX_LOG_ERROR("[HL] replace rejected: " << reason << " (orderId=" << order.id << ")");
+  if (!_orderBus)
+  {
+    return;
+  }
+  OrderEvent ev;
+  ev.status = OrderEventStatus::REPLACE_REJECTED;
+  ev.order = order;
+  ev.newOrder = newOrder;
   ev.rejectReason = reason;
   ev.publishNs = nowMonoNanos();
   _orderBus->publish(std::move(ev));
@@ -1345,24 +1509,25 @@ void HyperliquidOrderExecutorT<Policies>::sendCancelOrder(OrderId localId)
     LRVX_LOG_ERROR("[HL] cancelOrder: no orderState for localId " << localId);
     return;
   }
+  const Order target = orderState->localOrder;
   if (orderState->clientOrderId.empty())
   {
-    LRVX_LOG_ERROR("[HL] cancelOrder: no clientOrderId for localId " << localId);
+    publishCancelRejected(target, "no cloid known for the order");
     return;
   }
 
-  auto symbol = orderState->localOrder.symbol;
+  auto symbol = target.symbol;
   auto info = _registry->getSymbolInfo(symbol);
   if (!info)
   {
-    LRVX_LOG_ERROR("[HL] cancelOrder: no symbolInfo for " << symbol);
+    publishCancelRejected(target, "unknown symbol id");
     return;
   }
 
   int asset = assetIdFor(info->symbol);
   if (asset < 0)
   {
-    LRVX_LOG_ERROR("[HL] cancelOrder: " << assetMissingReason(info->symbol));
+    publishCancelRejected(target, assetMissingReason(info->symbol));
     return;
   }
 
@@ -1374,7 +1539,7 @@ void HyperliquidOrderExecutorT<Policies>::sendCancelOrder(OrderId localId)
   auto body = signedBody(action, hl::nextNonceMs());
   if (!body)
   {
-    LRVX_LOG_ERROR("[HL] cancelOrder: signing failed");
+    publishCancelRejected(target, "signing via SDK helper failed");
     return;
   }
 
@@ -1384,27 +1549,26 @@ void HyperliquidOrderExecutorT<Policies>::sendCancelOrder(OrderId localId)
 
   _transport->post(
       _url, *body, {{"Content-Type", "application/json"}},
-      [this, localId](std::string_view resp)
+      [this, localId, target](std::string_view resp)
       {
         _policies.timeout.clearPending(localId);
 
-        simdjson::ondemand::parser p;
-        simdjson::padded_string ps(resp);
-        auto doc = p.iterate(ps);
-        auto st = doc["status"].get_string();
-        if (!st.error() && std::string_view(st.value_unsafe()) == "ok")
+        // A top-level "ok" alone is not a cancel: the order's own status can
+        // still be an error, and the order then stays live at the venue.
+        const HlActionAck ack = readHlActionAck(resp);
+        if (ack.ok)
         {
           _orderTracker->onCanceled(localId);
         }
         else
         {
-          LRVX_LOG_ERROR("[HL] cancel failed: " << resp);
+          publishCancelRejected(target, ack.reason);
         }
       },
-      [this, localId](std::string_view err)
+      [this, localId, target](std::string_view err)
       {
         _policies.timeout.clearPending(localId);
-        LRVX_LOG_ERROR("[HL] cancel error: " << err);
+        publishCancelRejected(target, "Transport error: " + std::string(err));
       });
 }
 
@@ -1443,6 +1607,7 @@ void HyperliquidOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldLocalId, c
 
   auto exId = orderState->exchangeOrderId;
   auto cloid = orderState->clientOrderId;
+  const Order current = orderState->localOrder;
 
   // HL's modify without always_place takes a non-trigger order only, with
   // tif Alo or a Gtc that would not execute, which the venue overrides to
@@ -1453,30 +1618,30 @@ void HyperliquidOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldLocalId, c
   // modify that names one is refused here rather than by the venue.
   if (isTriggerType(n.type))
   {
-    publishRejection(n,
-                     "replaceOrder: Hyperliquid's modify takes a non-trigger order; cancel the "
-                     "trigger order and submit a new one (oldLocalId " +
-                         std::to_string(oldLocalId) + ")");
+    publishReplaceRejected(current, n,
+                           "replaceOrder: Hyperliquid's modify takes a non-trigger order; cancel "
+                           "the trigger order and submit a new one (oldLocalId " +
+                               std::to_string(oldLocalId) + ")");
     return;
   }
 
   auto info = _registry->getSymbolInfo(n.symbol);
   if (!info)
   {
-    LRVX_LOG_ERROR("[HL] unknown symbol id in replaceOrder");
+    publishReplaceRejected(current, n, "unknown symbol id");
     return;
   }
   int asset = assetIdFor(info->symbol);
   if (asset < 0)
   {
-    LRVX_LOG_ERROR("[HL] replaceOrder: " << assetMissingReason(info->symbol));
+    publishReplaceRejected(current, n, assetMissingReason(info->symbol));
     return;
   }
 
   auto wire = buildOrderWire(n, asset, szDecimalsFor(info->symbol), cloid);
   if (!wire.error.empty())
   {
-    LRVX_LOG_ERROR("[HL] replaceOrder: " << wire.error << " (oldLocalId=" << oldLocalId << ")");
+    publishReplaceRejected(current, n, wire.error);
     return;
   }
   const std::string& orderObj = wire.wire;
@@ -1495,10 +1660,10 @@ void HyperliquidOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldLocalId, c
   }
   else
   {
-    publishRejection(n,
-                     "replaceOrder: neither an exchange order id nor a cloid is known for "
-                     "localId " +
-                         std::to_string(oldLocalId));
+    publishReplaceRejected(current, n,
+                           "replaceOrder: neither an exchange order id nor a cloid is known for "
+                           "localId " +
+                               std::to_string(oldLocalId));
     return;
   }
 
@@ -1507,7 +1672,7 @@ void HyperliquidOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldLocalId, c
   auto body = signedBody(action, hl::nextNonceMs());
   if (!body)
   {
-    LRVX_LOG_ERROR("[HL] replaceOrder: signing failed");
+    publishReplaceRejected(current, n, "signing via SDK helper failed");
     return;
   }
 
@@ -1518,28 +1683,24 @@ void HyperliquidOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldLocalId, c
 
   _transport->post(
       _url, *body, {{"Content-Type", "application/json"}},
-      [this, oldLocalId, exId, n, cloid](std::string_view resp)
+      [this, oldLocalId, exId, n, cloid, current](std::string_view resp)
       {
         _policies.timeout.clearPending(oldLocalId);
 
-        simdjson::ondemand::parser parser;
-        simdjson::padded_string padded(resp);
-        auto doc = parser.iterate(padded);
-
-        auto status = doc["status"].get_string();
-        if (!status.error() && status.value() == "ok")
+        const HlActionAck ack = readHlActionAck(resp);
+        if (ack.ok)
         {
           _orderTracker->onReplaced(oldLocalId, n, exId, cloid);
         }
         else
         {
-          LRVX_LOG_ERROR("[HL] modify error: " << status);
+          publishReplaceRejected(current, n, ack.reason);
         }
       },
-      [this, oldLocalId](std::string_view err)
+      [this, oldLocalId, n, current](std::string_view err)
       {
         _policies.timeout.clearPending(oldLocalId);
-        LRVX_LOG_ERROR("[HL] modify error: " << err);
+        publishReplaceRejected(current, n, "Transport error: " + std::string(err));
       });
 }
 

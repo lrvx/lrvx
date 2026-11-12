@@ -9,6 +9,7 @@
 
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/capi/order_type_names.hpp"
+#include "lrvx/strategy/signal.h"
 
 #include <cstdint>
 #include <string>
@@ -65,6 +66,71 @@ inline PySignal pySignalFromC(const LrvxSignal* s)
   ps.range_upper = s->range_upper;
   ps.liquidity = s->liquidity;
   return ps;
+}
+
+// The same Signal, read from the C++ struct rather than the C ABI copy.
+inline PySignal pySignalFromCxx(const lrvx::Signal& s)
+{
+  using lrvx::SignalType;
+  uint8_t code = LRVX_SIGNAL_TYPE_MARKET;
+  switch (s.type)
+  {
+    case SignalType::Market:
+      code = LRVX_SIGNAL_TYPE_MARKET;
+      break;
+    case SignalType::Limit:
+      code = LRVX_SIGNAL_TYPE_LIMIT;
+      break;
+    case SignalType::StopMarket:
+      code = LRVX_SIGNAL_TYPE_STOP_MARKET;
+      break;
+    case SignalType::StopLimit:
+      code = LRVX_SIGNAL_TYPE_STOP_LIMIT;
+      break;
+    case SignalType::TakeProfitMarket:
+      code = LRVX_SIGNAL_TYPE_TAKE_PROFIT_MARKET;
+      break;
+    case SignalType::TakeProfitLimit:
+      code = LRVX_SIGNAL_TYPE_TAKE_PROFIT_LIMIT;
+      break;
+    case SignalType::TrailingStop:
+      code = LRVX_SIGNAL_TYPE_TRAILING_STOP;
+      break;
+    case SignalType::Cancel:
+      code = LRVX_SIGNAL_TYPE_CANCEL;
+      break;
+    case SignalType::CancelAll:
+      code = LRVX_SIGNAL_TYPE_CANCEL_ALL;
+      break;
+    case SignalType::Modify:
+      code = LRVX_SIGNAL_TYPE_MODIFY;
+      break;
+    case SignalType::OCO:
+      code = LRVX_SIGNAL_TYPE_OCO;
+      break;
+    case SignalType::ProvideLiquidity:
+      code = LRVX_SIGNAL_TYPE_PROVIDE_LIQUIDITY;
+      break;
+    case SignalType::WithdrawLiquidity:
+      code = LRVX_SIGNAL_TYPE_WITHDRAW_LIQUIDITY;
+      break;
+  }
+  LrvxSignal c{};
+  c.order_id = s.orderId;
+  c.symbol = s.symbol;
+  c.side = s.side == lrvx::Side::BUY ? 0 : 1;
+  c.order_type = code;
+  c.price = s.price.toDouble();
+  c.quantity = s.quantity.toDouble();
+  c.trigger_price = s.triggerPrice.toDouble();
+  c.trailing_offset = s.trailingOffset.toDouble();
+  c.trailing_bps = s.trailingCallbackRate;
+  c.new_price = s.newPrice.toDouble();
+  c.new_quantity = s.newQuantity.toDouble();
+  c.range_lower = s.priceLower.toDouble();
+  c.range_upper = s.priceUpper.toDouble();
+  c.liquidity = s.liquidity.toDouble();
+  return pySignalFromC(&c);
 }
 
 }  // namespace

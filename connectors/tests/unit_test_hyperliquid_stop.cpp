@@ -136,6 +136,7 @@ struct Buses
 HyperliquidConfig configFor(std::string endpoint)
 {
   HyperliquidConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   cfg.wsEndpoint = std::move(endpoint);
   cfg.symbols = {"BTC"};
   cfg.reconnectDelayMs = 5000;
