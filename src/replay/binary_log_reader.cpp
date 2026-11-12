@@ -655,6 +655,60 @@ std::optional<IndexWindow> indexWindow(std::span<const IndexEntry> idx,
   return w;
 }
 
+// Proven lower bound on every event of a Sorted segment, or nullopt.
+//
+// Uncompressed: the frames are in non-decreasing order, so the first frame's
+// timestamp is the minimum. The header's first_event_ns is not: the writer
+// records the first non-zero timestamp, past any leading run of zeros.
+// Compressed: the index holds one entry per block with that block's minimum
+// after the block was sorted, so the smallest entry is the segment minimum.
+// The header records the first event in arrival order, which can sit above
+// the block minimum. An index that is missing, fails its CRC or does not
+// start at the first block bounds nothing.
+std::optional<int64_t> sortedSegmentLowerBound(std::FILE* f, const SegmentHeader& hdr)
+{
+  if (!hdr.isSorted())
+  {
+    return std::nullopt;
+  }
+  if (!hdr.isCompressed())
+  {
+    FrameHeader frame{};
+    int64_t ts = 0;
+    if (std::fseek(f, sizeof(SegmentHeader), SEEK_SET) != 0 ||
+        std::fread(&frame, sizeof(frame), 1, f) != 1 || frame.size < sizeof(int64_t) ||
+        std::fread(&ts, sizeof(ts), 1, f) != 1)
+    {
+      return std::nullopt;
+    }
+    return ts;
+  }
+  if (!hdr.hasIndex() || hdr.index_offset == 0 ||
+      std::fseek(f, static_cast<long>(hdr.index_offset), SEEK_SET) != 0)
+  {
+    return std::nullopt;
+  }
+  SegmentIndexHeader idx_header{};
+  if (std::fread(&idx_header, sizeof(idx_header), 1, f) != 1 || !idx_header.isValid() ||
+      idx_header.entry_count == 0 || idx_header.entry_count > (1u << 24))
+  {
+    return std::nullopt;
+  }
+  std::vector<IndexEntry> entries(idx_header.entry_count);
+  if (std::fread(entries.data(), sizeof(IndexEntry), entries.size(), f) != entries.size() ||
+      Crc32::compute(entries.data(), entries.size() * sizeof(IndexEntry)) != idx_header.crc32 ||
+      entries.front().file_offset != sizeof(SegmentHeader))
+  {
+    return std::nullopt;
+  }
+  int64_t lo = entries.front().timestamp_ns;
+  for (const auto& e : entries)
+  {
+    lo = std::min(lo, e.timestamp_ns);
+  }
+  return lo;
+}
+
 // Min-heap comparator for ReplayEvent. Greater-than yields a min-heap
 // when paired with std::push_heap / std::pop_heap. Defined in this
 // anon namespace so both `streamSegmentWithStats` (single-thread per-
@@ -869,6 +923,8 @@ BinaryLogReader::BinaryLogReader(BinaryLogReader&& other) noexcept
     : _config(std::move(other._config)),
       _stats(other._stats),
       _segments(std::move(other._segments)),
+      _read_order(std::move(other._read_order)),
+      _read_groups(std::move(other._read_groups)),
       _scanned(other._scanned),
       _progress_cb(std::move(other._progress_cb)),
       _progress_interval(other._progress_interval)
@@ -882,6 +938,8 @@ BinaryLogReader& BinaryLogReader::operator=(BinaryLogReader&& other) noexcept
     _config = std::move(other._config);
     _stats = other._stats;
     _segments = std::move(other._segments);
+    _read_order = std::move(other._read_order);
+    _read_groups = std::move(other._read_groups);
     _scanned = other._scanned;
     _progress_cb = std::move(other._progress_cb);
     _progress_interval = other._progress_interval;
@@ -975,13 +1033,62 @@ bool BinaryLogReader::scanSegments()
         }
       }
 
+      if (const auto lo = sortedSegmentLowerBound(f, header))
+      {
+        info.time_bounded = true;
+        info.min_event_ns = *lo;
+      }
+
       _segments.push_back(std::move(info));
     }
     std::fclose(f);
   }
 
+  planReadOrder();
   _scanned = true;
   return true;
+}
+
+void BinaryLogReader::planReadOrder()
+{
+  _read_order.clear();
+  _read_groups.clear();
+  const size_t n = _segments.size();
+  _read_order.reserve(n);
+
+  // Time-bounded segments between two unbounded ones form a run, sorted by
+  // first event and merged. An unbounded segment proves nothing about where
+  // its events fall, so it stays where its file name puts it and ends the run.
+  size_t i = 0;
+  while (i < n)
+  {
+    if (!_config.order_segments_by_time || !_segments[i].time_bounded)
+    {
+      _read_groups.push_back({_read_order.size(), _read_order.size() + 1, false});
+      _read_order.push_back(i);
+      ++i;
+      continue;
+    }
+    const size_t begin = _read_order.size();
+    for (; i < n && _segments[i].time_bounded; ++i)
+    {
+      _read_order.push_back(i);
+    }
+    std::stable_sort(_read_order.begin() + static_cast<std::ptrdiff_t>(begin), _read_order.end(),
+                     [this](size_t a, size_t b)
+                     { return _segments[a].min_event_ns < _segments[b].min_event_ns; });
+    _read_groups.push_back({begin, _read_order.size(), true});
+  }
+}
+
+void BinaryLogReader::noteVisited(size_t read_pos)
+{
+  // _read_order is a permutation of the file-name order; a segment sits at
+  // its own index exactly when nothing moved it.
+  if (_read_order[read_pos] != read_pos)
+  {
+    ++_stats.segments_reordered;
+  }
 }
 
 bool BinaryLogReader::passesFilter(const ReplayEvent& event) const
@@ -1165,7 +1272,7 @@ bool BinaryLogReader::readSegment(const std::filesystem::path& path, EventCallba
 }
 
 bool BinaryLogReader::readSegmentFrom(const SegmentInfo& segment, int64_t start_ts_ns,
-                                      EventCallback& callback)
+                                      bool seek, EventCallback& callback)
 {
   BinaryLogIterator iter(segment.path);
   if (!iter.isValid())
@@ -1176,7 +1283,7 @@ bool BinaryLogReader::readSegmentFrom(const SegmentInfo& segment, int64_t start_
   ++_stats.files_read;
 
   // Use index if available to seek to starting position
-  if (segment.has_index)
+  if (seek && segment.has_index)
   {
     iter.loadIndex();
     if (iter.hasIndex())
@@ -1246,21 +1353,259 @@ bool BinaryLogReader::forEach(EventCallback callback)
   {
     return false;
   }
+  return walk(/*buffered=*/true, std::nullopt, callback);
+}
 
-  for (const auto& segment : _segments)
+bool BinaryLogReader::walk(bool buffered, std::optional<int64_t> start, EventCallback& callback)
+{
+  // The *From entry points seek the first segment they read to `start` by its
+  // index. A segment without the Sorted flag is only filtered after that: its
+  // index is not monotonic, so a seek there could pass over events in range.
+  const uint64_t visited_before = _stats.files_read + _stats.segments_skipped;
+
+  for (const auto& group : _read_groups)
   {
+    if (group.merge)
+    {
+      if (!mergeSortedRun(group, start, callback))
+      {
+        return false;
+      }
+      continue;
+    }
+
+    const SegmentInfo& segment = _segments[_read_order[group.begin]];
+    if (start && segment.last_event_ns < *start)
+    {
+      continue;
+    }
+    noteVisited(group.begin);
     if (segmentOutsideRange(segment))
     {
       ++_stats.segments_skipped;
       continue;
     }
-    if (!readSegment(segment.path, callback))
+    const bool seek = _stats.files_read + _stats.segments_skipped == visited_before;
+    bool ok = false;
+    if (start)
+    {
+      ok = buffered ? readSegmentFrom(segment, *start, seek, callback)
+                    : readSegmentStreamingFrom(segment, *start, seek, callback);
+    }
+    else
+    {
+      ok = buffered ? readSegment(segment.path, callback)
+                    : readSegmentStreaming(segment.path, callback);
+    }
+    if (!ok)
     {
       return false;
     }
   }
-
   return true;
+}
+
+namespace
+{
+
+// One open segment of a run being merged: its iterator and the next event it
+// will deliver.
+struct SortedCursor
+{
+  explicit SortedCursor(const std::filesystem::path& path) : iter(path) {}
+
+  BinaryLogIterator iter;
+  ReplayEvent head;
+  size_t file_index{0};
+  bool stop_past_to{false};
+  bool interleaved{false};
+};
+
+}  // namespace
+
+bool BinaryLogReader::mergeSortedRun(const ReadGroup& run, std::optional<int64_t> start,
+                                     EventCallback& callback)
+{
+  const int64_t lower = start.value_or(std::numeric_limits<int64_t>::min());
+
+  // Loads the cursor's next deliverable event into `head`; false at its end.
+  auto advance = [this, lower](SortedCursor& c)
+  {
+    while (c.iter.next(c.head))
+    {
+      if (c.stop_past_to && c.head.timestamp_ns > *_config.to_ns)
+      {
+        return false;
+      }
+      if (c.head.timestamp_ns < lower || !passesFilter(c.head))
+      {
+        continue;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // Min-heap on (head timestamp, file order). Each cursor reads its own
+  // segment front to back, which supplies the last tie-break: position.
+  auto later = [](const std::unique_ptr<SortedCursor>& a, const std::unique_ptr<SortedCursor>& b)
+  {
+    if (a->head.timestamp_ns != b->head.timestamp_ns)
+    {
+      return a->head.timestamp_ns > b->head.timestamp_ns;
+    }
+    return a->file_index > b->file_index;
+  };
+
+  std::vector<std::unique_ptr<SortedCursor>> heap;
+  size_t next = run.begin;
+  for (;;)
+  {
+    // Open each pending segment that may hold an event ordered before the
+    // earliest head. Pending segments are sorted by min_event_ns, a lower
+    // bound on all their events, so the first one that cannot ends the scan.
+    // On a tape recorded in order the next segment opens only once the
+    // current one is exhausted, exactly as a plain walk would.
+    while (next < run.end)
+    {
+      const size_t index = _read_order[next];
+      const SegmentInfo& segment = _segments[index];
+      if (!heap.empty())
+      {
+        const SortedCursor& top = *heap.front();
+        if (segment.min_event_ns > top.head.timestamp_ns ||
+            (segment.min_event_ns == top.head.timestamp_ns && index > top.file_index))
+        {
+          break;
+        }
+      }
+      const size_t pos = next++;
+      if (start && segment.last_event_ns < *start)
+      {
+        continue;
+      }
+      noteVisited(pos);
+      if (segmentOutsideRange(segment))
+      {
+        ++_stats.segments_skipped;
+        continue;
+      }
+
+      auto cursor = std::make_unique<SortedCursor>(segment.path);
+      if (!cursor->iter.isValid())
+      {
+        return false;
+      }
+      cursor->file_index = index;
+      if (start)
+      {
+        ++_stats.files_read;
+        if (segment.has_index)
+        {
+          cursor->iter.loadIndex();
+          cursor->iter.seekToTimestamp(*start);
+        }
+      }
+      else
+      {
+        if (!narrowToRange(cursor->iter, cursor->stop_past_to))
+        {
+          ++_stats.segments_skipped;
+          continue;
+        }
+        ++_stats.files_read;
+      }
+      if (!advance(*cursor))
+      {
+        continue;
+      }
+      if (!heap.empty())
+      {
+        cursor->interleaved = true;
+        ++_stats.segments_interleaved;
+        for (auto& open : heap)
+        {
+          if (!open->interleaved)
+          {
+            open->interleaved = true;
+            ++_stats.segments_interleaved;
+          }
+        }
+      }
+      heap.push_back(std::move(cursor));
+      std::push_heap(heap.begin(), heap.end(), later);
+    }
+
+    if (heap.empty())
+    {
+      return true;
+    }
+
+    if (heap.size() == 1)
+    {
+      // One segment open, the common case: stream it until it is exhausted or
+      // reaches the point where the next pending segment must be opened.
+      SortedCursor& only = *heap.front();
+      ReplayEvent& ev = only.head;
+      const size_t next_index = next < run.end ? _read_order[next] : 0;
+      // Past this timestamp the next pending segment must be opened; on
+      // reaching it exactly, only when that segment's file sorts first.
+      const int64_t open_above = next < run.end ? _segments[next_index].min_event_ns
+                                                : std::numeric_limits<int64_t>::max();
+      const bool open_at = next < run.end && next_index < only.file_index;
+      const int64_t to = only.stop_past_to ? *_config.to_ns : std::numeric_limits<int64_t>::max();
+      for (;;)
+      {
+        ++_stats.events_read;
+        ev.type == EventType::Trade ? ++_stats.trades_read : ++_stats.book_updates_read;
+        if (!callback(ev))
+        {
+          return false;
+        }
+        bool more = false;
+        while (only.iter.next(ev))
+        {
+          if (ev.timestamp_ns > to)
+          {
+            break;
+          }
+          if (ev.timestamp_ns < lower || !passesFilter(ev))
+          {
+            continue;
+          }
+          more = true;
+          break;
+        }
+        if (!more)
+        {
+          heap.clear();
+          break;
+        }
+        if (ev.timestamp_ns > open_above || (open_at && ev.timestamp_ns == open_above))
+        {
+          break;
+        }
+      }
+      continue;
+    }
+
+    std::pop_heap(heap.begin(), heap.end(), later);
+    SortedCursor& top = *heap.back();
+    ++_stats.events_read;
+    top.head.type == EventType::Trade ? ++_stats.trades_read : ++_stats.book_updates_read;
+    if (!callback(top.head))
+    {
+      return false;
+    }
+    if (advance(top))
+    {
+      std::push_heap(heap.begin(), heap.end(), later);
+    }
+    else
+    {
+      heap.pop_back();
+    }
+  }
 }
 
 bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
@@ -1352,7 +1697,7 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
       // total event count) so the timestamp is exact, not just the
       // most recent intra-walk dispatch.
       const int64_t end_ts =
-          _segments.empty() ? int64_t{0} : _segments.back().last_event_ns;
+          _read_order.empty() ? int64_t{0} : _segments[_read_order.back()].last_event_ns;
       (*cb_ptr)(1.0, end_ts);
     }
 
@@ -1473,8 +1818,13 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
     return streamSegmentWithStats(path, cb, _stats);
   };
 
-  for (const auto& segment : _segments)
+  // Segments in read order, each partitioned on its own: segments whose
+  // ranges overlap are not interleaved here, any more than the blocks a
+  // segment is split into are.
+  for (size_t read_pos = 0; read_pos < _read_order.size(); ++read_pos)
   {
+    const SegmentInfo& segment = _segments[_read_order[read_pos]];
+    noteVisited(read_pos);
     if (segmentOutsideRange(segment))
     {
       ++_stats.segments_skipped;
@@ -1648,21 +1998,7 @@ bool BinaryLogReader::streamForEach(EventCallback callback)
   }
 
   _stream_watermark = std::numeric_limits<int64_t>::min();
-
-  for (const auto& segment : _segments)
-  {
-    if (segmentOutsideRange(segment))
-    {
-      ++_stats.segments_skipped;
-      continue;
-    }
-    if (!readSegmentStreaming(segment.path, callback))
-    {
-      return false;
-    }
-  }
-
-  return true;
+  return walk(/*buffered=*/false, std::nullopt, callback);
 }
 
 bool BinaryLogReader::streamForEachFrom(int64_t start_ts_ns, EventCallback callback)
@@ -1673,26 +2009,7 @@ bool BinaryLogReader::streamForEachFrom(int64_t start_ts_ns, EventCallback callb
   }
 
   _stream_watermark = std::numeric_limits<int64_t>::min();
-
-  auto it = std::lower_bound(_segments.begin(), _segments.end(), start_ts_ns,
-                             [](const SegmentInfo& seg, int64_t ts)
-                             { return seg.last_event_ns < ts; });
-
-  for (; it != _segments.end(); ++it)
-  {
-    if (segmentOutsideRange(*it))
-    {
-      ++_stats.segments_skipped;
-    }
-    else if (!readSegmentStreamingFrom(*it, start_ts_ns, callback))
-    {
-      return false;
-    }
-    // After first segment, deliver remaining segments from beginning.
-    start_ts_ns = 0;
-  }
-
-  return true;
+  return walk(/*buffered=*/false, start_ts_ns, callback);
 }
 
 bool BinaryLogReader::readSegmentStreaming(const std::filesystem::path& path,
@@ -1783,7 +2100,7 @@ bool BinaryLogReader::streamSegmentWithStats(const std::filesystem::path& path,
 }
 
 bool BinaryLogReader::readSegmentStreamingFrom(const SegmentInfo& segment,
-                                               int64_t start_ts_ns,
+                                               int64_t start_ts_ns, bool seek,
                                                EventCallback& callback)
 {
   BinaryLogIterator iter(segment.path);
@@ -1794,7 +2111,7 @@ bool BinaryLogReader::readSegmentStreamingFrom(const SegmentInfo& segment,
 
   ++_stats.files_read;
 
-  if (segment.has_index)
+  if (seek && segment.has_index)
   {
     iter.loadIndex();
     if (iter.hasIndex())
@@ -1855,29 +2172,7 @@ bool BinaryLogReader::forEachFrom(int64_t start_ts_ns, EventCallback callback)
   {
     return false;
   }
-
-  // Find first segment that may contain events >= start_ts_ns
-  auto it = std::lower_bound(_segments.begin(), _segments.end(), start_ts_ns,
-                             [](const SegmentInfo& seg, int64_t ts)
-                             {
-                               return seg.last_event_ns < ts;
-                             });
-
-  for (; it != _segments.end(); ++it)
-  {
-    if (segmentOutsideRange(*it))
-    {
-      ++_stats.segments_skipped;
-    }
-    else if (!readSegmentFrom(*it, start_ts_ns, callback))
-    {
-      return false;
-    }
-    // After first segment, read remaining segments from beginning
-    start_ts_ns = 0;
-  }
-
-  return true;
+  return walk(/*buffered=*/true, start_ts_ns, callback);
 }
 
 std::optional<std::pair<int64_t, int64_t>> BinaryLogReader::timeRange() const
@@ -1921,6 +2216,18 @@ std::vector<std::filesystem::path> BinaryLogReader::segmentFiles() const
     paths.push_back(seg.path);
   }
   return paths;
+}
+
+std::vector<SegmentInfo> BinaryLogReader::segmentsInReadOrder() const
+{
+  ensureScanned();
+  std::vector<SegmentInfo> out;
+  out.reserve(_read_order.size());
+  for (size_t index : _read_order)
+  {
+    out.push_back(_segments[index]);
+  }
+  return out;
 }
 
 const std::vector<SegmentInfo>& BinaryLogReader::segments() const

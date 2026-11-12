@@ -15041,12 +15041,27 @@
         },
         {
           "kind": "method",
+          "name": "mergeSortedRun",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
           "name": "narrowToRange",
           "parent": "BinaryLogReader"
         },
         {
           "kind": "method",
+          "name": "noteVisited",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
           "name": "passesFilter",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
+          "name": "planReadOrder",
           "parent": "BinaryLogReader"
         },
         {
@@ -15101,6 +15116,11 @@
         },
         {
           "kind": "method",
+          "name": "segmentsInReadOrder",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
           "name": "setProgressCallback",
           "parent": "BinaryLogReader"
         },
@@ -15132,6 +15152,11 @@
         {
           "kind": "method",
           "name": "timeRange",
+          "parent": "BinaryLogReader"
+        },
+        {
+          "kind": "method",
+          "name": "walk",
           "parent": "BinaryLogReader"
         },
         {

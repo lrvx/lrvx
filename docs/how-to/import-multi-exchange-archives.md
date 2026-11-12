@@ -14,6 +14,8 @@ Adding a new venue is a self-contained module under `lrvx/archives/` that implem
 
 All five trade importers append by default and dedup the same way: a row is skipped when its trade id is already on the tape for the same symbol within the incoming file's time range. A trade keeps its exchange timestamp, so only that range can hold a copy of it, and the dedup read covers that range instead of the whole tape. Re-importing a day adds nothing, a new day lands in full, an overlapping range keeps each trade once, and days may be imported in any order (a later day first, or a day that fills a gap). `--no-append` turns the check off.
 
+Each import writes new segments named by the time of the import, so a tape filled out of order lists its segments out of time order. Readers and `run_tape` order segments by their first event, so the tape still replays forward in time.
+
 ## Bybit
 
 Bybit publishes daily trade ticks at `https://public.bybit.com/` going back two-plus years. The on-disk CSV layout (post-2022):

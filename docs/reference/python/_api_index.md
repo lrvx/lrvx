@@ -484,7 +484,7 @@ Returns the same nanoseconds every call. Useful as a baseline.
 
 **Constructor**
 
-- `DataReader(data_dir: str, from_ns: typing.Any = None, to_ns: typing.Any = None, symbols: typing.Any = None, reorder_window_ns: typing.Any = None, strict_ordering: bool = False) -> None`
+- `DataReader(data_dir: str, from_ns: typing.Any = None, to_ns: typing.Any = None, symbols: typing.Any = None, reorder_window_ns: typing.Any = None, strict_ordering: bool = False, order_segments_by_time: bool = True) -> None`
 
 **Members**
 
