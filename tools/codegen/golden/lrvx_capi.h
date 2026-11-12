@@ -40,6 +40,7 @@ extern "C"
   typedef void* LrvxCurveHandle;
   typedef void* LrvxPoolTapeHandle;
   typedef void* LrvxPoolReplayHandle;
+  typedef void* LrvxStreamingIndicatorHandle;
   typedef void* LrvxIndicatorGraphHandle;
   typedef LrvxIndicatorGraphHandle LrvxStreamingGraphHandle;
   typedef void* LrvxOrderGroupHandle;
@@ -93,6 +94,7 @@ extern "C"
 
   // Feature Flags
 #define LRVX_HAS_OPTIONAL_RAW_BEST_QUOTE 1
+#define LRVX_HAS_STREAMING_INDICATOR_HANDLES 1
 
   // Signal type codes (LrvxSignal.order_type)
 #define LRVX_SIGNAL_TYPE_MARKET 0
@@ -2320,6 +2322,30 @@ extern "C"
                           uint64_t bar_type_param, double open, double high, double low,
                           double close, double volume, double buy_volume, int64_t start_time_ns,
                           int64_t end_time_ns, uint8_t close_reason);
+
+  // ============================================================
+  // Streaming Indicator
+  // ============================================================
+
+  LrvxStreamingIndicatorHandle lrvx_streaming_indicator_create(const char* name,
+                                                               const double* args,
+                                                               uint32_t num_args);
+  void lrvx_streaming_indicator_destroy(LrvxStreamingIndicatorHandle h);
+  uint32_t lrvx_streaming_indicator_input_count(LrvxStreamingIndicatorHandle h);
+  uint32_t lrvx_streaming_indicator_output_count(LrvxStreamingIndicatorHandle h);
+  double lrvx_streaming_indicator_update(LrvxStreamingIndicatorHandle h, double value);
+  double lrvx_streaming_indicator_update_bar(LrvxStreamingIndicatorHandle h, double high, double low,
+                                             double close);
+  double lrvx_streaming_indicator_update_high_low(LrvxStreamingIndicatorHandle h, double high,
+                                                  double low);
+  double lrvx_streaming_indicator_update_ohlc(LrvxStreamingIndicatorHandle h, double open,
+                                              double high, double low, double close);
+  double lrvx_streaming_indicator_update_pair(LrvxStreamingIndicatorHandle h, double x, double y);
+  double lrvx_streaming_indicator_value(LrvxStreamingIndicatorHandle h);
+  double lrvx_streaming_indicator_output(LrvxStreamingIndicatorHandle h, uint32_t index);
+  uint8_t lrvx_streaming_indicator_ready(LrvxStreamingIndicatorHandle h);
+  uint64_t lrvx_streaming_indicator_count(LrvxStreamingIndicatorHandle h);
+  void lrvx_streaming_indicator_reset(LrvxStreamingIndicatorHandle h);
 
   // ============================================================
   // Symbol Registry

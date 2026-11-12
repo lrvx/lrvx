@@ -14,7 +14,9 @@ Adding a new venue is a self-contained module under `lrvx/archives/` that implem
 
 All five trade importers append by default and dedup the same way: a row is skipped when its trade id is already on the tape for the same symbol within the incoming file's time range. A trade keeps its exchange timestamp, so only that range can hold a copy of it, and the dedup read covers that range instead of the whole tape. Re-importing a day adds nothing, a new day lands in full, an overlapping range keeps each trade once, and days may be imported in any order (a later day first, or a day that fills a gap). `--no-append` turns the check off.
 
-The Binance bookTicker importer (`--book t1`) follows the same rule on the book record's update id, and encode every file on its own, starting from a snapshot, so book days may be imported in any order too. See [Import Binance book archives](import-binance-book-archive.md#append-safe-and-idempotent).
+Each import writes new segments named by the time of the import, so a tape filled out of order lists its segments out of time order. Readers and `run_tape` order segments by their first event, so the tape still replays forward in time.
+
+The Binance bookTicker importer (`--book t1`) follows the same rule on the book record's update id, and encodes every file on its own, starting from a snapshot, so book days may be imported in any order too. See [Import Binance book archives](import-binance-book-archive.md#append-safe-and-idempotent).
 
 ## Bybit
 
@@ -160,7 +162,7 @@ trade_id, timestamp_ms, instrument, side, price, amount,
 mark_price, iv, index_price
 ```
 
-`trade_id` is integer, used directly for append-safe dedup. `side` is `buy` / `sell` lowercase. `mark_price`, `iv`, and `index_price` are dropped at read time — the lrvx `TradeRecord` schema does not represent them; keep the source CSV alongside the tape and re-join in numpy when needed.
+`trade_id` is integer, used directly for append-safe dedup. `side` is `buy` / `sell` lowercase. For an option instrument `mark_price`, `iv` and `index_price` are kept: each trade row also writes an OptionQuote frame carrying them, with `iv` stored as the archive gives it. For a future or perpetual the three columns are not written, since the `TradeRecord` schema has no field for them.
 
 ### Instrument naming
 

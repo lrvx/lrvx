@@ -535,10 +535,10 @@ class ReorderingWalker
     {
       // If the heap's smallest event is safely below watermark - W
       // (no future event can be older), emit it.
-      if (!_heap.empty() && _heap.front().timestamp_ns < safeBelow())
+      if (!_heap.empty() && _heap.front().event.timestamp_ns < safeBelow())
       {
         std::pop_heap(_heap.begin(), _heap.end(), Cmp{});
-        out = std::move(_heap.back());
+        out = std::move(_heap.back().event);
         _heap.pop_back();
         return true;
       }
@@ -553,7 +553,7 @@ class ReorderingWalker
           return false;
         }
         std::pop_heap(_heap.begin(), _heap.end(), Cmp{});
-        out = std::move(_heap.back());
+        out = std::move(_heap.back().event);
         _heap.pop_back();
         return true;
       }
@@ -573,18 +573,29 @@ class ReorderingWalker
       {
         _watermark = ev.timestamp_ns;
       }
-      _heap.push_back(std::move(ev));
+      _heap.push_back(Pending{std::move(ev), _arrivals++});
       std::push_heap(_heap.begin(), _heap.end(), Cmp{});
       // Loop: re-check whether the heap head is now safe to emit.
     }
   }
 
  private:
+  // Arrival number breaks timestamp ties, so events sharing a nanosecond
+  // leave in the order the tape holds them.
+  struct Pending
+  {
+    ReplayEvent event;
+    uint64_t arrival;
+  };
   struct Cmp
   {
-    bool operator()(const ReplayEvent& a, const ReplayEvent& b) const noexcept
+    bool operator()(const Pending& a, const Pending& b) const noexcept
     {
-      return a.timestamp_ns > b.timestamp_ns;  // min-heap
+      if (a.event.timestamp_ns != b.event.timestamp_ns)
+      {
+        return a.event.timestamp_ns > b.event.timestamp_ns;  // min-heap
+      }
+      return a.arrival > b.arrival;
     }
   };
 
@@ -598,7 +609,8 @@ class ReorderingWalker
   TapeWalker _inner;
   int64_t _W;
   uint32_t _tape_index;
-  std::vector<ReplayEvent> _heap;
+  std::vector<Pending> _heap;
+  uint64_t _arrivals{0};
   int64_t _watermark{std::numeric_limits<int64_t>::min()};
 };
 
@@ -628,9 +640,9 @@ bool MergedTapeReader::streamEvents(StreamCallback callback)
     // cross-block reorder buffer) which iterates without buffering.
     BinaryLogReader reader(
         makeReaderConfig(_config.tape_dirs[i], _config.from_ns, _config.to_ns));
-    // segments() returns the cached vector — populate via summary().
-    (void)reader.summary();
-    auto seg_list = reader.segments();
+    // Read order, not file-name order: a tape filled out of order (an
+    // archive import of day 3, then day 1) lists its segments out of time.
+    auto seg_list = reader.segmentsInReadOrder();
     auto walker = std::make_unique<ReorderingWalker>(
         std::move(seg_list), _config.from_ns, _config.to_ns,
         _config.reorder_window_ns, static_cast<uint32_t>(i));

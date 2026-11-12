@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 749 functions, 58 handles, 59 structs, 44 callback typedefs, 3 enums, 16 macro constants, 73 groups.
+**Surface:** 763 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
 
 ## Opaque handles
 
@@ -23,6 +23,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `LrvxCurveHandle`
 - `LrvxPoolTapeHandle`
 - `LrvxPoolReplayHandle`
+- `LrvxStreamingIndicatorHandle`
 - `LrvxIndicatorGraphHandle`
 - `LrvxStreamingGraphHandle` (alias of `LrvxIndicatorGraphHandle`)
 - `LrvxOrderGroupHandle`
@@ -99,6 +100,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 ### feature_flags
 
 - `LRVX_HAS_OPTIONAL_RAW_BEST_QUOTE` = `1`
+- `LRVX_HAS_STREAMING_INDICATOR_HANDLES` = `1`
 
 ### signal_type
 
@@ -1768,6 +1770,23 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `void lrvx_runner_on_book_snapshot(LrvxRunnerHandle runner, uint32_t symbol, const double * bid_prices, const double * bid_qtys, uint32_t n_bids, const double * ask_prices, const double * ask_qtys, uint32_t n_asks, int64_t exchange_ts_ns)`
 - `void lrvx_runner_on_book_top(LrvxRunnerHandle runner, uint32_t symbol, uint8_t has_bid, double bid_price, double bid_qty, uint8_t has_ask, double ask_price, double ask_qty, int64_t exchange_ts_ns)`
 - `void lrvx_runner_on_bar(LrvxRunnerHandle runner, uint32_t symbol, uint8_t bar_type, uint64_t bar_type_param, double open, double high, double low, double close, double volume, double buy_volume, int64_t start_time_ns, int64_t end_time_ns, uint8_t close_reason)`
+
+### streaming_indicator
+
+- `LrvxStreamingIndicatorHandle lrvx_streaming_indicator_create(const char * name, const double * args, uint32_t num_args)`
+- `void lrvx_streaming_indicator_destroy(LrvxStreamingIndicatorHandle h)`
+- `uint32_t lrvx_streaming_indicator_input_count(LrvxStreamingIndicatorHandle h)`
+- `uint32_t lrvx_streaming_indicator_output_count(LrvxStreamingIndicatorHandle h)`
+- `double lrvx_streaming_indicator_update(LrvxStreamingIndicatorHandle h, double value)`
+- `double lrvx_streaming_indicator_update_bar(LrvxStreamingIndicatorHandle h, double high, double low, double close)`
+- `double lrvx_streaming_indicator_update_high_low(LrvxStreamingIndicatorHandle h, double high, double low)`
+- `double lrvx_streaming_indicator_update_ohlc(LrvxStreamingIndicatorHandle h, double open, double high, double low, double close)`
+- `double lrvx_streaming_indicator_update_pair(LrvxStreamingIndicatorHandle h, double x, double y)`
+- `double lrvx_streaming_indicator_value(LrvxStreamingIndicatorHandle h)`
+- `double lrvx_streaming_indicator_output(LrvxStreamingIndicatorHandle h, uint32_t index)`
+- `uint8_t lrvx_streaming_indicator_ready(LrvxStreamingIndicatorHandle h)`
+- `uint64_t lrvx_streaming_indicator_count(LrvxStreamingIndicatorHandle h)`
+- `void lrvx_streaming_indicator_reset(LrvxStreamingIndicatorHandle h)`
 
 ### symbol_registry
 

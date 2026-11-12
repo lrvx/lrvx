@@ -133,6 +133,16 @@ struct ReaderConfig
   // first event past to_ns. The result is identical either way; false
   // restores the full walk (benchmarks, equivalence tests).
   bool skip_segments_by_time{true};
+
+  // Deliver segments in exchange_ts_ns order instead of file-name order.
+  // Segment files are named by the wall-clock time they were opened, so a
+  // tape filled out of order (an archive import of day 3, then of day 1)
+  // lists them out of time order. With this set, segments whose recorded
+  // bounds prove where they start are delivered by their first event, and
+  // segments whose ranges overlap are merged event by event. Segments that
+  // prove nothing (no Sorted flag, still being written) keep their file-name
+  // position. false restores plain file-name order.
+  bool order_segments_by_time{true};
 };
 
 struct DatasetSummary
@@ -189,6 +199,12 @@ struct ReaderStats
   // additive, so they are skipped by FrameHeader.size rather than
   // ending the read.
   uint64_t unknown_frames_skipped{0};
+  // Segments visited at a different position than their file name gives
+  // them (ReaderConfig::order_segments_by_time).
+  uint64_t segments_reordered{0};
+  // Segments whose events were merged with another segment's because their
+  // time ranges overlap.
+  uint64_t segments_interleaved{0};
 };
 
 struct ReplayEvent
@@ -239,6 +255,12 @@ struct SegmentInfo
   // see BinaryLogReader::segmentOutsideRange.
   bool sorted{false};
   bool compressed{false};
+  // True when min_event_ns is a proven lower bound on every event in the
+  // segment: a Sorted segment, bounded by its first frame (uncompressed) or
+  // by its block index (compressed). Segments without the Sorted flag, still
+  // being written, or with no usable index are not bounded.
+  bool time_bounded{false};
+  int64_t min_event_ns{0};
 };
 
 class BinaryLogReader
@@ -278,20 +300,21 @@ class BinaryLogReader
       std::chrono::milliseconds interval = std::chrono::milliseconds(1000));
   void clearProgressCallback();
 
-  // Sorted-order delivery. For segments without the Sorted flag the
-  // entire segment is buffered into memory and stable_sort'ed before
-  // dispatch — O(N_events × sizeof(ReplayEvent)) per segment. Use
-  // this when the caller requires strict timestamp ordering across
-  // events from the same segment (replay engine, tape_diff).
+  // Sorted-order delivery. Segments are visited in read order (see
+  // ReaderConfig::order_segments_by_time): Sorted segments are delivered
+  // in timestamp order across segments, overlapping ones merged event by
+  // event. For segments without the Sorted flag the entire segment is
+  // buffered into memory and stable_sort'ed before dispatch —
+  // O(N_events × sizeof(ReplayEvent)) per segment; such a segment keeps its
+  // file-name position. Use this when the caller requires strict timestamp
+  // ordering (replay engine, tape_diff).
   bool forEach(EventCallback callback);
   bool forEachFrom(int64_t start_ts_ns, EventCallback callback);
 
-  // Writer-order delivery — never buffers a whole segment. O(1)
-  // memory per segment regardless of event count. Events arrive in
-  // BinaryLogIterator order (the order the writer flushed them); for
-  // Sorted segments this is identical to forEach. For unsorted
-  // segments (e.g. tapes from external writers that don't set the
-  // Sorted flag) the caller must tolerate writer-order arrival.
+  // Streaming delivery — never buffers a whole segment. Sorted segments
+  // arrive exactly as from forEach. Segments without the Sorted flag go
+  // through the bounded reorder buffer (reorder_window_ns) instead of a
+  // whole-segment sort, so an event later than the window is dropped.
   //
   // Use this when memory matters more than strict timestamp order.
   // `run(panel)` below uses this path.
@@ -331,10 +354,24 @@ class BinaryLogReader
 
   std::optional<std::pair<int64_t, int64_t>> timeRange() const;
   ReaderStats stats() const;
+  // Segments in file-name order.
   std::vector<std::filesystem::path> segmentFiles() const;
   const std::vector<SegmentInfo>& segments() const;
+  // Segments in the order the reader visits them (see
+  // ReaderConfig::order_segments_by_time). Segments whose ranges overlap are
+  // listed by their first event; the reader interleaves their events.
+  std::vector<SegmentInfo> segmentsInReadOrder() const;
 
  private:
+  // A slice of _read_order: either one segment read on its own, or a run of
+  // time-bounded Sorted segments merged by mergeSortedRun.
+  struct ReadGroup
+  {
+    size_t begin{0};
+    size_t end{0};
+    bool merge{false};
+  };
+
   bool scanSegments();
 
   // Build the segment index exactly once, safely, from a const context.
@@ -343,10 +380,24 @@ class BinaryLogReader
   // thread (a replay loop scanning lazily while the owner asks for timeRange).
   bool ensureScanned() const;
   bool readSegment(const std::filesystem::path& path, EventCallback& callback);
-  bool readSegmentFrom(const SegmentInfo& segment, int64_t start_ts_ns, EventCallback& callback);
+  bool readSegmentFrom(const SegmentInfo& segment, int64_t start_ts_ns, bool seek,
+                       EventCallback& callback);
   bool readSegmentStreaming(const std::filesystem::path& path, EventCallback& callback);
-  bool readSegmentStreamingFrom(const SegmentInfo& segment, int64_t start_ts_ns,
+  bool readSegmentStreamingFrom(const SegmentInfo& segment, int64_t start_ts_ns, bool seek,
                                 EventCallback& callback);
+
+  // Fills _read_order / _read_groups from _segments.
+  void planReadOrder();
+  // Walks the tape in read order. `buffered` selects how segments without
+  // time bounds are read: whole-segment sort (forEach) or the bounded reorder
+  // buffer (streamForEach). `start` is the *From entry points' start.
+  bool walk(bool buffered, std::optional<int64_t> start, EventCallback& callback);
+  // Delivers a run of time-bounded Sorted segments, sorted by first event,
+  // as one stream ordered by (timestamp, file order, position).
+  bool mergeSortedRun(const ReadGroup& run, std::optional<int64_t> start,
+                      EventCallback& callback);
+  // Counts ReaderStats::segments_reordered for the segment at `read_pos`.
+  void noteVisited(size_t read_pos);
   // Streams a single segment using the same intra-block sort + bounded
   // reorder buffer logic as readSegmentStreaming, but writes counter
   // updates into the caller-supplied ReaderStats. Used by parallel
@@ -370,6 +421,8 @@ class BinaryLogReader
   ReaderConfig _config;
   ReaderStats _stats;
   std::vector<SegmentInfo> _segments;
+  std::vector<size_t> _read_order;
+  std::vector<ReadGroup> _read_groups;
   bool _scanned{false};
   mutable std::once_flag _scan_once;
   ProgressCallback _progress_cb;

@@ -785,6 +785,34 @@ groups:
         lrvx_indicator_tema: __lrvx_indicator_tema
         lrvx_indicator_vwap: __lrvx_indicator_vwap
 
+  # One handle per streaming indicator instance. pybind11 and napi wrap the
+  # C++ classes directly rather than these handles; the classes are the
+  # same ones, so they are listed for coverage. The Codon and QuickJS
+  # streaming classes are built on the handles.
+  streaming_indicator:
+    pybind11:
+      status: required
+      classes: [SMA, EMA, ATR, MACD, Bollinger, Stochastic, Correlation]
+    napi:
+      status: required
+      classes: [SMA, EMA, ATR, MACD, Bollinger, Stochastic, Correlation]
+    codon: { status: required }
+    quickjs:
+      status: required
+      functions:
+        lrvx_streaming_indicator_create: __lrvx_streaming_indicator_create
+        lrvx_streaming_indicator_destroy: __lrvx_streaming_indicator_destroy
+        lrvx_streaming_indicator_update: __lrvx_streaming_indicator_update
+        lrvx_streaming_indicator_update_bar: __lrvx_streaming_indicator_update_bar
+        lrvx_streaming_indicator_update_high_low: __lrvx_streaming_indicator_update_high_low
+        lrvx_streaming_indicator_update_ohlc: __lrvx_streaming_indicator_update_ohlc
+        lrvx_streaming_indicator_update_pair: __lrvx_streaming_indicator_update_pair
+        lrvx_streaming_indicator_value: __lrvx_streaming_indicator_value
+        lrvx_streaming_indicator_output: __lrvx_streaming_indicator_output
+        lrvx_streaming_indicator_ready: __lrvx_streaming_indicator_ready
+        lrvx_streaming_indicator_count: __lrvx_streaming_indicator_count
+        lrvx_streaming_indicator_reset: __lrvx_streaming_indicator_reset
+
   targets:
     pybind11:
       status: allowlist
@@ -1986,6 +2014,20 @@ allowlist_functions:
     lrvx_volume_profile_val: *cpp_direct
     lrvx_walk_forward_run_csv: *cpp_direct
 
+    lrvx_streaming_indicator_count: *cpp_direct
+    lrvx_streaming_indicator_create: *cpp_direct
+    lrvx_streaming_indicator_destroy: *cpp_direct
+    lrvx_streaming_indicator_input_count: *cpp_direct
+    lrvx_streaming_indicator_output: *cpp_direct
+    lrvx_streaming_indicator_output_count: *cpp_direct
+    lrvx_streaming_indicator_ready: *cpp_direct
+    lrvx_streaming_indicator_reset: *cpp_direct
+    lrvx_streaming_indicator_update: *cpp_direct
+    lrvx_streaming_indicator_update_bar: *cpp_direct
+    lrvx_streaming_indicator_update_high_low: *cpp_direct
+    lrvx_streaming_indicator_update_ohlc: *cpp_direct
+    lrvx_streaming_indicator_update_pair: *cpp_direct
+    lrvx_streaming_indicator_value: *cpp_direct
   napi:
     lrvx_backtest_result_write_equity_curve_csv: *no_napi_wrapper
     lrvx_backtest_runner_add_journey_tracer: *no_napi_wrapper
@@ -2139,6 +2181,20 @@ allowlist_functions:
     lrvx_volume_profile_num_levels: *no_napi_wrapper
     lrvx_volume_profile_total_delta: *no_napi_wrapper
 
+    lrvx_streaming_indicator_count: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_create: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_destroy: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_input_count: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_output: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_output_count: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_ready: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_reset: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_update: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_update_bar: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_update_high_low: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_update_ohlc: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_update_pair: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
+    lrvx_streaming_indicator_value: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
   codon:
     lrvx_aggregator_destroy: *no_codon_import
     lrvx_best_ask_raw: "the Codon context reads the _opt variants, which tell no quote from a price of zero"
@@ -2317,6 +2373,8 @@ allowlist_functions:
     lrvx_volume_profile_num_levels: *no_codon_import
     lrvx_volume_profile_total_delta: *no_codon_import
 
+    lrvx_streaming_indicator_input_count: "the indicator classes know their own inputs and outputs, so the handle's arity queries are not called"
+    lrvx_streaming_indicator_output_count: "the indicator classes know their own inputs and outputs, so the handle's arity queries are not called"
   quickjs:
     lrvx_aggregator_destroy: *no_quickjs_global
     lrvx_backtest_result_trades: *no_quickjs_global
@@ -2535,3 +2593,5 @@ allowlist_functions:
     lrvx_volume_profile_num_levels: *no_quickjs_global
     lrvx_volume_profile_total_delta: *no_quickjs_global
     lrvx_walk_forward_run_csv: *no_quickjs_global
+    lrvx_streaming_indicator_input_count: "the indicator classes know their own inputs and outputs, so the handle's arity queries are not called"
+    lrvx_streaming_indicator_output_count: "the indicator classes know their own inputs and outputs, so the handle's arity queries are not called"

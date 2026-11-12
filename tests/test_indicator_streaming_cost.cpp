@@ -10,14 +10,16 @@
 //     allocate. Every buffer an indicator needs is sized by its parameters
 //     and reserved up front, so memory cannot grow with history. Counted by
 //     replacing the global operator new for this test binary.
-//   - Timing: 10N updates must take less than 25 x the time of N updates.
+//   - Timing: 10N updates must take less than 25 x the time of N updates,
+//     or less than a quarter of a second when that product is smaller.
 //     A per-update cost that is constant gives a ratio near 10; one that
 //     grows linearly with history gives a ratio near 100. The bound sits
 //     between the two with a wide margin either way, and each side takes the
 //     minimum over several runs so a preempted run on a shared CI runner does
 //     not decide the outcome. A run that passes the bound is cut short and
-//     reported as a failure, so a regression fails in seconds instead of
-//     running a quadratic loop to completion.
+//     the next one tried, so a regression fails in seconds instead of
+//     running a quadratic loop to completion; the check fails when no run
+//     finishes inside the bound.
 
 #include "lrvx/indicator/atr.h"
 #include "lrvx/indicator/autocorrelation.h"
@@ -177,6 +179,14 @@ double timedRun(Make make, const std::vector<Bar4>& bars, size_t n, double budge
 
 constexpr double kMaxRatio = 25.0;
 
+// N updates of an O(1) indicator take about a tenth of a millisecond, so
+// 25 x that is a budget one scheduler pause on a shared runner can exceed.
+// The budget therefore has an absolute floor. It costs nothing in power: a
+// per-update cost that grows with history turns the 10N run into seconds
+// (48 s for RollingZScore(240) at N = 2000 before the kernels), far past it.
+constexpr double kBudgetFloorSeconds = 0.25;
+constexpr int kLongRuns = 5;
+
 template <typename Make>
 void checkCostIndependentOfHistory(const char* name, Make make, size_t n)
 {
@@ -191,21 +201,32 @@ void checkCostIndependentOfHistory(const char* name, Make make, size_t n)
   // loudly instead of passing on a meaningless number.
   ASSERT_GT(t1, 0.0) << name;
 
-  const double budget = kMaxRatio * t1;
+  // One slow run is the machine; every run slow is the code. A run past the
+  // budget is cut short and the next one tried; the check fails only when
+  // none of them finishes inside it.
+  const double budget = std::max(kMaxRatio * t1, kBudgetFloorSeconds);
   double t10 = 1e300;
-  for (int r = 0; r < 3; ++r)
+  double longestCut = 0.0;
+  for (int r = 0; r < kLongRuns; ++r)
   {
     const double t = timedRun(make, bars, 10 * n, budget);
     if (t < 0)
     {
-      FAIL() << name << ": " << 10 * n << " updates exceeded " << kMaxRatio << " x the time of "
-             << n << " updates (" << t1 << " s) and were cut short after " << -t
-             << " s; per-update cost grows with history";
+      longestCut = std::max(longestCut, -t);
+      continue;
     }
     t10 = std::min(t10, t);
   }
-  std::printf("%s: t(N=%zu)=%.6f s, t(10N)=%.6f s, ratio %.2f (limit %.0f)\n", name, n, t1, t10,
-              t10 / t1, kMaxRatio);
+  if (t10 == 1e300)
+  {
+    FAIL() << name << ": " << 10 * n << " updates never finished inside the budget of " << budget
+           << " s (" << kMaxRatio << " x the time of " << n << " updates, " << t1
+           << " s, with a floor of " << kBudgetFloorSeconds << " s) in " << kLongRuns
+           << " runs; the longest was cut short after " << longestCut
+           << " s; per-update cost grows with history";
+  }
+  std::printf("%s: t(N=%zu)=%.6f s, t(10N)=%.6f s, ratio %.2f (budget %.3f s)\n", name, n, t1,
+              t10, t10 / t1, budget);
   EXPECT_LT(t10, budget) << name << ": t(N)=" << t1 << " s, t(10N)=" << t10
                          << " s, ratio=" << t10 / t1;
 }

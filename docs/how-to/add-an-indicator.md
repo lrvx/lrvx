@@ -133,11 +133,20 @@ You now have:
   `update(v)` / `value` / `ready` / `reset()` on the same instance.
 - `lrvx.MyIndicator(...)` in **Node.js** — same surface, same semantics
   (thin N-API wrapper around the same C++ class).
-- `MyIndicator` in **QuickJS** (`quickjs/lrvx/indicators.js`) — accumulates
-  history and re-runs the batch C-API; same `update`/`value`/`ready`/`reset`.
-  Add a 3-line class to that file using one of the `_Stream*` helper bases.
-- `MyIndicator` in **Codon** (`codon/lrvx/indicators.codon`) — same pattern
-  as QuickJS, history + batch call.
+- A C API handle: `lrvx_streaming_indicator_create("my_indicator", args, n)`
+  creates one from the registry row, with `_update*` / `_value` / `_ready` /
+  `_count` / `_reset` / `_destroy` forwarding to the C++ class (include the
+  new header in `src/capi/lrvx_capi.cpp`). A `MultiOutput` row also needs a
+  `StreamingIndicatorOutputs` specialisation there, or it does not compile.
+  Add the row's constructor arguments to `kCases` in
+  `tests/support/streaming_indicator_cases.h`; the C API and QuickJS tests
+  fail until you do, and then hold the handle against the class bit for bit.
+- `MyIndicator` in **QuickJS** (`quickjs/lrvx/indicators.js`) — a 3-line
+  class on one of the `_Stream*` bases, which hold the C handle; same
+  `update`/`value`/`ready`/`count`/`reset`, one kernel step per update.
+- `MyIndicator` in **Codon** (`codon/lrvx/indicators.codon`) — a class
+  around `_Stream`, the same handle; add it to
+  `codon/examples/indicator_streaming_smoke.codon`.
 - The streaming-vs-batch parity test
   (`tests/test_streaming_parity.cpp`) automatically covers it once you add
   one line to the registry-driven test list.

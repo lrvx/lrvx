@@ -186,6 +186,33 @@ The strings a `LrvxBreach` points at follow the same rule. They live until
 the next call that refills the breach list for that handle, or until the
 handle is destroyed. Copy them out if they have to outlive that.
 
+## Streaming indicators
+
+`lrvx_indicator_<name>` computes a whole array. For one value at a time, a
+`LrvxStreamingIndicatorHandle` owns an instance of the C++ streaming
+indicator; every row of `include/lrvx/indicator/registry.def` can be created
+by its snake_case name, with that row's constructor arguments passed as
+doubles:
+
+```c
+double args[] = {20};
+LrvxStreamingIndicatorHandle sma = lrvx_streaming_indicator_create("sma", args, 1);
+for (size_t i = 0; i < n; ++i) {
+    double v = lrvx_streaming_indicator_update(sma, close[i]);  /* NaN until ready */
+}
+lrvx_streaming_indicator_destroy(sma);
+```
+
+An update is one step of the C++ class: no history is kept, its cost does
+not depend on how many values the handle has seen, and update, value,
+output, ready and count never allocate. Values, readiness and NaN behaviour
+are the class's, bit for bit. Each indicator takes the update for its inputs
+(`_update`, `_update_bar`, `_update_high_low`, `_update_ohlc` or
+`_update_pair`); `_output(h, i)` reads the extra outputs of MACD, Bollinger
+and Stochastic. A bad name or argument returns NULL with the reason in
+`lrvx_last_error_message()`. The Codon and QuickJS indicator classes are
+built on these handles.
+
 ## Full API reference
 
 See [C API Reference](../reference/api/capi/lrvx_capi.md) for all functions, structs, and callback signatures.
