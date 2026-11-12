@@ -4,7 +4,24 @@ The aggTrades importer covered in [Import Binance public archives](import-binanc
 
 - **bookTicker** (book type `t1`): the best bid and ask after every book update, one row per update. Published for **um-futures** (USDT-margined) and **cm-futures** (coin-margined).
 
-The spot archive has no bookTicker product, so a book import for `spot` fails with an error naming the supported markets. bookTicker is the only book product imported: any other book type fails with an error as well. Binance publishes bookTicker days for a bounded date range per symbol; a day outside it does not download (pass `--skip-missing` to step over such days in a range).
+The files sit at
+
+```text
+https://data.binance.vision/data/futures/um/daily/bookTicker/<SYMBOL>/<SYMBOL>-bookTicker-<YYYY-MM-DD>.zip
+https://data.binance.vision/data/futures/cm/daily/bookTicker/<SYMBOL>/<SYMBOL>-bookTicker-<YYYY-MM-DD>.zip
+```
+
+one per UTC day, with the header
+
+```text
+update_id,best_bid_price,best_bid_qty,best_ask_price,best_ask_qty,transaction_time,event_time
+```
+
+`transaction_time` (Unix milliseconds) is the record's timestamp on the tape; prices and quantities are as published (cm-futures quantities in contracts). A file whose first row is not that header raises `lrvx.archives.UnknownLayoutError`, and one with rows of which none parse raises `lrvx.archives.NothingParsedError`.
+
+Binance publishes bookTicker only for a bounded date range per symbol, and the symbols checked have no day after 2024: `BTCUSDT` um-futures runs from 2023-05-16 to 2024-03-30, `BTCUSD_PERP` cm-futures from 2023-05-18 to 2024-10-14. The bucket listing shows a symbol's days, for example `https://s3-ap-northeast-1.amazonaws.com/data.binance.vision?delimiter=/&prefix=data/futures/um/daily/bookTicker/BTCUSDT/`. A day outside the range does not download (pass `--skip-missing` to step over such days in a range).
+
+The spot archive has no bookTicker product, so a book import for `spot` fails with an error naming the supported markets. bookTicker is the only book product imported: any other book type fails with an error as well.
 
 The importer lives alongside `aggtrades_to_lrvx` in `lrvx.archives.binance` and emits book events into the same `.lrvx` tape directory, so a single tape can carry trades + book updates the engine and `MergedTapeReader` read interleaved.
 
@@ -59,13 +76,15 @@ lrvx archive binance --book t1 \
   --parallel 2
 ```
 
-`--market spot` with `--book` exits with status 2 and an error naming the supported markets, as does any `--book` value other than `t1`.
+`--market spot` with `--book` exits with status 2 and an error naming the supported markets, as does any `--book` value other than `t1`. An unrecognised header or a file with no parsable row exits with status 1 and a one-line error.
 
 ## Append-safe and idempotent
 
 A record is left out when a book record with the same `update_id` is already on the tape for the same symbol within the incoming file's time range. Binance's update ids are unique per symbol and a record keeps its exchange timestamp, so only that range can hold a copy, and the dedup read covers that range instead of the whole tape: an import costs about one day of tape, whatever the tape's length.
 
-Because a file's records never depend on the tape, the outcome does not depend on the order days are imported in. Re-running a day adds nothing, an overlapping range keeps each record once, a day earlier than the ones already on the tape or one that fills a gap lands in full, and a day cut short by an interrupted import is completed by importing it again. In each case the tape holds the same book records a single in-order import of the same days writes, so a replay ordered by timestamp (`orderbook.book_at`, `OrderBookIterator`) reconstructs the same ladders; and because every day opens with a snapshot, so does a consumer that streams segments in file-name order, where a day imported later sits after the days imported before it. The reported `rows_skipped` counter counts rows not written: unchanged ticks, malformed rows and rows already on the tape. `--no-append` turns the check off.
+Because a file's records never depend on the tape, the outcome does not depend on the order days are imported in. Re-running a day adds nothing, an overlapping range keeps each record once, a day earlier than the ones already on the tape or one that fills a gap lands in full, and a day cut short by an interrupted import is completed by importing it again. In each case the tape holds the same book records a single in-order import of the same days writes, so a replay ordered by timestamp (`orderbook.book_at`, `OrderBookIterator`) reconstructs the same ladders; and because every day opens with a snapshot, so does a consumer that streams segments in file-name order, where a day imported later sits after the days imported before it. The reported `rows_skipped` counter counts rows not written: unchanged ticks, malformed rows and rows already on the tape; `rows_invalid` counts the malformed ones alone. `--no-append` turns the check off.
+
+`python/tests/test_binance_book_archive.py` also downloads one real um-futures day and checks the replayed top of book against the file's rows when `LRVX_ARCHIVE_NETWORK_TESTS=1` is set.
 
 ## Co-existence with aggTrades
 

@@ -59,22 +59,22 @@
     {
       "language": "python",
       "path": "docs/examples/python_binance_archive.py",
-      "sha256": "27fcff010ee0270b5b5b06b08b0b96d81fe6d01f54093e92eab76fc6b3faced8",
-      "size_bytes": 2499,
+      "sha256": "bd0a28a70edf57cb397414eaf7ad7656f7955c3839ce6221e8c635e841800317",
+      "size_bytes": 2726,
       "topic": "strategy"
     },
     {
       "language": "python",
       "path": "docs/examples/python_binance_book_archive.py",
-      "sha256": "da10766cc9cdf16f8609fc26aa0d2e6b8b576963ece62dcc79158d47c3421cf1",
-      "size_bytes": 2140,
+      "sha256": "4bd0fe7527fa34132fb15d75c4c56c2ac86a4654822f37dbce8c2eae42ce15a6",
+      "size_bytes": 2270,
       "topic": "strategy"
     },
     {
       "language": "python",
       "path": "docs/examples/python_bitget_archive.py",
-      "sha256": "610a5ef850eaec8e1c6b8fa0ba61792236c629c1f89c46fb7bfc3a4a2d587f3c",
-      "size_bytes": 1880,
+      "sha256": "5f14bd7f8512a2bdaa144df2d843322573f55cfd17508d1580c8b6686907316b",
+      "size_bytes": 2141,
       "topic": "strategy"
     },
     {
@@ -87,8 +87,8 @@
     {
       "language": "python",
       "path": "docs/examples/python_bybit_archive.py",
-      "sha256": "8df3f63d4c00c3afee5d5cc0848e7664ef5872cf69eb6ef822bf418a804ce3b1",
-      "size_bytes": 2200,
+      "sha256": "d6cba6f85f8a64b22d44114ca42ae5a4d0974d29100c9d558a0c2ecea7a9c0b7",
+      "size_bytes": 2455,
       "topic": "strategy"
     },
     {
@@ -97,13 +97,6 @@
       "sha256": "bba3030ca3673136c7dfcb68ff5021c21cfbcc25e4b4f6a143963ea4522b7b6b",
       "size_bytes": 3028,
       "topic": "connector"
-    },
-    {
-      "language": "python",
-      "path": "docs/examples/python_deribit_archive.py",
-      "sha256": "756820b82e2062a7b93a8a5357140f929483790fb68f257dc62cd6a6421c3aa6",
-      "size_bytes": 2673,
-      "topic": "strategy"
     },
     {
       "language": "python",
@@ -199,8 +192,8 @@
     {
       "language": "python",
       "path": "docs/examples/python_okx_archive.py",
-      "sha256": "e8ec7223367b9728e9d8d0e4bcae246c82eebd8a2368c3e1fc3e64f572d524ba",
-      "size_bytes": 1910,
+      "sha256": "5a77e55a47bc38f5adfae73cc79f5dcfe9d0d84a3d2ce88b8c30f9b0bc32f803",
+      "size_bytes": 2371,
       "topic": "strategy"
     },
     {

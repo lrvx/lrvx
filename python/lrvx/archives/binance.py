@@ -1,14 +1,37 @@
 """Binance public archive → lrvx converter.
 
-``data.binance.vision`` publishes daily aggTrades zip archives going
-back 2+ years for spot, USDT-margined futures, and coin-margined
-futures. The on-disk CSV layout is well-known and stable:
+``data.binance.vision`` publishes one aggTrades zip per UTC day for
+spot, USDT-margined futures (``um-futures``) and coin-margined futures
+(``cm-futures``):
 
-    agg_trade_id, price, quantity, first_trade_id, last_trade_id,
-    transact_time_ms, is_buyer_maker, is_best_match
+    https://data.binance.vision/data/spot/daily/aggTrades/<SYM>/<SYM>-aggTrades-<YYYY-MM-DD>.zip
+    https://data.binance.vision/data/futures/um/daily/aggTrades/<SYM>/...
+    https://data.binance.vision/data/futures/cm/daily/aggTrades/<SYM>/...
 
-Some daily files prepend a header row; the reader skips it
-transparently. Side encoding follows the existing lrvx convention:
+The layout is recognised per file:
+
+  * futures files from mid 2022 on open with the header
+    ``agg_trade_id,price,quantity,first_trade_id,last_trade_id,transact_time,is_buyer_maker``;
+    older futures files have the same seven columns and no header;
+  * spot files have no header and eight columns, the same seven plus
+    ``is_best_match``.
+
+Any other first row is rejected with ``UnknownLayoutError``.
+
+The timestamp is Unix milliseconds, except in spot files from
+2025-01-01 on, where Binance writes microseconds. A value of 10^14 or
+more is read as microseconds (10^14 ms is the year 5138), so both land
+on the tape as the same nanoseconds.
+
+Quantity is stored as published: the base asset for spot and
+um-futures, contracts for cm-futures (``BTCUSD_PERP``: 100 USD per
+contract, other cm symbols 10 USD). The live path through the ccxt
+bridge reports cm contracts in contracts too. ``qty_multiplier``
+scales every quantity by a constant the caller supplies; the importer
+does not know contract sizes. ``metadata.json`` records the unit under
+``custom.qty_unit`` and the multiplier under ``custom.qty_multiplier``.
+
+Side encoding follows the existing lrvx convention:
 
   * ``is_buyer_maker = true``  → buyer rests as maker → active flow is
     selling → ``Side::SELL`` (1)
@@ -27,22 +50,19 @@ tapes — exchange = "binance", instrument_type derived from ``market``.
 """
 from __future__ import annotations
 
-import csv
-import io
 import json
 import shutil
 import tempfile
 import time
 import urllib.error
 import urllib.request
-import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, List, Optional, Sequence, Tuple, Union
 
-from . import _dedup
+from . import _dedup, _layout
 
 # Market identifier → URL path prefix on data.binance.vision for the
 # trade stream (aggTrades) and the book stream (bookTicker). Layout in
@@ -100,6 +120,7 @@ class ConvertStats:
     trades_written: int = 0
     rows_read: int = 0
     rows_skipped: int = 0
+    rows_invalid: int = 0
     files_processed: int = 0
     first_ts_ns: int = 0
     last_ts_ns: int = 0
@@ -153,48 +174,44 @@ def _download(url: str, dest: Path, *, retries: int = 3, backoff: float = 2.0) -
 # ── CSV parsing ─────────────────────────────────────────────────────
 
 
-def _open_csv_member(path: Path) -> Tuple[io.TextIOBase, "object"]:
-    """Open the single CSV member inside a Binance aggTrades zip (or a
-    bare CSV file). Returns the text stream + a context object the
-    caller must close."""
-    if path.suffix.lower() == ".zip":
-        zf = zipfile.ZipFile(path)
-        names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
-        if not names:
-            zf.close()
-            raise ValueError(f"no CSV member inside {path}")
-        raw = zf.open(names[0])
-        return io.TextIOWrapper(raw, encoding="ascii", newline=""), zf
-    fh = open(path, "r", encoding="ascii", newline="")
-    return fh, fh
+_AGG_COLUMNS = ("agg_trade_id", "price", "quantity", "first_trade_id",
+                "last_trade_id", "transact_time", "is_buyer_maker")
+
+_AGG_LAYOUTS = (
+    _layout.Layout("futures", _AGG_COLUMNS),
+    _layout.Layout("futures, no header", _AGG_COLUMNS, has_header=False),
+    _layout.Layout("spot", _AGG_COLUMNS + ("is_best_match",), has_header=False),
+)
+
+# Timestamps at or above this are microseconds (spot files from
+# 2025-01-01); below it, milliseconds.
+_MICROS_FROM = 10 ** 14
 
 
-def _iter_rows(path: Path) -> Iterator[Tuple[int, float, float, int, bool]]:
-    """Yield ``(agg_id, price, qty, ts_ms, is_buyer_maker)`` rows from a
-    Binance aggTrades CSV (zipped or extracted). The first row is
-    skipped transparently if it is a header."""
-    stream, ctx = _open_csv_member(path)
-    try:
-        reader = csv.reader(stream)
-        for row in reader:
-            if not row:
-                continue
-            try:
-                agg_id = int(row[0])
-            except ValueError:
-                # Header line such as
-                # "agg_trade_id,price,quantity,first_trade_id,..."
-                continue
-            price = float(row[1])
-            qty = float(row[2])
-            ts_ms = int(row[5])
-            maker = row[6].strip().lower() in ("true", "1")
-            yield (agg_id, price, qty, ts_ms, maker)
-    finally:
+def _ts_ns(token: str) -> int:
+    ts = int(token)
+    return ts * 1_000 if ts >= _MICROS_FROM else ts * 1_000_000
+
+
+def _maker_flag(token: str) -> bool:
+    t = token.strip().lower()
+    if t in ("true", "1"):
+        return True
+    if t in ("false", "0"):
+        return False
+    raise ValueError(token)
+
+
+def _iter_rows(src: _layout.CsvFile, qty_multiplier: float = 1.0
+               ) -> Iterator[Tuple[int, float, float, int, bool]]:
+    """Yield ``(agg_id, price, qty, ts_ns, is_buyer_maker)`` rows from a
+    Binance aggTrades CSV (zipped or extracted)."""
+    for row in src.rows():
         try:
-            ctx.close()
-        except Exception:
-            pass
+            yield (int(row[0]), float(row[1]), float(row[2]) * qty_multiplier,
+                   _ts_ns(row[5]), _maker_flag(row[6]))
+        except (ValueError, IndexError):
+            src.counts.bad(row)
 
 
 # ── metadata.json writer ────────────────────────────────────────────
@@ -225,6 +242,7 @@ def _write_metadata(
     first_ts_ns: int,
     last_ts_ns: int,
     trades_added: int,
+    qty_multiplier: float = 1.0,
 ) -> None:
     """Create or merge ``metadata.json`` so MergedTapeReader can key
     this tape by ``(exchange, name)``."""
@@ -258,7 +276,10 @@ def _write_metadata(
         "hostname": "",
         "timezone": "UTC",
         "lrvx_version": "",
-        "custom": {},
+        "custom": {
+            "qty_unit": "contracts" if market == "cm-futures" else "base",
+            "qty_multiplier": float(qty_multiplier),
+        },
     }
 
     meta_path = out_tape / "metadata.json"
@@ -286,6 +307,9 @@ def _write_metadata(
                       "timezone"):
                 if not existing.get(k):
                     existing[k] = meta[k]
+            custom = existing.get("custom") or {}
+            custom.update(meta["custom"])
+            existing["custom"] = custom
             meta = existing
         except (OSError, ValueError, KeyError):
             pass
@@ -310,16 +334,23 @@ def aggtrades_to_lrvx(
     max_segment_mb: int = 256,
     compression: str = "none",
     write_metadata: bool = True,
+    qty_multiplier: float = 1.0,
 ) -> ConvertStats:
     """Convert one Binance aggTrades day (zipped or extracted CSV) into
     a lrvx tape.
 
     ``symbol_name`` defaults to the file's basename leading token if
     omitted. Dedup keys on ``agg_trade_id`` within the file's time
-    range, so re-running a day already
-    present in ``out_tape`` returns ``trades_written=0`` and updates
-    only ``rows_skipped``.
+    range, so re-running a day already present in ``out_tape`` returns
+    ``trades_written=0`` and updates only ``rows_skipped``. Raises
+    ``UnknownLayoutError`` for a first row that is neither the futures
+    header nor a headerless seven-column (futures) or eight-column
+    (spot) row, and ``NothingParsedError`` when the file has rows and
+    none parse.
     """
+    if market not in _MARKET_PATHS:
+        raise ValueError(
+            f"unknown market '{market}'. expected one of: {sorted(_MARKET_PATHS)}")
     csv_path = Path(csv_path).expanduser()
     out_tape = Path(out_tape).expanduser()
     if not csv_path.exists():
@@ -330,57 +361,40 @@ def aggtrades_to_lrvx(
 
     # Rows keep file order; the side is resolved from is_buyer_maker as
     # they are parsed.
-    parsed = ((agg_id, price, qty, ts_ms, _SIDE_SELL if maker else _SIDE_BUY)
-              for agg_id, price, qty, ts_ms, maker in _iter_rows(csv_path))
+    src = _layout.CsvFile(csv_path, _AGG_LAYOUTS, source="Binance aggTrades")
+    parsed = ((agg_id, price, qty, ts_ns, _SIDE_SELL if maker else _SIDE_BUY)
+              for agg_id, price, qty, ts_ns, maker
+              in _iter_rows(src, qty_multiplier))
     with _dedup.TradeFile(parsed, _dedup.trade_dtype("i8"), sort=False) as rows:
+        src.check(rows.rows_read)
         done = _dedup.write_trade_file(
             rows, out_tape, append=append, symbol_id=symbol_id,
             exchange_id=exchange_id, max_segment_mb=max_segment_mb,
-            compression=compression, ts_ns_per_unit=1_000_000)
-        rows_read, rows_skipped = rows.rows_read, rows.rows_skipped
-        kept, last_seen_id = rows.rows_kept, rows.id_max
-
-    if not kept:
-        if write_metadata and rows_read:
-            _write_metadata(
-                out_tape,
-                exchange_name=exchange_name,
-                market=market,
-                symbol_id=symbol_id,
-                symbol_name=symbol_name,
-                first_ts_ns=0,
-                last_ts_ns=0,
-                trades_added=0,
-            )
-        return ConvertStats(
-            trades_written=0,
-            rows_read=rows_read,
-            rows_skipped=rows_skipped,
+            compression=compression)
+        stats = ConvertStats(
+            trades_written=done.count,
+            rows_read=rows.rows_read,
+            rows_skipped=rows.rows_skipped,
+            rows_invalid=src.counts.invalid,
             files_processed=1,
-            last_trade_id=last_seen_id,
+            first_ts_ns=done.first_ts_ns,
+            last_ts_ns=done.last_ts_ns,
+            last_trade_id=done.last_id if done.count else rows.id_max,
         )
 
-    if write_metadata:
+    if write_metadata and (stats.trades_written or stats.rows_read):
         _write_metadata(
             out_tape,
             exchange_name=exchange_name,
             market=market,
             symbol_id=symbol_id,
             symbol_name=symbol_name,
-            first_ts_ns=done.first_ts_ns,
-            last_ts_ns=done.last_ts_ns,
-            trades_added=done.count,
+            first_ts_ns=stats.first_ts_ns,
+            last_ts_ns=stats.last_ts_ns,
+            trades_added=stats.trades_written,
+            qty_multiplier=qty_multiplier,
         )
-
-    return ConvertStats(
-        trades_written=done.count,
-        rows_read=rows_read,
-        rows_skipped=rows_skipped,
-        files_processed=1,
-        first_ts_ns=done.first_ts_ns,
-        last_ts_ns=done.last_ts_ns,
-        last_trade_id=done.last_id,
-    )
+    return stats
 
 
 # ── Multi-day conversion ────────────────────────────────────────────
@@ -414,6 +428,7 @@ def range_to_lrvx(
     max_segment_mb: int = 256,
     compression: str = "none",
     skip_missing: bool = False,
+    qty_multiplier: float = 1.0,
 ) -> ConvertStats:
     """Convert a date range from a local mirror or HTTP into lrvx.
 
@@ -470,10 +485,12 @@ def range_to_lrvx(
             # Skip per-day metadata; one final write at the end captures
             # the full range range and total count.
             write_metadata=False,
+            qty_multiplier=qty_multiplier,
         )
         agg.trades_written += s.trades_written
         agg.rows_read += s.rows_read
         agg.rows_skipped += s.rows_skipped
+        agg.rows_invalid += s.rows_invalid
         agg.files_processed += s.files_processed
         if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
             agg.first_ts_ns = s.first_ts_ns
@@ -491,6 +508,7 @@ def range_to_lrvx(
         first_ts_ns=agg.first_ts_ns,
         last_ts_ns=agg.last_ts_ns,
         trades_added=agg.trades_written,
+        qty_multiplier=qty_multiplier,
     )
 
     if cleanup:
@@ -499,9 +517,14 @@ def range_to_lrvx(
     return agg
 
 
+UnknownLayoutError = _layout.UnknownLayoutError
+NothingParsedError = _layout.NothingParsedError
+
 __all__ = [
     "ConvertStats",
     "BookConvertStats",
+    "NothingParsedError",
+    "UnknownLayoutError",
     "aggtrades_to_lrvx",
     "range_to_lrvx",
     "t1_to_lrvx",
@@ -533,6 +556,7 @@ class BookConvertStats:
     deltas_written: int = 0
     rows_read: int = 0
     rows_skipped: int = 0
+    rows_invalid: int = 0
     files_processed: int = 0
     first_ts_ns: int = 0
     last_ts_ns: int = 0
@@ -544,6 +568,7 @@ def _aggregate_book_stats(agg: BookConvertStats, add: BookConvertStats) -> None:
     agg.deltas_written += add.deltas_written
     agg.rows_read += add.rows_read
     agg.rows_skipped += add.rows_skipped
+    agg.rows_invalid += add.rows_invalid
     agg.files_processed += add.files_processed
     if add.first_ts_ns and (agg.first_ts_ns == 0 or add.first_ts_ns < agg.first_ts_ns):
         agg.first_ts_ns = add.first_ts_ns
@@ -752,29 +777,24 @@ def _diff_book(prev_bids: dict, cur_bids: dict,
     return bid_delta, ask_delta
 
 
-def _open_csv_lines(path: Path) -> Iterator[List[str]]:
-    """Iterate CSV rows from a zipped or extracted file, transparently
-    skipping a leading header row when one is present.
+_BOOK_COLUMNS = ("update_id", "best_bid_price", "best_bid_qty",
+                 "best_ask_price", "best_ask_qty", "transaction_time",
+                 "event_time")
 
-    The header check parses ``row[0]`` (the bookTicker update_id) as a
-    float; any row where that conversion fails is dropped."""
-    stream, ctx = _open_csv_member(path)
-    try:
-        reader = csv.reader(stream)
-        for row in reader:
-            if not row:
-                continue
-            try:
-                float(row[0])
-            except (ValueError, IndexError):
-                # Header line or malformed row.
-                continue
-            yield row
-    finally:
-        try:
-            ctx.close()
-        except Exception:
-            pass
+_BOOK_LAYOUTS = (
+    _layout.Layout("bookTicker", _BOOK_COLUMNS),
+)
+
+
+def _book_csv(path: Path) -> _layout.CsvFile:
+    return _layout.CsvFile(path, _BOOK_LAYOUTS, source="Binance bookTicker")
+
+
+def _open_csv_lines(path: Path) -> Iterator[List[str]]:
+    """Iterate the data rows of a bookTicker file (zipped or extracted),
+    its header row recognised and left out. Raises UnknownLayoutError
+    for a first row that is not the bookTicker header."""
+    return _book_csv(path).rows()
 
 
 # ── T1 / bookTicker ────────────────────────────────────────────────
@@ -830,13 +850,14 @@ def t1_to_lrvx(
                            max_segment_mb=max_segment_mb,
                            compression=compression)
 
+    src = _book_csv(csv_path)
     rows_read = 0
     rows_skipped = 0
     prev_bids: dict = {}
     prev_asks: dict = {}
     is_first_emit = True
     try:
-        for row in _open_csv_lines(csv_path):
+        for row in src.rows():
             rows_read += 1
             try:
                 update_id = int(row[0])
@@ -846,6 +867,7 @@ def t1_to_lrvx(
                 ask_q = float(row[4])
                 ts_ms = int(row[5])
             except (ValueError, IndexError):
+                src.counts.bad(row)
                 rows_skipped += 1
                 continue
 
@@ -877,16 +899,19 @@ def t1_to_lrvx(
             prev_asks = cur_asks
     finally:
         sink.close()
+    src.check(rows_read - src.counts.invalid)
 
     return _finish_book_import(
         sink, out_tape, rows_read=rows_read, rows_skipped=rows_skipped,
+        rows_invalid=src.counts.invalid,
         write_metadata=write_metadata, exchange_name=exchange_name,
         market=market, symbol_id=symbol_id, symbol_name=symbol_name,
         depth=1)
 
 
 def _finish_book_import(sink: _BookSink, out_tape: Path, *, rows_read: int,
-                        rows_skipped: int, write_metadata: bool,
+                        rows_skipped: int, rows_invalid: int,
+                        write_metadata: bool,
                         exchange_name: str, market: str, symbol_id: int,
                         symbol_name: str, depth: int) -> BookConvertStats:
     stats = BookConvertStats(
@@ -894,6 +919,7 @@ def _finish_book_import(sink: _BookSink, out_tape: Path, *, rows_read: int,
         deltas_written=sink.deltas,
         rows_read=rows_read,
         rows_skipped=rows_skipped + sink.rows_on_tape,
+        rows_invalid=rows_invalid,
         files_processed=1,
         first_ts_ns=sink.first_ts_ns,
         last_ts_ns=sink.last_ts_ns,

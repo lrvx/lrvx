@@ -53,7 +53,7 @@ backtest patterns (use vectorbt for those).
   (`.lrvx` + `.lrvxrun` + strategy code + config + dep hashes).
 - `lrvx lint lookahead <strategy.py>` — static lookahead-bias
   detection.
-- `lrvx archive {binance,bybit,okx,bitget,deribit} <symbol>` — pull
+- `lrvx archive {binance,bybit,okx,bitget} <symbol>` — pull
   public venue archives into lrvx tapes.
 
 ## Discovery — MCP tools (offline, no engine needed)

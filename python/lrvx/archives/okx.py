@@ -1,61 +1,72 @@
 """OKX public archive → lrvx converter.
 
-OKX publishes daily trade ticks on their public CDN going back
-2+ years. The on-disk CSV layout is:
+OKX publishes daily trade files on its CDN and lists them through the
+public ``GET /api/v5/public/market-data-history`` endpoint (module 1,
+tick-by-tick trades). A file's URL is
 
-    trade_id, side, size, price, timestamp_ms
+    https://static.okx.com/cdn/okex/traderecords/trades/daily/<YYYYMMDD>/<FILE>.zip
 
-`timestamp_ms` is Unix milliseconds. `side` is the active flow as
-``buy`` / ``sell`` lowercase strings; the importer maps to lrvx's
-``Side::BUY`` / ``Side::SELL``. ``trade_id`` is already an integer
-exchange-assigned id, used as the lrvx ``trade_id`` for
-append-safe dedup.
+with ``<FILE>`` by market:
 
-Symbol naming follows OKX convention:
+  * spot:    ``<INST>-trades-<YYYY-MM-DD>``       (``BTC-USDT``)
+  * swap:    ``<INST>-trades-<YYYY-MM-DD>``       (``BTC-USDT-SWAP``)
+  * futures: ``<FAMILY>-futureschain-trades-<YYYY-MM-DD>``, every
+    expiry of the family in one file (``BTC-USD`` for ``BTC-USD-240329``)
+  * option:  ``<FAMILY>-optionchain-trades-<YYYY-MM-DD>``, every
+    option of the family in one file (``BTC-USD`` for
+    ``BTC-USD-240329-50000-C``)
 
-  * spot:    ``BTC-USDT``
-  * swap:    ``BTC-USDT-SWAP`` (perpetual)
-  * futures: ``BTC-USD-240329`` (dated)
-  * option:  ``BTC-29MAR24-50000-C`` (option-chain instrument)
+A day is a UTC+8 calendar day: the file for 2024-01-15 holds trades
+from 2024-01-14T16:00Z to 2024-01-15T16:00Z. Files usually appear two
+days after the day ends.
 
-Cross-exchange symbol normalisation (e.g. mapping OKX's
-``BTC-USDT-SWAP`` to Binance's ``BTCUSDT`` / Bybit's ``BTCUSDT``) is
-out of scope for the importer — each tape keeps its native naming
-and ``MergedTapeReader`` keys by ``(exchange, name)``.
+The CSV layout is read from the header row. OKX publishes:
 
-URL layout per market on `www.okx.com`:
+    instrument_name,trade_id,side,price,size,created_time
+    instrument_name,trade_id,side,price,size,created_time,source
+    trade_id,side,size,price,created_time      (legacy per-instrument
+                                                files; each header cell
+                                                carries a Chinese
+                                                translation after "/")
 
-  * spot:    ``cdn/okex/traderecords/spot/daily/<YYYYMMDD>/<SYMBOL>-trades-<YYYY-MM-DD>.zip``
-  * swap:    ``cdn/okex/traderecords/swap/daily/<YYYYMMDD>/<SYMBOL>-trades-<YYYY-MM-DD>.zip``
-  * futures: ``cdn/okex/traderecords/futures/daily/<YYYYMMDD>/<SYMBOL>-trades-<YYYY-MM-DD>.zip``
-  * option:  ``cdn/okex/traderecords/option/daily/<YYYYMMDD>/<SYMBOL>-trades-<YYYY-MM-DD>.zip``
+``created_time`` is Unix milliseconds. ``side`` is the taker side,
+``buy`` / ``sell`` in any case. ``trade_id`` is an integer, increasing
+per instrument, used as the lrvx ``trade_id`` for append dedup. Any
+other header is rejected with ``UnknownLayoutError``.
 
-Both ``.zip`` and ``.csv.gz`` extensions are accepted on disk —
-OKX's mirror changed packaging conventions over time and the
-parser falls back automatically.
+Quantity: ``size`` is stored as published, so it is in the base
+currency for spot and in contracts for swap, futures and option
+(``BTC-USDT-SWAP``: 0.01 BTC per contract; ``BTC-USD-SWAP`` and the
+BTC-USD futures: 100 USD per contract). The live path through the ccxt
+bridge reports contract markets in contracts too. ``qty_multiplier``
+scales every size by a constant, e.g. 0.01 to store ``BTC-USDT-SWAP``
+in BTC; the importer does not know contract values, so the caller
+supplies it (OKX's ``ctVal`` / ``ctMult`` from
+``/api/v5/public/instruments``). ``metadata.json`` records the unit
+under ``custom.qty_unit`` and the multiplier under
+``custom.qty_multiplier``.
+
+One tape holds one instrument. Importing a futures or option instrument
+reads the family's chain file and keeps the rows of that instrument;
+the other rows are counted in ``rows_other_instruments``.
 """
 from __future__ import annotations
 
-import csv
-import gzip
-import io
 import json
 import shutil
-import tempfile
 import time
 import urllib.error
 import urllib.request
-import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple, Union
 
-from . import _cache, _dedup
+from . import _cache, _dedup, _layout
 
 
-_BASE_URL = "https://www.okx.com/cdn/okex/traderecords"
+_BASE_URL = "https://static.okx.com/cdn/okex/traderecords/trades/daily"
 
 _MARKETS = {"spot", "swap", "futures", "option"}
 
@@ -66,10 +77,23 @@ _INSTRUMENT_TYPE = {
     "option":  "option",
 }
 
-_SIDE_BUY = 0
-_SIDE_SELL = 1
+_CHAIN = {"futures": "futureschain", "option": "optionchain"}
+
+_LAYOUTS = (
+    _layout.Layout("instrument", ("instrument_name", "trade_id", "side",
+                                  "price", "size", "created_time")),
+    _layout.Layout("instrument+source", ("instrument_name", "trade_id", "side",
+                                         "price", "size", "created_time",
+                                         "source")),
+    _layout.Layout("legacy", ("trade_id", "side", "size", "price",
+                              "created_time")),
+)
 
 DateLike = Union[str, date]
+
+
+class InstrumentNotInFileError(ValueError):
+    """The file parsed but holds no trade of the requested instrument."""
 
 
 @dataclass
@@ -77,24 +101,50 @@ class ConvertStats:
     trades_written: int = 0
     rows_read: int = 0
     rows_skipped: int = 0
+    rows_invalid: int = 0
+    rows_other_instruments: int = 0
     files_processed: int = 0
     first_ts_ns: int = 0
     last_ts_ns: int = 0
     last_trade_id: int = 0
 
 
-def _archive_url(symbol: str, market: str, day: date) -> str:
+def _check_symbol(symbol: str, market: str) -> None:
     if market not in _MARKETS:
         raise ValueError(
             f"unknown market '{market}'. expected one of {sorted(_MARKETS)}"
         )
-    yyyymmdd = day.strftime("%Y%m%d")
+    parts = symbol.split("-")
+    ok = {
+        "spot": len(parts) == 2,
+        "swap": len(parts) == 3 and parts[2] == "SWAP",
+        "futures": len(parts) == 3 and parts[2].isdigit() and len(parts[2]) == 6,
+        "option": len(parts) == 5 and parts[2].isdigit() and parts[4] in ("C", "P"),
+    }[market]
+    if not ok:
+        example = {"spot": "BTC-USDT", "swap": "BTC-USDT-SWAP",
+                   "futures": "BTC-USD-240329",
+                   "option": "BTC-USD-240329-50000-C"}[market]
+        raise ValueError(
+            f"'{symbol}' is not an OKX {market} instrument id (e.g. {example})")
+
+
+def _archive_name(symbol: str, market: str, day: date) -> str:
+    _check_symbol(symbol, market)
     iso = day.isoformat()
-    return f"{_BASE_URL}/{market}/daily/{yyyymmdd}/{symbol}-trades-{iso}.zip"
+    if market in _CHAIN:
+        family = "-".join(symbol.split("-")[:2])
+        return f"{family}-{_CHAIN[market]}-trades-{iso}.zip"
+    return f"{symbol}-trades-{iso}.zip"
+
+
+def _archive_url(symbol: str, market: str, day: date) -> str:
+    name = _archive_name(symbol, market, day)
+    return f"{_BASE_URL}/{day.strftime('%Y%m%d')}/{name}"
 
 
 def _mirror_path(mirror: Path, symbol: str, market: str, day: date) -> Path:
-    return mirror / market / symbol / f"{symbol}-trades-{day.isoformat()}.zip"
+    return mirror / market / _archive_name(symbol, market, day)
 
 
 def _download(url: str, dest: Path, *, retries: int = 3,
@@ -108,6 +158,14 @@ def _download(url: str, dest: Path, *, retries: int = 3,
                 shutil.copyfileobj(resp, f)
             tmp.replace(dest)
             return
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if tmp.exists():
+                tmp.unlink()
+            if e.code in (403, 404):
+                break
+            if attempt < retries - 1:
+                time.sleep(backoff * (2 ** attempt))
         except (urllib.error.URLError, OSError, TimeoutError) as e:
             last_err = e
             if tmp.exists():
@@ -120,54 +178,39 @@ def _download(url: str, dest: Path, *, retries: int = 3,
     raise RuntimeError(f"failed to download {url}: {last_err}") from last_err
 
 
-def _open_csv(path: Path) -> Tuple[io.TextIOBase, "object"]:
-    """Open OKX's archive as a text stream. Accepts ``.zip`` (with one
-    CSV inside) or ``.csv.gz`` or a bare ``.csv``."""
-    name = path.name.lower()
-    if name.endswith(".zip"):
-        zf = zipfile.ZipFile(path)
-        members = [n for n in zf.namelist() if n.lower().endswith(".csv")]
-        if not members:
-            zf.close()
-            raise ValueError(f"no CSV member inside {path}")
-        raw = zf.open(members[0])
-        return io.TextIOWrapper(raw, encoding="utf-8", newline=""), zf
-    if name.endswith(".csv.gz") or name.endswith(".gz"):
-        f = gzip.open(path, "rt", encoding="utf-8", newline="")
-        return f, f
-    f = open(path, "r", encoding="utf-8", newline="")
-    return f, f
+class _Other:
+    def __init__(self) -> None:
+        self.rows = 0
+        self.names: List[str] = []
 
 
-def _iter_rows(path: Path) -> Iterator[Tuple[int, float, float, int, int]]:
-    """Yield ``(trade_id, price, qty, ts_ns, side)`` rows from an OKX
-    trade CSV. Skips a leading header row when present."""
-    stream, ctx = _open_csv(path)
-    try:
-        reader = csv.reader(stream)
-        for row in reader:
-            if not row:
-                continue
-            # Header parses as non-numeric; skip.
-            try:
-                trade_id = int(row[0])
-            except (ValueError, IndexError):
-                continue
-            try:
-                side_token = row[1].strip().lower() if len(row) > 1 else ""
-                size = float(row[2])
-                price = float(row[3])
-                ts_ms = int(row[4])
-            except (ValueError, IndexError):
-                continue
-            side = _SIDE_BUY if side_token == "buy" else _SIDE_SELL
-            ts_ns = ts_ms * 1_000_000
-            yield (trade_id, price, size, ts_ns, side)
-    finally:
+def _iter_rows(src: _layout.CsvFile, symbol: str, qty_multiplier: float,
+               other: _Other) -> Iterator[Tuple[int, float, float, int, int]]:
+    """Yield ``(trade_id, price, qty, ts_ms, side)`` for the rows of
+    ``symbol`` (every row when the layout has no instrument column)."""
+    inst = tid = side_i = price_i = size_i = ts_i = None
+    for row in src.rows():
+        if tid is None:
+            lay = src.layout
+            inst = (lay.index("instrument_name")
+                    if "instrument_name" in lay.columns else None)
+            tid, side_i = lay.index("trade_id"), lay.index("side")
+            price_i, size_i = lay.index("price"), lay.index("size")
+            ts_i = lay.index("created_time")
+        if (inst is not None and symbol and len(row) == len(src.layout.columns)
+                and row[inst] != symbol):
+            other.rows += 1
+            if len(other.names) < 5 and row[inst] not in other.names:
+                other.names.append(row[inst])
+            continue
         try:
-            ctx.close()
-        except Exception:
-            pass
+            side = _layout.side_of(row[side_i])
+            if side is None:
+                raise ValueError(row[side_i])
+            yield (int(row[tid]), float(row[price_i]),
+                   float(row[size_i]) * qty_multiplier, int(row[ts_i]), side)
+        except (ValueError, IndexError):
+            src.counts.bad(row)
 
 
 def _ns_to_iso(ns: int) -> str:
@@ -179,13 +222,17 @@ def _ns_to_iso(ns: int) -> str:
 
 
 def _base_quote(name: str) -> Tuple[str, str]:
-    """Pull (base, quote) out of an OKX instrument id. Spot has the
-    simple `BASE-QUOTE` form; perp / future / option carry extra
-    suffixes — we just take the first two hyphen-separated tokens."""
+    """Pull (base, quote) out of an OKX instrument id: the first two
+    hyphen-separated tokens."""
     parts = name.split("-")
     if len(parts) >= 2:
         return parts[0], parts[1]
     return "", ""
+
+
+def _qty_custom(market: str, qty_multiplier: float) -> dict:
+    return {"qty_unit": "base" if market == "spot" else "contracts",
+            "qty_multiplier": float(qty_multiplier)}
 
 
 def _write_metadata(out_tape: Path, *,
@@ -195,7 +242,8 @@ def _write_metadata(out_tape: Path, *,
                     symbol_name: str,
                     first_ts_ns: int,
                     last_ts_ns: int,
-                    trades_added: int) -> None:
+                    trades_added: int,
+                    qty_multiplier: float = 1.0) -> None:
     base, quote = _base_quote(symbol_name)
     sym_entry = {
         "symbol_id": int(symbol_id),
@@ -226,7 +274,7 @@ def _write_metadata(out_tape: Path, *,
         "hostname": "",
         "timezone": "UTC",
         "lrvx_version": "",
-        "custom": {},
+        "custom": _qty_custom(market, qty_multiplier),
     }
 
     meta_path = out_tape / "metadata.json"
@@ -251,12 +299,70 @@ def _write_metadata(out_tape: Path, *,
                       "timezone"):
                 if not existing.get(k):
                     existing[k] = meta[k]
+            custom = existing.get("custom") or {}
+            custom.update(meta["custom"])
+            existing["custom"] = custom
             meta = existing
         except (OSError, ValueError, KeyError):
             pass
 
     out_tape.mkdir(parents=True, exist_ok=True)
     meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True))
+
+
+def _symbol_from_file(path: Path) -> str:
+    """``BTC-USDT-SWAP-trades-2024-01-15.zip`` → ``BTC-USDT-SWAP``; empty
+    for a chain file, whose name does not identify one instrument."""
+    stem = path.name
+    for ext in (".csv.gz", ".csv", ".zip"):
+        if stem.endswith(ext):
+            stem = stem[: -len(ext)]
+            break
+    for chain in _CHAIN.values():
+        if f"-{chain}-" in stem:
+            return ""
+    idx = stem.find("-trades-")
+    return stem[:idx] if idx > 0 else stem
+
+
+def _convert_file(csv_path: Path, out_tape: Path, *, symbol_id: int,
+                  symbol_name: str, market: str, exchange_id: int,
+                  exchange_name: str, append: bool, max_segment_mb: int,
+                  compression: str, write_metadata: bool,
+                  qty_multiplier: float) -> ConvertStats:
+    src = _layout.CsvFile(csv_path, _LAYOUTS, source="OKX trade")
+    other = _Other()
+    with _dedup.TradeFile(_iter_rows(src, symbol_name, qty_multiplier, other),
+                          _dedup.trade_dtype(), sort=True) as rows:
+        src.check(rows.rows_read)
+        done = _dedup.write_trade_file(
+            rows, out_tape, append=append, symbol_id=symbol_id,
+            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+            compression=compression, ts_ns_per_unit=1_000_000)
+        stats = ConvertStats(
+            trades_written=done.count,
+            rows_read=rows.rows_read,
+            rows_skipped=rows.rows_skipped,
+            rows_invalid=src.counts.invalid,
+            rows_other_instruments=other.rows,
+            files_processed=1,
+            first_ts_ns=done.first_ts_ns,
+            last_ts_ns=done.last_ts_ns,
+            last_trade_id=done.last_id if done.count else rows.id_max,
+        )
+    if other.rows and not stats.rows_read and not stats.rows_invalid:
+        raise InstrumentNotInFileError(
+            f"{csv_path}: no trade of '{symbol_name}' among {other.rows} rows; "
+            f"the file holds {', '.join(other.names)}"
+            + (", ..." if len(other.names) == 5 else ""))
+    if write_metadata and (stats.trades_written or stats.rows_read):
+        _write_metadata(
+            out_tape, exchange_name=exchange_name, market=market,
+            symbol_id=symbol_id, symbol_name=symbol_name,
+            first_ts_ns=stats.first_ts_ns, last_ts_ns=stats.last_ts_ns,
+            trades_added=stats.trades_written, qty_multiplier=qty_multiplier,
+        )
+    return stats
 
 
 def trades_to_lrvx(
@@ -272,64 +378,36 @@ def trades_to_lrvx(
     max_segment_mb: int = 256,
     compression: str = "none",
     write_metadata: bool = True,
+    qty_multiplier: float = 1.0,
 ) -> ConvertStats:
-    """Convert one OKX archive CSV (zipped, gzipped, or extracted) into lrvx."""
+    """Convert one OKX archive file (zipped, gzipped, or extracted) into
+    lrvx.
+
+    ``symbol_name`` defaults to the instrument in the file name; it is
+    required for a futures or option chain file, whose rows are filtered
+    to that instrument. Raises ``UnknownLayoutError`` for a header OKX
+    does not publish, ``NothingParsedError`` when the file has rows and
+    none parse, and ``InstrumentNotInFileError`` when a chain file holds
+    no trade of ``symbol_name``. A file whose trades are all on the tape
+    already returns ``trades_written=0`` with ``rows_skipped`` set."""
     csv_path = Path(csv_path).expanduser()
     out_tape = Path(out_tape).expanduser()
     if not csv_path.exists():
         raise FileNotFoundError(csv_path)
+    if market not in _MARKETS:
+        raise ValueError(
+            f"unknown market '{market}'. expected one of {sorted(_MARKETS)}")
     if not symbol_name:
-        # `BTC-USDT-SWAP-trades-2024-01-15.zip` → `BTC-USDT-SWAP`.
-        stem = csv_path.name
-        for ext in (".csv.gz", ".csv", ".zip"):
-            if stem.endswith(ext):
-                stem = stem[: -len(ext)]
-                break
-        marker = "-trades-"
-        idx = stem.find(marker)
-        if idx > 0:
-            symbol_name = stem[:idx]
-        else:
-            symbol_name = stem
-
-    with _dedup.TradeFile(_iter_rows(csv_path), _dedup.trade_dtype(),
-                          sort=True) as rows:
-        done = _dedup.write_trade_file(
-            rows, out_tape, append=append, symbol_id=symbol_id,
-            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
-            compression=compression)
-        rows_read, rows_skipped = rows.rows_read, rows.rows_skipped
-        kept, last_seen_id = rows.rows_kept, rows.id_max
-
-    if not kept:
-        if write_metadata and rows_read:
-            _write_metadata(
-                out_tape, exchange_name=exchange_name, market=market,
-                symbol_id=symbol_id, symbol_name=symbol_name,
-                first_ts_ns=0, last_ts_ns=0, trades_added=0,
-            )
-        return ConvertStats(rows_read=rows_read,
-                            rows_skipped=rows_skipped,
-                            files_processed=1,
-                            last_trade_id=last_seen_id)
-
-    if write_metadata:
-        _write_metadata(
-            out_tape, exchange_name=exchange_name, market=market,
-            symbol_id=symbol_id, symbol_name=symbol_name,
-            first_ts_ns=done.first_ts_ns, last_ts_ns=done.last_ts_ns,
-            trades_added=done.count,
-        )
-
-    return ConvertStats(
-        trades_written=done.count,
-        rows_read=rows_read,
-        rows_skipped=rows_skipped,
-        files_processed=1,
-        first_ts_ns=done.first_ts_ns,
-        last_ts_ns=done.last_ts_ns,
-        last_trade_id=done.last_id,
-    )
+        symbol_name = _symbol_from_file(csv_path)
+        if not symbol_name:
+            raise ValueError(
+                f"{csv_path.name} is a chain file holding many instruments; "
+                f"pass symbol_name to pick one")
+    return _convert_file(
+        csv_path, out_tape, symbol_id=symbol_id, symbol_name=symbol_name,
+        market=market, exchange_id=exchange_id, exchange_name=exchange_name,
+        append=append, max_segment_mb=max_segment_mb, compression=compression,
+        write_metadata=write_metadata, qty_multiplier=qty_multiplier)
 
 
 def _coerce_day(d: DateLike) -> date:
@@ -360,10 +438,16 @@ def range_to_lrvx(
     max_segment_mb: int = 256,
     compression: str = "none",
     skip_missing: bool = False,
+    qty_multiplier: float = 1.0,
 ) -> ConvertStats:
-    """Convert a multi-day OKX range into lrvx. Uses the shared
-    archive cache (``~/.lrvx/archive-cache/okx``) when ``mirror`` is
-    omitted."""
+    """Convert a range of OKX days (UTC+8 dates, inclusive) into lrvx.
+    Uses the shared archive cache (``~/.lrvx/archive-cache/okx``) when
+    ``mirror`` is omitted.
+
+    For futures and options, a day whose chain file holds no trade of
+    ``symbol`` adds nothing; the range raises
+    ``InstrumentNotInFileError`` only when no day held one."""
+    _check_symbol(symbol, market)
     days = list(_iter_days(date_from, date_to))
     if not days:
         return ConvertStats()
@@ -391,19 +475,28 @@ def range_to_lrvx(
             pairs.append(pair)
 
     agg = ConvertStats()
+    absent: List[str] = []
     for day, path in pairs:
         if path is None:
             continue
-        s = trades_to_lrvx(
-            path, out_tape,
-            symbol_id=symbol_id, symbol_name=symbol, market=market,
-            exchange_id=exchange_id, exchange_name=exchange_name,
-            append=append, max_segment_mb=max_segment_mb,
-            compression=compression, write_metadata=False,
-        )
+        try:
+            s = _convert_file(
+                path, Path(out_tape).expanduser(),
+                symbol_id=symbol_id, symbol_name=symbol, market=market,
+                exchange_id=exchange_id, exchange_name=exchange_name,
+                append=append, max_segment_mb=max_segment_mb,
+                compression=compression, write_metadata=False,
+                qty_multiplier=qty_multiplier,
+            )
+        except InstrumentNotInFileError as e:
+            absent.append(str(e))
+            agg.files_processed += 1
+            continue
         agg.trades_written += s.trades_written
         agg.rows_read += s.rows_read
         agg.rows_skipped += s.rows_skipped
+        agg.rows_invalid += s.rows_invalid
+        agg.rows_other_instruments += s.rows_other_instruments
         agg.files_processed += s.files_processed
         if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
             agg.first_ts_ns = s.first_ts_ns
@@ -412,19 +505,29 @@ def range_to_lrvx(
         if s.last_trade_id > agg.last_trade_id:
             agg.last_trade_id = s.last_trade_id
 
+    if absent and not agg.rows_read:
+        raise InstrumentNotInFileError(
+            f"no day in the range holds a trade of '{symbol}': " + absent[0])
+
     _write_metadata(
-        Path(out_tape),
+        Path(out_tape).expanduser(),
         exchange_name=exchange_name, market=market,
         symbol_id=symbol_id, symbol_name=symbol,
         first_ts_ns=agg.first_ts_ns, last_ts_ns=agg.last_ts_ns,
-        trades_added=agg.trades_written,
+        trades_added=agg.trades_written, qty_multiplier=qty_multiplier,
     )
 
     return agg
 
 
+UnknownLayoutError = _layout.UnknownLayoutError
+NothingParsedError = _layout.NothingParsedError
+
 __all__ = [
     "ConvertStats",
+    "InstrumentNotInFileError",
+    "NothingParsedError",
+    "UnknownLayoutError",
     "trades_to_lrvx",
     "range_to_lrvx",
 ]

@@ -1,8 +1,10 @@
-"""Binance public aggTrades archive round-trip — build a tiny
-synthetic zip in the exact layout published on data.binance.vision,
-push it through ``lrvx.archives.binance.aggtrades_to_lrvx``,
-then read the resulting ``.lrvx`` tape back via ``DataReader`` and
-print a summary.
+"""Binance public aggTrades archive round-trip — build a tiny zip in
+the layout data.binance.vision publishes for USDT-margined futures
+(a header row, seven columns), push it through
+``lrvx.archives.binance.aggtrades_to_lrvx``, then read the resulting
+``.lrvx`` tape back via ``DataReader`` and print a summary. Spot
+files have no header and an eighth ``is_best_match`` column; the
+importer recognises either.
 
 This example is the CI-runnable companion to
 [Import the Binance public archive](../how-to/import-binance-archive.md).
@@ -26,15 +28,17 @@ from lrvx.archives import binance
 
 
 _ROWS = [
-    # agg_id, price, qty, first_id, last_id, ts_ms, is_buyer_maker, is_best
-    (1001, 42100.50, 0.005, 9001, 9001, 1_700_000_000_000, "True",  "True"),
-    (1002, 42101.00, 0.010, 9002, 9003, 1_700_000_001_000, "False", "True"),
-    (1003, 42100.75, 0.002, 9004, 9004, 1_700_000_002_500, "True",  "True"),
+    # agg_id, price, qty, first_id, last_id, transact_time (ms), is_buyer_maker
+    (1001, 42100.50, 0.005, 9001, 9001, 1_700_000_000_000, "true"),
+    (1002, 42101.00, 0.010, 9002, 9003, 1_700_000_001_000, "false"),
+    (1003, 42100.75, 0.002, 9004, 9004, 1_700_000_002_500, "true"),
 ]
 
 
 def _build_synthetic_zip(dest: Path) -> Path:
     buf = io.StringIO()
+    buf.write("agg_trade_id,price,quantity,first_trade_id,last_trade_id,"
+              "transact_time,is_buyer_maker\n")
     for r in _ROWS:
         buf.write(",".join(str(x) for x in r) + "\n")
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -63,8 +67,8 @@ def main() -> None:
             f"trades_written={stats.trades_written} "
             f"tape_trades={int(trades.size)}"
         )
-        # is_buyer_maker=True maps to Side::SELL (1); False → SELL is False → BUY (0).
-        expected_sides = [1 if r[6] == "True" else 0 for r in _ROWS]
+        # is_buyer_maker=true maps to Side::SELL (1); false maps to Side::BUY (0).
+        expected_sides = [1 if r[6] == "true" else 0 for r in _ROWS]
         actual_sides = [int(t["side"]) for t in trades]
         assert actual_sides == expected_sides, (actual_sides, expected_sides)
         assert int(trades.size) == len(_ROWS)

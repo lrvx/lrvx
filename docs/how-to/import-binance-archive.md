@@ -1,6 +1,14 @@
 # Import Binance public archives into a lrvx tape
 
-`data.binance.vision` publishes daily aggregate-trade zip archives for spot, USDT-margined perpetuals, and coin-margined perpetuals, going back more than two years. The archive layout is stable, but the per-row work is fiddly: column ordering, header autoskip, millisecond-to-nanosecond rescale, side mapping, and dedup on re-runs.
+`data.binance.vision` publishes one aggregate-trade zip per symbol and UTC day for spot, USDT-margined futures (`um-futures`) and coin-margined futures (`cm-futures`):
+
+```text
+https://data.binance.vision/data/spot/daily/aggTrades/<SYMBOL>/<SYMBOL>-aggTrades-<YYYY-MM-DD>.zip
+https://data.binance.vision/data/futures/um/daily/aggTrades/<SYMBOL>/<SYMBOL>-aggTrades-<YYYY-MM-DD>.zip
+https://data.binance.vision/data/futures/cm/daily/aggTrades/<SYMBOL>/<SYMBOL>-aggTrades-<YYYY-MM-DD>.zip
+```
+
+The per-row work is fiddly: two layouts, two timestamp units, side mapping, and dedup on re-runs.
 
 `lrvx.archives.binance` wraps the converter in two function calls, plus a `lrvx archive binance` CLI subcommand. The output is a regular `.lrvx` tape, which means every aggregator, `MergedTapeReader`, the live recorder hook, and the engine itself read it without special-casing.
 
@@ -20,7 +28,20 @@ The simplest form takes one already-downloaded zip and writes a tape directory. 
 --8<-- "examples/python_binance_archive.py"
 ```
 
-`csv_path` accepts either the zip published by Binance or the extracted CSV; the reader autoskips a header row when one is present.
+`csv_path` accepts either the zip published by Binance or the extracted CSV.
+
+## Columns and units
+
+The layout is recognised per file:
+
+- futures files (`um-futures`, `cm-futures`) from mid 2022 on open with the header `agg_trade_id,price,quantity,first_trade_id,last_trade_id,transact_time,is_buyer_maker`; older futures files have the same seven columns and no header;
+- spot files have no header and eight columns: the same seven plus `is_best_match`, with `True` / `False` flags.
+
+A file whose first row is neither raises `lrvx.archives.UnknownLayoutError`, and a file with rows of which none parse raises `lrvx.archives.NothingParsedError`; nothing is written in either case. Rows that fail to parse in an otherwise good file are counted in `rows_invalid`.
+
+`transact_time` is Unix milliseconds, except in spot files from 2025-01-01 on, where Binance writes microseconds (as its [public data README](https://github.com/binance/binance-public-data) states). The importer reads a value of 10^14 or more as microseconds, so both land on the tape as nanoseconds.
+
+`quantity` is stored as published: the base asset for spot and um-futures, contracts for cm-futures (`BTCUSD_PERP` 100 USD each, other symbols 10 USD). `qty_multiplier` (`--qty-multiplier`) multiplies every quantity by a constant you supply, for example a contract size; the importer does not know contract sizes. `metadata.json` records the unit and the multiplier under `custom.qty_unit` and `custom.qty_multiplier`.
 
 Side encoding follows the lrvx convention. `is_buyer_maker = true` becomes `Side::SELL` (the buyer was the resting maker, so the active flow is a seller hitting the bid). `is_buyer_maker = false` becomes `Side::BUY`.
 
@@ -44,7 +65,7 @@ binance.range_to_lrvx(
 ) -> ConvertStats
 ```
 
-Without `mirror`, the converter writes to a tempdir and discards it after the range is done. Set `skip_missing=True` to keep going if Binance has not published a particular day yet (common at the head of the archive).
+Without `mirror`, the converter writes to a tempdir and discards it after the range is done. Set `skip_missing=True` to keep going if Binance has not published a particular day yet (common at the head of the archive). A day's file usually appears the following day.
 
 ## CLI
 
@@ -71,7 +92,11 @@ lrvx archive binance \
 
 ## Append-safe and idempotent
 
-The converter dedups on `agg_trade_id` against any trades already in the target tape. Re-running the same day, or running an overlapping range, is a no-op: every previously-imported row is skipped, and the writer adds zero new records. The reported `rows_skipped` counter shows how many rows were elided.
+The converter dedups on `agg_trade_id` against the trades already in the target tape for the same symbol within the incoming file's time range. Re-running the same day, or running an overlapping range, adds nothing: every previously-imported row is skipped, and the writer adds zero new records. The reported `rows_skipped` counter shows how many rows were elided; this empty result is not an error.
+
+## Real-archive tests
+
+`python/tests/test_binance_archive.py` builds its fixtures from the real headers and row shapes. Its `BinanceRealArchiveTests` download one day per market (including a spot day in microseconds) and compare decoded trades with the file; they run only with `LRVX_ARCHIVE_NETWORK_TESTS=1`.
 
 ## metadata.json
 
@@ -79,7 +104,7 @@ The tape's `metadata.json` is created (or merged into) on every successful conve
 
 ## What is and is not in the archive
 
-aggTrades only carries print events. There is no book information. The bookTicker archive (best bid / ask, um-futures and cm-futures) has its own converters in `lrvx.archives.binance`:
+aggTrades only carries print events. There is no book information. The bookTicker archive (best bid / ask, um-futures and cm-futures, days from 2023-05 to 2024) has its own converters in `lrvx.archives.binance`:
 
 | Function | Archive |
 |---|---|
@@ -88,4 +113,4 @@ aggTrades only carries print events. There is no book information. The bookTicke
 
 They write into the same tape directory, so a single lrvx can carry both trades and book updates. See [Import Binance book archives](import-binance-book-archive.md).
 
-Other public archives ship as sibling subcommands under `lrvx archive`: `bybit`, `okx`, `bitget` and `deribit` (`lrvx.archives.deribit`). See [Import multi-exchange archives](import-multi-exchange-archives.md).
+Other public archives ship as sibling subcommands under `lrvx archive`: `bybit`, `okx` and `bitget`. See [Import multi-exchange archives](import-multi-exchange-archives.md).

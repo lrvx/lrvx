@@ -28,7 +28,7 @@ Solve specific problems. Assumes you know the basics.
 | [Aggregate tape events in a single pass](aggregate-tape-events.md) | Run a panel of streaming aggregators over a tape without materialising it |
 | [Import Binance public archives](import-binance-archive.md) | Convert `data.binance.vision` aggTrades zips into a `.lrvx` tape |
 | [Import Binance book archives](import-binance-book-archive.md) | Convert `bookTicker` zips (um-futures, cm-futures) into delta-encoded book events on the same tape |
-| [Import multi-exchange archives](import-multi-exchange-archives.md) | Binance / Bybit / OKX / Bitget / Deribit public archive importers |
+| [Import multi-exchange archives](import-multi-exchange-archives.md) | Binance / Bybit / OKX / Bitget public archive importers: real URLs, columns, units |
 | [Iterate the order book from a tape](iterate-orderbook.md) | Reconstruct ladder state per bucket or at a chosen instant for offline book analysis |
 | [Rolling top-K thresholds](rolling-thresholds.md) | Vectorized sliding K-th-largest for extreme-event filters at any timeframe |
 | [Cross-sectional panel builder](cross-sectional-panel.md) | Aligned (T × S) close / OHLC / returns panel over N lrvx tapes |

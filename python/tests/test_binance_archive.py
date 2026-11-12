@@ -1,23 +1,30 @@
 """Tests for ``lrvx.archives.binance`` — Binance public aggTrades
 zip → lrvx converter.
 
-No network: a synthetic ``aggTrades.zip`` matching the exact column
-layout published on ``data.binance.vision`` is built in-memory and
-fed through the converter. The resulting `.lrvx` directory is
-read back via ``lrvx.DataReader`` and asserted trade-by-trade.
+No network by default: ``aggTrades.zip`` files in the two layouts
+published on ``data.binance.vision`` (futures: header, seven columns;
+spot: no header, eight columns) are built in-memory and fed through
+the converter. The resulting `.lrvx` directory is read back via
+``lrvx.DataReader`` and asserted trade-by-trade.
 
 Covers:
 
-  * Single-day conversion via ``aggtrades_to_lrvx``.
+  * Single-day conversion via ``aggtrades_to_lrvx``, both layouts.
   * Side mapping: ``is_buyer_maker=True`` → ``Side::SELL``.
-  * Header-row autoskip (older daily files prepend a header).
+  * Spot timestamps in microseconds (files from 2025-01-01).
+  * An unknown header raises UnknownLayoutError; a file whose rows all
+    fail to parse raises NothingParsedError.
+  * ``qty_multiplier`` and the quantity unit in ``metadata.json``.
   * Append + dedup: re-running the same day writes zero new trades.
   * Multi-day append: days in sequence, re-imports, overlapping
     ranges and out-of-order days each keep every trade once, and the
     dedup read is bounded to the incoming day's time range.
   * ``metadata.json`` is produced with exchange / instrument_type /
     symbol entry / time range.
-  * CLI wiring: ``lrvx archive binance --csv ... --out ...``.
+  * CLI wiring: ``lrvx archive binance --csv ... --out ...``, and a
+    one-line error for an unknown header.
+  * With LRVX_ARCHIVE_NETWORK_TESTS=1, real days downloaded from
+    data.binance.vision.
 
 Run from repo root:
     PYTHONPATH=build/python python3 python/tests/test_binance_archive.py
@@ -41,9 +48,11 @@ for cand in ("build/python", "build-py312/python"):
     if p.is_dir():
         sys.path.insert(0, str(p))
         break
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import lrvx  # noqa: E402
 
+import _archive_network as net  # noqa: E402
 from lrvx import cli  # noqa: E402
 from lrvx.archives import binance as bnc  # noqa: E402
 
@@ -60,14 +69,22 @@ _ROWS = [
 ]
 
 
+_FUTURES_HEADER = ("agg_trade_id,price,quantity,first_trade_id,last_trade_id,"
+                   "transact_time,is_buyer_maker")
+
+
 def _build_zip(dest: Path, *, with_header: bool, rows=_ROWS) -> Path:
-    """Pack ``rows`` into a Binance-style aggTrades zip."""
+    """Pack ``rows`` into a Binance aggTrades zip: the futures layout
+    (header, seven columns, ``true``/``false``) with ``with_header``,
+    else the spot layout (no header, eight columns, ``True``/``False``)."""
     buf = io.StringIO()
     if with_header:
-        buf.write("agg_trade_id,price,quantity,first_trade_id,last_trade_id,"
-                  "transact_time,is_buyer_maker,is_best_match\n")
-    for r in rows:
-        buf.write(",".join(str(x) for x in r) + "\n")
+        buf.write(_FUTURES_HEADER + "\n")
+        for r in rows:
+            buf.write(",".join(str(x) for x in r[:6]) + f",{r[6].lower()}\n")
+    else:
+        for r in rows:
+            buf.write(",".join(str(x) for x in r) + "\n")
     csv_bytes = buf.getvalue().encode("ascii")
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(dest.with_suffix(".csv").name, csv_bytes)
@@ -139,6 +156,73 @@ class SingleDayConvertTests(unittest.TestCase):
         self.assertEqual(sym["name"], "BTCUSDT")
         self.assertEqual(sym["base_asset"], "BTC")
         self.assertEqual(sym["quote_asset"], "USDT")
+
+    def test_spot_microsecond_timestamps(self) -> None:
+        rows = [(402537070, 0.02833, 0.0038, 533980877, 533980877,
+                 1_794_268_832_225_401, "True", "True"),
+                (402537071, 0.02833, 0.04, 533980878, 533980879,
+                 1_794_268_860_433_720, "False", "True")]
+        _build_zip(self.zip_path, with_header=False, rows=rows)
+        bnc.aggtrades_to_lrvx(self.zip_path, self.tape, market="spot")
+        trades = lrvx.DataReader(str(self.tape)).read_trades()
+        self.assertEqual([int(t["exchange_ts_ns"]) for t in trades],
+                         [1_794_268_832_225_401_000, 1_794_268_860_433_720_000])
+
+    def test_headerless_futures_layout(self) -> None:
+        rows = [(18374167, 7189.43, 0.030, 25247504, 25247504,
+                 1_577_836_801_481, "true"),
+                (18374168, 7189.42, 0.100, 25247505, 25247506,
+                 1_577_836_801_640, "false")]
+        with zipfile.ZipFile(self.zip_path, "w") as zf:
+            zf.writestr("x.csv", "".join(",".join(str(v) for v in r) + "\n"
+                                         for r in rows))
+        stats = bnc.aggtrades_to_lrvx(self.zip_path, self.tape, market="um-futures")
+        self.assertEqual(stats.trades_written, 2)
+        trades = lrvx.DataReader(str(self.tape)).read_trades()
+        self.assertEqual([(int(t["trade_id"]), int(t["exchange_ts_ns"]), int(t["side"]))
+                          for t in trades],
+                         [(18374167, 1_577_836_801_481_000_000, 1),
+                          (18374168, 1_577_836_801_640_000_000, 0)])
+
+    def test_unknown_header_is_rejected(self) -> None:
+        with zipfile.ZipFile(self.zip_path, "w") as zf:
+            zf.writestr("x.csv", _FUTURES_HEADER + ",is_best_match\n"
+                        "1,1.0,1.0,1,1,1700000000000,true,true\n")
+        with self.assertRaises(bnc.UnknownLayoutError) as ctx:
+            bnc.aggtrades_to_lrvx(self.zip_path, self.tape)
+        self.assertIn(_FUTURES_HEADER, str(ctx.exception))
+        self.assertFalse(self.tape.exists())
+
+    def test_unknown_header_cli_error(self) -> None:
+        with zipfile.ZipFile(self.zip_path, "w") as zf:
+            zf.writestr("x.csv", "id,px\n1,2\n")
+        err = io.StringIO()
+        with mock.patch.object(sys, "stderr", err):
+            rc = cli.main(["archive", "binance", "--csv", str(self.zip_path),
+                           "--out", str(self.tape)])
+        self.assertEqual(rc, 1)
+        self.assertIn("lrvx archive binance:", err.getvalue())
+        self.assertIn("unrecognised", err.getvalue())
+
+    def test_nothing_parsed_is_an_error(self) -> None:
+        with zipfile.ZipFile(self.zip_path, "w") as zf:
+            zf.writestr("x.csv", _FUTURES_HEADER + "\n"
+                        "1,1.0,1.0,1,1,1700000000000,maybe\n"
+                        "2,1.0,1.0,1,1,later,true\n")
+        with self.assertRaises(bnc.NothingParsedError):
+            bnc.aggtrades_to_lrvx(self.zip_path, self.tape)
+        self.assertFalse(self.tape.exists())
+
+    def test_cm_contracts_and_qty_multiplier(self) -> None:
+        _build_zip(self.zip_path, with_header=True)
+        bnc.aggtrades_to_lrvx(self.zip_path, self.tape, market="cm-futures",
+                              symbol_name="BTCUSD_PERP", qty_multiplier=100.0)
+        trades = lrvx.DataReader(str(self.tape)).read_trades()
+        for t, r in zip(trades, _ROWS):
+            self.assertAlmostEqual(float(t["qty_raw"]) / 1e8, r[2] * 100.0, places=6)
+        meta = json.loads((self.tape / "metadata.json").read_text())
+        self.assertEqual(meta["custom"], {"qty_unit": "contracts",
+                                          "qty_multiplier": 100.0})
 
     def test_cli_wiring(self) -> None:
         _build_zip(self.zip_path, with_header=False)
@@ -219,7 +303,7 @@ class MultiDayAppendTests(unittest.TestCase):
             dest = bnc._mirror_path(self.mirror, "BTCUSDT", "um-futures",
                                     date(2024, 1, 15 + i))
             dest.parent.mkdir(parents=True, exist_ok=True)
-            self.paths.append(_build_zip(dest, with_header=False, rows=rows))
+            self.paths.append(_build_zip(dest, with_header=True, rows=rows))
 
     def _import(self, day_index: int) -> bnc.ConvertStats:
         return bnc.aggtrades_to_lrvx(
@@ -289,6 +373,49 @@ class MultiDayAppendTests(unittest.TestCase):
             self.assertEqual(kwargs.get("from_ns"), min(ts))
             self.assertEqual(kwargs.get("to_ns"), max(ts))
             self.assertEqual(kwargs.get("symbols"), [7])
+
+
+def _decode_agg(row):
+    ts = int(row[5])
+    ts = ts * 1_000 if ts >= 10 ** 14 else ts * 1_000_000
+    return (int(row[0]), float(row[1]), float(row[2]), ts,
+            1 if row[6].lower() == "true" else 0)
+
+
+@unittest.skipUnless(net.ENABLED, net.SKIP_REASON)
+class BinanceRealArchiveTests(unittest.TestCase):
+    """One real day per market, downloaded from data.binance.vision."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory(prefix="binance-net-")
+        self.addCleanup(self._tmp.cleanup)
+        self.tmp = Path(self._tmp.name)
+
+    def _check(self, symbol: str, market: str, day: str, header: bool) -> None:
+        tape = self.tmp / f"{market}-tape"
+        mirror = self.tmp / "mirror"
+        stats = bnc.range_to_lrvx(symbol, market, day, day, tape,
+                                  mirror=mirror, parallel=1)
+        self.assertGreater(stats.trades_written, 0)
+        self.assertEqual(stats.rows_invalid, 0)
+        path = bnc._mirror_path(mirror, symbol, market, date.fromisoformat(day))
+        net.assert_sample(self, tape, net.expected_from(path, _decode_agg,
+                                                         header=header))
+
+    def test_spot_milliseconds(self) -> None:
+        self._check("ETHBTC", "spot", "2024-01-15", header=False)
+
+    def test_spot_microseconds(self) -> None:
+        self._check("ETHBTC", "spot", "2026-11-10", header=False)
+
+    def test_um_futures(self) -> None:
+        self._check("ETHBTC", "um-futures", "2026-11-10", header=True)
+
+    def test_futures_without_header(self) -> None:
+        self._check("ADAUSD_PERP", "cm-futures", "2022-06-01", header=False)
+
+    def test_cm_futures(self) -> None:
+        self._check("ADAUSD_PERP", "cm-futures", "2026-11-10", header=True)
 
 
 if __name__ == "__main__":
