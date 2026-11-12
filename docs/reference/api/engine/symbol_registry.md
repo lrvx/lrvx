@@ -9,7 +9,11 @@ struct SymbolInfo
   std::string exchange;
   std::string symbol;
   InstrumentType type = InstrumentType::Spot;
-  Price tickSize{Price::fromDouble(0.01)};
+  Price tickSize{kDefaultTickSize};  // 0.01
+  // True when tickSize is the venue's price increment. A simulated venue
+  // refuses order prices off a known tick. Any tickSize other than the default
+  // counts as known without this flag; set it to have an explicit 0.01 checked.
+  bool tickSizeKnown{false};
   ExchangeId exchangeId{InvalidExchangeId};
 
   std::optional<Price> strike;
@@ -140,10 +144,22 @@ auto bybitEquiv = registry.getEquivalentOnExchange(btcBinance, bybitExchangeId);
 
 | Method          | Description                                         |
 | --------------- | --------------------------------------------------- |
-| `saveToFile`    | Persists registry to a binary file.                 |
-| `loadFromFile`  | Loads registry from a binary file.                  |
+| `saveToFile`    | Persists registry to a JSON file.                   |
+| `loadFromFile`  | Loads registry from a JSON file.                    |
 | `serialize`     | Returns binary representation as `std::vector<std::byte>`. |
 | `deserialize`   | Restores state from binary data.                    |
+
+Both formats keep `tickSizeKnown`, so a symbol whose tick was declared is checked the same way
+after a load as before the save. The JSON file writes `"tick_size_known": true` on such an entry;
+the binary form sets bit `0x10` of the per-symbol flags byte. Neither is written for an undeclared
+tick, so an undeclared symbol's entry is unchanged.
+
+Data written before the flag was persisted loads with `tickSizeKnown` false on every symbol. An old
+entry with the 0.01 tick is therefore not checked after the load, and an old entry with any other
+tick is, which is how those symbols were treated before they were saved unless the 0.01 had been
+declared with the flag. A registry saved with a declared 0.01 tick before the flag was persisted
+loads it unchecked; register it again with `tickSizeKnown`, or save it again, to have it checked.
+A reader that predates the flag ignores the bit and the key, and loads the symbol without it.
 
 ## Capacity Limits
 
@@ -169,6 +185,11 @@ auto bybitEquiv = registry.getEquivalentOnExchange(btcBinance, bybitExchangeId);
 * `InstrumentType` allows immediate filtering (`Spot`, `Future`, `Option`) without extra registry calls in hot paths.
 * `SymbolId` remains a compact, contiguous 32-bit value suitable for array indices in event buses and order books.
 * Option-specific fields (`strike`, `expiry`, `optionType`) are populated only when `type == InstrumentType::Option`.
-* `tickSize` stores the minimum price increment for the instrument (default 0.01).
+* `tickSize` stores the minimum price increment for the instrument (default 0.01). Whether a backtest
+  checks order prices against it is decided by `orderTickRaw` in `execution/order_price_rule.h`: a
+  tick is checked when `tickSizeKnown` is set or the tick is not the 0.01 default, and never when it
+  is zero. See [SimulatedExecutor](../backtest/simulated_executor.md#order-prices-and-the-tick).
+* `registerSymbol(info)` stores a copy of the whole `SymbolInfo`, flag included. The name-only
+  overloads declare no tick.
 * `exchangeId` links symbol directly to its exchange for O(1) access.
 * Persistence methods are useful for storing symbol mappings alongside recorded market data.

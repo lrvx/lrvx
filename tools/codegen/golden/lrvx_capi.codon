@@ -129,6 +129,7 @@ from C import lrvx_backtest_runner_set_strategy(cobj, cobj)
 from C import lrvx_backtest_runner_run_csv(cobj, cobj, cobj, cobj) -> int
 from C import lrvx_backtest_runner_run_tape(cobj, cobj, cobj) -> int
 from C import lrvx_backtest_runner_run_tapes(cobj, Ptr[cobj], u32, cobj) -> int
+from C import lrvx_backtest_runner_run_tape_bars(cobj, cobj, i64, cobj, cobj) -> int
 from C import lrvx_backtest_runner_run_ohlcv(cobj, Ptr[i64], Ptr[float], u32, cobj, cobj) -> int
 from C import lrvx_backtest_runner_run_bars(cobj, Ptr[i64], Ptr[i64], Ptr[float], Ptr[float], Ptr[float], Ptr[float], Ptr[float], u32, cobj, u8, u64, cobj) -> int
 from C import lrvx_backtest_runner_run_replay_source(cobj, cobj, cobj) -> int
@@ -137,6 +138,7 @@ from C import lrvx_backtest_runner_set_risk_manager(cobj, cobj)
 from C import lrvx_backtest_runner_set_kill_switch(cobj, cobj)
 from C import lrvx_backtest_runner_set_order_validator(cobj, cobj)
 from C import lrvx_backtest_runner_set_pnl_tracker(cobj, cobj)
+from C import lrvx_backtest_runner_create_with_fill_settings(cobj, float, float, i32, i32, float, float, float, i64, i64, i64, i64, u64, i64, i64, cobj) -> cobj
 
 # ── bar_aggregation ──
 from C import lrvx_aggregate_time_bars(Ptr[i64], Ptr[float], Ptr[float], Ptr[u8], int, float, cobj, u32) -> u32

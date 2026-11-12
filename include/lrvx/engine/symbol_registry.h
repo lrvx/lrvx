@@ -43,7 +43,8 @@ struct SymbolInfo
   // True when tickSize is the venue's price increment. A simulated venue
   // refuses order prices off a known tick (see execution/order_price_rule.h).
   // Any tickSize other than the default counts as known without this flag; set
-  // it to have an explicit 0.01 checked.
+  // it to have an explicit 0.01 checked. saveToFile and serialize keep it; data
+  // written before they did loads with it clear.
   bool tickSizeKnown{false};
   ExchangeId exchangeId{InvalidExchangeId};
 

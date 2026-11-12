@@ -142,6 +142,16 @@ protected:
   bool isSubscribed(SymbolId sym) const noexcept;
 ```
 
+```cpp
+public:
+  // Each symbol's registry entry, copied by the constructor, in symbols() order
+  const std::vector<SymbolInfo>& symbolInfos() const noexcept;
+```
+
+`symbolInfos()` is where a `BacktestRunner` without `setSymbolRegistry` reads the symbols' declared
+ticks ([BacktestRunner](../backtest/backtest_runner.md#strategy-setup)). It is a copy, so the
+registry the strategy was built with need not outlive it.
+
 ## Signal Emission
 
 All order methods return an `OrderId` for tracking:

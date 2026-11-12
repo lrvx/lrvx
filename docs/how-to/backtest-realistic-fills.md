@@ -28,6 +28,42 @@ Details and the exact bounds: [SimulatedExecutor](../reference/api/backtest/simu
 
 ## 1. Configure the simulator
 
+`BacktestRunner` takes the default slippage profile as constructor arguments --
+`slippage_model` (`none`, `fixed_ticks`, `fixed_bps`, `volume_impact`) and the
+one parameter that model reads: `slippage_ticks` with `slippage_tick_size`,
+`slippage_bps`, or `slippage_impact_coeff` (camelCase in Node). Every model
+moves the fill against the taker. A parameter the chosen model does not read is
+refused rather than ignored, and `volume_impact` is refused by the bar and
+trade-only runs (`run_bars`, `run_tape_bars`, `run_csv`, `run_ohlcv`), which
+carry no book depth for it to divide by.
+
+=== "Python"
+
+    ```python
+    import lrvx
+
+    bt = lrvx.BacktestRunner(reg, fee_rate=0.0002, initial_capital=100_000,
+                             slippage_model="fixed_bps", slippage_bps=1.0)
+    ```
+
+=== "Node.js"
+
+    ```javascript
+    const bt = new lrvx.BacktestRunner(reg, 0.0002, 100_000,
+        {slippageModel: "fixed_bps", slippageBps: 1.0});
+    ```
+
+=== "Codon"
+
+    ```python
+    bt = BacktestRunner(reg, 0.0002, 100_000.0,
+                        slippage_model="fixed_bps", slippage_bps=1.0)
+    ```
+
+The queue model, per-symbol slippage and the rest of the executor's knobs are
+set on a `SimulatedExecutor` you drive yourself, or through `BacktestConfig` in
+C++:
+
 === "Python"
 
     ```python
@@ -83,17 +119,19 @@ Details and the exact bounds: [SimulatedExecutor](../reference/api/backtest/simu
 === "Python"
 
     ```python
-    bt = lrvx.BacktestRunner(reg, fee_rate=0.0002, initial_capital=100_000)
+    bt = lrvx.BacktestRunner(reg, fee_rate=0.0002, initial_capital=100_000,
+                             slippage_model="fixed_bps", slippage_bps=1.0)
     bt.set_strategy(my_strategy)
-    stats = bt.run_csv("data.csv", "BTCUSDT")
+    stats = bt.run_tape_bars("data/tape", interval_seconds=300, symbol="BTCUSDT")
     ```
 
 === "Node.js"
 
     ```javascript
-    const bt = new lrvx.BacktestRunner(reg, 0.0002, 100_000);
+    const bt = new lrvx.BacktestRunner(reg, 0.0002, 100_000,
+        {slippageModel: "fixed_bps", slippageBps: 1.0});
     bt.setStrategy(myStrategy);
-    const stats = bt.runCsv("data.csv", "BTCUSDT");
+    const stats = bt.runTapeBars("data/tape", 300, "BTCUSDT");
     ```
 
 === "C++"

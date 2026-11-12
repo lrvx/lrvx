@@ -1,0 +1,198 @@
+# Smoke test: BacktestRunner.run_tape_bars and the runner's slippage /
+# latency keywords. Mirrors python/tests/test_run_tape_bars.py and
+# python/tests/test_runner_slippage_latency.py:
+#   * run_tape_bars equals aggregate_time_bars -> run_bars on the same trades,
+#     bar for bar and trade for trade, at 60 s and 300 s, for both symbols
+#   * a two-symbol tape without a symbol raises ValueError
+#   * fixed_bps slippage moves every fill against the taker, a latency model
+#     composes like the submit ack latency, invalid settings raise
+
+import os
+
+from C import lrvx_registry_create() -> cobj
+from C import lrvx_registry_destroy(cobj)
+from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+
+from lrvx.runner import BacktestRunner
+from lrvx.strategy import Strategy, SymbolContext
+from lrvx.types import BarData
+from lrvx.tools import DataWriter, aggregate_time_bars
+from lrvx.latency import ConstantLatency
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+class Swing(Strategy):
+    opens: List[float]
+    starts: List[int]
+
+    def __init__(self, symbols: List[int]):
+        super().__init__(symbols)
+        self.opens = list[float]()
+        self.starts = list[int]()
+
+    def on_bar(self, ctx: SymbolContext, bar: BarData):
+        self.opens.append(bar.open)
+        self.starts.append(bar.start_time_ns)
+        i = len(self.opens)
+        if i % 6 == 1:
+            self.market_buy(0.5)
+        elif i % 6 == 4:
+            self.market_sell(0.5)
+
+
+SEC = 1_000_000_000
+T0 = 1_767_225_600 * SEC
+
+# (ts, price, qty, symbol, side) per symbol, a deterministic walk
+ts_by = [list[int](), list[int]()]
+px_by = [list[float](), list[float]()]
+qty_by = [list[float](), list[float]()]
+buy_by = [list[bool](), list[bool]()]
+
+root = "/tmp/codon_backtest_run_tape_bars_smoke"
+os.system("rm -rf " + root)
+os.system("mkdir -p " + root)
+w = DataWriter(root)
+seed = 7
+tid = 0
+t = T0
+pa = 10_000
+pb = 5_000
+for i in range(3000):
+    seed = (seed * 1103515245 + 12345) % 2147483648
+    t += 1 + (seed % 2_500) * 1_000_000
+    s = 0 if seed % 3 != 0 else 1
+    step = (seed // 7) % 51 - 25
+    if s == 0:
+        pa += step
+        px = float(pa) / 100.0
+    else:
+        pb += step
+        px = float(pb) / 100.0
+    q = float(1 + (seed // 13) % 2000) / 1000.0
+    side = (seed // 17) % 2
+    tid += 1
+    w.write_trade(t, t, px, q, tid, s + 1, side)
+    ts_by[s].append(t)
+    px_by[s].append(px)
+    qty_by[s].append(q)
+    buy_by[s].append(side == 0)
+w.close()
+
+
+def registry() -> cobj:
+    reg = lrvx_registry_create()
+    lrvx_registry_add_symbol(reg, "test".c_str(), "AAA".c_str(), 0.01)
+    lrvx_registry_add_symbol(reg, "test".c_str(), "BBB".c_str(), 0.01)
+    return reg
+
+
+names = ["AAA", "BBB"]
+for interval in [60.0, 300.0]:
+    for k in range(2):
+        sym = k + 1
+        reg = registry()
+        a = Swing([sym])
+        bt = BacktestRunner(reg, 0.0004, 10_000.0)
+        bt.set_strategy(a)
+        got = bt.run_tape_bars(root, interval, names[k])
+        got_trades = bt.trades()
+
+        bars = aggregate_time_bars(ts_by[k], px_by[k], qty_by[k], buy_by[k], interval)
+        b = Swing([sym])
+        bt2 = BacktestRunner(reg, 0.0004, 10_000.0)
+        bt2.set_strategy(b)
+        want = bt2.run_bars([x.start_time_ns for x in bars], [x.end_time_ns for x in bars],
+                            [x.open() for x in bars], [x.high() for x in bars],
+                            [x.low() for x in bars], [x.close() for x in bars],
+                            [float(x.volume_raw) / 1e8 for x in bars],
+                            names[k], 0, int(interval * 1e9))
+        want_trades = bt2.trades()
+        tag = names[k] + " " + str(int(interval)) + "s"
+        check(len(bars) > 5 and len(a.opens) == len(bars), tag + ": on_bar count equals the bar count")
+        check(a.opens == b.opens and a.starts == b.starts, tag + ": same bars")
+        check(len(got_trades[2]) >= 2 and got_trades == want_trades, tag + ": same trades")
+        check(got.net_pnl == want.net_pnl and got.final_capital == want.final_capital
+              and got.total_trades == want.total_trades, tag + ": same stats")
+        check(bt.equity_curve() == bt2.equity_curve(), tag + ": same equity curve")
+
+reg = registry()
+bt = BacktestRunner(reg, 0.0004, 10_000.0)
+bt.set_strategy(Swing([1]))
+threw = False
+try:
+    bt.run_tape_bars(root, 60.0)
+except ValueError as e:
+    threw = "more than one symbol" in e.message
+check(threw, "two-symbol tape without a symbol raises")
+
+threw = False
+try:
+    bt.run_tape_bars(root, 0.0, "AAA")
+except ValueError:
+    threw = True
+check(threw, "interval 0 raises")
+
+plain = BacktestRunner(reg, 0.0004, 10_000.0)
+plain.set_strategy(Swing([1]))
+plain.run_tape_bars(root, 60.0, "AAA")
+pt = plain.trades()
+bps = BacktestRunner(reg, 0.0004, 10_000.0, slippage_model="fixed_bps", slippage_bps=10.0)
+bps.set_strategy(Swing([1]))
+bps.run_tape_bars(root, 60.0, "AAA")
+st = bps.trades()
+ok = len(st[2]) == len(pt[2]) and len(pt[2]) > 0
+for i in range(len(pt[2])):
+    # The symbol declares a 0.01 tick: a slipped fill is then put on the tick
+    # against the taker, a buy up and a sell down.
+    buy = pt[2][i] * 1.001
+    sell = pt[3][i] * 0.999
+    ok = ok and st[2][i] >= buy - 1e-9 and st[2][i] < buy + 0.01
+    ok = ok and st[3][i] <= sell + 1e-9 and st[3][i] > sell - 0.01
+check(ok, "fixed_bps moves every fill 10 bps against the taker, onto the tick")
+
+acked = BacktestRunner(reg, 0.0004, 10_000.0, submit_ack_latency_ns=5_000_000)
+acked.set_strategy(Swing([1]))
+acked.run_tape_bars(root, 60.0, "AAA")
+model = ConstantLatency(0, 5_000_000, 0)
+modelled = BacktestRunner(reg, 0.0004, 10_000.0, latency=model)
+modelled.set_strategy(Swing([1]))
+modelled.run_tape_bars(root, 60.0, "AAA")
+check(acked.trades() == modelled.trades() and acked.trades() != pt,
+      "a latency model composes like the submit ack latency, and both move fills")
+
+threw = False
+try:
+    BacktestRunner(reg, 0.0, 1000.0, slippage_model="fixed_bps")
+except ValueError as e:
+    threw = "slippage_bps" in e.message
+check(threw, "fixed_bps without slippage_bps raises")
+
+threw = False
+try:
+    BacktestRunner(reg, 0.0, 1000.0, slippage_model="bogus")
+except ValueError:
+    threw = True
+check(threw, "unknown slippage model raises")
+
+threw = False
+try:
+    BacktestRunner(reg, 0.0, 1000.0, submit_ack_latency_ns=-1)
+except ValueError as e:
+    threw = "submit_ack_latency_ns" in e.message
+check(threw, "negative latency raises")
+
+os.system("rm -rf " + root)
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")

@@ -15,6 +15,8 @@
 #include "lrvx/backtest/backtest_config.h"
 #include "lrvx/backtest/backtest_result.h"
 #include "lrvx/backtest/backtest_runner.h"
+#include "lrvx/backtest/latency_model.h"
+#include "lrvx/backtest/runner_fill_settings.h"
 #include "lrvx/backtest/venue_stack.h"
 #include "lrvx/book/bus/book_update_bus.h"
 #include "lrvx/book/bus/trade_bus.h"
@@ -35,6 +37,8 @@
 
 #include <atomic>
 #include <cctype>
+#include <chrono>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <functional>
@@ -1989,16 +1993,42 @@ class OhlcvBacktestReader : public replay::IMultiSegmentReader
 // but replays historical OHLCV data through it and returns stats.
 // ──────────────────────────────────────────────────────────────────────
 
+// slippage_model as the Python keyword spells it.
+inline lrvx::SlippageModel pySlippageModel(const std::string& name)
+{
+  for (auto m : {lrvx::SlippageModel::NONE, lrvx::SlippageModel::FIXED_TICKS,
+                 lrvx::SlippageModel::FIXED_BPS, lrvx::SlippageModel::VOLUME_IMPACT})
+  {
+    if (name == lrvx::slippageModelName(m))
+    {
+      return m;
+    }
+  }
+  throw lrvx::LrvxError("E_VAL_002",
+                        "BacktestRunner: slippage_model must be one of 'none', 'fixed_ticks', "
+                        "'fixed_bps', 'volume_impact'; got '" +
+                            name + "'");
+}
+
 class PyBacktestRunner
 {
  public:
-  PyBacktestRunner(SymbolRegistry* reg, double fee_rate, double initial_capital)
-      : _reg(reg)
+  PyBacktestRunner(SymbolRegistry* reg, double fee_rate, double initial_capital,
+                   lrvx::RunnerFillSettings fill = {}, py::object latencyOwner = py::none())
+      : _reg(reg), _fill(std::move(fill)), _latencyOwner(std::move(latencyOwner))
   {
     BacktestConfig cfg{};
     cfg.feeRate = fee_rate;
     cfg.initialCapital = initial_capital;
     cfg.usePercentageFee = true;
+    try
+    {
+      _fill.applyTo(cfg);
+    }
+    catch (const std::invalid_argument& e)
+    {
+      throw lrvx::LrvxError("E_VAL_002", std::string("BacktestRunner: ") + e.what());
+    }
     _runner = std::make_unique<BacktestRunner>(cfg);
     _runner->setSymbolRegistry(reg);
   }
@@ -2017,6 +2047,7 @@ class PyBacktestRunner
   {
     if (exec)
     {
+      refuseExternalExecutor("set_executor");
       _executor_adapter =
           std::make_unique<lrvx::cxx_adapters::PyExecutorCxxAdapter>(std::move(exec));
       _runner->setExecutor(_executor_adapter.get());
@@ -2053,6 +2084,7 @@ class PyBacktestRunner
       _runner->setSimulatedExecutor(nullptr, nullptr);
       return;
     }
+    refuseExternalExecutor("set_venue_stack");
     _runner->setSimulatedExecutor(&stack->executor(), &stack->clock());
   }
 
@@ -2150,6 +2182,7 @@ class PyBacktestRunner
 
   py::object run_csv(const std::string& path, const std::string& symbol = "")
   {
+    refuseWithoutDepth("run_csv");
     std::string sym = symbol.empty() ? inferSymbol(path) : symbol;
     auto id = resolveSymbol(sym);
     auto bars = loadCsv(path, id);
@@ -2166,6 +2199,57 @@ class PyBacktestRunner
           "Attach a strategy with set_strategy(MyStrategy()) first.");
     }
     BacktestResult result = _runner->runTape(path);
+    return statsToDict(std::move(result));
+  }
+
+  // The tape aggregated into time bars inside the call and replayed with
+  // run_bars' rules. The trades stay on the C++ side: the reader streams them
+  // into the aggregator, and only closed bars reach the strategy.
+  py::object run_tape_bars(const std::string& path, double interval_seconds,
+                           const std::string& symbol = "")
+  {
+    if (!_host)
+    {
+      throw lrvx::LrvxError(
+          "E_RUN_001",
+          "BacktestRunner.run_tape_bars() called before set_strategy(). "
+          "Attach a strategy with set_strategy(MyStrategy()) first.");
+    }
+    // Converted the way aggregate_time_bars converts it, so the same
+    // interval_seconds lands on the same buckets.
+    const bool finite = std::isfinite(interval_seconds);
+    const auto interval = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::duration<double>(finite ? interval_seconds : 0.0));
+    if (!finite || interval.count() <= 0)
+    {
+      throw lrvx::LrvxError(
+          "E_VAL_002",
+          "BacktestRunner.run_tape_bars: interval_seconds must be a finite number of seconds "
+          "of at least one nanosecond, got " +
+              std::to_string(interval_seconds));
+    }
+    refuseWithoutDepth("run_tape_bars");
+    std::optional<SymbolId> sid;
+    if (!symbol.empty())
+    {
+      sid = resolveSymbol(symbol);
+    }
+    BacktestResult result;
+    try
+    {
+      result = _runner->runTapeBars(path, interval, sid);
+    }
+    catch (const std::invalid_argument& e)
+    {
+      if (sid)
+      {
+        throw lrvx::LrvxError("E_VAL_002",
+                              "BacktestRunner.run_tape_bars: the tape has no trade for symbol '" +
+                                  symbol + "' (id " + std::to_string(*sid) +
+                                  "); the registry id has to be the tape's symbol id");
+      }
+      throw lrvx::LrvxError("E_VAL_002", std::string(e.what()) + " as symbol=<name>");
+    }
     return statsToDict(std::move(result));
   }
 
@@ -2229,6 +2313,7 @@ class PyBacktestRunner
                        py::array_t<double, py::array::c_style | py::array::forcecast> close,
                        const std::string& symbol = "")
   {
+    refuseWithoutDepth("run_ohlcv");
     std::string sym = symbol.empty() ? "default" : symbol;
     auto id = resolveSymbol(sym);
     auto n = ts.size();
@@ -2264,6 +2349,7 @@ class PyBacktestRunner
           "BacktestRunner.run_bars() called before set_strategy(). "
           "Attach a strategy with set_strategy(MyStrategy()) first.");
     }
+    refuseWithoutDepth("run_bars");
     std::string sym = symbol.empty() ? "default" : symbol;
     auto id = resolveSymbol(sym);
     const auto n = start_ns.size();
@@ -2429,6 +2515,43 @@ class PyBacktestRunner
   std::unique_ptr<lrvx::cxx_adapters::PyKillSwitchCxxAdapter> _kill_adapter;
   std::unique_ptr<lrvx::cxx_adapters::PyOrderValidatorCxxAdapter> _validator_adapter;
   std::unique_ptr<lrvx::cxx_adapters::PyPnLTrackerCxxAdapter> _pnl_adapter;
+
+  lrvx::RunnerFillSettings _fill;
+  // Keeps a Python-defined LatencyModel subclass alive for as long as the
+  // runner's config holds the C++ side of it.
+  py::object _latencyOwner;
+
+  // set_executor / set_venue_stack route orders to an executor this runner
+  // did not configure, so slippage and latency given to the constructor would
+  // silently stop applying. Refuse the combination instead.
+  void refuseExternalExecutor(const char* method) const
+  {
+    if (_fill.customized())
+    {
+      throw lrvx::LrvxError(
+          "E_VAL_002",
+          std::string("BacktestRunner.") + method +
+              ": this runner was built with slippage or latency settings, which apply to the "
+              "built-in executor only; the attached executor would not use them. Configure "
+              "the external executor itself and build the runner without those keywords.");
+    }
+  }
+
+  // VOLUME_IMPACT divides by the visible level size. Bars and trade-only
+  // replays carry no book, so the model would produce no slippage at all.
+  void refuseWithoutDepth(const char* method) const
+  {
+    if (_fill.slippageModel == SlippageModel::VOLUME_IMPACT)
+    {
+      throw lrvx::LrvxError(
+          "E_VAL_002",
+          std::string("BacktestRunner.") + method +
+              ": slippage_model='volume_impact' needs book depth, and this replay has none "
+              "(bars and trade-only data report no level sizes), so it would add no slippage. "
+              "Use fixed_ticks or fixed_bps here, or volume_impact with run_tape on a tape "
+              "that records the book.");
+    }
+  }
 
   uint32_t resolveSymbol(const std::string& sym)
   {
@@ -3073,12 +3196,73 @@ inline void bindStrategy(py::module_& m)
                       bar_type, bar_type_param, close_reason); }, py::arg("symbol"), py::arg("open"), py::arg("high"), py::arg("low"), py::arg("close"), py::arg("volume") = 0.0, py::arg("buy_volume") = 0.0, py::arg("start_time_ns") = 0, py::arg("end_time_ns") = 0, py::arg("bar_type") = 0, py::arg("bar_type_param") = 0, py::arg("close_reason") = 0);
 
   py::class_<PyBacktestRunner>(m, "BacktestRunner")
-      .def(py::init([](SymbolRegistry* reg, double fee_rate, double initial_capital)
-                    { return std::make_unique<PyBacktestRunner>(reg, fee_rate, initial_capital); }),
+      .def(py::init(
+               [](SymbolRegistry* reg, double fee_rate, double initial_capital,
+                  const std::string& slippage_model, int32_t slippage_ticks,
+                  double slippage_tick_size, double slippage_bps, double slippage_impact_coeff,
+                  int64_t submit_ack_latency_ns, int64_t submit_ack_jitter_ns,
+                  int64_t cancel_ack_latency_ns, int64_t cancel_ack_jitter_ns,
+                  uint64_t cancel_ack_seed, int64_t replace_ack_latency_ns,
+                  int64_t replace_ack_jitter_ns, py::object latency)
+               {
+                 lrvx::RunnerFillSettings fill;
+                 fill.slippageModel = pySlippageModel(slippage_model);
+                 fill.slippageTicks = slippage_ticks;
+                 fill.slippageTickSize = slippage_tick_size;
+                 fill.slippageBps = slippage_bps;
+                 fill.slippageImpactCoeff = slippage_impact_coeff;
+                 fill.submitAckLatencyNs = submit_ack_latency_ns;
+                 fill.submitAckJitterNs = submit_ack_jitter_ns;
+                 fill.cancelAckLatencyNs = cancel_ack_latency_ns;
+                 fill.cancelAckJitterNs = cancel_ack_jitter_ns;
+                 fill.cancelAckSeed = cancel_ack_seed;
+                 fill.replaceAckLatencyNs = replace_ack_latency_ns;
+                 fill.replaceAckJitterNs = replace_ack_jitter_ns;
+                 if (!latency.is_none())
+                 {
+                   if (!py::isinstance<lrvx::LatencyModel>(latency))
+                   {
+                     throw py::type_error(
+                         "BacktestRunner: latency must be a lrvx.LatencyModel (ConstantLatency, "
+                         "GaussianLatency, ExponentialLatency, EmpiricalLatency or a subclass) "
+                         "or None");
+                   }
+                   fill.latency = latency.cast<std::shared_ptr<lrvx::LatencyModel>>();
+                 }
+                 return std::make_unique<PyBacktestRunner>(reg, fee_rate, initial_capital,
+                                                           std::move(fill), latency);
+               }),
            py::arg("registry"),
            py::arg("fee_rate") = 0.0004,
            py::arg("initial_capital") = 100000.0,
-           py::keep_alive<1, 2>())
+           py::kw_only(),
+           py::arg("slippage_model") = "none",
+           py::arg("slippage_ticks") = 0,
+           py::arg("slippage_tick_size") = 0.0,
+           py::arg("slippage_bps") = 0.0,
+           py::arg("slippage_impact_coeff") = 0.0,
+           py::arg("submit_ack_latency_ns") = 0,
+           py::arg("submit_ack_jitter_ns") = 0,
+           py::arg("cancel_ack_latency_ns") = 0,
+           py::arg("cancel_ack_jitter_ns") = 0,
+           py::arg("cancel_ack_seed") = 42,
+           py::arg("replace_ack_latency_ns") = 0,
+           py::arg("replace_ack_jitter_ns") = 0,
+           py::arg("latency") = py::none(),
+           py::keep_alive<1, 2>(),
+           "Backtest runner over the built-in SimulatedExecutor. The keyword-only "
+           "arguments are BacktestConfig's executor fields under their snake_case "
+           "names. slippage_model: none | fixed_ticks (slippage_ticks x "
+           "slippage_tick_size) | fixed_bps (slippage_bps) | volume_impact "
+           "(slippage_impact_coeff x order/level size; needs book depth), each "
+           "against the taker; a setting the chosen model does not read is refused. "
+           "submit/cancel/replace_ack_latency_ns and *_jitter_ns: venue ack delay, "
+           "drawn uniformly from [latency - jitter, latency + jitter] floored at 0, "
+           "with cancel_ack_seed seeding the draw. latency: a lrvx.LatencyModel "
+           "whose order_delay() is added to the submit deferral. On bar replay the "
+           "clock reads the bar's end, so any positive submit deferral moves a fill "
+           "to a later bar's open (docs/how-to/backtest-with-latency.md). The "
+           "defaults reproduce the instant, slippage-free run.")
       .def("set_strategy", &PyBacktestRunner::set_strategy, py::arg("strategy"),
            py::keep_alive<1, 2>())
       .def("set_executor", &PyBacktestRunner::set_executor, py::arg("executor"),
@@ -3123,6 +3307,17 @@ inline void bindStrategy(py::module_& m)
            "Run a backtest off a `.lrvx` tape directory. The tape is "
            "the canonical recorded artifact (`lrvx tape record` writes it). "
            "Returns the same stats dict shape as run_csv / run_bars.")
+      .def("run_tape_bars", &PyBacktestRunner::run_tape_bars, py::arg("path"),
+           py::kw_only(), py::arg("interval_seconds"), py::arg("symbol") = "",
+           "Replay a `.lrvx` tape as time bars of interval_seconds: the trades "
+           "are aggregated while the tape streams (wall-clock aligned, the last "
+           "still-open bar dropped, exactly as aggregate_time_bars does) and every "
+           "closed bar goes to Strategy.on_bar with run_bars' fill rules -- an order "
+           "sent from on_bar fills at the next bar's open. on_trade does not fire. "
+           "symbol names the registry symbol to replay and is required when the "
+           "tape holds more than one; its registry id must be the tape's symbol "
+           "id. Same result as read_trades -> aggregate_time_bars -> run_bars for "
+           "the same interval, without the trade array ever reaching Python.")
       .def("run_tapes", &PyBacktestRunner::run_tapes, py::arg("paths"),
            "Run a backtest off N `.lrvx` tapes merged on read. "
            "Symbols are rekeyed by (metadata.exchange, name) so two "

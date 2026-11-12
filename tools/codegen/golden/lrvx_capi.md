@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 763 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
+**Surface:** 765 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
 
 ## Opaque handles
 
@@ -1012,6 +1012,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `int lrvx_backtest_runner_run_csv(LrvxBacktestRunnerHandle runner, const char * path, const char * symbol, LrvxBacktestStats * stats_out)`
 - `int lrvx_backtest_runner_run_tape(LrvxBacktestRunnerHandle runner, const char * tape_dir, LrvxBacktestStats * stats_out)`
 - `int lrvx_backtest_runner_run_tapes(LrvxBacktestRunnerHandle runner, const char *const * tape_dirs, uint32_t n_dirs, LrvxBacktestStats * stats_out)`
+- `int lrvx_backtest_runner_run_tape_bars(LrvxBacktestRunnerHandle runner, const char * tape_dir, int64_t interval_ns, const char * symbol, LrvxBacktestStats * stats_out)`
 - `int lrvx_backtest_runner_run_ohlcv(LrvxBacktestRunnerHandle runner, const int64_t * timestamps_ns, const double * close_prices, uint32_t n, const char * symbol, LrvxBacktestStats * stats_out)`
 - `int lrvx_backtest_runner_run_bars(LrvxBacktestRunnerHandle runner, const int64_t * start_time_ns, const int64_t * end_time_ns, const double * open, const double * high, const double * low, const double * close, const double * volume, uint32_t n, const char * symbol, uint8_t bar_type, uint64_t bar_type_param, LrvxBacktestStats * stats_out)`
 - `int lrvx_backtest_runner_run_replay_source(LrvxBacktestRunnerHandle runner, LrvxReplaySourceHandle source, LrvxBacktestStats * stats_out)`
@@ -1020,6 +1021,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `void lrvx_backtest_runner_set_kill_switch(LrvxBacktestRunnerHandle runner, LrvxKillSwitchHandle ks)`
 - `void lrvx_backtest_runner_set_order_validator(LrvxBacktestRunnerHandle runner, LrvxOrderValidatorHandle ov)`
 - `void lrvx_backtest_runner_set_pnl_tracker(LrvxBacktestRunnerHandle runner, LrvxPnLTrackerHandle tracker)`
+- `LrvxBacktestRunnerHandle lrvx_backtest_runner_create_with_fill_settings(LrvxRegistryHandle registry, double fee_rate, double initial_capital, int32_t slippage_model, int32_t slippage_ticks, double slippage_tick_size, double slippage_bps, double slippage_impact_coeff, int64_t submit_ack_latency_ns, int64_t submit_ack_jitter_ns, int64_t cancel_ack_latency_ns, int64_t cancel_ack_jitter_ns, uint64_t cancel_ack_seed, int64_t replace_ack_latency_ns, int64_t replace_ack_jitter_ns, LrvxLatencyModelHandle latency)`
 
 ### bar_aggregation
 

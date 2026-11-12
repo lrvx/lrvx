@@ -1206,6 +1206,9 @@ extern "C"
                                     LrvxBacktestStats* stats_out);
   int lrvx_backtest_runner_run_tapes(LrvxBacktestRunnerHandle runner, const char* const* tape_dirs,
                                      uint32_t n_dirs, LrvxBacktestStats* stats_out);
+  int lrvx_backtest_runner_run_tape_bars(LrvxBacktestRunnerHandle runner, const char* tape_dir,
+                                         int64_t interval_ns, const char* symbol,
+                                         LrvxBacktestStats* stats_out);
   int lrvx_backtest_runner_run_ohlcv(LrvxBacktestRunnerHandle runner, const int64_t* timestamps_ns,
                                      const double* close_prices, uint32_t n, const char* symbol,
                                      LrvxBacktestStats* stats_out);
@@ -1921,6 +1924,13 @@ extern "C"
   int64_t lrvx_latency_fill_delay(LrvxLatencyModelHandle model);
   void lrvx_latency_sample(LrvxLatencyModelHandle model, LrvxLatencySample* out);
   void lrvx_latency_reset(LrvxLatencyModelHandle model, uint64_t seed);
+  LrvxBacktestRunnerHandle lrvx_backtest_runner_create_with_fill_settings(
+      LrvxRegistryHandle registry, double fee_rate, double initial_capital, int32_t slippage_model,
+      int32_t slippage_ticks, double slippage_tick_size, double slippage_bps,
+      double slippage_impact_coeff, int64_t submit_ack_latency_ns, int64_t submit_ack_jitter_ns,
+      int64_t cancel_ack_latency_ns, int64_t cancel_ack_jitter_ns, uint64_t cancel_ack_seed,
+      int64_t replace_ack_latency_ns, int64_t replace_ack_jitter_ns,
+      LrvxLatencyModelHandle latency);
 
   // ============================================================
   // Liquidation Engine

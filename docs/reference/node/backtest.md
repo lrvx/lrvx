@@ -16,7 +16,18 @@ bt.setStrategy(strategy);
 
 const stats = bt.runCsv('/path/to/data.csv', 'BTCUSDT');
 const stats = bt.runOhlcv(timestampsNs, closePrices, 'BTCUSDT');
+const stats = bt.runTapeBars('/path/to/tape', 300, 'BTCUSDT');
 ```
+
+`new BacktestRunner(registry, feeRate, initialCapital, options?)`: `options` sets the built-in
+executor's slippage and latency, the `BacktestConfig` fields camelCased -- `slippageModel`
+(`'none'`, `'fixed_ticks'`, `'fixed_bps'`, `'volume_impact'`), `slippageTicks`,
+`slippageTickSize`, `slippageBps`, `slippageImpactCoeff`, `submitAckLatencyNs`,
+`submitAckJitterNs`, `cancelAckLatencyNs`, `cancelAckJitterNs`, `cancelAckSeed`,
+`replaceAckLatencyNs`, `replaceAckJitterNs`, and `latency` (a `ConstantLatency`,
+`GaussianLatency`, `ExponentialLatency` or `EmpiricalLatency`). The meaning and the refusals are
+the Python ones: see [BacktestRunner constructor](../python/strategy.md#constructor). A runner
+built with options refuses `setExecutor`.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
@@ -24,6 +35,7 @@ const stats = bt.runOhlcv(timestampsNs, closePrices, 'BTCUSDT');
 | `runCsv(path, symbol)` | stats object | Replay a CSV file (timestamp, open, high, low, close, volume) |
 | `runOhlcv(timestamps, closes, symbol)` | stats object | Replay raw arrays (timestamps as Float64Array, closes as Float64Array) |
 | `runTape(path)` | stats object | Replay a `.lrvx` tape directory — the canonical recording written by `lrvx tape record` or `scripts/backfill_to_tape.py` |
+| `runTapeBars(path, intervalSeconds, symbol?)` | stats object | Replay a `.lrvx` tape as time bars: trades aggregated while the tape streams, each closed bar to `onBar` with `runBars`' fill rules. Same result as `readTrades` -> `aggregateTimeBars` -> `runBars` for the same interval. `symbol` is required when the tape holds more than one; throws `LrvxError` on a bad interval, unknown symbol, unreadable tape or a symbol with no trades |
 | `runTapes(paths)` | stats object | Merge N `.lrvx` tape directories on read and replay the merged stream. Symbols are rekeyed by `(metadata.exchange, name)` so two venues stay distinct. `runTapes([t])` equals `runTape(t)`; throws on bad paths or overlapping book streams |
 | `setExecutor(executor)` | `void` | Replace the built-in `SimulatedExecutor`. `null` detaches |
 | `addExecutionListener(listener)` | `void` | Attach an order-lifecycle listener. Multiple listeners may be attached; each fires for every order event |
@@ -84,6 +96,9 @@ exec.setQueueModel('tob', 1);
 | `setDefaultSlippage(model, ticks, tickSize, bps, impactCoeff)` | Configure slippage. `model` is one of `"none"`, `"fixed_ticks"`, `"fixed_bps"`, `"volume_impact"` |
 | `setQueueModel(model, depth)` | Configure limit order queue. `model` is one of `"none"`, `"tob"`, `"full"`, `"pro_rata"`, `"pro_rata_with_fifo"`, `"top_pro_lmm"`, `"pro_rata_with_priority"` |
 | `fillCount` | Number of fills (property) |
+
+No symbol registry can be attached to this executor, so order prices are not checked against a
+tick; `BacktestRunner` checks them.
 
 `submitOrder`'s `type` is one of `"market"`, `"limit"`, `"stop_market"`,
 `"stop_limit"`, `"trailing_stop"`. The optional seventh argument carries
@@ -166,6 +181,10 @@ const stats = engine.run(signals);
 `run()` returns the full `BacktestStats` shape, not the narrower runner
 shape — see [Stats object](#stats-object). The key names are the same in
 both; only the field set differs.
+
+`Engine` symbols are names with no tick, so limit prices are not checked
+against one; a `BacktestRunner` on a registry with a tick rejects an
+off-tick price ([SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick)).
 
 ---
 

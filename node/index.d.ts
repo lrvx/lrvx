@@ -829,8 +829,46 @@ export class GridSearch {
   run(): GridSearchResult[];
 }
 
+/** Slippage and latency of a BacktestRunner's built-in executor. Each key
+ *  is a BacktestConfig field (camelCased) and means what it means there;
+ *  leaving all of them out is the instant, slippage-free runner. A key the
+ *  chosen slippage model does not read, an unknown key, or a negative
+ *  latency throws LrvxError(E_VAL_002). */
+export interface BacktestRunnerOptions {
+  /** Against the taker: `fixed_ticks` (slippageTicks x slippageTickSize),
+   *  `fixed_bps` (slippageBps), `volume_impact` (slippageImpactCoeff x
+   *  order / level size; needs book depth, so the bar and trade-only runs
+   *  refuse it). Default `none`. */
+  slippageModel?: 'none' | 'fixed_ticks' | 'fixed_bps' | 'volume_impact';
+  slippageTicks?: number;
+  slippageTickSize?: number;
+  slippageBps?: number;
+  slippageImpactCoeff?: number;
+  /** Venue ack delay before a submitted order can match, in ns, drawn
+   *  uniformly from [latency - jitter, latency + jitter] floored at 0. On
+   *  bar replay the clock reads the bar's end, so any positive delay moves
+   *  a fill to a later bar's open. */
+  submitAckLatencyNs?: number;
+  submitAckJitterNs?: number;
+  cancelAckLatencyNs?: number;
+  cancelAckJitterNs?: number;
+  /** Seeds the ack-latency draws (default 42). */
+  cancelAckSeed?: number;
+  replaceAckLatencyNs?: number;
+  replaceAckJitterNs?: number;
+  /** Its orderDelay() is added to every submit's deferral. */
+  latency?: ConstantLatency | GaussianLatency | ExponentialLatency | EmpiricalLatency;
+}
+
 export class BacktestRunner {
-  constructor(registry: SymbolRegistry, feeRate: number, initialCapital: number);
+  /** With `options`, the built-in executor gets that slippage and latency;
+   *  such a runner refuses setExecutor(), whose executor would not use them. */
+  constructor(
+    registry: SymbolRegistry,
+    feeRate: number,
+    initialCapital: number,
+    options?: BacktestRunnerOptions,
+  );
   setStrategy(strategy: Strategy): void;
   /** Returns `null` if `path` cannot be opened. */
   runCsv(path: string, symbol: string): RunnerStats | null;
@@ -863,6 +901,15 @@ export class BacktestRunner {
    *  `runTapes([t])` is equivalent to `runTape(t)`. Throws on bad paths
    *  or overlapping book streams across tapes. */
   runTapes(paths: string[]): RunnerStats;
+  /** Replay a `.lrvx` tape as time bars of `intervalSeconds`: the trades are
+   *  aggregated while the tape streams (wall-clock aligned, the last
+   *  still-open bar dropped, as aggregateTimeBars does) and each closed bar
+   *  goes to onBar with runBars' fill rules -- an order sent from onBar
+   *  fills at the next bar's open. onTrade does not fire. `symbol` is
+   *  required when the tape holds more than one; its registry id must be the
+   *  tape's symbol id. Throws LrvxError on a bad interval, an unknown symbol,
+   *  an unreadable tape or a symbol with no trades. */
+  runTapeBars(path: string, intervalSeconds: number, symbol?: string): RunnerStats;
   /** Replace the built-in SimulatedExecutor with a binding-supplied one. */
   setExecutor(executor: Executor | null): void;
   /** Attach a listener for order lifecycle events. Multiple listeners

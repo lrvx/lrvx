@@ -242,6 +242,86 @@ A 10/20 SMA crossover. Buy when fast crosses above slow, sell on the reverse.
     }
     ```
 
+## Bars from a tape in one call
+
+A bar strategy over a recorded `.lrvx` tape is one call: `run_tape_bars`
+aggregates the tape's trades into time bars while it streams and hands each
+closed bar to `on_bar`. The trades never reach Python, so a three-month tape
+runs in the memory its bars need.
+
+=== "Python"
+
+    ```python
+    bt = lrvx.BacktestRunner(reg, fee_rate=0.0004, initial_capital=10_000,
+                             slippage_model="fixed_bps", slippage_bps=1.0)
+    bt.set_strategy(strat)
+    stats = bt.run_tape_bars("data/tape", interval_seconds=300, symbol="BTCUSDT")
+    ```
+
+=== "Node.js"
+
+    ```javascript
+    const bt = new lrvx.BacktestRunner(reg, 0.0004, 10000,
+        {slippageModel: "fixed_bps", slippageBps: 1.0});
+    bt.setStrategy(strat);
+    const stats = bt.runTapeBars("data/tape", 300, "BTCUSDT");
+    ```
+
+=== "Codon"
+
+    ```python
+    bt = BacktestRunner(reg, 0.0004, 10_000.0,
+                        slippage_model="fixed_bps", slippage_bps=1.0)
+    bt.set_strategy(strat)
+    stats = bt.run_tape_bars("data/tape", 300.0, "BTCUSDT")
+    ```
+
+=== "C++"
+
+    ```cpp
+    BacktestRunner runner(config);
+    runner.setStrategy(&strat);
+    auto result = runner.runTapeBars("data/tape", std::chrono::minutes(5), btcId);
+    ```
+
+What it does, exactly:
+
+- Bars are wall-clock aligned (a 300 s bar starts on a multiple of five
+  minutes, UTC), built by the same time-bar policy as `aggregate_time_bars`: a
+  trade later than its bar's bucket is dropped, and the last bar, still open
+  when the tape ends, is not delivered. An interval with no trades has no bar.
+- The executor is fed the bars, not the ticks, so the fill rules are
+  `run_bars`' rules: an order sent from `on_bar` fills at that symbol's next
+  bar open, and resting and conditional orders walk open, low, high, close.
+  `on_trade` does not fire, and book records in the tape are not used.
+- One symbol per run. `symbol` names the registered symbol whose registry id is
+  the tape's symbol id; it may be left out only when the tape holds a single
+  symbol, and a tape with more than one raises instead of mixing them.
+- Each bar carries `bar_type` 0 (time), `bar_type_param` = the interval in
+  nanoseconds, and its buy volume, as a live time aggregator would set them.
+
+The result is the result of the explicit route -- `DataReader.read_trades`,
+`aggregate_time_bars`, `run_bars` -- for the same interval: same fills, same
+`trades()`, same `equity_curve()`. This example runs both and checks it:
+
+```python
+--8<-- "examples/python_run_tape_bars.py"
+```
+
+Two differences a strategy can see, neither of which reaches a fill: the
+explicit route passes no buy volume (`run_bars` takes none), and it carries
+each bar's volume through a float, so a bar whose notional exceeds about
+9e7 quote units arrives rounded to the nearest representable value where the
+one-call route delivers it exact. Use the explicit form when the bars are
+reused across many runs -- load or aggregate them once and hand the same arrays
+to every run, as in [Sweep parameters over bars](sweep-over-bars.md).
+
+Slippage and latency arguments are covered in
+[Realistic backtest fills](backtest-realistic-fills.md) and
+[Add latency to a backtest](backtest-with-latency.md). On bars, any positive
+submit latency moves a fill to a later bar's open:
+[Latency on bar replay](backtest-with-latency.md#latency-on-bar-replay).
+
 ## Output
 
 ```

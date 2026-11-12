@@ -15,7 +15,7 @@ All bindings expose the same core model: strategy callbacks, order emission, pos
 | Capability | Python | Node | Codon | JavaScript (QuickJS) |
 |---|---|---|---|---|
 | `Strategy` callbacks — trade, book, bar | yes | yes | yes | yes |
-| `BacktestRunner` — event-driven replay (`run_csv`, `run_tape`, `run_ohlcv`, `run_bars`) | yes | yes | yes | no |
+| `BacktestRunner` — event-driven replay (`run_csv`, `run_tape`, `run_ohlcv`, `run_bars`, `run_tape_bars`), slippage and latency arguments | yes | yes | yes | no |
 | `Engine` + `SignalBuilder` — backtest a pre-built signal list | yes | yes | yes | yes |
 | `SimulatedExecutor`, `BacktestResult` | yes | yes | yes | yes |
 | `DataReader`, `DataWriter` | yes | yes | yes | yes |

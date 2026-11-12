@@ -39,7 +39,10 @@ inline constexpr const char* kRejectTrailingOffsetOffTick = "trailing_offset_off
 // when the symbol's tick is not known. A tick is known when it was declared:
 // tickSizeKnown is set, or tickSize differs from the registry default. A
 // symbol registered without a tick keeps the 0.01 default for its book but is
-// not checked, and a tick of zero is never checked.
+// not checked, and a tick of zero is never checked. The second half exists
+// because a SymbolInfo cannot tell an assigned 0.01 from the default: any
+// other value was set on purpose, so C++ code that writes a venue's tick into
+// tickSize is checked without knowing the flag exists.
 inline int64_t orderTickRaw(const SymbolInfo& info) noexcept
 {
   const int64_t tick = info.tickSize.raw();
