@@ -217,6 +217,13 @@ class Credit
     {
       return RejectReason::InvalidQuantity;
     }
+    // The instrument's minimum size, refused with the reason validate() gives
+    // a limit, in the same place: a stop below it used to be parked and only
+    // refused when it fired.
+    if (!cfg.minQty.isZero() && o.quantity < cfg.minQty)
+    {
+      return RejectReason::InvalidQuantity;
+    }
     if (!cfg.lotSize.isZero() && (o.quantity.raw() % cfg.lotSize.raw()) != 0)
     {
       return RejectReason::LotSizeViolation;

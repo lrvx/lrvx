@@ -1141,9 +1141,8 @@ class PyMergedTapeReader
       out[i].trade_id = r.trade_id;
       out[i].symbol_id = r.global_symbol_id;
       out[i].side = r.side;
-      out[i]._pad[0] = out[i]._pad[1] = out[i]._pad[2] = 0;
     }
-    return std::move(arr);
+    return zeroPadding(std::move(arr));
   }
 
   py::tuple readBooks()
@@ -1183,6 +1182,8 @@ class PyMergedTapeReader
         lout[k].side = 1;
       }
     }
+    headers = zeroPadding(std::move(headers));
+    lvls = zeroPadding(std::move(lvls));
     return py::make_tuple(std::move(headers), std::move(lvls));
   }
 

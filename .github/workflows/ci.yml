@@ -559,7 +559,7 @@ jobs:
                    codon_delta_book_smoke codon_order_book_window_smoke \
                    codon_composite_book_smoke codon_bar_close_ordering_parity_smoke \
                    codon_order_type_codes_smoke codon_indicator_bounds_smoke \
-                   codon_indicator_streaming_smoke \
+                   codon_indicator_streaming_smoke codon_indicator_params_smoke \
                    codon_signal_fields_smoke codon_aggregate_bars_smoke \
                    codon_strategy_dispatch_smoke codon_graph_smoke \
                    codon_streaming_graph_smoke codon_adf_smoke \

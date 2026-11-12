@@ -5,8 +5,8 @@ Loads BTC and ETH 1m data, resamples to 5m,
 runs a pairs/spread strategy across both.
 
 Usage:
-    cd /Users/e/dev/lrvx
-    PYTHONPATH=build/python .venv/bin/python3 examples/python_multi_symbol.py
+    cd /path/to/lrvx
+    PYTHONPATH=build/python python3 docs/examples/python_multi_symbol.py
 """
 
 import os

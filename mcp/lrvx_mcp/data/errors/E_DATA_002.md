@@ -45,7 +45,7 @@ Worth doing when `late_dropped` is higher than you are willing to lose, or when 
 ## Common causes
 
 - Exchange websocket reconnect after a long network blip delivered a batch of stale events into a fresh tape block.
-- The tape was produced by an external recorder that didn't sort events at write time (e.g. `md_collector`'s `commit_log_writer`) and a particular trading session had a tail wider than the default 10 s window.
+- The tape was produced by an external recorder that didn't sort events at write time and a particular trading session had a tail wider than the default 10 s window.
 - The reader is configured with `reorder_window_ns = 0` while the source is not Sorted-flagged.
 
 ## Memory cost of a larger window

@@ -48,14 +48,30 @@ class MmapSegmentReader
   bool seekToTimestamp(int64_t target_ts_ns);
   size_t position() const;
 
+  // Raw frame walk: no CRC check, no counters.
   const FrameHeader* currentFrame() const;
   bool advanceFrame();
 
   bool loadIndex();
   const std::vector<IndexEntry>& indexEntries() const;
 
+  // As BinaryLogIterator: next() checks each frame's payload against its
+  // CRC32 (default true) and skips a frame that fails, or whose payload is
+  // too short for its record type, counting it in crcErrors(). truncated()
+  // turns true when next() stops on bytes it cannot walk past (a frame
+  // length past the data, or past the 10 MiB frame ceiling, or data that
+  // ends before the index). reset() clears both.
+  void setVerifyCrc(bool verify) { _verify_crc = verify; }
+  uint64_t crcErrors() const { return _crc_errors; }
+  bool truncated() const { return _truncated; }
+
  private:
+  friend class MmapReader;
+
   void cleanup();
+  // The next frame that passes its CRC, advancing past it; nullptr at the
+  // end of the data or on a truncation.
+  const FrameHeader* nextCheckedFrame();
 
   void* _mapped_data{nullptr};
   size_t _mapped_size{0};
@@ -74,6 +90,13 @@ class MmapSegmentReader
 
   std::vector<IndexEntry> _index_entries;
   bool _index_loaded{false};
+  // The header promises an index at index_offset, so the data must run up
+  // to it; a file that ends first has lost bytes.
+  bool _data_short{false};
+
+  bool _verify_crc{true};
+  uint64_t _crc_errors{0};
+  bool _truncated{false};
 };
 
 struct MmapReaderStats
@@ -82,6 +105,11 @@ struct MmapReaderStats
   uint64_t bytes_mapped{0};
   uint64_t events_read{0};
   uint64_t page_faults{0};
+  // As ReaderStats: frames skipped for a CRC mismatch or a payload too short
+  // for its record, and segment reads that stopped on data they could not
+  // walk past. Summed over every read of this reader.
+  uint64_t crc_errors{0};
+  uint64_t segments_truncated{0};
 };
 
 class MmapReader
@@ -95,6 +123,10 @@ class MmapReader
     std::optional<int64_t> from_ns;
     std::optional<int64_t> to_ns;
     std::set<uint32_t> symbols;
+    // As ReaderConfig::verify_crc, with the same default: every read path
+    // (forEach, forEachFrom, forEachRawTrade) checks each frame's CRC32 and
+    // skips one that does not match.
+    bool verify_crc{true};
   };
 
   explicit MmapReader(const Config& config);

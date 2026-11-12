@@ -1,0 +1,104 @@
+# Smoke test: integer arguments below a registry indicator's floor
+# (include/lrvx/indicator/params.h) raise ValueError, from the class
+# constructor (the C streaming handle is refused) and from the batch
+# function (the C function writes nothing and records E_IND_001). At the
+# floor both work. The batch functions used to return an all-NaN list for
+# a period of 0, and ShannonEntropy with 0 bins crashed the process.
+
+from lrvx.indicators import *
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+def refused(fn) -> bool:
+    try:
+        fn()
+        return False
+    except ValueError as e:
+        return "must be at least" in e.message
+
+
+def works(fn) -> bool:
+    try:
+        fn()
+        return True
+    except ValueError:
+        return False
+
+
+d = [100.0 + float(i % 7) + 0.1 * float(i) for i in range(40)]
+h = [x + 1.0 for x in d]
+l = [x - 1.0 for x in d]
+o = [x + 0.2 for x in d]
+
+check(refused(lambda: SMA(0)), "SMA(0) raises")
+check(refused(lambda: sma(d, 0)), "sma(d, 0) raises")
+check(works(lambda: sma(d, 1)), "sma(d, 1) works")
+check(refused(lambda: EMA(0)), "EMA(0) raises")
+check(refused(lambda: ema(d, 0)), "ema(d, 0) raises")
+check(refused(lambda: RMA(0)), "RMA(0) raises")
+check(refused(lambda: rma(d, 0)), "rma(d, 0) raises")
+check(refused(lambda: RSI(0)), "RSI(0) raises")
+check(refused(lambda: rsi(d, 0)), "rsi(d, 0) raises")
+check(refused(lambda: DEMA(0)), "DEMA(0) raises")
+check(refused(lambda: dema(d, 0)), "dema(d, 0) raises")
+check(refused(lambda: TEMA(0)), "TEMA(0) raises")
+check(refused(lambda: tema(d, 0)), "tema(d, 0) raises")
+check(refused(lambda: Slope(0)), "Slope(0) raises")
+check(refused(lambda: slope(d, 0)), "slope(d, 0) raises")
+check(works(lambda: slope(d, 1)), "slope(d, 1) works")
+check(refused(lambda: KAMA(10, 0, 30)), "KAMA(10, 0, 30) raises")
+check(refused(lambda: kama(d, 10, 2, 0)), "kama(d, 10, 2, 0) raises")
+check(works(lambda: kama(d, 10, 1, 1)), "kama(d, 10, 1, 1) works")
+check(refused(lambda: Skewness(2)), "Skewness(2) raises")
+check(refused(lambda: skewness(d, 2)), "skewness(d, 2) raises")
+check(works(lambda: skewness(d, 3)), "skewness(d, 3) works")
+check(refused(lambda: Kurtosis(3)), "Kurtosis(3) raises")
+check(refused(lambda: kurtosis(d, 3)), "kurtosis(d, 3) raises")
+check(works(lambda: kurtosis(d, 4)), "kurtosis(d, 4) works")
+check(refused(lambda: RollingZScore(1)), "RollingZScore(1) raises")
+check(refused(lambda: rolling_zscore(d, 1)), "rolling_zscore(d, 1) raises")
+check(refused(lambda: ShannonEntropy(10, 0)), "ShannonEntropy(10, 0) raises")
+check(refused(lambda: shannon_entropy(d, 1, 5)), "shannon_entropy(d, 1, 5) raises")
+check(works(lambda: shannon_entropy(d, 2, 2)), "shannon_entropy(d, 2, 2) works")
+check(refused(lambda: AutoCorrelation(10, 0)), "AutoCorrelation(10, 0) raises")
+check(refused(lambda: autocorrelation(d, 1, 1)), "autocorrelation(d, 1, 1) raises")
+check(refused(lambda: ATR(0)), "ATR(0) raises")
+check(refused(lambda: atr(h, l, d, 0)), "atr(h, l, c, 0) raises")
+check(refused(lambda: CCI(0)), "CCI(0) raises")
+check(refused(lambda: cci(h, l, d, 0)), "cci(h, l, c, 0) raises")
+check(refused(lambda: CHOP(1)), "CHOP(1) raises")
+check(refused(lambda: chop(h, l, d, 1)), "chop(h, l, c, 1) raises")
+check(works(lambda: chop(h, l, d, 2)), "chop(h, l, c, 2) works")
+check(refused(lambda: Stochastic(14, 0)), "Stochastic(14, 0) raises")
+check(refused(lambda: stochastic(h, l, d, 0, 3)), "stochastic(h, l, c, 0, 3) raises")
+check(refused(lambda: ParkinsonVol(0)), "ParkinsonVol(0) raises")
+check(refused(lambda: parkinson_vol(h, l, 0)), "parkinson_vol(h, l, 0) raises")
+check(refused(lambda: RogersSatchellVol(0)), "RogersSatchellVol(0) raises")
+check(refused(lambda: rogers_satchell_vol(o, h, l, d, 0)), "rogers_satchell_vol(..., 0) raises")
+check(refused(lambda: Correlation(1)), "Correlation(1) raises")
+check(refused(lambda: rolling_correlation(d, h, 1)), "rolling_correlation(x, y, 1) raises")
+check(works(lambda: rolling_correlation(d, h, 2)), "rolling_correlation(x, y, 2) works")
+check(refused(lambda: MACD(12, 26, 0)), "MACD(12, 26, 0) raises")
+check(refused(lambda: macd(d, 0, 26, 9)), "macd(d, 0, 26, 9) raises")
+check(works(lambda: macd(d, 1, 1, 1)), "macd(d, 1, 1, 1) works")
+check(refused(lambda: Bollinger(0, 2.0)), "Bollinger(0, 2.0) raises")
+check(refused(lambda: bollinger(d, 0, 2.0)), "bollinger(d, 0, 2.0) raises")
+check(works(lambda: bollinger(d, 1, 2.0)), "bollinger(d, 1, 2.0) works")
+
+# A refusal leaves nothing behind for the next call.
+check(works(lambda: sma(d, 3)), "a valid call after a refusal works")
+
+if failed > 0:
+    print(str(failed) + " check(s) failed")
+    raise ValueError("indicator_params_smoke failed")
+print("indicator_params_smoke OK")

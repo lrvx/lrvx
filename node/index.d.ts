@@ -1440,6 +1440,8 @@ interface StreamingSingleInput {
   readonly value: number;
   /** True once `update` has been called enough times to produce a value. */
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   /** Reset state but keep configuration. */
   reset(): void;
   /** Batch convenience: apply `update` over an array, returning the values. */
@@ -1539,6 +1541,8 @@ export class ShannonEntropy {
   update(value: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(input: Float64Array): Float64Array;
 }
@@ -1547,6 +1551,8 @@ export class AutoCorrelation {
   update(value: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(input: Float64Array): Float64Array;
 }
@@ -1557,6 +1563,8 @@ export class ATR {
   update(high: number, low: number, close: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(high: Float64Array, low: Float64Array, close: Float64Array): Float64Array;
 }
@@ -1565,6 +1573,8 @@ export class CCI {
   update(high: number, low: number, close: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(high: Float64Array, low: Float64Array, close: Float64Array): Float64Array;
 }
@@ -1573,6 +1583,8 @@ export class CHOP {
   update(high: number, low: number, close: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(high: Float64Array, low: Float64Array, close: Float64Array): Float64Array;
 }
@@ -1582,6 +1594,10 @@ export class Stochastic {
   readonly k: number;
   readonly d: number;
   readonly ready: boolean;
+  /** Same as `k`. */
+  readonly value: number;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(
     high: Float64Array,
@@ -1594,6 +1610,8 @@ export class ParkinsonVol {
   update(high: number, low: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(high: Float64Array, low: Float64Array): Float64Array;
 }
@@ -1602,6 +1620,8 @@ export class RogersSatchellVol {
   update(open: number, high: number, low: number, close: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(
     open: Float64Array,
@@ -1615,6 +1635,8 @@ export class Correlation {
   update(x: number, y: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(x: Float64Array, y: Float64Array): Float64Array;
 }
@@ -1627,6 +1649,10 @@ export class MACD {
   readonly signal: number;
   readonly histogram: number;
   readonly ready: boolean;
+  /** Same as `line`. */
+  readonly value: number;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(input: Float64Array): { line: Float64Array; signal: Float64Array; histogram: Float64Array };
 }
@@ -1638,6 +1664,10 @@ export class Bollinger {
   readonly middle: number;
   readonly lower: number;
   readonly ready: boolean;
+  /** Same as `middle`. */
+  readonly value: number;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(input: Float64Array): { upper: Float64Array; middle: Float64Array; lower: Float64Array };
 }

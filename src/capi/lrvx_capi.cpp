@@ -68,6 +68,7 @@
 #include "lrvx/indicator/kurtosis.h"
 #include "lrvx/indicator/macd.h"
 #include "lrvx/indicator/obv.h"
+#include "lrvx/indicator/params.h"
 #include "lrvx/indicator/parkinson_vol.h"
 #include "lrvx/indicator/rma.h"
 #include "lrvx/indicator/rogers_satchell_vol.h"
@@ -141,6 +142,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -880,6 +882,7 @@ double lrvx_quantity_to_double(int64_t raw)
 void lrvx_indicator_ema(const double* input, size_t len, size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("ema", {period});
   indicator::EMA ema(period);
   ema.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
@@ -888,6 +891,7 @@ void lrvx_indicator_ema(const double* input, size_t len, size_t period, double* 
 void lrvx_indicator_sma(const double* input, size_t len, size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("sma", {period});
   indicator::SMA sma(period);
   sma.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
@@ -896,6 +900,7 @@ void lrvx_indicator_sma(const double* input, size_t len, size_t period, double* 
 void lrvx_indicator_rsi(const double* input, size_t len, size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("rsi", {period});
   indicator::RSI rsi(period);
   rsi.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
@@ -905,6 +910,7 @@ void lrvx_indicator_atr(const double* high, const double* low, const double* clo
                         size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("atr", {period});
   indicator::ATR atr(period);
   atr.compute(std::span<const double>(high, len), std::span<const double>(low, len),
               std::span<const double>(close, len), std::span<double>(output, len));
@@ -916,6 +922,7 @@ void lrvx_indicator_macd(const double* input, size_t len, size_t fast_period, si
                          double* hist_out)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("macd", {fast_period, slow_period, signal_period});
   indicator::MACD macd(fast_period, slow_period, signal_period);
   macd.compute(std::span<const double>(input, len), std::span<double>(macd_out, len),
                std::span<double>(signal_out, len), std::span<double>(hist_out, len));
@@ -926,6 +933,7 @@ void lrvx_indicator_bollinger(const double* input, size_t len, size_t period, do
                               double* upper, double* middle, double* lower)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("bollinger", {period});
   indicator::Bollinger bb(period, multiplier);
   bb.compute(std::span<const double>(input, len), std::span<double>(upper, len),
              std::span<double>(middle, len), std::span<double>(lower, len));
@@ -935,6 +943,7 @@ void lrvx_indicator_bollinger(const double* input, size_t len, size_t period, do
 void lrvx_indicator_rma(const double* input, size_t len, size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("rma", {period});
   indicator::RMA rma(period);
   rma.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
@@ -943,6 +952,7 @@ void lrvx_indicator_rma(const double* input, size_t len, size_t period, double* 
 void lrvx_indicator_dema(const double* input, size_t len, size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("dema", {period});
   indicator::DEMA dema(period);
   auto result = dema.compute(std::span<const double>(input, len));
   std::copy(result.begin(), result.end(), output);
@@ -952,6 +962,7 @@ void lrvx_indicator_dema(const double* input, size_t len, size_t period, double*
 void lrvx_indicator_tema(const double* input, size_t len, size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("tema", {period});
   indicator::TEMA tema(period);
   auto result = tema.compute(std::span<const double>(input, len));
   std::copy(result.begin(), result.end(), output);
@@ -962,6 +973,7 @@ void lrvx_indicator_kama(const double* input, size_t len, size_t period, size_t 
                          double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("kama", {period, fast, slow});
   indicator::KAMA kama(period, fast, slow);
   auto result = kama.compute(std::span<const double>(input, len));
   std::copy(result.begin(), result.end(), output);
@@ -971,6 +983,7 @@ void lrvx_indicator_kama(const double* input, size_t len, size_t period, size_t 
 void lrvx_indicator_slope(const double* input, size_t len, size_t length, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("slope", {length});
   indicator::Slope slope(length);
   slope.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
@@ -993,6 +1006,7 @@ void lrvx_indicator_cci(const double* high, const double* low, const double* clo
                         size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("cci", {period});
   indicator::CCI cci(period);
   auto result = cci.compute(std::span<const double>(high, len), std::span<const double>(low, len),
                             std::span<const double>(close, len));
@@ -1005,6 +1019,7 @@ void lrvx_indicator_stochastic(const double* high, const double* low, const doub
                                double* d_out)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("stochastic", {k_period, d_period});
   indicator::Stochastic stoch(k_period, d_period);
   auto result =
       stoch.compute(std::span<const double>(high, len), std::span<const double>(low, len),
@@ -1018,6 +1033,7 @@ void lrvx_indicator_chop(const double* high, const double* low, const double* cl
                          size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("chop", {period});
   indicator::CHOP chop(period);
   auto result = chop.compute(std::span<const double>(high, len), std::span<const double>(low, len),
                              std::span<const double>(close, len));
@@ -1061,6 +1077,7 @@ void lrvx_indicator_cvd(const double* open, const double* high, const double* lo
 void lrvx_indicator_skewness(const double* input, size_t len, size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("skewness", {period});
   indicator::Skewness ind(period);
   ind.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
@@ -1069,6 +1086,7 @@ void lrvx_indicator_skewness(const double* input, size_t len, size_t period, dou
 void lrvx_indicator_kurtosis(const double* input, size_t len, size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("kurtosis", {period});
   indicator::Kurtosis ind(period);
   ind.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
@@ -1078,6 +1096,7 @@ void lrvx_indicator_parkinson_vol(const double* high, const double* low, size_t 
                                   double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("parkinson_vol", {period});
   indicator::ParkinsonVol ind(period);
   ind.compute(std::span<const double>(high, len), std::span<const double>(low, len),
               std::span<double>(output, len));
@@ -1089,6 +1108,7 @@ void lrvx_indicator_rogers_satchell_vol(const double* open, const double* high, 
                                         double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("rogers_satchell_vol", {period});
   indicator::RogersSatchellVol ind(period);
   ind.compute(std::span<const double>(open, len), std::span<const double>(high, len),
               std::span<const double>(low, len), std::span<const double>(close, len),
@@ -1099,6 +1119,7 @@ void lrvx_indicator_rogers_satchell_vol(const double* open, const double* high, 
 void lrvx_indicator_rolling_zscore(const double* input, size_t len, size_t period, double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("rolling_zscore", {period});
   indicator::RollingZScore ind(period);
   ind.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
@@ -1108,6 +1129,7 @@ void lrvx_indicator_shannon_entropy(const double* input, size_t len, size_t peri
                                     double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("shannon_entropy", {period, bins});
   indicator::ShannonEntropy ind(period, bins);
   ind.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
@@ -1117,6 +1139,7 @@ void lrvx_indicator_correlation(const double* x, const double* y, size_t len, si
                                 double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("correlation", {period});
   indicator::Correlation ind(period);
   ind.compute(std::span<const double>(x, len), std::span<const double>(y, len),
               std::span<double>(output, len));
@@ -1148,6 +1171,7 @@ void lrvx_indicator_autocorrelation(const double* input, size_t len, size_t wind
                                     double* output)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("autocorrelation", {window, lag});
   indicator::AutoCorrelation ind(window, lag);
   ind.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
@@ -1443,7 +1467,10 @@ StreamingIndicatorHandle* makeStreamingIndicatorFrom(std::type_identity<void(A..
                                                      std::index_sequence<I...>, const char* name,
                                                      const double* args)
 {
-  return new StreamingIndicatorOf<T, In>(name, T(streamingIndicatorArg<A>(name, I, args[I])...));
+  const std::tuple<A...> converted{streamingIndicatorArg<A>(name, I, args[I])...};
+  // The ranges every binding refuses (E_IND_001), before anything is built.
+  indicator::requireArgs(name, std::get<I>(converted)...);
+  return new StreamingIndicatorOf<T, In>(name, T(std::get<I>(converted)...));
 }
 
 template <typename T, StreamingIndicatorKind K, typename... A>
