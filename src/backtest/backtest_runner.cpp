@@ -9,6 +9,7 @@
 
 #include "lrvx/backtest/backtest_runner.h"
 
+#include "lrvx/aggregator/policies/time_bar_policy.h"
 #include "lrvx/book/events/book_update_event.h"
 #include "lrvx/book/events/trade_event.h"
 #include "lrvx/log/log.h"
@@ -16,6 +17,8 @@
 #include "lrvx/strategy/strategy.h"
 
 #include <memory_resource>
+#include <stdexcept>
+#include <string>
 
 namespace lrvx
 {
@@ -139,6 +142,34 @@ void BacktestRunner::addExecutionListener(IOrderExecutionListener* listener)
   _executionListeners.push_back(listener);
 }
 
+namespace
+{
+
+std::unique_ptr<replay::IMultiSegmentReader> openTapeDir(const std::filesystem::path& data_dir,
+                                                         const replay::ReaderFilter& filter,
+                                                         const char* caller)
+{
+  if (!std::filesystem::exists(data_dir))
+  {
+    throw std::runtime_error(std::string("BacktestRunner.") + caller +
+                             ": directory does not exist: " + data_dir.string());
+  }
+  if (!std::filesystem::is_directory(data_dir))
+  {
+    throw std::runtime_error(std::string("BacktestRunner.") + caller +
+                             ": path is not a directory: " + data_dir.string());
+  }
+  auto reader = replay::createMultiSegmentReader(data_dir, filter);
+  if (!reader)
+  {
+    throw std::runtime_error(std::string("BacktestRunner.") + caller +
+                             ": cannot open `.lrvx` directory: " + data_dir.string());
+  }
+  return reader;
+}
+
+}  // namespace
+
 // ========== Non-interactive mode ==========
 
 // Everything a finished run leaves behind. Without it a second run reports the
@@ -195,25 +226,7 @@ BacktestResult BacktestRunner::run(replay::IMultiSegmentReader& reader)
 
 BacktestResult BacktestRunner::runTape(const std::filesystem::path& data_dir)
 {
-  if (!std::filesystem::exists(data_dir))
-  {
-    throw std::runtime_error(
-        "BacktestRunner.runTape: directory does not exist: " +
-        data_dir.string());
-  }
-  if (!std::filesystem::is_directory(data_dir))
-  {
-    throw std::runtime_error(
-        "BacktestRunner.runTape: path is not a directory: " +
-        data_dir.string());
-  }
-  auto reader = replay::createMultiSegmentReader(data_dir);
-  if (!reader)
-  {
-    throw std::runtime_error(
-        "BacktestRunner.runTape: cannot open `.lrvx` directory: " +
-        data_dir.string());
-  }
+  auto reader = openTapeDir(data_dir, {}, "runTape");
   return run(*reader);
 }
 
@@ -241,6 +254,16 @@ BacktestResult BacktestRunner::runTapes(
 
 BacktestResult BacktestRunner::runBars(const std::vector<BarEvent>& bars)
 {
+  beginBarRun();
+  for (const auto& ev : bars)
+  {
+    stepBar(ev);
+  }
+  return endBarRun();
+}
+
+void BacktestRunner::beginBarRun()
+{
   resetRunState();
   _interactiveMode = false;
   _running.store(true, std::memory_order_release);
@@ -251,36 +274,37 @@ BacktestResult BacktestRunner::runBars(const std::vector<BarEvent>& bars)
   {
     _strategy->start();
   }
+}
 
-  for (const auto& ev : bars)
+void BacktestRunner::stepBar(const BarEvent& ev)
+{
+  advanceClocks(UnixNanos::fromRaw(ev.bar.endTime.time_since_epoch().count()));
+  ++_eventCount;
+
+  // Feed the bar's full range so resting stops/take-profits match against the
+  // intrabar high/low, not just the close. The open leads: it is where the
+  // orders held back from the previous bar's callback are matched.
+  sim().onBar(ev.symbol, ev.bar.open, ev.bar.high, ev.bar.low, ev.bar.close);
+
+  // The strategy is shown a bar the simulator has already walked, so every
+  // price it can react to is in the market state. Anything it submits from
+  // here is held until the next bar for that symbol opens. The scope closes
+  // the window on every way out of this block -- including a callback that
+  // throws, which would otherwise leave it open and hold every later order
+  // for the rest of the run.
+  SimulatedExecutor::BarCallbackScope window(sim());
+  if (_strategy)
   {
-    advanceClocks(UnixNanos::fromRaw(ev.bar.endTime.time_since_epoch().count()));
-    ++_eventCount;
-
-    // Feed the bar's full range so resting stops/take-profits match against the
-    // intrabar high/low, not just the close. The open leads: it is where the
-    // orders held back from the previous bar's callback are matched.
-    sim().onBar(ev.symbol, ev.bar.open, ev.bar.high, ev.bar.low, ev.bar.close);
-
-    {
-      // The strategy is shown a bar the simulator has already walked, so every
-      // price it can react to is in the market state. Anything it submits from
-      // here is held until the next bar for that symbol opens. The scope closes
-      // the window on every way out of this block -- including a callback that
-      // throws, which would otherwise leave it open and hold every later order
-      // for the rest of the run.
-      SimulatedExecutor::BarCallbackScope window(sim());
-      if (_strategy)
-      {
-        _strategy->onBar(ev);
-      }
-      for (auto* sub : _marketDataSubscribers)
-      {
-        sub->onBar(ev);
-      }
-    }
+    _strategy->onBar(ev);
   }
+  for (auto* sub : _marketDataSubscribers)
+  {
+    sub->onBar(ev);
+  }
+}
 
+BacktestResult BacktestRunner::endBarRun()
+{
   if (_strategy)
   {
     _strategy->stop();
@@ -290,6 +314,121 @@ BacktestResult BacktestRunner::runBars(const std::vector<BarEvent>& bars)
   _running.store(false, std::memory_order_release);
 
   return result();
+}
+
+BacktestResult BacktestRunner::runTapeBars(const std::filesystem::path& data_dir,
+                                           std::chrono::nanoseconds interval,
+                                           std::optional<SymbolId> symbol)
+{
+  if (interval.count() <= 0)
+  {
+    throw std::invalid_argument("BacktestRunner.runTapeBars: interval must be positive, got " +
+                                std::to_string(interval.count()) + " ns");
+  }
+  replay::ReaderFilter filter{};
+  if (symbol)
+  {
+    filter.symbols.insert(*symbol);
+  }
+  auto reader = openTapeDir(data_dir, filter, "runTapeBars");
+
+  // The close path below is the one the batch aggregators run (doAggregate in
+  // python/aggregator_bindings.h, doAggregateC in the C ABI) for a single
+  // symbol: same policy, same late-trade drop, same rule that the bar still
+  // open at the end is never emitted. The one-call route and the explicit
+  // read_trades -> aggregate_time_bars -> run_bars route see the same bars.
+  TimeBarPolicy policy(interval);
+  Bar bar{};
+  bool barOpen = false;
+  InstrumentType instrument = InstrumentType::Spot;
+  std::optional<SymbolId> barSymbol = symbol;
+  std::optional<SymbolId> otherSymbol;
+
+  const auto unixPoint = [](TimePoint tp)
+  {
+    const int64_t lrvxNs =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
+    return TimePoint{std::chrono::nanoseconds{
+        lrvxNs - unix_to_lrvx_offset_ns().load(std::memory_order_relaxed)}};
+  };
+  const auto emit = [&]()
+  {
+    BarEvent ev{};
+    ev.symbol = *barSymbol;
+    ev.instrument = instrument;
+    ev.barType = BarType::Time;
+    ev.barTypeParam = policy.param();
+    ev.bar = bar;
+    // runBars() takes bar times as Unix nanoseconds; the aggregator keeps
+    // them on the engine clock.
+    ev.bar.startTime = unixPoint(bar.startTime);
+    ev.bar.endTime = unixPoint(bar.endTime);
+    stepBar(ev);
+  };
+
+  beginBarRun();
+  reader->forEach(
+      [&](const replay::ReplayEvent& event) -> bool
+      {
+        if (event.type != replay::EventType::Trade)
+        {
+          return true;
+        }
+        const SymbolId sid = event.trade.symbol_id;
+        if (!barSymbol)
+        {
+          barSymbol = sid;
+        }
+        else if (sid != *barSymbol)
+        {
+          otherSymbol = sid;
+          return false;
+        }
+
+        TradeEvent trade;
+        trade.trade.symbol = sid;
+        trade.trade.price = Price::fromRaw(event.trade.price_raw);
+        trade.trade.quantity = Quantity::fromRaw(event.trade.qty_raw);
+        trade.trade.isBuy = (event.trade.side == 0);
+        trade.trade.exchangeTsNs = UnixNanos::fromRaw(event.trade.exchange_ts_ns);
+        trade.trade.instrument = static_cast<InstrumentType>(event.trade.instrument);
+
+        if (!barOpen)
+        {
+          policy.initBar(trade, bar);
+          instrument = trade.trade.instrument;
+          barOpen = true;
+          return true;
+        }
+        if (policy.isLate(trade, bar))
+        {
+          return true;
+        }
+        if (policy.shouldClose(trade, bar))
+        {
+          emit();
+          policy.initBar(trade, bar);
+          instrument = trade.trade.instrument;
+          return true;
+        }
+        policy.update(trade, bar);
+        return true;
+      });
+  BacktestResult res = endBarRun();
+
+  if (otherSymbol)
+  {
+    throw std::invalid_argument(
+        "BacktestRunner.runTapeBars: the tape holds trades of more than one symbol (ids " +
+        std::to_string(*barSymbol) + " and " + std::to_string(*otherSymbol) +
+        "); pass the symbol to replay");
+  }
+  if (symbol && !barOpen)
+  {
+    throw std::invalid_argument("BacktestRunner.runTapeBars: the tape has no trade for symbol id " +
+                                std::to_string(*symbol));
+  }
+  return res;
 }
 
 // ========== Interactive mode ==========

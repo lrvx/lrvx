@@ -62,7 +62,7 @@ the market to `open` — releasing any order held from a prior
 `begin_bar_callback_window()` / `end_bar_callback_window()` pair at that
 price — then walks `low -> high -> close` so resting stops and targets match
 the bar's intrabar extremes, not just its close. Use this, not `on_bar`, when
-driving `SimulatedExecutor` by hand: `BacktestRunner.run_bars` uses this
+driving `SimulatedExecutor` by hand: `BacktestRunner.run_bars` (and `run_tape_bars`) uses this
 overload internally, so `on_bar` alone gives a caller neither the bar's open
 nor its intrabar extremes.
 
@@ -137,6 +137,11 @@ executor.set_default_slippage("fixed_bps", bps=2.0)
 | `"volume_impact"` | Volume-proportional impact — uses `impact_coeff` |
 
 `tick_size` is in price units; `0.0` falls back to one raw price unit.
+
+`BacktestRunner` takes the default profile as constructor keywords instead
+(`slippage_model`, `slippage_ticks`, `slippage_tick_size`, `slippage_bps`,
+`slippage_impact_coeff`), stricter than this setter: an unknown model, a missing
+parameter or one the model does not read raises there.
 
 #### `set_symbol_slippage(symbol, model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)`
 

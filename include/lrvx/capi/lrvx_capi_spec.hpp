@@ -3379,6 +3379,27 @@ extern "C"
                                      uint32_t n_dirs,
                                      LrvxBacktestStats* stats_out);
 
+  // Replay a `.lrvx` tape as time bars of `interval_ns`. The tape's trades
+  // are aggregated into wall-clock-aligned time bars while it streams, and
+  // each closed bar is replayed the way lrvx_backtest_runner_run_bars
+  // replays it: Strategy.on_bar fires, on_trade does not, and an order sent
+  // from on_bar fills at the next bar's open. The bars are the ones
+  // lrvx_aggregate_time_bars returns for the same trades; the last bar,
+  // still open when the tape ends, is not replayed. `symbol` names the
+  // registered symbol to replay (its registry id must be the tape's symbol
+  // id); NULL or "" when the tape holds a single symbol.
+  // Returns 1 on success, 0 on error, with the reason in
+  // lrvx_last_error_message: interval_ns <= 0, an unregistered symbol, an
+  // unreadable tape, a tape with more than one symbol and no symbol given,
+  // no trade for the symbol, or a volume_impact slippage model (bars carry
+  // no book depth for it to read).
+  LRVX_EXPORT(group = "backtestrunner_replay")
+  int lrvx_backtest_runner_run_tape_bars(LrvxBacktestRunnerHandle runner,
+                                         const char* tape_dir,
+                                         int64_t interval_ns,
+                                         const char* symbol,
+                                         LrvxBacktestStats* stats_out);
+
   // Replay raw OHLCV arrays (timestamps in nanoseconds, close prices as double).
   // Each row produces one synthetic trade (price=close, qty=1). Strategy.on_trade fires.
   // Returns 1 on success, 0 on error.
@@ -3667,6 +3688,47 @@ extern "C"
 
   LRVX_EXPORT(group = "latency_models")
   void lrvx_latency_reset(LrvxLatencyModelHandle model, uint64_t seed);
+
+  // lrvx_backtest_runner_create with the built-in executor's slippage and
+  // latency set. Every argument after initial_capital is the BacktestConfig
+  // field of the same name and means what it means there:
+  //   slippage_model  0 none, 1 fixed_ticks, 2 fixed_bps, 3 volume_impact;
+  //                   only the chosen model's own parameters may be non-zero
+  //                   (fixed_ticks: slippage_ticks > 0 and
+  //                   slippage_tick_size > 0; fixed_bps: slippage_bps > 0;
+  //                   volume_impact: slippage_impact_coeff > 0).
+  //   *_ack_latency_ns / *_ack_jitter_ns  venue ack delay for submits,
+  //                   cancels and replaces, >= 0, drawn uniformly from
+  //                   [latency - jitter, latency + jitter] floored at 0;
+  //                   cancel_ack_seed seeds the draw.
+  //   latency         NULL, or a model from lrvx_latency_*_create whose
+  //                   order delay is added to every submit's deferral. Not
+  //                   owned: it must outlive the runner.
+  // All zeros (seed 42, latency NULL) is lrvx_backtest_runner_create.
+  // Returns NULL when a value is invalid, with the argument named in
+  // lrvx_last_error_message. A runner built with any of these set refuses
+  // lrvx_backtest_runner_set_executor, whose executor would not use them.
+  // volume_impact needs book depth: run_bars, run_csv, run_ohlcv and
+  // run_tape_bars refuse it (return 0); run_tape uses it on a tape that
+  // records the book.
+  LRVX_EXPORT(group = "backtestrunner_replay")
+  LrvxBacktestRunnerHandle lrvx_backtest_runner_create_with_fill_settings(
+      LrvxRegistryHandle registry,
+      double fee_rate,
+      double initial_capital,
+      int32_t slippage_model,
+      int32_t slippage_ticks,
+      double slippage_tick_size,
+      double slippage_bps,
+      double slippage_impact_coeff,
+      int64_t submit_ack_latency_ns,
+      int64_t submit_ack_jitter_ns,
+      int64_t cancel_ack_latency_ns,
+      int64_t cancel_ack_jitter_ns,
+      uint64_t cancel_ack_seed,
+      int64_t replace_ack_latency_ns,
+      int64_t replace_ack_jitter_ns,
+      LrvxLatencyModelHandle latency);
 
   // ============================================================
   // Tape diff (replay-equivalence localization)

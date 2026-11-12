@@ -306,7 +306,7 @@ Passed to the `on_signal` callback.
 
 ## Class: `lrvx.BacktestRunner`
 
-Runs a strategy against historical CSV data.
+Runs a strategy against historical data: CSV, bar arrays, or `.lrvx` tapes.
 
 `fee_rate` defaults to `0.0004` here, a taker rate. `lrvx.BacktestResult` and the C++
 `BacktestConfig` default to `0.0001`, so pass the rate explicitly when a runner result is
@@ -318,7 +318,34 @@ bt.set_strategy(strategy)
 
 stats = bt.run_csv("data.csv")             # auto-detects symbol from registry
 stats = bt.run_csv("data.csv", "BTCUSDT")  # explicit symbol name
+stats = bt.run_tape_bars("data/tape", interval_seconds=300, symbol="BTCUSDT")
 ```
+
+### Constructor
+
+`BacktestRunner(registry, fee_rate=0.0004, initial_capital=100000.0, *, ...)`
+
+The keyword-only arguments configure the built-in simulated executor. Each is the `BacktestConfig`
+field of the same name (snake_cased) and means what it means there. All defaults reproduce the
+instant, slippage-free runner.
+
+| Keyword | Default | Meaning |
+|---------|---------|---------|
+| `slippage_model` | `"none"` | `"none"`, `"fixed_ticks"`, `"fixed_bps"` or `"volume_impact"`; every model moves a taker fill against the taker |
+| `slippage_ticks`, `slippage_tick_size` | `0`, `0.0` | `fixed_ticks`: both required and positive; the fill moves `ticks x tick_size` |
+| `slippage_bps` | `0.0` | `fixed_bps`: required and positive |
+| `slippage_impact_coeff` | `0.0` | `volume_impact`: required and positive; moves `coeff x order / level size`. Needs book depth, so `run_bars`, `run_tape_bars`, `run_csv` and `run_ohlcv` refuse it |
+| `submit_ack_latency_ns`, `submit_ack_jitter_ns` | `0`, `0` | Venue ack delay before a submitted order can match, drawn uniformly from `[latency - jitter, latency + jitter]` floored at 0 |
+| `cancel_ack_latency_ns`, `cancel_ack_jitter_ns` | `0`, `0` | Same for cancels; the order can still fill in the window |
+| `replace_ack_latency_ns`, `replace_ack_jitter_ns` | `0`, `0` | Same for replaces |
+| `cancel_ack_seed` | `42` | Seeds the ack-latency draws |
+| `latency` | `None` | A `lrvx.LatencyModel` (`ConstantLatency`, `GaussianLatency`, `ExponentialLatency`, `EmpiricalLatency` or a subclass); its `order_delay()` is added to every submit's deferral |
+
+A setting the chosen slippage model does not read, an unknown model, or a negative latency raises
+`LrvxError` (`E_VAL_002`). A runner built with any of these settings refuses `set_executor` and
+`set_venue_stack`, whose executors would not use them. On bar replay any positive submit deferral
+moves a fill to a later bar's open: see
+[Latency on bar replay](../../how-to/backtest-with-latency.md#latency-on-bar-replay).
 
 | Method | Description |
 |--------|-------------|
@@ -327,6 +354,7 @@ stats = bt.run_csv("data.csv", "BTCUSDT")  # explicit symbol name
 | `run_ohlcv(ts, close, symbol='')` | Replay close-only bars as synthetic trades (`Strategy.on_trade` fires) |
 | `run_bars(start_time_ns, end_time_ns, open, high, low, close, volume, symbol='', bar_type=0, bar_type_param=0)` | Replay full OHLCV bars (`Strategy.on_bar` fires) |
 | `run_tape(path)` | Run against a `.lrvx` tape directory — the canonical recorded artifact `lrvx tape record` writes. Same stats shape as `run_csv` |
+| `run_tape_bars(path, *, interval_seconds, symbol='')` | Replay a `.lrvx` tape as time bars of `interval_seconds` (`Strategy.on_bar` fires, `on_trade` does not). The trades are aggregated while the tape streams, never materialised in Python. Same bars, fills, `trades()` and `equity_curve()` as `read_trades` -> `aggregate_time_bars` -> `run_bars` for the same interval. `symbol` is required when the tape holds more than one. See [Bars from a tape in one call](../../how-to/backtest.md#bars-from-a-tape-in-one-call) |
 | `run_tapes(paths)` | Run against N `.lrvx` tapes merged on read. Symbols are rekeyed by `(metadata.exchange, name)`, so two captures of the same venue/symbol collapse and two venues stay distinct. `run_tapes([t])` equals `run_tape(t)` |
 | `equity_curve()` | Equity curve from the most recent run, as a dict of numpy arrays (`timestamp_ns`, `equity`, `drawdown_pct`). One point per closed trade; a position still open at the end adds none (see [A position open at the end](#a-position-open-at-the-end)) |
 | `trades()` | Closed trades from the most recent run, as a dict of numpy arrays (`symbol`, `side`, `entry_price`, `exit_price`, `quantity`, `pnl`, `fee`, `entry_time_ns`, `exit_time_ns`). A position still open at the end is not a trade and is not listed |

@@ -213,6 +213,31 @@ class BacktestRunner : public ISignalHandler
   /// to `runTape(t)` modulo the rekey.
   BacktestResult runTapes(const std::vector<std::filesystem::path>& data_dirs);
 
+  /// Replay a `.lrvx` tape as time bars: the tape's trades are aggregated
+  /// into wall-clock-aligned bars of `interval` while the tape streams, and
+  /// every closed bar goes through the same per-bar step as runBars(). The
+  /// executor is fed bars, not ticks, so the fill rules are runBars' rules:
+  /// an order sent from onBar fills at that symbol's next bar open, and
+  /// resting and conditional orders walk open, low, high, close.
+  ///
+  /// The bars are the ones TimeBarPolicy produces over the same trades
+  /// (the batch `aggregate_time_bars` helpers, BarAggregator): a trade later
+  /// than its bar's bucket is dropped, and the last bar, still open when the
+  /// tape ends, is not delivered. Each BarEvent carries BarType::Time,
+  /// barTypeParam = interval in ns, and the bar's buy volume and trade count.
+  /// Bar times are Unix nanoseconds, as runBars() takes them. Book records
+  /// in the tape are not used.
+  ///
+  /// One symbol per run. With `symbol` set, only that symbol's trades are
+  /// read; a tape with no trade for it throws std::invalid_argument after
+  /// the (empty) run. Without it the tape must hold a single symbol: a
+  /// trade of a second symbol stops the run and throws std::invalid_argument.
+  /// Throws std::invalid_argument for a non-positive interval and
+  /// std::runtime_error when `data_dir` is not a readable `.lrvx` directory.
+  BacktestResult runTapeBars(const std::filesystem::path& data_dir,
+                             std::chrono::nanoseconds interval,
+                             std::optional<SymbolId> symbol = std::nullopt);
+
   // ========== Interactive mode ==========
 
   /// Start backtest in interactive mode (starts paused, must call from separate thread)
@@ -264,6 +289,12 @@ class BacktestRunner : public ISignalHandler
   // Clears everything a previous run left behind so run() / runBars() /
   // runTape() report their own run and not the sum of every run so far.
   void resetRunState();
+  // The bar replay loop, split so runBars() and runTapeBars() share every
+  // step: beginBarRun() resets and starts, stepBar() is one bar, and
+  // endBarRun() stops and returns the result.
+  void beginBarRun();
+  void stepBar(const BarEvent& ev);
+  BacktestResult endBarRun();
   bool checkBreakpoints(const replay::ReplayEvent& event);
   void waitForResume();
   void notifyPaused();

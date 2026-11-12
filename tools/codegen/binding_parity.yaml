@@ -1370,12 +1370,14 @@ allowlist_functions:
     lrvx_backtest_runner_add_execution_listener: *cpp_direct
     lrvx_backtest_runner_add_journey_tracer: *cpp_direct
     lrvx_backtest_runner_create: *cpp_direct
+    lrvx_backtest_runner_create_with_fill_settings: *cpp_direct
     lrvx_backtest_runner_destroy: *cpp_direct
     lrvx_backtest_runner_run_bars: *cpp_direct
     lrvx_backtest_runner_run_csv: *cpp_direct
     lrvx_backtest_runner_run_ohlcv: *cpp_direct
     lrvx_backtest_runner_run_replay_source: *cpp_direct
     lrvx_backtest_runner_run_tape: *cpp_direct
+    lrvx_backtest_runner_run_tape_bars: *cpp_direct
     lrvx_backtest_runner_run_tapes: *cpp_direct
     lrvx_backtest_runner_set_executor: *cpp_direct
     lrvx_backtest_runner_set_kill_switch: *cpp_direct
@@ -2381,12 +2383,14 @@ allowlist_functions:
     lrvx_backtest_runner_add_execution_listener: *no_quickjs_global
     lrvx_backtest_runner_add_journey_tracer: *no_quickjs_global
     lrvx_backtest_runner_create: *no_quickjs_global
+    lrvx_backtest_runner_create_with_fill_settings: *no_quickjs_global
     lrvx_backtest_runner_destroy: *no_quickjs_global
     lrvx_backtest_runner_run_bars: *no_quickjs_global
     lrvx_backtest_runner_run_csv: *no_quickjs_global
     lrvx_backtest_runner_run_ohlcv: *no_quickjs_global
     lrvx_backtest_runner_run_replay_source: *no_quickjs_global
     lrvx_backtest_runner_run_tape: *no_quickjs_global
+    lrvx_backtest_runner_run_tape_bars: *no_quickjs_global
     lrvx_backtest_runner_run_tapes: *no_quickjs_global
     lrvx_backtest_runner_set_executor: *no_quickjs_global
     lrvx_backtest_runner_set_kill_switch: *no_quickjs_global
