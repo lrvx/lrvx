@@ -103,8 +103,8 @@ an `OrderEventData`, described under [Types](types.md); it carries `order_id`, `
 #### `on_order_update(ctx, ev)`
 
 Called on every order-lifecycle status change for orders this strategy emitted: `NEW`, `ACCEPTED`,
-`CANCELED`, `REJECTED`, `REPLACED`, `TRIGGERED`, `TRAILING_UPDATED`. Fills come through here too —
-override `on_fill` instead if you only want fills.
+`CANCELED`, `REJECTED`, `REPLACED`, `TRIGGERED`, `TRAILING_UPDATED` and the rest. A fill does not
+come through here: a `PARTIALLY_FILLED` or `FILLED` event reaches `on_fill` only.
 
 #### `on_queue_position_change(ctx, ev)`
 
@@ -151,7 +151,9 @@ Cancel all orders for a symbol.
 
 #### `emit_modify(order_id, new_price, new_qty)`
 
-Modify an existing order's price and quantity.
+Modify an existing order's price and quantity. It keeps its id, symbol, side and type. `new_price`
+is the trigger of a stop-market, take-profit-market or trailing-stop order and the limit price of
+every other type. A refused modify arrives in `on_order_update` as `REPLACE_REJECTED`.
 
 #### `emit_stop_market(symbol, side, trigger, qty) -> int`
 

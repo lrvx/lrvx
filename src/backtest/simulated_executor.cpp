@@ -103,6 +103,23 @@ void SimulatedExecutor::emitRejected(const Order& order, const char* reason)
   }
 }
 
+void SimulatedExecutor::emitReplaceRejected(const Order& order, const Order& newOrder,
+                                            const char* reason)
+{
+  if (!_callback)
+  {
+    return;
+  }
+  OrderEvent ev;
+  ev.status = OrderEventStatus::REPLACE_REJECTED;
+  ev.order = order;
+  ev.newOrder = newOrder;
+  ev.rejectReason = reason;
+  ev.exchangeTsNs = _clock.nowNs();
+  ev.timestamps = timestampsFor(order.id);
+  _callback(ev);
+}
+
 void SimulatedExecutor::setOrderEventCallback(OrderEventCallback cb)
 {
   _callback = std::move(cb);
@@ -1134,20 +1151,19 @@ void SimulatedExecutor::cancelAllOrdersAsync(SymbolId symbol)
 void SimulatedExecutor::replaceOrder(OrderId oldOrderId, const Order& newOrder)
 {
   // An off-tick replacement is refused and the original order stays as it was.
-  if (const char* why = offTickReason(newOrder, orderTickRaw(newOrder.symbol)))
+  const int64_t tickRaw = orderTickRaw(newOrder.symbol);
+  const char* why = offTickReason(newOrder, tickRaw);
+  // A trailing stop is placed with an offset and no trigger; a replacement
+  // may name one, and it has to sit on the grid like any other trigger.
+  if (why == nullptr && newOrder.type == OrderType::TRAILING_STOP && tickRaw > 0 &&
+      newOrder.triggerPrice.raw() % tickRaw != 0)
+  {
+    why = kRejectTriggerOffTick;
+  }
+  if (why != nullptr)
   {
     const Order* old = findOrder(oldOrderId);
-    if (_callback)
-    {
-      OrderEvent ev;
-      ev.status = OrderEventStatus::REPLACE_REJECTED;
-      ev.order = old != nullptr ? *old : newOrder;
-      ev.newOrder = newOrder;
-      ev.rejectReason = why;
-      ev.exchangeTsNs = _clock.nowNs();
-      ev.timestamps = timestampsFor(ev.order.id);
-      _callback(ev);
-    }
+    emitReplaceRejected(old != nullptr ? *old : newOrder, newOrder, why);
     return;
   }
 
@@ -1183,64 +1199,87 @@ void SimulatedExecutor::replaceOrder(OrderId oldOrderId, const Order& newOrder)
                                             .oldOrderId = oldOrderId});
     return;
   }
+  // The order rests in the book, or still waits on its trigger. Anything
+  // else -- an id never seen, an order already filled or cancelled -- is
+  // refused, so the caller hears that nothing changed.
+  Order* resting = findPendingOrder(oldOrderId);
+  Order* untriggered = resting == nullptr ? findConditionalOrder(oldOrderId) : nullptr;
+  if (resting == nullptr && untriggered == nullptr)
+  {
+    emitReplaceRejected(newOrder, newOrder, kRejectUnknownOrder);
+    return;
+  }
+  Order& live = resting != nullptr ? *resting : *untriggered;
+  // A stop stays a stop: its trigger bookkeeping follows its type.
+  if (untriggered != nullptr && newOrder.type != untriggered->type)
+  {
+    emitReplaceRejected(live, newOrder, kRejectReplaceChangesType);
+    return;
+  }
+
   if (_hasRateLimit &&
       !_rateLimit.tryConsume(RateLimitPolicy::ActionKind::Replace,
                              _clock.nowNs().raw()))
   {
-    for (const auto& o : _pending_orders)
-    {
-      if (o.id == oldOrderId)
-      {
-        emitEvent(OrderEventStatus::REJECTED_RATE_LIMIT, o);
-        return;
-      }
-    }
+    emitEvent(OrderEventStatus::REJECTED_RATE_LIMIT, live);
     return;
   }
 
   // Async path: emit REPLACE_SUBMITTED immediately and defer the
   // ACCEPTED + REPLACED transition until the ack deadline. The
-  // original order stays in the book and can still fill in the
+  // original order stays in force and can still fill or trigger in the
   // race window.
   if (_replaceAckDist.medianNs() > 0)
   {
-    for (const auto& order : _pending_orders)
+    OrderEvent ev;
+    ev.status = OrderEventStatus::REPLACE_SUBMITTED;
+    ev.order = live;
+    ev.newOrder = newOrder;
+    ev.exchangeTsNs = _clock.nowNs();
+    ev.timestamps = timestampsFor(live.id);
+    // The callback may re-enter and move the order books under `live`.
+    const Order snapshot = live;
+    if (_callback)
     {
-      if (order.id == oldOrderId)
-      {
-        OrderEvent ev;
-        ev.status = OrderEventStatus::REPLACE_SUBMITTED;
-        ev.order = order;
-        ev.newOrder = newOrder;
-        ev.exchangeTsNs = _clock.nowNs();
-        ev.timestamps = timestampsFor(order.id);
-        if (_callback)
-        {
-          _callback(ev);
-        }
-        enqueuePendingReplace(order, newOrder);
-        return;
-      }
+      _callback(ev);
     }
+    enqueuePendingReplace(snapshot, newOrder, untriggered != nullptr);
     return;
   }
 
-  for (auto& order : _pending_orders)
+  const Order oldOrder = live;
+  if (untriggered != nullptr)
   {
-    if (order.id == oldOrderId)
-    {
-      Order oldOrder = order;
-      order = newOrder;
+    replaceConditionalOrder(*untriggered, newOrder);
+  }
+  else
+  {
+    live = newOrder;
+  }
 
-      OrderEvent ev;
-      ev.status = OrderEventStatus::REPLACED;
-      ev.order = oldOrder;
-      ev.newOrder = newOrder;
-      ev.exchangeTsNs = _clock.nowNs();
-      if (_callback)
-      {
-        _callback(ev);
-      }
+  OrderEvent ev;
+  ev.status = OrderEventStatus::REPLACED;
+  ev.order = oldOrder;
+  ev.newOrder = newOrder;
+  ev.exchangeTsNs = _clock.nowNs();
+  if (_callback)
+  {
+    _callback(ev);
+  }
+}
+
+void SimulatedExecutor::replaceConditionalOrder(Order& conditional, const Order& newOrder)
+{
+  conditional = newOrder;
+  if (newOrder.type != OrderType::TRAILING_STOP || newOrder.triggerPrice.raw() == 0)
+  {
+    return;
+  }
+  for (auto& [id, trailing] : _trailing_states)
+  {
+    if (id == newOrder.id)
+    {
+      trailing.currentTrigger = newOrder.triggerPrice;
       return;
     }
   }
@@ -2040,6 +2079,18 @@ Order* SimulatedExecutor::findPendingOrder(OrderId orderId)
   return nullptr;
 }
 
+Order* SimulatedExecutor::findConditionalOrder(OrderId orderId)
+{
+  for (auto& order : _conditional_orders)
+  {
+    if (order.id == orderId)
+    {
+      return &order;
+    }
+  }
+  return nullptr;
+}
+
 const Order* SimulatedExecutor::findOrder(OrderId orderId) const
 {
   for (const auto* book : {&_heldBarOrders, &_pending_orders, &_conditional_orders})
@@ -2589,15 +2640,16 @@ int64_t SimulatedExecutor::sampleReplaceAckLatency()
   return base;
 }
 
-void SimulatedExecutor::enqueuePendingReplace(const Order& oldOrder,
-                                              const Order& newOrder)
+void SimulatedExecutor::enqueuePendingReplace(const Order& oldOrder, const Order& newOrder,
+                                              bool untriggered)
 {
   const int64_t now = _clock.nowNs().raw();
   _pendingReplaces.push_back(
       PendingReplace{.orderId = oldOrder.id,
                      .ackAtNs = now + sampleReplaceAckLatency(),
                      .oldSnapshot = oldOrder,
-                     .newOrder = newOrder});
+                     .newOrder = newOrder,
+                     .untriggered = untriggered});
 }
 
 void SimulatedExecutor::forgetPendingReplace(OrderId orderId)
@@ -2633,11 +2685,29 @@ void SimulatedExecutor::finalizePendingReplaces()
     const OrderId orderId = _pendingReplaces[i].orderId;
     Order oldSnapshot = _pendingReplaces[i].oldSnapshot;
     Order newOrder = _pendingReplaces[i].newOrder;
+    const bool untriggered = _pendingReplaces[i].untriggered;
     _pendingReplaces[i] = _pendingReplaces.back();
     _pendingReplaces.pop_back();
 
     Order* live = findPendingOrder(orderId);
-    if (!live)
+    Order* conditional = nullptr;
+    if (untriggered)
+    {
+      conditional = findConditionalOrder(orderId);
+      if (conditional == nullptr)
+      {
+        // It triggered inside the window. The replacement was written for
+        // an order still waiting on its trigger, so it is refused and the
+        // triggered order works on as placed. An order that also filled, or
+        // was cancelled, is gone and has been answered already.
+        if (live != nullptr)
+        {
+          emitReplaceRejected(*live, newOrder, kRejectLateReplaceAfterTrigger);
+        }
+        continue;
+      }
+    }
+    else if (!live)
     {
       // Original order is gone (typically filled mid-window); the
       // fill path already emitted REPLACE_REJECTED.
@@ -2652,7 +2722,25 @@ void SimulatedExecutor::finalizePendingReplaces()
     accepted.timestamps = timestampsFor(orderId);
     _callback(accepted);
 
-    *live = newOrder;
+    // The callback may have re-entered and moved the books: look again.
+    if (untriggered)
+    {
+      conditional = findConditionalOrder(orderId);
+      if (conditional == nullptr)
+      {
+        continue;
+      }
+      replaceConditionalOrder(*conditional, newOrder);
+    }
+    else
+    {
+      live = findPendingOrder(orderId);
+      if (live == nullptr)
+      {
+        continue;
+      }
+      *live = newOrder;
+    }
 
     OrderEvent replaced;
     replaced.status = OrderEventStatus::REPLACED;

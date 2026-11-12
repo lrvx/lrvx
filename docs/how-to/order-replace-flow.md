@@ -18,6 +18,20 @@ If the original order fills before the ack arrives:
 - FILLED — on the original order
 - REPLACE_REJECTED — with reject_reason "late_replace_after_fill"
 
+A replace is also refused, with or without an ack delay, when:
+
+- it names no live order -- an id never sent, or an order already
+  filled or cancelled: reject_reason "unknown_order"
+- its price or trigger is off the symbol's tick: "price_off_tick" /
+  "trigger_off_tick"
+- it would turn an order still waiting on its trigger into another
+  order type: "replace_changes_order_type"
+- the order triggered inside the ack window: "late_replace_after_trigger".
+  The replacement was written for an untriggered order, so the triggered
+  one works on as placed.
+
+Every refusal leaves the original order as it was.
+
 REPLACED still fires through the existing onOrderReplaced listener;
 the new in-flight statuses dispatch through three new virtuals
 onOrderReplaceSubmitted, onOrderReplaceAccepted, onOrderReplaceRejected.
@@ -100,7 +114,7 @@ is configured through BacktestConfig in C++.
 
 - Neither the Python nor the Node SimulatedExecutor exposes a
   replace call. A backtest replace is emitted from the strategy
-  (modify_order / emitModify); the runner turns that Modify signal
+  (modify_order / emit.modify / emitModify); the runner turns that Modify signal
   into replaceOrder on its own executor.
 - A Modify names an order id, a new price and a new quantity. The
   replacement is that order with the two fields changed: it keeps its
@@ -110,7 +124,16 @@ is configured through BacktestConfig in C++.
 - The pending replace is dropped if the order is canceled by other
   means before the ack arrives. Replace ack finalization runs on
   the next simulator tick after the deadline passes.
-- Conditional orders (stops, take-profits, trailing) use the same
-  async path when replaceAckLatencyNs > 0.
+- A stop, take-profit or trailing order that has not triggered yet is
+  replaced in place and goes on waiting, on the same async path when
+  replaceAckLatencyNs > 0. The one price a Modify carries is the price
+  the order works at: the trigger of a stop-market, take-profit-market
+  or trailing-stop order, the limit of a stop-limit or take-profit-limit
+  (its trigger stays). A trailing stop keeps trailing from the trigger
+  it was given.
+- A Modify that names a finished order comes back to the strategy as
+  REPLACE_REJECTED "unknown_order" on that order's symbol. One that names
+  an id the run never sent belongs to no symbol: execution listeners see
+  the refusal, strategy callbacks do not.
 - The clock source is the engine's simulated clock; live runs
   follow whichever clock the connector attached.

@@ -230,7 +230,8 @@ Where a runner's registry comes from:
 
 A refused order emits `REJECTED` with the reason in `OrderEvent::rejectReason`, before `SUBMITTED`,
 and never reaches the book. A refused replace emits `REPLACE_REJECTED` with the reason and leaves the
-original order as it was. An order held from a bar callback is checked when the next bar's open
+original order as it was. A replacement trailing stop that names a `triggerPrice` has that checked too
+(`trigger_off_tick`). An order held from a bar callback is checked when the next bar's open
 releases it.
 
 Which tick applies:
@@ -324,6 +325,12 @@ it. On bar data the trigger is tested against a synthetic `bid = ask = extreme`,
 bound a take-profit sell armed at 105 would book the bar's 110 high — a price it had no claim on,
 since it only exists because the bar is over. The bound is one-sided, so a protective stop still
 pays the adverse extreme: a sell stop armed at 95 on a bar that traded down to 90 books 90.
+
+`replaceOrder` on an order still waiting for its trigger rewrites it in place: it keeps waiting, with
+the replacement's trigger, limit and quantity. The replacement must keep the order's type
+(`replace_changes_order_type` otherwise). For a trailing stop a non-zero `triggerPrice` on the
+replacement becomes the current trigger, and trailing continues from there. `replaceOrder` on an id
+that is neither resting nor waiting emits `REPLACE_REJECTED` with `unknown_order`.
 
 A trailing stop is bounded by its moving trigger, which is written onto the order as it fires, so
 the `TRIGGERED` event reports the arming price. A stop-limit is additionally capped by its own limit;
@@ -424,7 +431,7 @@ seeds, so a repeated run repeats. `BacktestRunner` calls it at the start of ever
 | `CANCELED` | Order canceled |
 | `REPLACED` | Order modified |
 | `REJECTED` | Order refused; `rejectReason` says why (for example `price_off_tick`, `reduce_only`) |
-| `REPLACE_REJECTED` | Replace refused; the original order is unchanged |
+| `REPLACE_REJECTED` | Replace refused; the original order is unchanged. `rejectReason` says why (`price_off_tick`, `trigger_off_tick`, `unknown_order`, `replace_changes_order_type`, `late_replace_after_fill`, `late_replace_after_trigger`) |
 
 Trailing stop updates emit `TRAILING_UPDATED` events with the new trigger price.
 

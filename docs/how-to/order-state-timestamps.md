@@ -20,6 +20,10 @@ For every fill or order-update event, the payload has these fields
   PENDING_TRIGGER to TRIGGERED
 - `expired_at_ns` — when EXPIRED fired
 
+In Node the timestamps are `bigint` (a JS `number` cannot hold a
+nanosecond clock reading exactly), so a difference of two is a `bigint`
+too; wrap it in `Number(...)` to do float arithmetic with it.
+
 A timestamp reads zero if the order has not reached that stage. The
 slot for the status of the current event is always the freshest;
 earlier stages carry their historical timestamps.
@@ -49,7 +53,7 @@ earlier stages carry their historical timestamps.
     const strat = {
       onOrderUpdate(ctx, ev, emit) {
         if (ev.status === "ACCEPTED") {
-          const ackNs = ev.acceptedAtNs - ev.submittedAtNs;
+          const ackNs = Number(ev.acceptedAtNs - ev.submittedAtNs);
           console.log(`ack latency: ${ackNs} ns`);
         }
       },

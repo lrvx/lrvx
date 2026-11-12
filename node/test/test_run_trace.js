@@ -70,7 +70,7 @@ function roundTrip() {
 
   const reader = new TraceReader(out);
   check('strategy id', reader.strategyId() === 'pair-trade');
-  check('run ended', reader.runEndedNs() === 1700000000400000000);
+  check('run ended', reader.runEndedNs() === 1700000000400000000n);
   const refs = reader.tapeRefs();
   check('tape ref count', refs.length === 1);
   check('tape ref path', refs[0].path === 'BTCUSDT.lrvx');

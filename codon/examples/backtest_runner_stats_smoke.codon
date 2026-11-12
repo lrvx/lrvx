@@ -2,6 +2,8 @@
 #   * a run with a closed trade reports its duration, its time bounds and
 #     its time-weighted return, the same from run_tape and run_tapes
 #   * a tape that cannot be opened raises ValueError carrying the reason
+#   * so do run_csv on a missing file or a bad row, and run_ohlcv / run_bars
+#     on a run the runner refuses
 
 import os
 
@@ -127,7 +129,48 @@ except ValueError as e:
     said = e.message
 check("not a directory" in said and missing in said,
       "run_tapes on a missing directory names the reason: " + said)
+
+missing_csv = root + "/no_such.csv"
+said = ""
+try:
+    bt.run_csv(missing_csv, "AAA")
+except ValueError as e:
+    said = e.message
+check("cannot open" in said and missing_csv in said,
+      "run_csv on a missing file names the reason: " + said)
+
+bad_csv = root + "/bad.csv"
+with open(bad_csv, "w") as f:
+    f.write("timestamp,open,high,low,close,volume\n")
+    f.write("1767225600,100,101,99,100,1\n")
+    f.write("not-a-timestamp,100,101,99,100,1\n")
+said = ""
+try:
+    bt.run_csv(bad_csv, "AAA")
+except ValueError as e:
+    said = e.message
+check(bad_csv in said and "line 3" in said,
+      "run_csv on a bad row names the file and the line: " + said)
 bt.close()
+
+# volume_impact reads level sizes, which bars do not carry: the run is refused.
+refusing = BacktestRunner(reg, 0.0, 10_000.0, slippage_model="volume_impact",
+                          slippage_impact_coeff=0.5)
+refusing.set_strategy(idle)
+said = ""
+try:
+    refusing.run_ohlcv([T0, T0 + SEC], [100.0, 101.0], "AAA")
+except ValueError as e:
+    said = e.message
+check("volume_impact" in said, "run_ohlcv names why the run was refused: " + said)
+
+said = ""
+try:
+    refusing.run_bars([T0], [T0 + SEC], [100.0], [101.0], [99.0], [100.0], [1.0], "AAA")
+except ValueError as e:
+    said = e.message
+check("volume_impact" in said, "run_bars names why the run was refused: " + said)
+refusing.close()
 lrvx_registry_destroy(reg)
 
 os.system("rm -rf " + root)

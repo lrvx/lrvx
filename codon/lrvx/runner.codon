@@ -512,12 +512,14 @@ class BacktestRunner:
         )
 
     def run_csv(self, path: str, symbol: str) -> BacktestStats:
-        """Replay a OHLCV CSV file. Returns BacktestStats."""
+        """Replay a OHLCV CSV file. Returns BacktestStats. Raises ValueError
+        with the reason on a file that cannot be opened or a row that cannot
+        be parsed."""
         buf = [i64(0)] * 31
         ok = lrvx_backtest_runner_run_csv(
             self._handle, path.c_str(), symbol.c_str(), buf.arr.ptr)
         if ok == i32(0):
-            raise ValueError(f"BacktestRunner.run_csv failed: {path}")
+            raise ValueError(str.from_ptr(lrvx_last_error_message()))
         return self._parse_stats(buf)
 
     def run_tape(self, path: str) -> BacktestStats:
@@ -626,7 +628,7 @@ class BacktestRunner:
             ts_buf.arr.ptr, closes.arr.ptr, n,
             symbol.c_str(), buf.arr.ptr)
         if ok == i32(0):
-            raise ValueError("BacktestRunner.run_ohlcv failed")
+            raise ValueError(str.from_ptr(lrvx_last_error_message()))
         return self._parse_stats(buf)
 
     def run_bars(self, start_ns: List[int], end_ns: List[int],
@@ -649,7 +651,7 @@ class BacktestRunner:
             u8(bar_type), u64(bar_type_param),
             buf.arr.ptr)
         if ok == i32(0):
-            raise ValueError("BacktestRunner.run_bars failed")
+            raise ValueError(str.from_ptr(lrvx_last_error_message()))
         return self._parse_stats(buf)
 
     def equity_curve(self) -> Tuple[List[int], List[float], List[float]]:

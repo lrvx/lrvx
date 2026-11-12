@@ -103,6 +103,41 @@ console.log('=== a failed run says why ===');
 
   msg = failure(() => roundTripRunner().runTapes([]));
   check(msg !== null && msg.includes('empty'), `runTapes([]) names the reason (${msg})`);
+
+  const missingCsv = path.join(root, 'no_such.csv');
+  msg = failure(() => roundTripRunner().runCsv(missingCsv, 'AAA'));
+  check(msg !== null, 'runCsv on a missing file throws');
+  check(msg !== null && msg.includes('cannot open') && msg.includes(missingCsv),
+        `runCsv names the reason and the path (${msg})`);
+  check(msg !== null && !msg.includes('lrvx_backtest_runner_run_csv'),
+        `runCsv does not name the C function (${msg})`);
+
+  const badCsv = path.join(root, 'bad.csv');
+  fs.writeFileSync(badCsv, 'timestamp,open,high,low,close,volume\n1767225600,1,1,1,1,1\nx,1,1,1,1,1\n');
+  msg = failure(() => roundTripRunner().runCsv(badCsv, 'AAA'));
+  check(msg !== null && msg.includes(badCsv) && msg.includes('line 3'),
+        `runCsv names the file and the line of a bad row (${msg})`);
+
+  // A volume_impact runner refuses a replay that carries no book depth; the
+  // refusal is thrown with its reason, not returned as null.
+  const depthRunner = () => {
+    const reg = new lrvx.SymbolRegistry();
+    reg.addSymbol('test', 'AAA', 0.01);
+    return new lrvx.BacktestRunner(reg, 0, 10000,
+                                   {slippageModel: 'volume_impact', slippageImpactCoeff: 0.5});
+  };
+  const one = new BigInt64Array([T0]);
+  const px = new Float64Array([100]);
+  for (const [label, run] of [
+    ['runOhlcv', (bt) => bt.runOhlcv(one, px, 'AAA')],
+    ['runBars', (bt) => bt.runBars(one, one, px, px, px, px, px, 'AAA')],
+    ['runCsv', (bt) => bt.runCsv(missingCsv, 'AAA')],
+  ]) {
+    let result;
+    msg = failure(() => { result = run(depthRunner()); });
+    check(msg !== null && msg.includes('volume_impact') && result === undefined,
+          `${label} on a refused run throws the reason (${msg})`);
+  }
 }
 
 fs.rmSync(root, {recursive: true, force: true});

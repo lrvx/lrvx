@@ -505,6 +505,11 @@ const _drCount: number = dr.count;
 const summary = dr.summary();
 void summary.totalEvents;
 void summary.durationSeconds;
+// Clock readings are declared `bigint` and must be one at runtime.
+const _summaryFirst: bigint = summary.firstEventNs;
+const _summaryLast: bigint = summary.lastEventNs;
+check(typeof _summaryFirst === "bigint" && typeof _summaryLast === "bigint",
+      "DataReaderSummary.firstEventNs / lastEventNs are bigint at runtime");
 const drStats = dr.stats();
 void drStats.tradesRead;
 const trades: TradeRecord[] = dr.readTrades(100);

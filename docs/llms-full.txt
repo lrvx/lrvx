@@ -2260,7 +2260,7 @@ Every Strategy subclass gets ten callbacks. You override the ones you need; the 
 | `on_bar(ctx, bar)` | `onBar(ctx, bar, emit)` | A closed OHLC bar is dispatched |
 | `on_touch(ctx)` | `onTouch(ctx, emit)` | The touch (best bid / ask, price or size) changed |
 | `on_fill(ctx, event)` | `onFill(ctx, ev, emit)` | One of your orders partially or fully fills |
-| `on_order_update(ctx, event)` | `onOrderUpdate(ctx, ev, emit)` | Any order-lifecycle status change (fills included) |
+| `on_order_update(ctx, event)` | `onOrderUpdate(ctx, ev, emit)` | Any order-lifecycle status change other than a fill |
 | `on_queue_position_change(ctx, event)` | `onQueuePositionChange(ctx, ev, emit)` | A resting limit order's queue position moved (backtest only) |
 | `on_market_position_change(ctx, event)` | `onMarketPositionChange(ctx, ev, emit)` | A resting limit order crossed a categorical position boundary (backtest only) |
 | `on_start()` / `on_stop()` | `onStart()` / `onStop()` | Strategy lifecycle |
@@ -3993,7 +3993,7 @@ All bindings dispatch through the same C++ `BridgeStrategy` callbacks, so behavi
 | `on_bar(ctx, bar)` | Closed OHLC bar | All bindings (since [#123](https://github.com/lrvx/lrvx/pull/123)) |
 | `on_start()` / `on_stop()` | Lifecycle hooks | All bindings |
 | `on_fill(ctx, event)` | Every fill on the strategy's own orders (`PARTIALLY_FILLED` / `FILLED`) | Python, Node.js, Codon |
-| `on_order_update(ctx, event)` | Every order-lifecycle status change — `NEW` / `ACCEPTED` / `CANCELED` / `REJECTED` / `REPLACED` / `TRIGGERED` / `TRAILING_UPDATED`, fills included | Python, Node.js, Codon |
+| `on_order_update(ctx, event)` | Every order-lifecycle status change — `NEW` / `ACCEPTED` / `CANCELED` / `REJECTED` / `REPLACED` / `TRIGGERED` / `TRAILING_UPDATED` and the rest. A fill is not one of them: it reaches `on_fill` only | Python, Node.js, Codon |
 | `on_market_position_change(ctx, event)` | Resting limit order's categorical market position moved (`best` / `behind_best` / `mid_spread` / `level_empty` / `crossed`). Backtest only | Python, Node.js, Codon |
 | `on_queue_position_change(ctx, event)` | Resting limit order's queue position moved with no other lifecycle transition; `event.queue_ahead` / `queue_total` carry the snapshot. Backtest only | Python, Node.js, Codon |
 
@@ -4019,7 +4019,7 @@ Names differ slightly by language (snake_case vs camelCase) but the surface is t
 | Limit sell | `limit_sell(price, qty, tif="gtc")` | `emit.limitSell(p, qty)` | `limit_sell(price, qty, tif="gtc")` | `emitLimitSell(sym, p, qty[, tif])` |
 | Cancel | `cancel_order(id)` | `emit.cancel(id)` | `cancel_order(id)` | `emitCancel(id)` |
 | Cancel all | `cancel_all_orders()` | — | `cancel_all_orders()` | `emitCancelAll(sym)` |
-| Modify / replace | `modify_order(id, new_price, new_qty)` | — | `modify_order(id, new_price, new_qty)` | `emitModify(id, newPrice, newQty)` |
+| Modify / replace | `modify_order(id, new_price, new_qty)` | `emit.modify(id, newPrice, newQty)` | `modify_order(id, new_price, new_qty)` | `emitModify(id, newPrice, newQty)` |
 | Stop market | `stop_market(side, trigger, qty)` | — | `stop_market(side, trigger, qty)` | `emitStopMarket(sym, side, trigger, qty)` |
 | Stop limit | `stop_limit(side, trigger, limit_price, qty)` | — | `stop_limit(side, trigger, limit_price, qty)` | `emitStopLimit(sym, side, trigger, limit, qty)` |
 | Take profit market | `take_profit_market(side, trigger, qty)` | — | `take_profit_market(side, trigger, qty)` | `emitTakeProfitMarket(sym, side, trigger, qty)` |
@@ -12350,8 +12350,10 @@ Called on every fill this strategy's own orders produce (status
 #### `on_order_update(ctx: SymbolContext, event: OrderEventData)`
 
 Called on every order-lifecycle status change: `NEW`, `ACCEPTED`, `CANCELED`,
-`REJECTED`, `REPLACED`, `TRIGGERED`, `TRAILING_UPDATED`. Fills fire here too —
-use `on_fill` if you only care about those.
+`REJECTED`, `REPLACED`, `TRIGGERED`, `TRAILING_UPDATED` and the rest. A fill
+does not fire here: a `PARTIALLY_FILLED` or `FILLED` event reaches `on_fill`
+and only `on_fill`, in a backtest and in paper mode alike. A strategy that
+tracks an order to its end needs both callbacks.
 
 #### `on_queue_position_change(ctx: SymbolContext, event: OrderEventData)`
 
@@ -12387,7 +12389,7 @@ These methods use the first registered symbol when `symbol` is omitted. `symbol`
 | `close_position(symbol=None)` | Close position (reduce-only) |
 | `cancel_order(order_id)` | Cancel an order |
 | `cancel_all_orders(symbol=None)` | Cancel every order for a symbol |
-| `modify_order(order_id, new_price, new_qty)` | Modify a resting order. It keeps its id, symbol and side; `new_qty` is the quantity left to work |
+| `modify_order(order_id, new_price, new_qty)` | Modify a resting order, or a stop / take-profit / trailing order still waiting on its trigger. It keeps its id, symbol, side and type; `new_qty` is the quantity left to work. `new_price` is the trigger of a stop-market, take-profit-market or trailing-stop order and the limit price of every other type. A refused modify (off-tick price, an order already filled or cancelled) arrives in `on_order_update` as `REPLACE_REJECTED` with `reject_reason` set |
 
 `tif` accepts `"gtc"`, `"ioc"`, `"fok"`, `"gtd"`, `"post_only"`.
 
@@ -15426,7 +15428,7 @@ are the new touch.
 | Callback | Fires on |
 |----------|----------|
 | `onFill(ctx, ev, emit)` | Every fill this strategy's own orders produce (status `PARTIALLY_FILLED` or `FILLED`) |
-| `onOrderUpdate(ctx, ev, emit)` | Every order-lifecycle status change: `NEW` / `ACCEPTED` / `CANCELED` / `REJECTED` / `REPLACED` / `TRIGGERED` / `TRAILING_UPDATED`. Fills included — use `onFill` if you only want those |
+| `onOrderUpdate(ctx, ev, emit)` | Every order-lifecycle status change: `NEW` / `ACCEPTED` / `CANCELED` / `REJECTED` / `REPLACED` / `TRIGGERED` / `TRAILING_UPDATED` and the rest. A fill does not fire here: a `PARTIALLY_FILLED` or `FILLED` event reaches `onFill` only |
 | `onQueuePositionChange(ctx, ev, emit)` | A resting limit order's queue position moved with no other lifecycle transition. `ev.queueAhead` / `ev.queueTotal` carry the snapshot. Backtest only |
 | `onMarketPositionChange(ctx, ev, emit)` | A resting limit order's categorical market position transitioned (best / behind_best / mid_spread / level_empty / crossed). Backtest only |
 
@@ -15436,6 +15438,12 @@ are the new touch.
 `acceptedAtNs` / `firstFillAtNs` / `lastFillAtNs` / `canceledAtNs` /
 `rejectedAtNs` / `triggeredAtNs` / `expiredAtNs`, plus `isMaker`,
 `fillRole`, `marketPosition` and `distanceToBestTicks`.
+
+`exchangeTsNs` and the eight per-stage timestamps are `bigint`: they are
+clock readings, and a JS `number` steps 256 ns at a time at today's values.
+A stage the order has not reached reads `0n`. They compare against each
+other and against a `number`; for a latency, subtract first and convert the
+difference: `Number(ev.acceptedAtNs - ev.submittedAtNs)`.
 
 ### BarData (`bar`)
 
@@ -15481,6 +15489,7 @@ are the new touch.
 | `emit.provideLiquidity(priceLower, priceUpper, liquidity)` | Provide AMM liquidity in a price range |
 | `emit.withdrawLiquidity(liquidity)` | Withdraw AMM liquidity |
 | `emit.cancel(orderId)` | Cancel order |
+| `emit.modify(orderId, newPrice, newQty)` | Change the price and quantity of a working order. It keeps its id, symbol, side and type; `newQty` is the quantity left to work. `newPrice` is the trigger of a stop-market, take-profit-market or trailing-stop order and the limit price of every other type. `orderId` is the `ev.orderId` of the order's events. A refused modify arrives in `onOrderUpdate` as `REPLACE_REJECTED` with `rejectReason` set |
 | `emit.closePosition()` | Close position (reduce-only) |
 
 In a backtest, a `limitBuy` / `limitSell` price that is not a whole number of the symbol's `tickSize` is rejected: `onOrderUpdate` receives `status` `"REJECTED"` with `rejectReason` `"price_off_tick"`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
@@ -15543,6 +15552,12 @@ An order — the argument to `Executor.submit` and to every
 `bigint`. They are clock readings, and a JS `Number` is a double that steps
 256 ns at present-day magnitudes. Prices, sizes and ids on the same object
 stay `number`.
+
+`Executor.replace(oldId, order)` is called for a strategy's `emit.modify`.
+`order` is the order that modify named, as the executor was handed it --
+same id, symbol, side and type -- with the new price and quantity. A modify
+of an id the runner never handed to this executor (or has since seen
+cancelled) still arrives, under that id, with `symbol` 0.
 
 A trade handed to a `MarketDataRecorderHook`'s `onTrade` is a `TradeData`:
 `{ symbol, price, qty, isBuy, side, timestampNs }`, with `timestampNs` a
@@ -15624,7 +15639,7 @@ built with options refuses `setExecutor`.
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `setStrategy(strategy)` | `void` | Attach a strategy |
-| `runCsv(path, symbol)` | stats object | Replay a CSV file (timestamp, open, high, low, close, volume) |
+| `runCsv(path, symbol)` | stats object | Replay a CSV file (timestamp, open, high, low, close, volume). Throws `LrvxError` with the reason on a file that cannot be opened or a row that cannot be parsed |
 | `runOhlcv(timestamps, closes, symbol)` | stats object | Replay raw arrays (timestamps as Float64Array, closes as Float64Array) |
 | `runTape(path)` | stats object | Replay a `.lrvx` tape directory — the canonical recording written by `lrvx tape record` or `scripts/backfill_to_tape.py`. Throws `LrvxError` with the reason on a missing or unreadable tape |
 | `runTapeBars(path, intervalSeconds, symbol?)` | stats object | Replay a `.lrvx` tape as time bars: trades aggregated while the tape streams, each closed bar to `onBar` with `runBars`' fill rules. Same result as `readTrades` -> `aggregateTimeBars` -> `runBars` for the same interval. `symbol` is required when the tape holds more than one; throws `LrvxError` on a bad interval, unknown symbol, unreadable tape or a symbol with no trades |
@@ -15632,6 +15647,7 @@ built with options refuses `setExecutor`.
 | `runTapes(paths)` | stats object | Merge N `.lrvx` tape directories on read and replay the merged stream. Symbols are rekeyed by `(metadata.exchange, name)` so two venues stay distinct. `runTapes([t])` equals `runTape(t)`; throws `LrvxError` with the reason on bad paths or overlapping book streams |
 | `setExecutor(executor)` | `void` | Replace the built-in `SimulatedExecutor`. `null` detaches |
 | `addExecutionListener(listener)` | `void` | Attach an order-lifecycle listener. Multiple listeners may be attached; each fires for every order event |
+| `addJourneyTracer(tracer)` | `void` | Attach an `OrderJourneyTracer`; it records every order event of the runs that follow. Its rows carry `tsNs` and the per-stage timestamps as `bigint` |
 | `equityCurve()` | `EquityCurve` | Equity curve from the most recent run |
 | `trades()` | `BacktestTrades` | Closed trades from the most recent run |
 
@@ -15666,7 +15682,9 @@ to no callback or the executor, 0 for a run that read no tape.
 | `calmarRatio` | `number` | Calmar ratio |
 | `returnPct` | `number` | Net return (%) |
 
-A `BacktestRunner` run's stats object also carries:
+Every stats object -- a `BacktestRunner` run, `BacktestResult.stats()`,
+`Engine.run()`, a walk-forward fold's `trainStats` / `testStats` and a grid
+search result's `stats` -- also carries:
 
 | Key | Type | Description |
 |-----|------|-------------|
@@ -16295,7 +16313,7 @@ const events = reader.readBookUpdates();
 | Method / Property | Returns | Description |
 |-------------------|---------|-------------|
 | `count` | `number` | Total event count (property) |
-| `summary()` | `{ firstEventNs, lastEventNs, totalEvents, segmentCount, totalBytes, durationSeconds }` | Dataset summary |
+| `summary()` | `{ firstEventNs, lastEventNs, totalEvents, segmentCount, totalBytes, durationSeconds }` | Dataset summary. `firstEventNs` and `lastEventNs` are `bigint`; the rest are `number` |
 | `stats()` | `{ filesRead, eventsRead, tradesRead, bookUpdatesRead, bytesRead, crcErrors }` | Read statistics |
 | `readTrades(max?)` | trade record array | Read up to `max` trades (all if omitted) |
 | `readTradesFrom(startTsNs, max?)` | trade record array | Same as `readTrades` starting from `startTsNs` |
@@ -16311,7 +16329,7 @@ const events = reader.readBookUpdates();
 | Field | Type | Description |
 |-------|------|-------------|
 | `nThreads` | `number` | `0` (default) auto-picks `min(blocks_per_segment/2, hardware_concurrency)`; `1` forces single-thread; `>1` sets the worker count (capped to the effective block count). |
-| `onProgress` | `(pct, tsNs) => boolean \| void` | Called from inside the run loop with the bytes-based pct (0..1) and the cursor timestamp in nanoseconds. Return `false` to cancel. Only fires on the single-thread path, so it requires `nThreads: 1`. |
+| `onProgress` | `(pct, tsNs) => boolean \| void` | Called from inside the run loop with the bytes-based pct (0..1) and the cursor timestamp in nanoseconds (a `bigint`). Return `false` to cancel. Only fires on the single-thread path, so it requires `nThreads: 1`. |
 | `progressIntervalMs` | `number` | Minimum interval between `onProgress` calls. Defaults to `1000`; `0` is treated as `1000`. |
 
 Parallel mode partitions at the compressed-block level and merges per-worker
@@ -16380,7 +16398,7 @@ const partitioner = new lrvx.Partitioner(dataDir);
 const partitions = partitioner.byTime(numPartitions, warmupNs);
 ```
 
-All methods return an array of partition objects `{ partitionId, fromNs, toNs, warmupFromNs, estimatedEvents, estimatedBytes }`. Pass `0` as `warmupNs` if no warmup period is needed.
+All methods return an array of partition objects `{ partitionId, fromNs, toNs, warmupFromNs, estimatedEvents, estimatedBytes }`. `fromNs`, `toNs` and `warmupFromNs` are `bigint` and go straight back into `new DataReader(dataDir, fromNs, toNs)`. Pass `0` as `warmupNs` if no warmup period is needed.
 
 | Method | Description |
 |--------|-------------|
@@ -16575,8 +16593,8 @@ an `OrderEventData`, described under [Types](types.md); it carries `order_id`, `
 #### `on_order_update(ctx, ev)`
 
 Called on every order-lifecycle status change for orders this strategy emitted: `NEW`, `ACCEPTED`,
-`CANCELED`, `REJECTED`, `REPLACED`, `TRIGGERED`, `TRAILING_UPDATED`. Fills come through here too —
-override `on_fill` instead if you only want fills.
+`CANCELED`, `REJECTED`, `REPLACED`, `TRIGGERED`, `TRAILING_UPDATED` and the rest. A fill does not
+come through here: a `PARTIALLY_FILLED` or `FILLED` event reaches `on_fill` only.
 
 #### `on_queue_position_change(ctx, ev)`
 
@@ -16623,7 +16641,9 @@ Cancel all orders for a symbol.
 
 #### `emit_modify(order_id, new_price, new_qty)`
 
-Modify an existing order's price and quantity.
+Modify an existing order's price and quantity. It keeps its id, symbol, side and type. `new_price`
+is the trigger of a stop-market, take-profit-market or trailing-stop order and the limit price of
+every other type. A refused modify arrives in `on_order_update` as `REPLACE_REJECTED`.
 
 #### `emit_stop_market(symbol, side, trigger, qty) -> int`
 
@@ -17409,7 +17429,7 @@ names and meaning of the Python runner (see
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `set_strategy(strategy)` | `None` | Attach a strategy and install its event callbacks |
-| `run_csv(path, symbol)` | `BacktestStats` | Replay a CSV file (columns: timestamp, open, high, low, close, volume) |
+| `run_csv(path, symbol)` | `BacktestStats` | Replay a CSV file (columns: timestamp, open, high, low, close, volume). Raises `ValueError` with the reason on a file that cannot be opened or a row that cannot be parsed |
 | `run_ohlcv(timestamps, closes, symbol)` | `BacktestStats` | Replay raw arrays (`List[int]` timestamps in ns, `List[float]` closes) |
 | `run_bars(start_ns, end_ns, opens, highs, lows, closes, volumes, symbol, bar_type=0, bar_type_param=0)` | `BacktestStats` | Replay full OHLCV bars. `Strategy.on_bar` fires; `on_trade` does **not** |
 | `run_tape(path)` | `BacktestStats` | Replay one `.lrvx` tape directory. Raises `ValueError` with the reason on a missing or unreadable tape |

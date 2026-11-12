@@ -25021,6 +25021,11 @@
         },
         {
           "kind": "method",
+          "name": "emitReplaceRejected",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "emitTrailingUpdate",
           "parent": "SimulatedExecutor"
         },
@@ -25082,6 +25087,11 @@
         {
           "kind": "method",
           "name": "finalizePendingSubmissions",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "findConditionalOrder",
           "parent": "SimulatedExecutor"
         },
         {
@@ -25262,6 +25272,11 @@
         {
           "kind": "method",
           "name": "removePendingOrder",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "replaceConditionalOrder",
           "parent": "SimulatedExecutor"
         },
         {
@@ -28807,6 +28822,11 @@
         },
         {
           "kind": "method",
+          "name": "addJourneyTracer",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "equityCurve",
           "parent": "BacktestRunner"
         },
@@ -28932,12 +28952,22 @@
         },
         {
           "kind": "method",
+          "name": "avgTradeDurationNs",
+          "parent": "BacktestStats"
+        },
+        {
+          "kind": "method",
           "name": "avgWin",
           "parent": "BacktestStats"
         },
         {
           "kind": "method",
           "name": "calmarRatio",
+          "parent": "BacktestStats"
+        },
+        {
+          "kind": "method",
+          "name": "endTimeNs",
           "parent": "BacktestStats"
         },
         {
@@ -28977,6 +29007,16 @@
         },
         {
           "kind": "method",
+          "name": "maxTradeDurationNs",
+          "parent": "BacktestStats"
+        },
+        {
+          "kind": "method",
+          "name": "medianTradeDurationNs",
+          "parent": "BacktestStats"
+        },
+        {
+          "kind": "method",
           "name": "netPnl",
           "parent": "BacktestStats"
         },
@@ -28998,6 +29038,16 @@
         {
           "kind": "method",
           "name": "sortinoRatio",
+          "parent": "BacktestStats"
+        },
+        {
+          "kind": "method",
+          "name": "startTimeNs",
+          "parent": "BacktestStats"
+        },
+        {
+          "kind": "method",
+          "name": "timeWeightedReturn",
           "parent": "BacktestStats"
         },
         {
@@ -30022,6 +30072,11 @@
         },
         {
           "kind": "method",
+          "name": "modify",
+          "parent": "EmitMethods"
+        },
+        {
+          "kind": "method",
           "name": "provideLiquidity",
           "parent": "EmitMethods"
         },
@@ -30517,7 +30572,17 @@
         },
         {
           "kind": "method",
+          "name": "avgTradeDurationNs",
+          "parent": "FoldStats"
+        },
+        {
+          "kind": "method",
           "name": "calmarRatio",
+          "parent": "FoldStats"
+        },
+        {
+          "kind": "method",
+          "name": "endTimeNs",
           "parent": "FoldStats"
         },
         {
@@ -30547,6 +30612,16 @@
         },
         {
           "kind": "method",
+          "name": "maxTradeDurationNs",
+          "parent": "FoldStats"
+        },
+        {
+          "kind": "method",
+          "name": "medianTradeDurationNs",
+          "parent": "FoldStats"
+        },
+        {
+          "kind": "method",
           "name": "netPnl",
           "parent": "FoldStats"
         },
@@ -30568,6 +30643,16 @@
         {
           "kind": "method",
           "name": "sortinoRatio",
+          "parent": "FoldStats"
+        },
+        {
+          "kind": "method",
+          "name": "startTimeNs",
+          "parent": "FoldStats"
+        },
+        {
+          "kind": "method",
+          "name": "timeWeightedReturn",
           "parent": "FoldStats"
         },
         {

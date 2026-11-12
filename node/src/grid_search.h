@@ -59,6 +59,18 @@ inline int gridSearchFactoryThunk(void* user_data, uint64_t param_index,
   out_stats->sortinoRatio = getNum("sortinoRatio");
   out_stats->winRate = getNum("winRate");
   out_stats->profitFactor = getNum("profitFactor");
+  out_stats->avgTradeDurationNs = getNum("avgTradeDurationNs");
+  out_stats->medianTradeDurationNs = getNum("medianTradeDurationNs");
+  out_stats->maxTradeDurationNs = getNum("maxTradeDurationNs");
+  out_stats->timeWeightedReturn = getNum("timeWeightedReturn");
+  // The run's bounds are clock readings: a runner hands them over as BigInt.
+  auto getNs = [&](const char* key) -> int64_t
+  {
+    auto v = obj.Get(key);
+    return (v.IsBigInt() || v.IsNumber()) ? toInt64Ns(v) : 0;
+  };
+  out_stats->startTimeNs = getNs("startTimeNs");
+  out_stats->endTimeNs = getNs("endTimeNs");
   (void)param_index;
   return 1;
 }

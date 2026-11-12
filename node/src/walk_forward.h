@@ -4,6 +4,7 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
 #include "error_translator.h"
 #include "hooks.h"
 #include "lrvx/capi/bridge_strategy.h"
@@ -79,6 +80,7 @@ inline Napi::Object statsToJsObj(Napi::Env env, const LrvxBacktestStats& s)
   obj.Set("calmarRatio", Napi::Number::New(env, s.calmarRatio));
   obj.Set("winRate", Napi::Number::New(env, s.winRate));
   obj.Set("profitFactor", Napi::Number::New(env, s.profitFactor));
+  setTradeTimeStats(env, obj, s);
   return obj;
 }
 

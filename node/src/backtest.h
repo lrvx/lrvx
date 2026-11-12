@@ -2,6 +2,7 @@
 
 #pragma once
 #include <napi.h>
+#include "bindings_common.h"
 #include "data_ops.h"
 #include "lrvx/backtest/runner_fill_settings.h"
 #include "lrvx/capi/lrvx_capi.h"
@@ -681,6 +682,7 @@ class BacktestResultWrap : public Napi::ObjectWrap<BacktestResultWrap>
     o.Set("sortinoRatio", s.sortinoRatio);
     o.Set("calmarRatio", s.calmarRatio);
     o.Set("returnPct", s.returnPct);
+    setTradeTimeStats(info.Env(), o, s);
     return o;
   }
   LrvxBacktestResultHandle _h;

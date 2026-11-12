@@ -229,6 +229,8 @@ inline Napi::Object statsObj(Napi::Env env, const BacktestStats& s)
   o.Set("sortinoRatio", s.sortinoRatio);
   o.Set("calmarRatio", s.calmarRatio);
   o.Set("returnPct", s.returnPct);
+  setTradeTimeStats(env, o, s.avgTradeDurationNs, s.medianTradeDurationNs, s.maxTradeDurationNs,
+                    s.timeWeightedReturn, s.startTimeNs.raw(), s.endTimeNs.raw());
   return o;
 }
 

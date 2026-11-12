@@ -10,6 +10,7 @@
 
 #include <vector>
 
+#include "bindings_common.h"
 #include "lrvx/capi/lrvx_capi.h"
 
 namespace node_lrvx
@@ -104,8 +105,7 @@ class RateLimitPolicyWrap : public Napi::ObjectWrap<RateLimitPolicyWrap>
   }
   Napi::Value BanUntilNs(const Napi::CallbackInfo& info)
   {
-    return Napi::Number::New(info.Env(),
-                             static_cast<double>(lrvx_rate_limit_policy_ban_until_ns(_h)));
+    return Napi::BigInt::New(info.Env(), lrvx_rate_limit_policy_ban_until_ns(_h));
   }
   Napi::Value ConsecutiveRejects(const Napi::CallbackInfo& info)
   {
@@ -114,7 +114,7 @@ class RateLimitPolicyWrap : public Napi::ObjectWrap<RateLimitPolicyWrap>
   }
   Napi::Value BucketStates(const Napi::CallbackInfo& info)
   {
-    int64_t now_ns = info[0].As<Napi::Number>().Int64Value();
+    int64_t now_ns = toInt64Ns(info[0]);
     uint32_t count = lrvx_rate_limit_policy_bucket_state(_h, now_ns, nullptr, 0);
     std::vector<int64_t> buf(count * 4, 0);
     lrvx_rate_limit_policy_bucket_state(_h, now_ns, buf.data(), count);

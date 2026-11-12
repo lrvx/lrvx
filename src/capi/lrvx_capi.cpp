@@ -129,6 +129,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
 #include <cmath>
 #include <cstring>
 #include <exception>
@@ -144,6 +145,7 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -6836,6 +6838,10 @@ class RunnerSignalHandler : public ISignalHandler
   }
   void setExecutor(LrvxExecutorImpl* e)
   {
+    {
+      std::lock_guard lock(_forwardedMutex);
+      _forwarded.clear();
+    }
     _executor.set(TrackerRegistry<LrvxExecutorImpl>::lookup(e));
   }
   void setTraceRecorder(void* rec) noexcept
@@ -7053,37 +7059,56 @@ class RunnerSignalHandler : public ISignalHandler
         case SignalType::TakeProfitMarket:
         case SignalType::TakeProfitLimit:
         case SignalType::TrailingStop:
+        {
+          const LrvxOrder fo = signalToLrvxOrder(sig);
+          // A market order never rests, so there is nothing of it to modify.
+          if (sig.type != SignalType::Market)
+          {
+            std::lock_guard lock(_forwardedMutex);
+            _forwarded[fo.id] = fo;
+          }
           if (exec->cb.submit != nullptr)
           {
-            LrvxOrder fo = signalToLrvxOrder(sig);
             exec->cb.submit(exec->cb.user_data, &fo);
           }
           break;
+        }
         case SignalType::Cancel:
+        {
+          {
+            std::lock_guard lock(_forwardedMutex);
+            _forwarded.erase(sig.orderId);
+          }
           if (exec->cb.cancel != nullptr)
           {
             exec->cb.cancel(exec->cb.user_data, sig.orderId);
           }
           break;
+        }
         case SignalType::CancelAll:
+        {
+          {
+            std::lock_guard lock(_forwardedMutex);
+            // order: not observable -- every order of the symbol is dropped
+            std::erase_if(_forwarded,
+                          [&](const auto& entry)
+                          { return entry.second.symbol == sig.symbol; });
+          }
           if (exec->cb.cancel_all != nullptr)
           {
             exec->cb.cancel_all(exec->cb.user_data, sig.symbol);
           }
           break;
+        }
         case SignalType::Modify:
+        {
+          const LrvxOrder fo = modifiedOrder(sig);
           if (exec->cb.replace != nullptr)
           {
-            LrvxOrder fo{};
-            fo.id = sig.orderId;
-            fo.symbol = sig.symbol;
-            fo.side = (sig.side == Side::BUY) ? 0 : 1;
-            fo.type = static_cast<uint8_t>(OrderType::LIMIT);
-            fo.price_raw = sig.newPrice.raw();
-            fo.quantity_raw = sig.newQuantity.raw();
             exec->cb.replace(exec->cb.user_data, sig.orderId, &fo);
           }
           break;
+        }
         case SignalType::OCO:
           if (exec->cb.submit_oco != nullptr)
           {
@@ -7117,8 +7142,54 @@ class RunnerSignalHandler : public ISignalHandler
   }
 
  private:
+  // A Modify signal names an order and its new price and quantity, nothing
+  // else. This is that order as it was forwarded, with the two fields
+  // changed: same id, symbol, side and type. An id this handler never
+  // forwarded (or has since seen cancelled) still goes out under that id.
+  LrvxOrder modifiedOrder(const Signal& sig)
+  {
+    LrvxOrder fo{};
+    fo.id = sig.orderId;
+    fo.symbol = sig.symbol;
+    fo.type = static_cast<uint8_t>(OrderType::LIMIT);
+    std::lock_guard lock(_forwardedMutex);
+    const auto it = _forwarded.find(sig.orderId);
+    if (it != _forwarded.end())
+    {
+      fo = it->second;
+    }
+    // The one price a Modify carries is the price the order works at, as
+    // in the backtest runner: the trigger of a stop, take-profit or trailing
+    // order that fills at market, the limit of everything else.
+    switch (static_cast<OrderType>(fo.type))
+    {
+      case OrderType::STOP_MARKET:
+      case OrderType::TAKE_PROFIT_MARKET:
+      case OrderType::TRAILING_STOP:
+        fo.trigger_price_raw = sig.newPrice.raw();
+        break;
+      default:
+        fo.price_raw = sig.newPrice.raw();
+        break;
+    }
+    fo.quantity_raw = sig.newQuantity.raw();
+    // The replacement is a fresh order: newQuantity is what is left to work.
+    fo.filled_quantity_raw = 0;
+    if (it != _forwarded.end())
+    {
+      it->second = fo;
+    }
+    return fo;
+  }
+
   LrvxOnSignalCallback _cb;
   void* _ud;
+  // Orders handed to the executor, by id. The handler cannot ask the
+  // executor what it holds and hears of no fill from it, so an entry stays
+  // until its cancel or until the executor is swapped. Signals reach a
+  // handler from more than one consumer thread, hence the lock.
+  std::mutex _forwardedMutex;
+  std::unordered_map<uint64_t, LrvxOrder> _forwarded;
   TrackerSlot<LrvxRiskManagerImpl> _risk;
   TrackerSlot<LrvxKillSwitchImpl> _kill;
   TrackerSlot<LrvxOrderValidatorImpl> _validator;
@@ -8258,31 +8329,49 @@ struct LrvxBacktestRunnerImpl
   {
     refuseWithoutDepth("run_csv");
     uint32_t id = resolveSymbol(symbol);
+    errno = 0;
     std::ifstream f(path);
     if (!f.is_open())
     {
-      return 0;
+      std::string why = std::string("cannot open '") + path + "'";
+      if (errno != 0)
+      {
+        why += std::string(": ") + std::strerror(errno);
+      }
+      throw std::runtime_error(why);
     }
 
     std::vector<OhlcvBacktestReader::Bar> bars;
     std::string line;
     std::getline(f, line);  // skip header
+    size_t lineNo = 1;
     while (std::getline(f, line))
     {
+      ++lineNo;
       if (line.empty())
       {
         continue;
       }
-      std::istringstream ss(line);
-      std::string tok;
-      std::getline(ss, tok, ',');
-      int64_t ts = normalizeTs(std::stoll(tok));
-      std::getline(ss, tok, ',');  // open
-      std::getline(ss, tok, ',');  // high
-      std::getline(ss, tok, ',');  // low
-      std::getline(ss, tok, ',');
-      double c = std::stod(tok);
-      bars.push_back({ts, Price::fromDouble(c).raw(), id});
+      try
+      {
+        std::istringstream ss(line);
+        std::string tok;
+        std::getline(ss, tok, ',');
+        int64_t ts = normalizeTs(std::stoll(tok));
+        std::getline(ss, tok, ',');  // open
+        std::getline(ss, tok, ',');  // high
+        std::getline(ss, tok, ',');  // low
+        std::getline(ss, tok, ',');
+        double c = std::stod(tok);
+        bars.push_back({ts, Price::fromDouble(c).raw(), id});
+      }
+      catch (const std::logic_error&)
+      {
+        // std::stoll / std::stod say only "no conversion".
+        throw std::runtime_error(std::string("'") + path + "' line " + std::to_string(lineNo) +
+                                 ": expected timestamp,open,high,low,close[,volume], got '" +
+                                 line + "'");
+      }
     }
     return runBars(std::move(bars), out);
   }
@@ -8345,10 +8434,6 @@ struct LrvxBacktestRunnerImpl
 
   int runReplaySource(LrvxReplaySourceImpl* source, LrvxBacktestStats* out)
   {
-    if (source == nullptr)
-    {
-      return 0;
-    }
     if (source->cb.on_start != nullptr)
     {
       source->cb.on_start(source->cb.user_data);
@@ -9270,6 +9355,7 @@ int lrvx_backtest_runner_run_csv(LrvxBacktestRunnerHandle h,
                                  LrvxBacktestStats* out)
 {
   LRVX_CAPI_ENTER(h);
+  LRVX_CAPI_REQUIRE(path);
   return toBacktestRunner(h)->runCsv(path, symbol, out);
   LRVX_CAPI_LEAVE;
 }
@@ -9375,14 +9461,20 @@ int lrvx_backtest_runner_run_tapes(LrvxBacktestRunnerHandle h,
 }
 
 int lrvx_backtest_runner_run_ohlcv(LrvxBacktestRunnerHandle h,
-                                   const int64_t* ts,
-                                   const double* close,
+                                   const int64_t* timestamps_ns,
+                                   const double* close_prices,
                                    uint32_t n,
                                    const char* symbol,
                                    LrvxBacktestStats* out)
 {
   LRVX_CAPI_ENTER(h);
-  return toBacktestRunner(h)->runOhlcv(ts, close, n, symbol, out);
+  // No bars need no arrays behind them.
+  if (n > 0)
+  {
+    LRVX_CAPI_REQUIRE(timestamps_ns);
+    LRVX_CAPI_REQUIRE(close_prices);
+  }
+  return toBacktestRunner(h)->runOhlcv(timestamps_ns, close_prices, n, symbol, out);
   LRVX_CAPI_LEAVE;
 }
 
@@ -9401,6 +9493,16 @@ int lrvx_backtest_runner_run_bars(LrvxBacktestRunnerHandle h,
                                   LrvxBacktestStats* out)
 {
   LRVX_CAPI_ENTER(h);
+  // volume may be NULL: the bars then carry zero volume.
+  if (n > 0)
+  {
+    LRVX_CAPI_REQUIRE(start_time_ns);
+    LRVX_CAPI_REQUIRE(end_time_ns);
+    LRVX_CAPI_REQUIRE(open);
+    LRVX_CAPI_REQUIRE(high);
+    LRVX_CAPI_REQUIRE(low);
+    LRVX_CAPI_REQUIRE(close);
+  }
   return toBacktestRunner(h)->runFullBars(start_time_ns, end_time_ns,
                                           open, high, low, close, volume,
                                           n, symbol, bar_type, bar_type_param, out);
@@ -9412,6 +9514,7 @@ int lrvx_backtest_runner_run_replay_source(LrvxBacktestRunnerHandle h,
                                            LrvxBacktestStats* out)
 {
   LRVX_CAPI_ENTER(h);
+  LRVX_CAPI_REQUIRE(source);
   return toBacktestRunner(h)->runReplaySource(
       static_cast<capi_impl::LrvxReplaySourceImpl*>(source), out);
   LRVX_CAPI_LEAVE;

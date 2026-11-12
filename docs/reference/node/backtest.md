@@ -32,7 +32,7 @@ built with options refuses `setExecutor`.
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `setStrategy(strategy)` | `void` | Attach a strategy |
-| `runCsv(path, symbol)` | stats object | Replay a CSV file (timestamp, open, high, low, close, volume) |
+| `runCsv(path, symbol)` | stats object | Replay a CSV file (timestamp, open, high, low, close, volume). Throws `LrvxError` with the reason on a file that cannot be opened or a row that cannot be parsed |
 | `runOhlcv(timestamps, closes, symbol)` | stats object | Replay raw arrays (timestamps as Float64Array, closes as Float64Array) |
 | `runTape(path)` | stats object | Replay a `.lrvx` tape directory — the canonical recording written by `lrvx tape record` or `scripts/backfill_to_tape.py`. Throws `LrvxError` with the reason on a missing or unreadable tape |
 | `runTapeBars(path, intervalSeconds, symbol?)` | stats object | Replay a `.lrvx` tape as time bars: trades aggregated while the tape streams, each closed bar to `onBar` with `runBars`' fill rules. Same result as `readTrades` -> `aggregateTimeBars` -> `runBars` for the same interval. `symbol` is required when the tape holds more than one; throws `LrvxError` on a bad interval, unknown symbol, unreadable tape or a symbol with no trades |
@@ -40,6 +40,7 @@ built with options refuses `setExecutor`.
 | `runTapes(paths)` | stats object | Merge N `.lrvx` tape directories on read and replay the merged stream. Symbols are rekeyed by `(metadata.exchange, name)` so two venues stay distinct. `runTapes([t])` equals `runTape(t)`; throws `LrvxError` with the reason on bad paths or overlapping book streams |
 | `setExecutor(executor)` | `void` | Replace the built-in `SimulatedExecutor`. `null` detaches |
 | `addExecutionListener(listener)` | `void` | Attach an order-lifecycle listener. Multiple listeners may be attached; each fires for every order event |
+| `addJourneyTracer(tracer)` | `void` | Attach an `OrderJourneyTracer`; it records every order event of the runs that follow. Its rows carry `tsNs` and the per-stage timestamps as `bigint` |
 | `equityCurve()` | `EquityCurve` | Equity curve from the most recent run |
 | `trades()` | `BacktestTrades` | Closed trades from the most recent run |
 
@@ -74,7 +75,9 @@ to no callback or the executor, 0 for a run that read no tape.
 | `calmarRatio` | `number` | Calmar ratio |
 | `returnPct` | `number` | Net return (%) |
 
-A `BacktestRunner` run's stats object also carries:
+Every stats object -- a `BacktestRunner` run, `BacktestResult.stats()`,
+`Engine.run()`, a walk-forward fold's `trainStats` / `testStats` and a grid
+search result's `stats` -- also carries:
 
 | Key | Type | Description |
 |-----|------|-------------|

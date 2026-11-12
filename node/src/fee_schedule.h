@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "account.h"
+#include "bindings_common.h"
 #include "lrvx/capi/lrvx_capi.h"
 
 namespace node_lrvx
@@ -66,14 +67,14 @@ class FeeScheduleWrap : public Napi::ObjectWrap<FeeScheduleWrap>
   }
   void RecordFill(const Napi::CallbackInfo& info)
   {
-    lrvx_fee_schedule_record_fill(_h, info[0].As<Napi::Number>().Int64Value(),
+    lrvx_fee_schedule_record_fill(_h, toInt64Ns(info[0]),
                                   info[1].As<Napi::Number>().DoubleValue());
   }
   Napi::Value FeeFor(const Napi::CallbackInfo& info)
   {
     return Napi::Number::New(
         info.Env(), lrvx_fee_schedule_fee_for(
-                        _h, info[0].As<Napi::Number>().Int64Value(),
+                        _h, toInt64Ns(info[0]),
                         info[1].As<Napi::Number>().DoubleValue(),
                         info[2].As<Napi::Boolean>().Value() ? 1 : 0));
   }
@@ -93,7 +94,7 @@ class FeeScheduleWrap : public Napi::ObjectWrap<FeeScheduleWrap>
     Napi::Array arr = Napi::Array::New(info.Env(), n);
     for (uint32_t i = 0; i < n; ++i)
     {
-      arr.Set(i, Napi::Number::New(info.Env(), static_cast<double>(buf[i])));
+      arr.Set(i, Napi::BigInt::New(info.Env(), buf[i]));
     }
     return arr;
   }

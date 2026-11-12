@@ -13,7 +13,7 @@ Every Strategy subclass gets ten callbacks. You override the ones you need; the 
 | `on_bar(ctx, bar)` | `onBar(ctx, bar, emit)` | A closed OHLC bar is dispatched |
 | `on_touch(ctx)` | `onTouch(ctx, emit)` | The touch (best bid / ask, price or size) changed |
 | `on_fill(ctx, event)` | `onFill(ctx, ev, emit)` | One of your orders partially or fully fills |
-| `on_order_update(ctx, event)` | `onOrderUpdate(ctx, ev, emit)` | Any order-lifecycle status change (fills included) |
+| `on_order_update(ctx, event)` | `onOrderUpdate(ctx, ev, emit)` | Any order-lifecycle status change other than a fill |
 | `on_queue_position_change(ctx, event)` | `onQueuePositionChange(ctx, ev, emit)` | A resting limit order's queue position moved (backtest only) |
 | `on_market_position_change(ctx, event)` | `onMarketPositionChange(ctx, ev, emit)` | A resting limit order crossed a categorical position boundary (backtest only) |
 | `on_start()` / `on_stop()` | `onStart()` / `onStop()` | Strategy lifecycle |
