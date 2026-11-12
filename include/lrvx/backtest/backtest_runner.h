@@ -81,6 +81,13 @@ struct BacktestState
   uint64_t tradeCount{0};
   uint64_t bookUpdateCount{0};
   uint64_t signalCount{0};
+  // Option-quote and pool-state records read off the tape. No strategy
+  // callback, market-data subscriber or the simulated executor consumes
+  // either kind, so the runner delivers them to nobody: these counts are how
+  // a run says how much of the tape it did not act on. Both are part of
+  // eventCount.
+  uint64_t optionQuoteCount{0};
+  uint64_t poolStateCount{0};
   bool isRunning{false};
   bool isPaused{false};
   bool isFinished{false};
@@ -377,7 +384,8 @@ class BacktestRunner : public ISignalHandler
   uint64_t _tradeCount{0};
   uint64_t _bookUpdateCount{0};
   uint64_t _signalCount{0};
-  uint64_t _skippedRecordCount{0};  // OptionQuote/PoolState records not dispatched
+  uint64_t _optionQuoteCount{0};  // read, delivered to no consumer (see BacktestState)
+  uint64_t _poolStateCount{0};    // read, delivered to no consumer (see BacktestState)
   std::optional<replay::EventType> _lastEventType;
 
   // Breakpoints

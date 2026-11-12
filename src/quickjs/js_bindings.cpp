@@ -2102,24 +2102,35 @@ static JSValue js_executor_fill_count(JSContext* ctx, JSValueConst, int, JSValue
       ctx, lrvx_simulated_executor_fill_count(static_cast<LrvxSimulatedExecutorHandle>(getHandle(ctx, argv[0]))));
 }
 
+// An out-of-range model code is refused by the C API; surface that as a throw.
 static JSValue js_executor_set_default_slippage(JSContext* ctx, JSValueConst, int,
                                                 JSValueConst* argv)
 {
+  lrvx_clear_last_error();
   lrvx_simulated_executor_set_default_slippage(
       static_cast<LrvxSimulatedExecutorHandle>(getHandle(ctx, argv[0])),
       static_cast<int32_t>(toInt64(ctx, argv[1])),
       static_cast<int32_t>(toInt64(ctx, argv[2])), toDouble(ctx, argv[3]),
       toDouble(ctx, argv[4]), toDouble(ctx, argv[5]));
+  if (lrvx_last_error_code() != 0)
+  {
+    return JS_ThrowTypeError(ctx, "setDefaultSlippage: %s", lrvx_last_error_message());
+  }
   return JS_UNDEFINED;
 }
 static JSValue js_executor_set_symbol_slippage(JSContext* ctx, JSValueConst, int,
                                                JSValueConst* argv)
 {
+  lrvx_clear_last_error();
   lrvx_simulated_executor_set_symbol_slippage(
       static_cast<LrvxSimulatedExecutorHandle>(getHandle(ctx, argv[0])), toUint32(ctx, argv[1]),
       static_cast<int32_t>(toInt64(ctx, argv[2])),
       static_cast<int32_t>(toInt64(ctx, argv[3])), toDouble(ctx, argv[4]),
       toDouble(ctx, argv[5]), toDouble(ctx, argv[6]));
+  if (lrvx_last_error_code() != 0)
+  {
+    return JS_ThrowTypeError(ctx, "setSymbolSlippage: %s", lrvx_last_error_message());
+  }
   return JS_UNDEFINED;
 }
 static JSValue js_executor_set_queue_model(JSContext* ctx, JSValueConst, int,

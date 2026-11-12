@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <optional>
 #include <shared_mutex>
@@ -484,14 +485,32 @@ bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
       std::fprintf(f, ", \"option_type\": %d", static_cast<int>(*sym.optionType));
     }
 
+    // The shortest of %.10g (the form files have always carried) and %.17g
+    // that reads back as the same double: a multiplier with more than ten
+    // significant digits used to come back rounded.
+    char mult[32];
+    std::snprintf(mult, sizeof mult, "%.10g", sym.contractMultiplier);
+    if (std::strtod(mult, nullptr) != sym.contractMultiplier)
+    {
+      std::snprintf(mult, sizeof mult, "%.17g", sym.contractMultiplier);
+    }
     std::fprintf(f,
-                 ", \"contract_multiplier\": %.10g, \"settlement_type\": %d, "
+                 ", \"contract_multiplier\": %s, \"settlement_type\": %d, "
                  "\"exercise_style\": %d",
-                 sym.contractMultiplier, static_cast<int>(sym.settlementType),
-                 static_cast<int>(sym.exerciseStyle));
+                 mult, static_cast<int>(sym.settlementType), static_cast<int>(sym.exerciseStyle));
     if (sym.settlementCcy.has_value())
     {
       std::fprintf(f, ", \"settlement_ccy\": \"%s\"", sym.settlementCcy->c_str());
+    }
+    // Written only when not the 1e8 default, so a default-scale entry reads
+    // exactly as a file from before the scales were persisted.
+    if (sym.priceScale != Price::Scale)
+    {
+      std::fprintf(f, ", \"price_scale\": %lld", static_cast<long long>(sym.priceScale));
+    }
+    if (sym.qtyScale != Quantity::Scale)
+    {
+      std::fprintf(f, ", \"qty_scale\": %lld", static_cast<long long>(sym.qtyScale));
     }
 
     std::fprintf(f, "}%s\n", (++count < _symbols.size()) ? "," : "");
@@ -655,6 +674,24 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
         {
           info.settlementCcy = content.substr(ccy_start, ccy_end - ccy_start);
         }
+      }
+
+      // Per-symbol fixed-point scale. A file written before the scales were
+      // persisted has neither key and loads the 1e8 default, as it always did.
+      size_t pscale_start = content.find("\"price_scale\":", pos);
+      if (pscale_start != std::string::npos && pscale_start < entry_end)
+      {
+        info.priceScale = std::stoll(content.substr(pscale_start + 14));
+      }
+      size_t qscale_start = content.find("\"qty_scale\":", pos);
+      if (qscale_start != std::string::npos && qscale_start < entry_end)
+      {
+        info.qtyScale = std::stoll(content.substr(qscale_start + 12));
+      }
+      // A scale registerSymbol would refuse makes the file malformed.
+      if (!validateSymbolScale(info))
+      {
+        throw std::invalid_argument("symbol registry file: invalid scale");
       }
 
       // Add to registry

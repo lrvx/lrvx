@@ -3,6 +3,7 @@
 #pragma once
 #include <napi.h>
 #include "data_ops.h"
+#include "lrvx/backtest/runner_fill_settings.h"
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/capi/order_type_names.hpp"
 #include "rate_limit.h"
@@ -295,36 +296,40 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   {
     // Accept either the string name or the exported SLIPPAGE_* constant.
     // The constants are part of the public surface, so rejecting them
-    // made documented code throw at runtime.
+    // made documented code throw at runtime. An unknown name or code throws
+    // and leaves the previous profile in place.
+    int32_t m = 0;
     if (info.Length() > 0 && info[0].IsNumber())
     {
-      const uint8_t code = static_cast<uint8_t>(info[0].As<Napi::Number>().Uint32Value());
-      int32_t t0 = info.Length() > 1 ? info[1].As<Napi::Number>().Int32Value() : 0;
-      double ts0 = info.Length() > 2 ? info[2].As<Napi::Number>().DoubleValue() : 0.0;
-      double b0 = info.Length() > 3 ? info[3].As<Napi::Number>().DoubleValue() : 0.0;
-      double i0 = info.Length() > 4 ? info[4].As<Napi::Number>().DoubleValue() : 0.0;
-      lrvx_simulated_executor_set_default_slippage(_h, code, t0, ts0, b0, i0);
-      return;
+      m = info[0].As<Napi::Number>().Int32Value();
     }
-    std::string model = info[0].As<Napi::String>().Utf8Value();
-    uint8_t m = 0;
-    if (model == "fixed_ticks")
+    else
     {
-      m = 1;
-    }
-    else if (model == "fixed_bps")
-    {
-      m = 2;
-    }
-    else if (model == "volume_impact")
-    {
-      m = 3;
+      const std::string model =
+          info.Length() > 0 ? info[0].ToString().Utf8Value() : std::string("undefined");
+      const auto parsed = lrvx::slippageModelFromName(model);
+      if (!parsed)
+      {
+        Napi::Error::New(info.Env(), "setDefaultSlippage: model must be one of " +
+                                         lrvx::slippageModelNameList() + "; got '" + model +
+                                         "'")
+            .ThrowAsJavaScriptException();
+        return;
+      }
+      m = static_cast<int32_t>(*parsed);
     }
     int32_t ticks = info.Length() > 1 ? info[1].As<Napi::Number>().Int32Value() : 0;
     double tickSize = info.Length() > 2 ? info[2].As<Napi::Number>().DoubleValue() : 0.0;
     double bps = info.Length() > 3 ? info[3].As<Napi::Number>().DoubleValue() : 0.0;
     double impact = info.Length() > 4 ? info[4].As<Napi::Number>().DoubleValue() : 0.0;
+    lrvx_clear_last_error();
     lrvx_simulated_executor_set_default_slippage(_h, m, ticks, tickSize, bps, impact);
+    if (lrvx_last_error_code() != 0)
+    {
+      Napi::Error::New(info.Env(),
+                       std::string("setDefaultSlippage: ") + lrvx_last_error_message())
+          .ThrowAsJavaScriptException();
+    }
   }
   void SetQueueModel(const Napi::CallbackInfo& info)
   {

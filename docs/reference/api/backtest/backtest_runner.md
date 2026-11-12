@@ -79,6 +79,19 @@ public:
 | `runTapeBars(dir, interval, symbol)` | One `.lrvx` directory, replayed as time bars | The tape's trades are aggregated into wall-clock-aligned bars of `interval` while it streams (`TimeBarPolicy`, the policy `aggregate_time_bars` uses: late trades dropped, the last still-open bar not delivered), and each closed bar goes through the same step as `runBars` -- so the next-open rule below applies. Each `BarEvent` carries `BarType::Time`, `barTypeParam` = interval in ns, buy volume and trade count; bar times are Unix nanoseconds, as `runBars` takes them. One symbol per run: with `symbol` only its trades are read, and a tape with none throws `std::invalid_argument`; without it a second symbol's trade stops the run with `std::invalid_argument`. A non-positive interval throws `std::invalid_argument`. Book records are not used |
 | `runTapes(dirs)` | N `.lrvx` directories, merged on read | Symbols are rekeyed into the engine registry via `(metadata.exchange, name)`, so strategies that pre-resolved venue-tagged symbols see the merger's ids. Throws if any input is not `.lrvx`, or if two inputs declare overlapping book streams for the same symbol (`OverlappingBookStreamError`). `runTapes({t})` equals `runTape(t)` modulo the rekey |
 
+## Records tick replay does not deliver
+
+`run`, `runTape` and `runTapes` deliver trades and book records (snapshot, delta, top of book) to
+the simulator, the strategy and every subscriber. A tape can also carry option-quote records
+(`EventType::OptionQuote`) and DEX pool-state records (`EventType::PoolState`). Nothing in the
+runner consumes either: there is no strategy or subscriber callback for them and the
+`SimulatedExecutor` does not match against them. They are read, advance the clock and count in
+`eventCount`, and are otherwise skipped -- counted per kind in `state().optionQuoteCount` and
+`state().poolStateCount`, with one warning logged on the first. The Python `run_tape` / `run_tapes`
+stats report the same counts as `skipped_option_quotes` and `skipped_pool_states`. The C API,
+Node and Codon `LrvxBacktestStats` carry no such field; read the tape's option quotes directly
+(`DataReader.read_option_quotes_from`) or drive pool state through `PoolStateReplay`.
+
 ## Bar callbacks fill at the next open
 
 The strategy is shown a bar the simulator has already walked, so open, high, low and close are all

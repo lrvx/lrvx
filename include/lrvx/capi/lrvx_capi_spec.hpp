@@ -1593,7 +1593,10 @@ extern "C"
   // Configure slippage. Applies to market-style fills on all symbols unless
   // a per-symbol override is set. `tick_size` is the venue tick size in
   // price units (e.g. 0.01 for 1-cent ticks); pass 0.0 to fall back to one
-  // raw price unit.
+  // raw price unit. `model` is 0 (none), 1 (fixed_ticks), 2 (fixed_bps) or
+  // 3 (volume_impact); any other code is refused, for both setters: the
+  // executor keeps its previous profile and lrvx_last_error_code() /
+  // lrvx_last_error_message() report the valid codes.
   LRVX_EXPORT(group = "backtest_slippage")
   void lrvx_simulated_executor_set_default_slippage(LrvxSimulatedExecutorHandle executor,
                                                     int32_t model, int32_t ticks,

@@ -129,6 +129,114 @@ class BundleConditionalOrderTests(unittest.TestCase):
         self.assertEqual(res.actual["fills"], res.expected["fills"])
 
 
+_OFF_TICK_STRATEGY_SOURCE = '''
+"""A take-profit triggered half a cent off the 0.01 grid."""
+import lrvx
+
+
+class OffTickTakeProfit(lrvx.Strategy):
+    def __init__(self, symbols):
+        super().__init__(symbols)
+        self._fired = False
+
+    def on_trade(self, ctx, trade):
+        if self._fired:
+            return
+        self._fired = True
+        self.take_profit_market(side="sell", trigger=100.755, qty=1.0)
+'''
+
+
+def _rewrite_manifest(bundle_path: Path, dest: Path, edit) -> None:
+    with tarfile.open(bundle_path, "r") as src, tarfile.open(dest, "w") as dst:
+        for member in src.getmembers():
+            data = src.extractfile(member) if member.isfile() else None
+            if member.name == "manifest.json":
+                manifest = json.loads(data.read())
+                edit(manifest)
+                raw = json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8")
+                member = tarfile.TarInfo(member.name)
+                member.size = len(raw)
+                data = io.BytesIO(raw)
+            dst.addfile(member, fileobj=data)
+
+
+class BundleTickTests(unittest.TestCase):
+    """A bundle checks order prices against a tick only when the run it was
+    packed from declared one, and an old bundle keeps the tick it always had."""
+
+    def setUp(self) -> None:
+        self.work = Path(tempfile.mkdtemp(prefix="lrvx-bundle-tick-test-"))
+        self.strat = self.work / "strategy.py"
+        self.strat.write_text(_OFF_TICK_STRATEGY_SOURCE)
+        self.tape_dir = _write_tape(self.work)
+        warnings.simplefilter("ignore", bundle.BundleTrustWarning)
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.work, ignore_errors=True)
+
+    def _manifest(self, path: Path) -> dict:
+        with tarfile.open(path) as tf:
+            return json.loads(tf.extractfile("manifest.json").read())
+
+    def test_pack_without_a_tick_reproduces_a_run_without_one(self) -> None:
+        direct = bundle._run_strategy_against_tape(self.strat, self.tape_dir, tick_size=None)
+        self.assertEqual(direct["fill_count"], 1, "an undeclared tick checks no price")
+
+        out = self.work / "b.tar"
+        bundle.pack_bundle(strategy=self.strat, tape=self.tape_dir, output=out)
+        manifest = self._manifest(out)
+        self.assertIs(manifest["tick_size_declared"], False)
+        res = bundle.validate_bundle(out)
+        self.assertTrue(res.matches, res.diff)
+        self.assertEqual(res.actual["fills"], direct["fills"])
+
+    def test_pack_with_a_tick_checks_prices_against_it(self) -> None:
+        out = self.work / "b.tar"
+        bundle.pack_bundle(strategy=self.strat, tape=self.tape_dir, output=out, tick_size=0.01)
+        manifest = self._manifest(out)
+        self.assertIs(manifest["tick_size_declared"], True)
+        self.assertEqual(manifest["tick_size"], 0.01)
+        res = bundle.validate_bundle(out)
+        self.assertTrue(res.matches, res.diff)
+        self.assertEqual(res.actual["fill_count"], 0, "the off-tick trigger is refused")
+
+    def test_a_manifest_from_before_the_flag_keeps_its_tick(self) -> None:
+        # Old shape: pack always declared its tick (0.01 unless given) and the
+        # manifest had no tick_size_declared. Built by packing the way the old
+        # default did and dropping the key.
+        packed = self.work / "packed.tar"
+        bundle.pack_bundle(strategy=self.strat, tape=self.tape_dir, output=packed, tick_size=0.01)
+        old = self.work / "old.tar"
+        _rewrite_manifest(packed, old, lambda m: m.pop("tick_size_declared"))
+        self.assertNotIn("tick_size_declared", self._manifest(old))
+        res = bundle.validate_bundle(old)
+        self.assertTrue(res.matches, res.diff)
+        self.assertEqual(res.actual["fill_count"], 0)
+
+        # No tick_size key at all reads as the 0.01 the old pack wrote.
+        older = self.work / "older.tar"
+        _rewrite_manifest(old, older, lambda m: m.pop("tick_size"))
+        res = bundle.validate_bundle(older)
+        self.assertTrue(res.matches, res.diff)
+        self.assertEqual(res.actual["fill_count"], 0)
+
+    def test_manifest_tick_rule(self) -> None:
+        tick = bundle._manifest_tick
+        self.assertEqual(tick({}), 0.01)
+        self.assertEqual(tick({"tick_size": 0.5}), 0.5)
+        self.assertEqual(tick({"tick_size": 0.5, "tick_size_declared": True}), 0.5)
+        self.assertIsNone(tick({"tick_size": 0.01, "tick_size_declared": False}))
+
+    def test_cli_pack_declares_no_tick_by_default(self) -> None:
+        from lrvx import cli
+
+        parser = cli._build_parser()
+        args = parser.parse_args(["bundle", "pack", "--strategy", "s.py", "--tape", "t",
+                                  "-o", "b.tar"])
+        self.assertIsNone(args.tick_size)
+
+
 class BundlePackTests(unittest.TestCase):
     def setUp(self) -> None:
         self.work = Path(tempfile.mkdtemp(prefix="lrvx-bundle-test-"))
@@ -411,6 +519,31 @@ class BundleIntegrityTests(unittest.TestCase):
         )
         self.assertNotIn("lrvxrun_present", res.actual)
         self.assertNotIn("lrvxrun_present", res.expected)
+
+    def test_an_unreadable_expected_trace_fails_validation(self) -> None:
+        # The trace is there but every file in it is garbage: the trace
+        # comparison cannot run, and validation must say so instead of
+        # quietly comparing the JSON alone.
+        with tarfile.open(self.bundle_path, "r") as src:
+            names = [m.name for m in src.getmembers()
+                     if m.isfile() and m.name.startswith("expected.lrvxrun/")]
+        self.assertTrue(names, "the bundle ships an expected trace")
+        corrupt = self.work / "corrupt.tar"
+        _repack_replacing_member(self.bundle_path, corrupt,
+                                 {n: b"not a trace" for n in names})
+        res = bundle.validate_bundle(corrupt)
+        self.assertFalse(res.matches, res.diff)
+        errors = [d for d in res.diff if d.startswith("lrvxrun_read_error:")]
+        self.assertEqual(len(errors), 1, res.diff)
+        self.assertIn("expected trace expected.lrvxrun unreadable", errors[0])
+        self.assertIsNone(res.actual["lrvxrun_read_error"])
+
+    def test_a_readable_trace_reports_no_read_error(self) -> None:
+        res = bundle.validate_bundle(self.bundle_path)
+        self.assertTrue(res.matches, res.diff)
+        self.assertIsNone(res.actual["lrvxrun_read_error"])
+        self.assertIsNone(res.expected["lrvxrun_read_error"])
+        self.assertIn("lrvxrun_fill_count", res.expected)
 
     def test_flox_era_bundle_validates(self) -> None:
         # A bundle packed under the FLOX name: `.floxlog` segments in the

@@ -1996,18 +1996,13 @@ class OhlcvBacktestReader : public replay::IMultiSegmentReader
 // slippage_model as the Python keyword spells it.
 inline lrvx::SlippageModel pySlippageModel(const std::string& name)
 {
-  for (auto m : {lrvx::SlippageModel::NONE, lrvx::SlippageModel::FIXED_TICKS,
-                 lrvx::SlippageModel::FIXED_BPS, lrvx::SlippageModel::VOLUME_IMPACT})
+  if (const auto m = lrvx::slippageModelFromName(name))
   {
-    if (name == lrvx::slippageModelName(m))
-    {
-      return m;
-    }
+    return *m;
   }
-  throw lrvx::LrvxError("E_VAL_002",
-                        "BacktestRunner: slippage_model must be one of 'none', 'fixed_ticks', "
-                        "'fixed_bps', 'volume_impact'; got '" +
-                            name + "'");
+  throw lrvx::LrvxError("E_VAL_002", "BacktestRunner: slippage_model must be one of " +
+                                         lrvx::slippageModelNameList() + "; got '" + name +
+                                         "'");
 }
 
 class PyBacktestRunner
@@ -2199,7 +2194,7 @@ class PyBacktestRunner
           "Attach a strategy with set_strategy(MyStrategy()) first.");
     }
     BacktestResult result = _runner->runTape(path);
-    return statsToDict(std::move(result));
+    return withSkippedRecords(statsToDict(std::move(result)));
   }
 
   // The tape aggregated into time bars inside the call and replayed with
@@ -2269,10 +2264,22 @@ class PyBacktestRunner
       ps.emplace_back(p);
     }
     BacktestResult result = _runner->runTapes(ps);
-    return statsToDict(std::move(result));
+    return withSkippedRecords(statsToDict(std::move(result)));
   }
 
  private:
+  // A tape can carry option-quote and pool-state records, which no strategy
+  // callback or the simulated executor consumes. They are skipped, never
+  // silently: the stats of a tape run say how many of each it read.
+  py::object withSkippedRecords(py::object stats)
+  {
+    const lrvx::BacktestState st = _runner->state();
+    py::dict d = stats.cast<py::dict>();
+    d["skipped_option_quotes"] = st.optionQuoteCount;
+    d["skipped_pool_states"] = st.poolStateCount;
+    return d;
+  }
+
   py::object statsToDict(BacktestResult result)
   {
     BacktestStats stats = result.computeStats();
@@ -3306,7 +3313,10 @@ inline void bindStrategy(py::module_& m)
       .def("run_tape", &PyBacktestRunner::run_tape, py::arg("path"),
            "Run a backtest off a `.lrvx` tape directory. The tape is "
            "the canonical recorded artifact (`lrvx tape record` writes it). "
-           "Returns the same stats dict shape as run_csv / run_bars.")
+           "Returns the same stats dict shape as run_csv / run_bars, plus "
+           "skipped_option_quotes and skipped_pool_states: option-quote and "
+           "pool-state records on the tape are read but reach no strategy "
+           "callback and do not move the simulated executor, and these count them.")
       .def("run_tape_bars", &PyBacktestRunner::run_tape_bars, py::arg("path"),
            py::kw_only(), py::arg("interval_seconds"), py::arg("symbol") = "",
            "Replay a `.lrvx` tape as time bars of interval_seconds: the trades "
@@ -3323,7 +3333,8 @@ inline void bindStrategy(py::module_& m)
            "Symbols are rekeyed by (metadata.exchange, name) so two "
            "captures of the same venue/symbol collapse, and two "
            "different venues stay distinct. `run_tapes([t])` is "
-           "equivalent to `run_tape(t)`. Stats shape mirrors run_tape.")
+           "equivalent to `run_tape(t)`. Stats shape mirrors run_tape, "
+           "including skipped_option_quotes and skipped_pool_states.")
       .def("run_ohlcv", &PyBacktestRunner::run_ohlcv,
            py::arg("ts"), py::arg("close"), py::arg("symbol") = "")
       .def("run_bars", &PyBacktestRunner::run_bars,

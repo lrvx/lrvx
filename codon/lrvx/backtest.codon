@@ -30,6 +30,9 @@ from C import lrvx_simulated_executor_advance_clock(cobj, i64)
 from C import lrvx_simulated_executor_fill_count(cobj) -> u32
 from C import lrvx_simulated_executor_set_default_slippage(cobj, i32, i32, float, float, float)
 from C import lrvx_simulated_executor_set_symbol_slippage(cobj, u32, i32, i32, float, float, float)
+from C import lrvx_clear_last_error()
+from C import lrvx_last_error_code() -> i32
+from C import lrvx_last_error_message() -> cobj
 from C import lrvx_simulated_executor_set_queue_model(cobj, i32, u32)
 from C import lrvx_simulated_executor_submit_bracket(cobj, u64, u32, u8, u8, float, float, u8, u8, float, u8, u8, float)
 from C import lrvx_simulated_executor_cancel_bracket(cobj, u64)
@@ -420,17 +423,25 @@ class SimulatedExecutor:
     def advance_clock(self, timestamp_ns: int):
         lrvx_simulated_executor_advance_clock(self._handle, i64(timestamp_ns))
 
+    # model: 0 none, 1 fixed_ticks, 2 fixed_bps, 3 volume_impact. Any other
+    # code raises ValueError and leaves the previous profile in place.
     def set_default_slippage(self, model: int, ticks: int = 0,
                              tick_size: float = 0.0, bps: float = 0.0,
                              impact_coeff: float = 0.0):
+        lrvx_clear_last_error()
         lrvx_simulated_executor_set_default_slippage(self._handle, i32(model), i32(ticks),
                                            tick_size, bps, impact_coeff)
+        if int(lrvx_last_error_code()) != 0:
+            raise ValueError("set_default_slippage: " + str.from_ptr(lrvx_last_error_message()))
 
     def set_symbol_slippage(self, symbol: int, model: int, ticks: int = 0,
                             tick_size: float = 0.0, bps: float = 0.0,
                             impact_coeff: float = 0.0):
+        lrvx_clear_last_error()
         lrvx_simulated_executor_set_symbol_slippage(self._handle, u32(symbol), i32(model),
                                           i32(ticks), tick_size, bps, impact_coeff)
+        if int(lrvx_last_error_code()) != 0:
+            raise ValueError("set_symbol_slippage: " + str.from_ptr(lrvx_last_error_message()))
 
     def set_queue_model(self, model: int, depth: int = 1):
         lrvx_simulated_executor_set_queue_model(self._handle, i32(model), u32(depth))

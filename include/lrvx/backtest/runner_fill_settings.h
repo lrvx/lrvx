@@ -13,6 +13,9 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 
 namespace lrvx
 {
@@ -66,5 +69,17 @@ struct RunnerFillSettings
 /// Snake_case name of a slippage model as the bindings spell it: none,
 /// fixed_ticks, fixed_bps, volume_impact.
 const char* slippageModelName(SlippageModel model) noexcept;
+
+/// The model `name` spells, as slippageModelName spells it; nullopt for any
+/// other string. Every binding that takes a model by name parses it here.
+std::optional<SlippageModel> slippageModelFromName(std::string_view name) noexcept;
+
+/// The model a numeric code (the enum value, as the C API takes it) stands
+/// for; nullopt when the code is out of range.
+std::optional<SlippageModel> slippageModelFromCode(int32_t code) noexcept;
+
+/// "'none', 'fixed_ticks', 'fixed_bps', 'volume_impact'": the valid names for
+/// an error message.
+std::string slippageModelNameList();
 
 }  // namespace lrvx

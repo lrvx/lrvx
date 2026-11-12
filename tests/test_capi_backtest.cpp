@@ -24,6 +24,37 @@ TEST(CapiBacktest, SlippageFixedBps)
   lrvx_simulated_executor_destroy(exec);
 }
 
+// An out-of-range model code is refused, not read as some other model: the
+// error names the valid codes and the profile installed before stays.
+TEST(CapiBacktest, SlippageRejectsUnknownModelCode)
+{
+  auto exec = lrvx_simulated_executor_create();
+  lrvx_simulated_executor_set_default_slippage(exec, LRVX_SLIPPAGE_FIXED_BPS, 0, 0.0, 100.0, 0.0);
+  ASSERT_EQ(lrvx_last_error_code(), 0);
+
+  for (int32_t bad : {4, -1, 255})
+  {
+    lrvx_clear_last_error();
+    lrvx_simulated_executor_set_default_slippage(exec, bad, 0, 0.0, 0.0, 0.0);
+    EXPECT_NE(lrvx_last_error_code(), 0) << "model " << bad;
+    const std::string msg = lrvx_last_error_message();
+    EXPECT_NE(msg.find("1 (fixed_ticks)"), std::string::npos) << msg;
+    EXPECT_NE(msg.find("3 (volume_impact)"), std::string::npos) << msg;
+  }
+  lrvx_clear_last_error();
+  lrvx_simulated_executor_set_symbol_slippage(exec, 1, 7, 0, 0.0, 0.0, 0.0);
+  EXPECT_NE(lrvx_last_error_code(), 0);
+  lrvx_clear_last_error();
+
+  lrvx_simulated_executor_on_best_levels(exec, 1, 100.0, 10.0, 100.0, 10.0);
+  lrvx_simulated_executor_submit_order(exec, /*id=*/1, /*side=buy=*/0, 0.0, 1.0, /*type=market=*/1, 1);
+  LrvxFill fill{};
+  ASSERT_EQ(lrvx_simulated_executor_get_fills(exec, &fill, 1), 1u);
+  EXPECT_DOUBLE_EQ(static_cast<double>(fill.price_raw) / 1e8, 101.0)
+      << "the fixed_bps profile installed before the refused calls still applies";
+  lrvx_simulated_executor_destroy(exec);
+}
+
 TEST(CapiBacktest, TopOfBookMovesTheTouchAndKeepsDepth)
 {
   auto exec = lrvx_simulated_executor_create();

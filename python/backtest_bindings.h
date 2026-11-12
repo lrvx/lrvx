@@ -8,10 +8,12 @@
 
 #include "lrvx/backtest/backtest_config.h"
 #include "lrvx/backtest/backtest_result.h"
+#include "lrvx/backtest/runner_fill_settings.h"
 #include "lrvx/backtest/simulated_clock.h"
 #include "lrvx/backtest/simulated_executor.h"
 #include "lrvx/backtest/venue_availability.h"
 #include "lrvx/common.h"
+#include "lrvx/error/lrvx_error.h"
 #include "order_type_bindings.h"
 
 #include <cstring>
@@ -103,26 +105,19 @@ inline PyEquityPoint equityToPy(const EquityPoint& p)
           .drawdown_pct = p.drawdownPct};
 }
 
-inline SlippageProfile makePyProfile(const std::string& model, int32_t ticks,
-                                     double tick_size, double bps, double impact)
+// `where` names the method in the error an unknown model raises.
+inline SlippageProfile makePyProfile(const char* where, const std::string& model,
+                                     int32_t ticks, double tick_size, double bps,
+                                     double impact)
 {
   SlippageProfile p;
-  if (model == "fixed_ticks")
+  const std::optional<SlippageModel> parsed = slippageModelFromName(model);
+  if (!parsed)
   {
-    p.model = SlippageModel::FIXED_TICKS;
+    throw LrvxError("E_VAL_002", std::string(where) + ": model must be one of " +
+                                     slippageModelNameList() + "; got '" + model + "'");
   }
-  else if (model == "fixed_bps")
-  {
-    p.model = SlippageModel::FIXED_BPS;
-  }
-  else if (model == "volume_impact")
-  {
-    p.model = SlippageModel::VOLUME_IMPACT;
-  }
-  else
-  {
-    p.model = SlippageModel::NONE;
-  }
+  p.model = *parsed;
   p.ticks = ticks;
   p.tickSize = (tick_size > 0.0) ? Price::fromDouble(tick_size) : Price{};
   p.bps = bps;
@@ -393,14 +388,16 @@ class PySimulatedExecutor
   void setDefaultSlippage(const std::string& model, int32_t ticks, double tick_size,
                           double bps, double impact)
   {
-    _executor.setDefaultSlippage(makePyProfile(model, ticks, tick_size, bps, impact));
+    _executor.setDefaultSlippage(makePyProfile("SimulatedExecutor.set_default_slippage", model,
+                                               ticks, tick_size, bps, impact));
   }
 
   void setSymbolSlippage(uint32_t symbol, const std::string& model, int32_t ticks,
                          double tick_size, double bps, double impact)
   {
     _executor.setSymbolSlippage(symbol,
-                                makePyProfile(model, ticks, tick_size, bps, impact));
+                                makePyProfile("SimulatedExecutor.set_symbol_slippage", model,
+                                              ticks, tick_size, bps, impact));
   }
 
   void setQueueModel(const std::string& model, uint32_t depth)

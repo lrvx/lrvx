@@ -968,6 +968,11 @@ void SimulatedExecutor::cancelAllOrders(SymbolId symbol)
                                             .cancelAllSymbol = symbol});
     return;
   }
+  if (_cancelAckDist.medianNs() > 0)
+  {
+    cancelAllOrdersAsync(symbol);
+    return;
+  }
   // Detach everything first, announce afterwards: each CANCELED event re-enters
   // the executor and can add or remove orders while the sweep is still running.
   std::vector<Order> canceled;
@@ -1041,6 +1046,85 @@ void SimulatedExecutor::cancelAllOrders(SymbolId symbol)
     // has been built and delivered.
     emitEvent(OrderEventStatus::CANCELED, order);
     forgetTimestamps(order.id);
+  }
+}
+
+void SimulatedExecutor::cancelAllOrdersAsync(SymbolId symbol)
+{
+  // The same request as cancelOrder() on every order of the symbol, in the
+  // order the synchronous sweep announces them: held orders first (they never
+  // reached the venue, so they cancel at once), then resting, then
+  // conditional orders, each going PENDING_CANCEL and staying live until its
+  // sampled ack. The ids are taken up front; an order an earlier event's
+  // callback has already removed is skipped, as cancelOrder() would.
+  std::vector<OrderId> ids;
+  for (const Order& o : _heldBarOrders)
+  {
+    if (o.symbol == symbol)
+    {
+      ids.push_back(o.id);
+    }
+  }
+  const size_t heldCount = ids.size();
+  // The synchronous sweep removes by swap-and-pop, which decides the order it
+  // announces in; walk a copy the same way so a latency changes only when the
+  // cancels land, never their order.
+  const auto sweepOrder = [&](std::vector<Order> book)
+  {
+    size_t i = 0;
+    while (i < book.size())
+    {
+      if (book[i].symbol == symbol)
+      {
+        ids.push_back(book[i].id);
+        book[i] = book.back();
+        book.pop_back();
+      }
+      else
+      {
+        ++i;
+      }
+    }
+  };
+  sweepOrder(_pending_orders);
+  sweepOrder(_conditional_orders);
+
+  for (size_t k = 0; k < ids.size(); ++k)
+  {
+    const OrderId id = ids[k];
+    if (k < heldCount)
+    {
+      for (size_t i = 0; i < _heldBarOrders.size(); ++i)
+      {
+        if (_heldBarOrders[i].id == id)
+        {
+          const Order cancelled = _heldBarOrders[i];
+          _heldBarOrders.erase(_heldBarOrders.begin() + static_cast<std::ptrdiff_t>(i));
+          emitEvent(OrderEventStatus::CANCELED, cancelled);
+          forgetTimestamps(id);
+          break;
+        }
+      }
+      continue;
+    }
+    const Order* live = findPendingOrder(id);
+    if (live == nullptr)
+    {
+      for (const Order& o : _conditional_orders)
+      {
+        if (o.id == id)
+        {
+          live = &o;
+          break;
+        }
+      }
+    }
+    if (live != nullptr)
+    {
+      const Order snapshot = *live;
+      emitEvent(OrderEventStatus::PENDING_CANCEL, snapshot);
+      enqueuePendingCancel(snapshot);
+    }
   }
 }
 

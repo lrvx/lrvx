@@ -42,6 +42,12 @@ lrvx bundle pack \
 
 Pack runs the strategy through the supplied tape with the given config, captures the fill sequence as `expected_output.json`, and writes the bundle. The tarball is reproducible-friendly: same inputs produce a manifest with the same SHAs.
 
+### The tick
+
+Pack learns the symbol's tick from `--tick-size` (`pack_bundle(tick_size=...)`) and nowhere else; it reads nothing about the tick from the tape. Without it the symbol is registered with no declared tick, so order and trigger prices are not checked against one -- the same as running the strategy on a symbol registered without `tick_size`. With it, prices off that tick are refused at pack and at every replay. The manifest records the choice as `tick_size_declared` (with `tick_size` beside it, 0.01 when none was declared).
+
+Bundles packed before `tick_size_declared` existed have no such key. Pack then always declared its tick (0.01 unless `--tick-size` said otherwise), so replay of such a manifest declares `tick_size`, or 0.01 when that key is absent too: an old bundle replays exactly as it always has.
+
 ## Replay
 
 ```bash
@@ -63,6 +69,8 @@ Replay plus a strict comparison against the recorded `expected_output.json`. Exi
 The validator checks `trade_count`, `fill_count`, the per-fill `(symbol, side, price, quantity)` tuples in order, and `total_filled_quantity`. Order IDs are intentionally excluded because the runner assigns them from a process-wide counter that is not stable between processes.
 
 It also recomputes `strategy_sha256` and `tape_sha256` from what was actually extracted and re-hashes the running engine's version, then compares all three against the values the manifest recorded at pack time. This catches a bundle whose `strategy.py` or tape changed after packing, even if `expected_output.json` was re-recorded to match the new content. It is not a substitute for signing: the manifest lives unsigned in the same archive it describes, so a party who edits the strategy can recompute these hashes too. What it does catch is accidental drift and an engine-version mismatch, which is the common case this format exists for.
+
+When the bundle ships an `expected.lrvxrun/` trace, the validator also compares its signal, order-event and fill counts with a trace captured from the replay. A trace that is present but cannot be read fails validation with a `lrvxrun_read_error` diff line naming the side and the reader's error; it is never skipped. A bundle with no expected trace (packed before traces rode along) is compared on the JSON fields alone, as before.
 
 If you need stricter comparison (per-fill timestamps, intermediate equity curve), open an issue. The current set is the minimum that catches engine-level regressions; extending it is cheap once a real divergence shows up.
 

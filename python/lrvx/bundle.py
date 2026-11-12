@@ -145,7 +145,7 @@ def _run_strategy_against_tape(
     *,
     symbol_name: str = "BTCUSDT",
     exchange: str = "bundle",
-    tick_size: float = 0.01,
+    tick_size: Optional[float] = 0.01,
     slippage_model: str = "none",
     slippage_params: Optional[Dict[str, float]] = None,
     lrvxrun_out: Optional[Path] = None,
@@ -154,7 +154,11 @@ def _run_strategy_against_tape(
     ``strategy_path`` using a SimulatedExecutor with the given
     config. Returns a dict capturing fill sequence and totals; this
     is what `pack` records as expected output and `validate`
-    compares against."""
+    compares against.
+
+    ``tick_size`` is declared on the symbol, so order prices off it are
+    refused; ``None`` declares no tick and leaves prices unchecked, as a
+    symbol registered without one is."""
     import lrvx
 
     mod = _load_strategy_module(strategy_path)
@@ -344,11 +348,19 @@ def pack_bundle(
     config: Optional[Dict[str, Any]] = None,
     symbol_name: str = "BTCUSDT",
     exchange: str = "bundle",
-    tick_size: float = 0.01,
+    tick_size: Optional[float] = None,
 ) -> Path:
     """Build a bundle from a strategy file and a tape directory.
     Writes a tar (or tar.zst if zstandard is available) at ``output``.
-    Returns the output path."""
+    Returns the output path.
+
+    ``tick_size`` is the symbol's tick, if the run declares one: order
+    prices off it are refused, at pack and at every replay. ``None`` (the
+    default) declares none, so prices are not checked against a tick --
+    the same as running the strategy on a symbol registered without one.
+    The tick is taken from this argument only; nothing is read from the
+    tape. The manifest records ``tick_size_declared`` so replay does the
+    same."""
     strategy = Path(strategy).expanduser().resolve()
     tape = Path(tape).expanduser().resolve()
     output = Path(output).expanduser().resolve()
@@ -382,7 +394,10 @@ def pack_bundle(
         "tape_sha256": _sha256_dir(tape),
         "symbol_name": symbol_name,
         "exchange": exchange,
-        "tick_size": tick_size,
+        # 0.01 is the registry's default tick, recorded so a reader that
+        # predates tick_size_declared still finds a number.
+        "tick_size": 0.01 if tick_size is None else tick_size,
+        "tick_size_declared": tick_size is not None,
         "slippage_model": slippage_model,
         "slippage_params": slippage_params,
     }
@@ -497,6 +512,33 @@ def _extract(bundle_path: Path) -> Path:
     return tmp
 
 
+def _trace_counts(trace: Path) -> Dict[str, int]:
+    """Signal, order-event and fill counts of a `.lrvxrun` directory.
+    Raises whatever the reader raises on a trace it cannot read."""
+    from lrvx._lrvx import TraceReader
+
+    reader = TraceReader(str(trace))
+    return {
+        "lrvxrun_signal_count": len(reader.read_all_signals()),
+        "lrvxrun_order_count": len(reader.read_all_order_events()),
+        "lrvxrun_fill_count": len(reader.read_all_fills()),
+    }
+
+
+def _manifest_tick(manifest: Dict[str, Any]) -> Optional[float]:
+    """The tick a bundle's replay declares, or None for no tick.
+
+    A manifest with ``tick_size_declared`` says it outright. One without
+    the key was packed before the flag existed, when pack always declared
+    its tick (0.01 unless given): it keeps declaring ``tick_size`` (0.01
+    when absent), so an old bundle replays exactly as it always has."""
+    if "tick_size_declared" in manifest:
+        if not manifest["tick_size_declared"]:
+            return None
+        return float(manifest.get("tick_size", 0.01))
+    return float(manifest.get("tick_size", 0.01))
+
+
 def _diff_dicts(actual: Dict[str, Any], expected: Dict[str, Any]) -> List[str]:
     diffs: List[str] = []
     keys = sorted(set(actual.keys()) | set(expected.keys()))
@@ -564,7 +606,7 @@ def replay_bundle(bundle_path: Path) -> BundleResult:
             strat_path, tape_path,
             symbol_name=manifest.get("symbol_name", "BTCUSDT"),
             exchange=manifest.get("exchange", "bundle"),
-            tick_size=float(manifest.get("tick_size", 0.01)),
+            tick_size=_manifest_tick(manifest),
             slippage_model=manifest.get("slippage_model", "none"),
             slippage_params=manifest.get("slippage_params") or {},
             lrvxrun_out=actual_lrvxrun,
@@ -605,20 +647,20 @@ def replay_bundle(bundle_path: Path) -> BundleResult:
             actual["lrvxrun_present"] = actual_lrvxrun.is_dir()
             expected["lrvxrun_present"] = True
             if actual_lrvxrun.is_dir():
-                try:
-                    from lrvx._lrvx import TraceReader
-                    a_reader = TraceReader(str(actual_lrvxrun))
-                    e_reader = TraceReader(str(expected_lrvxrun))
-                    actual["lrvxrun_signal_count"] = len(a_reader.read_all_signals())
-                    actual["lrvxrun_order_count"] = len(a_reader.read_all_order_events())
-                    actual["lrvxrun_fill_count"] = len(a_reader.read_all_fills())
-                    expected["lrvxrun_signal_count"] = len(e_reader.read_all_signals())
-                    expected["lrvxrun_order_count"] = len(e_reader.read_all_order_events())
-                    expected["lrvxrun_fill_count"] = len(e_reader.read_all_fills())
-                except Exception:
-                    # Reader missing or corrupt: silently skip the
-                    # lrvxrun diff; the JSON diff still runs.
-                    pass
+                # A trace that is there but cannot be read is a failed
+                # comparison, never a skipped one: the side that failed
+                # carries the error under lrvxrun_read_error, the other
+                # side None, so the diff names it. Each message names its
+                # side, so two unreadable traces still disagree.
+                for side, out, trace in (("actual", actual, actual_lrvxrun),
+                                         ("expected", expected, expected_lrvxrun)):
+                    try:
+                        out.update(_trace_counts(trace))
+                        out["lrvxrun_read_error"] = None
+                    except Exception as e:
+                        out["lrvxrun_read_error"] = (
+                            f"{side} trace {trace.name} unreadable: "
+                            f"{type(e).__name__}: {e}")
         # else: this bundle predates the .lrvxrun ride-along. Leave
         # `lrvxrun_present` out of both dicts entirely rather than
         # comparing "actual has a fresh one" against "expected never

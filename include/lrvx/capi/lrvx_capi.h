@@ -1125,6 +1125,9 @@ extern "C"
   // Backtest Slippage
   // ============================================================
 
+  // `model` is 0 (none), 1 (fixed_ticks), 2 (fixed_bps) or 3 (volume_impact).
+  // Any other code is refused by both setters: the executor keeps its
+  // previous profile and lrvx_last_error_code() reports the error.
   void lrvx_simulated_executor_set_default_slippage(LrvxSimulatedExecutorHandle executor,
                                                     int32_t model, int32_t ticks, double tick_size,
                                                     double bps, double impact_coeff);

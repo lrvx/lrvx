@@ -161,6 +161,17 @@ declared with the flag. A registry saved with a declared 0.01 tick before the fl
 loads it unchecked; register it again with `tickSizeKnown`, or save it again, to have it checked.
 A reader that predates the flag ignores the bit and the key, and loads the symbol without it.
 
+Both formats also keep the per-symbol `priceScale` and `qtyScale`. The binary form has carried them
+since version 4; the JSON file writes `"price_scale"` / `"qty_scale"` only on an entry whose scale is
+not the 1e8 default, so a default-scale entry is written exactly as before. A JSON file without the
+keys loads every symbol at 1e8, as it always did; a JSON entry whose scale `registerSymbol` would
+refuse (not positive, or above 1e18) makes `loadFromFile` return false. The JSON
+`contract_multiplier` is written with ten significant digits when that reads back as the same
+double, and with seventeen otherwise.
+
+`exchangeId` is in neither format: it is the loading registry's own id for the exchange, resolved
+when a symbol is registered, and a loaded symbol carries `InvalidExchangeId`.
+
 ## Capacity Limits
 
 | Constant                   | Value | Description                          |

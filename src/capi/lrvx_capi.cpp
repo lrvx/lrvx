@@ -4296,11 +4296,34 @@ uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path)
 
 namespace
 {
+// "0 (none), 1 (fixed_ticks), 2 (fixed_bps), 3 (volume_impact)"
+std::string slippageModelCodeList()
+{
+  std::string out;
+  for (int32_t code = 0; const auto m = slippageModelFromCode(code); ++code)
+  {
+    if (code > 0)
+    {
+      out += ", ";
+    }
+    out += std::to_string(code) + " (" + slippageModelName(*m) + ")";
+  }
+  return out;
+}
+
+// An out-of-range model code is refused (the setter records the error and
+// leaves the executor as it was) rather than read as some other model.
 SlippageProfile makeSlippageProfile(int32_t model, int32_t ticks, double tick_size,
                                     double bps, double impact_coeff)
 {
+  const std::optional<SlippageModel> parsed = slippageModelFromCode(model);
+  if (!parsed)
+  {
+    throw std::invalid_argument("slippage model must be one of " + slippageModelCodeList() +
+                                "; got " + std::to_string(model));
+  }
   SlippageProfile prof;
-  prof.model = static_cast<SlippageModel>(model);
+  prof.model = *parsed;
   prof.ticks = ticks;
   prof.tickSize = (tick_size > 0.0) ? Price::fromDouble(tick_size) : Price{};
   prof.bps = bps;

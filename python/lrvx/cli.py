@@ -425,7 +425,7 @@ def cmd_bundle_pack(args: argparse.Namespace) -> int:
         config=cfg,
         symbol_name=args.symbol_name,
         exchange=args.exchange,
-        tick_size=float(args.tick_size),
+        tick_size=None if args.tick_size is None else float(args.tick_size),
     )
     print(f"lrvx bundle pack: wrote {out}")
     return 0
@@ -1262,8 +1262,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Exchange tag for the symbol (default: bundle).",
     )
     p_pack.add_argument(
-        "--tick-size", type=float, default=0.01,
-        help="Tick size for the symbol (default: 0.01).",
+        "--tick-size", type=float, default=None,
+        help="Tick size to declare for the symbol; order prices off it are "
+             "refused. Default: none declared, prices are not checked "
+             "against a tick (as a symbol registered without one).",
     )
     p_pack.add_argument(
         "--slippage-model", default="none",

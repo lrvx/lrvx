@@ -10,6 +10,7 @@
 #include "lrvx/engine/symbol_registry.h"
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <filesystem>
@@ -344,6 +345,182 @@ TEST(SymbolRegistryTest, SaveAndLoadFromFile)
 
   // Cleanup
   std::filesystem::remove(tempPath);
+}
+
+namespace
+{
+// Every SymbolInfo field a round trip can lose. exchangeId is not here: it is
+// resolved from the loading registry's exchange table, not from the data, in
+// both formats.
+void expectSameSymbol(const SymbolInfo& got, const SymbolInfo& want)
+{
+  EXPECT_EQ(got.id, want.id);
+  EXPECT_EQ(got.exchange, want.exchange);
+  EXPECT_EQ(got.symbol, want.symbol);
+  EXPECT_EQ(got.type, want.type);
+  EXPECT_EQ(got.tickSize.raw(), want.tickSize.raw());
+  EXPECT_EQ(got.tickSizeKnown, want.tickSizeKnown);
+  EXPECT_EQ(got.strike.has_value(), want.strike.has_value());
+  if (got.strike && want.strike)
+  {
+    EXPECT_EQ(got.strike->raw(), want.strike->raw());
+  }
+  EXPECT_EQ(got.expiry, want.expiry);
+  EXPECT_EQ(got.optionType, want.optionType);
+  EXPECT_EQ(got.contractMultiplier, want.contractMultiplier);
+  EXPECT_EQ(got.settlementType, want.settlementType);
+  EXPECT_EQ(got.exerciseStyle, want.exerciseStyle);
+  EXPECT_EQ(got.settlementCcy, want.settlementCcy);
+  EXPECT_EQ(got.priceScale, want.priceScale);
+  EXPECT_EQ(got.qtyScale, want.qtyScale);
+}
+
+std::string readAll(const std::filesystem::path& p)
+{
+  std::string s;
+  if (std::FILE* f = std::fopen(p.string().c_str(), "rb"))
+  {
+    char buf[4096];
+    for (size_t n; (n = std::fread(buf, 1, sizeof buf, f)) > 0;)
+    {
+      s.append(buf, n);
+    }
+    std::fclose(f);
+  }
+  return s;
+}
+
+void writeAll(const std::filesystem::path& p, const std::string& s)
+{
+  std::FILE* f = std::fopen(p.string().c_str(), "wb");
+  ASSERT_NE(f, nullptr);
+  std::fwrite(s.data(), 1, s.size(), f);
+  std::fclose(f);
+}
+}  // namespace
+
+// The JSON file keeps every field the binary form keeps: a DEX token's
+// per-symbol scale used to come back as the 1e8 default, and a contract
+// multiplier with more than ten significant digits came back rounded.
+TEST(SymbolRegistryTest, JsonRoundTripKeepsWhatBinaryKeeps)
+{
+  SymbolInfo dex;
+  dex.exchange = "uniswap";
+  dex.symbol = "PEPEWETH";
+  dex.type = InstrumentType::Option;
+  dex.tickSize = Price::fromRaw(7);
+  dex.tickSizeKnown = true;
+  dex.strike = Price::fromDouble(1.25);
+  dex.expiry = TimePoint(std::chrono::nanoseconds(1724976000000000000LL));
+  dex.optionType = OptionType::PUT;
+  dex.contractMultiplier = 1.0 / 3.0;
+  dex.settlementType = SettlementType::Physical;
+  dex.exerciseStyle = ExerciseStyle::American;
+  dex.settlementCcy = "WETH";
+  dex.priceScale = 1'000'000'000'000'000;
+  dex.qtyScale = 10'000;
+
+  SymbolInfo plain;
+  plain.exchange = "binance";
+  plain.symbol = "BTCUSDT";
+  plain.qtyScale = 1'000'000;
+
+  SymbolRegistry registry;
+  dex.id = registry.registerSymbol(dex);
+  plain.id = registry.registerSymbol(plain);
+  ASSERT_NE(dex.id, 0u);
+  ASSERT_NE(plain.id, 0u);
+
+  SymbolRegistry fromBinary;
+  ASSERT_TRUE(fromBinary.deserialize(registry.serialize()));
+
+  const auto path = std::filesystem::temp_directory_path() / "test_registry_scales.json";
+  std::filesystem::remove(path);
+  ASSERT_TRUE(registry.saveToFile(path));
+  SymbolRegistry fromJson;
+  ASSERT_TRUE(fromJson.loadFromFile(path));
+  std::filesystem::remove(path);
+
+  for (const SymbolInfo* want : {&dex, &plain})
+  {
+    SCOPED_TRACE(want->symbol);
+    auto b = fromBinary.getSymbolInfo(want->id);
+    auto j = fromJson.getSymbolInfo(want->id);
+    ASSERT_TRUE(b.has_value());
+    ASSERT_TRUE(j.has_value());
+    expectSameSymbol(*b, *want);
+    expectSameSymbol(*j, *want);
+  }
+}
+
+// A file written before the scales were persisted carries neither key and
+// loads every symbol at the 1e8 default, as before. Saving it again writes the
+// same bytes: an entry at the default scale gains no key.
+TEST(SymbolRegistryTest, JsonWithoutScalesLoadsAsBefore)
+{
+  const std::string old =
+      "{\n  \"version\": 1,\n  \"symbols\": [\n"
+      "    {\"id\": 1, \"exchange\": \"binance\", \"symbol\": \"BTCUSDT\", \"type\": 0, "
+      "\"tick_size\": 1000000, \"contract_multiplier\": 1, \"settlement_type\": 0, "
+      "\"exercise_style\": 0},\n"
+      "    {\"id\": 2, \"exchange\": \"cboe\", \"symbol\": \"SPY\", \"type\": 2, "
+      "\"tick_size\": 5000000, \"tick_size_known\": true, \"strike\": 45000000000, "
+      "\"option_type\": 0, \"contract_multiplier\": 100, \"settlement_type\": 1, "
+      "\"exercise_style\": 1, \"settlement_ccy\": \"USD\"}\n"
+      "  ]\n}\n";
+  const auto path = std::filesystem::temp_directory_path() / "test_registry_old_shape.json";
+  writeAll(path, old);
+
+  SymbolRegistry registry;
+  ASSERT_TRUE(registry.loadFromFile(path));
+  for (SymbolId id : {1u, 2u})
+  {
+    auto info = registry.getSymbolInfo(id);
+    ASSERT_TRUE(info.has_value());
+    EXPECT_EQ(info->priceScale, Price::Scale);
+    EXPECT_EQ(info->qtyScale, Quantity::Scale);
+  }
+  EXPECT_DOUBLE_EQ(registry.getSymbolInfo(2)->contractMultiplier, 100.0);
+
+  // The registry writes entries in its own map order, so compare the entries
+  // without their trailing separators, as a set of lines.
+  const auto lines = [](const std::string& s)
+  {
+    std::vector<std::string> out;
+    size_t start = 0;
+    for (size_t nl; (nl = s.find('\n', start)) != std::string::npos; start = nl + 1)
+    {
+      std::string line = s.substr(start, nl - start);
+      if (!line.empty() && line.back() == ',')
+      {
+        line.pop_back();
+      }
+      out.push_back(line);
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+  };
+  ASSERT_TRUE(registry.saveToFile(path));
+  EXPECT_EQ(lines(readAll(path)), lines(old));
+  std::filesystem::remove(path);
+}
+
+// A scale registerSymbol would refuse is a malformed file, not a symbol.
+TEST(SymbolRegistryTest, JsonWithInvalidScaleIsRefused)
+{
+  const auto path = std::filesystem::temp_directory_path() / "test_registry_bad_scale.json";
+  for (const char* bad : {"\"price_scale\": 0", "\"qty_scale\": -5"})
+  {
+    SCOPED_TRACE(bad);
+    writeAll(path, std::string("{\n  \"version\": 1,\n  \"symbols\": [\n"
+                               "    {\"id\": 1, \"exchange\": \"x\", \"symbol\": \"Y\", "
+                               "\"type\": 0, \"tick_size\": 1000000, ") +
+                       bad + "}\n  ]\n}\n");
+    SymbolRegistry registry;
+    EXPECT_FALSE(registry.loadFromFile(path));
+    EXPECT_EQ(registry.size(), 0u);
+  }
+  std::filesystem::remove(path);
 }
 
 TEST(SymbolRegistryTest, BinarySerializeDeserialize)
