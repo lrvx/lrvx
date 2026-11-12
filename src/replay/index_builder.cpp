@@ -39,8 +39,8 @@ struct CompressedScan
 // Walks the blocks of a compressed segment between its header and `data_end`
 // and indexes each one the way BinaryLogWriter::flushBlock does: one entry per
 // block, at the block header's offset, holding the smallest exchange_ts_ns in
-// the block (the first int64 of each frame payload, 0 for a payload shorter
-// than that). Returns an error message, or an empty string.
+// the block (frameTimestamp of each frame, 0 for a payload shorter than its
+// record). Returns an error message, or an empty string.
 std::string scanCompressedSegment(std::FILE* file, const SegmentHeader& header,
                                   uint64_t data_end, bool verify_crc, CompressedScan& out)
 {
@@ -95,11 +95,8 @@ std::string scanCompressedSegment(std::FILE* file, const SegmentHeader& header,
       {
         return "CRC mismatch in block at offset " + std::to_string(pos);
       }
-      int64_t ts = 0;
-      if (frame.size >= sizeof(int64_t))
-      {
-        std::memcpy(&ts, block.data() + off, sizeof(ts));
-      }
+      int64_t ts = 0;  // stays 0 for a payload shorter than its record
+      frameTimestamp(frame.type, block.data() + off, frame.size, ts);
       off += frame.size;
 
       block_min = std::min(block_min, ts);
@@ -226,26 +223,10 @@ IndexBuildResult IndexBuilder::buildForSegment(const std::filesystem::path& segm
       }
     }
 
-    // Get timestamp from event
+    // Read the way the reader parses the frame, whatever its record type;
+    // stays 0 for a payload shorter than its record.
     int64_t event_ts = 0;
-    if (frame.type == static_cast<uint8_t>(EventType::Trade))
-    {
-      if (frame.size >= sizeof(TradeRecord))
-      {
-        TradeRecord trade;
-        std::memcpy(&trade, payload_buffer.data(), sizeof(trade));
-        event_ts = trade.exchange_ts_ns;
-      }
-    }
-    else
-    {
-      if (frame.size >= sizeof(BookRecordHeader))
-      {
-        BookRecordHeader book_header;
-        std::memcpy(&book_header, payload_buffer.data(), sizeof(book_header));
-        event_ts = book_header.exchange_ts_ns;
-      }
-    }
+    frameTimestamp(frame.type, payload_buffer.data(), frame.size, event_ts);
 
     if (first_ts == 0)
     {
@@ -297,18 +278,10 @@ IndexBuildResult IndexBuilder::buildForSegment(const std::filesystem::path& segm
   SegmentIndexHeader idx_header{};
   idx_header.interval = _config.index_interval;
   idx_header.entry_count = static_cast<uint32_t>(index_entries.size());
-  if (header.isCompressed())
-  {
-    // As the writer fills them for a compressed segment: the first and last
-    // block minimum.
-    idx_header.first_ts_ns = index_entries.front().timestamp_ns;
-    idx_header.last_ts_ns = index_entries.back().timestamp_ns;
-  }
-  else
-  {
-    idx_header.first_ts_ns = first_ts;
-    idx_header.last_ts_ns = last_ts;
-  }
+  // As the writer fills them (and the spec defines them): the first and last
+  // indexed timestamp, which on a compressed segment are block minima.
+  idx_header.first_ts_ns = index_entries.front().timestamp_ns;
+  idx_header.last_ts_ns = index_entries.back().timestamp_ns;
   idx_header.crc32 = Crc32::compute(index_entries.data(), index_entries.size() * sizeof(IndexEntry));
 
   if (std::fwrite(&idx_header, sizeof(idx_header), 1, file) != 1)

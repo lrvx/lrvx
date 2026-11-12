@@ -2946,38 +2946,29 @@ bool BinaryLogIterator::parseFrame(EventType type, const std::byte* data, size_t
 {
   out.type = type;
 
+  // Checks the payload against its type's fixed record as well.
+  if (!frameTimestamp(static_cast<uint8_t>(type), data, size, out.timestamp_ns))
+  {
+    return false;
+  }
+
   if (type == EventType::Trade)
   {
-    if (size < sizeof(TradeRecord))
-    {
-      return false;
-    }
     std::memcpy(&out.trade, data, sizeof(TradeRecord));
-    out.timestamp_ns = out.trade.exchange_ts_ns;
     out.bids.clear();
     out.asks.clear();
     return true;
   }
   else if (type == EventType::OptionQuote)
   {
-    if (size < sizeof(OptionQuoteRecord))
-    {
-      return false;
-    }
     std::memcpy(&out.option_quote, data, sizeof(OptionQuoteRecord));
-    out.timestamp_ns = out.option_quote.exchange_ts_ns;
     out.bids.clear();
     out.asks.clear();
     return true;
   }
   else if (type == EventType::PoolState)
   {
-    if (size < sizeof(PoolStateRecordHeader))
-    {
-      return false;
-    }
     std::memcpy(&out.pool_state_header, data, sizeof(PoolStateRecordHeader));
-    out.timestamp_ns = out.pool_state_header.exchange_ts_ns;
     const size_t payload_len = out.pool_state_header.payload_len;
     if (size < sizeof(PoolStateRecordHeader) + payload_len)
     {
@@ -2992,12 +2983,7 @@ bool BinaryLogIterator::parseFrame(EventType type, const std::byte* data, size_t
   else if (type == EventType::BookSnapshot || type == EventType::BookDelta ||
            type == EventType::BookTop)
   {
-    if (size < sizeof(BookRecordHeader))
-    {
-      return false;
-    }
     std::memcpy(&out.book_header, data, sizeof(BookRecordHeader));
-    out.timestamp_ns = out.book_header.exchange_ts_ns;
 
     const size_t levels_offset = sizeof(BookRecordHeader);
     const size_t bid_bytes = out.book_header.bid_count * sizeof(BookLevel);

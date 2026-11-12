@@ -17127,6 +17127,16 @@
         },
         {
           "kind": "method",
+          "name": "computeSoftware",
+          "parent": "Crc32"
+        },
+        {
+          "kind": "method",
+          "name": "hardwareAccelerated",
+          "parent": "Crc32"
+        },
+        {
+          "kind": "method",
           "name": "absDiff",
           "parent": "CryptoswapCurve"
         },
@@ -18458,6 +18468,11 @@
         {
           "kind": "method",
           "name": "isValid",
+          "parent": "FrameHeader"
+        },
+        {
+          "kind": "method",
+          "name": "memcpy",
           "parent": "FrameHeader"
         },
         {
@@ -21227,6 +21242,11 @@
         },
         {
           "kind": "method",
+          "name": "crcErrors",
+          "parent": "MmapSegmentReader"
+        },
+        {
+          "kind": "method",
           "name": "currentFrame",
           "parent": "MmapSegmentReader"
         },
@@ -21277,6 +21297,11 @@
         },
         {
           "kind": "method",
+          "name": "nextCheckedFrame",
+          "parent": "MmapSegmentReader"
+        },
+        {
+          "kind": "method",
           "name": "position",
           "parent": "MmapSegmentReader"
         },
@@ -21292,7 +21317,17 @@
         },
         {
           "kind": "method",
+          "name": "setVerifyCrc",
+          "parent": "MmapSegmentReader"
+        },
+        {
+          "kind": "method",
           "name": "totalSize",
+          "parent": "MmapSegmentReader"
+        },
+        {
+          "kind": "method",
+          "name": "truncated",
           "parent": "MmapSegmentReader"
         },
         {

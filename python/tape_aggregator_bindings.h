@@ -35,6 +35,57 @@ namespace py = pybind11;
 namespace lrvx
 {
 
+// Zeroes the bytes of a structured array that no dtype field covers: the
+// explicit `_pad` members of the record structs and the implicit padding of
+// the aggregator rows. Those bytes are copied from, or left as, whatever the
+// allocator held, so without this two reads of one tape give buffers that
+// hash differently although every field agrees.
+template <typename Row>
+inline py::array_t<Row> zeroPadding(py::array_t<Row> arr)
+{
+  const py::dtype dt = py::dtype::of<Row>();
+  const auto itemsize = static_cast<size_t>(dt.itemsize());
+  std::vector<bool> covered(itemsize, false);
+  for (auto item : dt.attr("fields").cast<py::dict>())
+  {
+    auto spec = item.second.cast<py::tuple>();
+    const auto field = spec[0].cast<py::dtype>();
+    const auto offset = spec[1].cast<size_t>();
+    for (size_t b = 0; b < static_cast<size_t>(field.itemsize()) && offset + b < itemsize; ++b)
+    {
+      covered[offset + b] = true;
+    }
+  }
+  std::vector<std::pair<size_t, size_t>> gaps;  // [start, length)
+  for (size_t b = 0; b < itemsize;)
+  {
+    if (covered[b])
+    {
+      ++b;
+      continue;
+    }
+    const size_t start = b;
+    while (b < itemsize && !covered[b])
+    {
+      ++b;
+    }
+    gaps.emplace_back(start, b - start);
+  }
+  if (gaps.empty() || arr.size() == 0)
+  {
+    return arr;
+  }
+  auto* base = reinterpret_cast<std::byte*>(arr.mutable_data());
+  for (py::ssize_t i = 0; i < arr.size(); ++i)
+  {
+    for (const auto& [start, len] : gaps)
+    {
+      std::memset(base + static_cast<size_t>(i) * itemsize + start, 0, len);
+    }
+  }
+  return arr;
+}
+
 // Common base over every Python-bound aggregator. Lets DataReader.run
 // take a py::list and extract IAggregator* without knowing every
 // concrete subclass.
@@ -65,7 +116,7 @@ class PyEventTypeStatsAggregator : public IPyAggregator
       std::memcpy(out.mutable_data(), rows.data(),
                   rows.size() * sizeof(lrvx::replay::EventTypeStatsAggregator::PerSymbolRow));
     }
-    return out;
+    return zeroPadding(std::move(out));
   }
 
  private:
@@ -93,7 +144,7 @@ class PyBinCountAggregator : public IPyAggregator
       std::memcpy(out.mutable_data(), rows.data(),
                   rows.size() * sizeof(lrvx::replay::BinCountAggregator::Row));
     }
-    return out;
+    return zeroPadding(std::move(out));
   }
 
  private:
@@ -121,7 +172,7 @@ class PyVolumeBinAggregator : public IPyAggregator
       std::memcpy(out.mutable_data(), rows.data(),
                   rows.size() * sizeof(lrvx::replay::VolumeBinAggregator::Row));
     }
-    return out;
+    return zeroPadding(std::move(out));
   }
 
  private:
@@ -149,7 +200,7 @@ class PyOHLCBinAggregator : public IPyAggregator
       std::memcpy(out.mutable_data(), rows.data(),
                   rows.size() * sizeof(lrvx::replay::OHLCBinAggregator::Row));
     }
-    return out;
+    return zeroPadding(std::move(out));
   }
 
  private:
@@ -177,7 +228,7 @@ class PyBookSnapshotBinAggregator : public IPyAggregator
       std::memcpy(out.mutable_data(), rows.data(),
                   rows.size() * sizeof(lrvx::replay::BookSnapshotBinAggregator::Row));
     }
-    return out;
+    return zeroPadding(std::move(out));
   }
 
  private:

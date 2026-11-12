@@ -11,6 +11,7 @@
 
 #include "lrvx/util/crc32.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <span>
@@ -227,6 +228,48 @@ using lrvx::util::Crc32;
 inline constexpr size_t bookRecordSize(uint16_t bid_count, uint16_t ask_count) noexcept
 {
   return sizeof(BookRecordHeader) + (bid_count + ask_count) * sizeof(BookLevel);
+}
+
+// The fixed record a frame of `type` starts with; 0 for a type this build
+// does not know.
+inline constexpr size_t frameRecordSize(uint8_t type) noexcept
+{
+  switch (static_cast<EventType>(type))
+  {
+    case EventType::Trade:
+      return sizeof(TradeRecord);
+    case EventType::OptionQuote:
+      return sizeof(OptionQuoteRecord);
+    case EventType::PoolState:
+      return sizeof(PoolStateRecordHeader);
+    case EventType::BookSnapshot:
+    case EventType::BookDelta:
+    case EventType::BookTop:
+      return sizeof(BookRecordHeader);
+  }
+  return 0;
+}
+
+// The exchange_ts_ns of a frame payload. Every record leads with it, so a
+// type this build does not know is read the same way. False when the payload
+// is shorter than its type's fixed record (8 bytes for an unknown type): the
+// frame is not a record of that type. The readers' frame parsing and the
+// index builder both take the timestamp from here.
+static_assert(offsetof(TradeRecord, exchange_ts_ns) == 0);
+static_assert(offsetof(OptionQuoteRecord, exchange_ts_ns) == 0);
+static_assert(offsetof(PoolStateRecordHeader, exchange_ts_ns) == 0);
+static_assert(offsetof(BookRecordHeader, exchange_ts_ns) == 0);
+
+inline bool frameTimestamp(uint8_t type, const std::byte* payload, size_t size,
+                           int64_t& ts_out) noexcept
+{
+  const size_t need = frameRecordSize(type);
+  if (size < (need != 0 ? need : sizeof(int64_t)))
+  {
+    return false;
+  }
+  std::memcpy(&ts_out, payload, sizeof(ts_out));
+  return true;
 }
 
 inline constexpr uint32_t kBlockMagic = 0x4B4C4246;
