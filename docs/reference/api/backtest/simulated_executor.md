@@ -63,6 +63,8 @@ public:
   const std::vector<Fill>& fills() const;
   std::vector<Fill> extractFills();
   const std::vector<Order>& conditionalOrders() const;
+  // The live order with this id (held, resting or conditional), or nullptr.
+  const Order* findOrder(OrderId orderId) const;
 
   // Top-of-book accessors. Return 0 when the side is empty.
   Price bestBidPrice(SymbolId symbol) const;

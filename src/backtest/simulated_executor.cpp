@@ -1136,30 +1136,7 @@ void SimulatedExecutor::replaceOrder(OrderId oldOrderId, const Order& newOrder)
   // An off-tick replacement is refused and the original order stays as it was.
   if (const char* why = offTickReason(newOrder, orderTickRaw(newOrder.symbol)))
   {
-    const Order* old = nullptr;
-    for (const Order& held : _heldBarOrders)
-    {
-      if (held.id == oldOrderId)
-      {
-        old = &held;
-        break;
-      }
-    }
-    if (old == nullptr)
-    {
-      old = findPendingOrder(oldOrderId);
-    }
-    if (old == nullptr)
-    {
-      for (const Order& cond : _conditional_orders)
-      {
-        if (cond.id == oldOrderId)
-        {
-          old = &cond;
-          break;
-        }
-      }
-    }
+    const Order* old = findOrder(oldOrderId);
     if (_callback)
     {
       OrderEvent ev;
@@ -2058,6 +2035,21 @@ Order* SimulatedExecutor::findPendingOrder(OrderId orderId)
     if (order.id == orderId)
     {
       return &order;
+    }
+  }
+  return nullptr;
+}
+
+const Order* SimulatedExecutor::findOrder(OrderId orderId) const
+{
+  for (const auto* book : {&_heldBarOrders, &_pending_orders, &_conditional_orders})
+  {
+    for (const Order& order : *book)
+    {
+      if (order.id == orderId)
+      {
+        return &order;
+      }
     }
   }
   return nullptr;

@@ -33,6 +33,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 namespace lrvx
@@ -350,6 +351,11 @@ class BacktestRunner : public ISignalHandler
   void waitForResume();
   void notifyPaused();
   Order signalToOrder(const Signal& sig);
+  // A Modify signal names an order and its new price and quantity, nothing
+  // else. This is that order with the two fields changed: same id, symbol,
+  // side and type, so the executor still finds it under the id the strategy
+  // holds.
+  Order modifiedOrder(const Signal& sig);
   bool passesPreTradeGate(const Order& order);
   // Routes an executor's order events into the position tracker, PnL
   // tracker and listener chain. Applied to the built-in executor in the
@@ -379,6 +385,12 @@ class BacktestRunner : public ISignalHandler
   // Optional binding-supplied executor. When non-null, signals are routed
   // here instead of to the built-in SimulatedExecutor.
   IOrderExecutor* _customExecutor{nullptr};
+  // Orders handed to _customExecutor, by id. The runner cannot ask a custom
+  // executor what it holds, so this is where a Modify finds the order it
+  // names. The runner hears of no fill from a custom executor either, so an
+  // entry stays until its cancel or the next run. Unused while the built-in
+  // or venue executor takes the orders.
+  std::unordered_map<OrderId, Order> _customOrders;
   // Optional externally owned SimulatedExecutor (VenueStack::executor()).
   // When non-null it receives market data and owns the run's fills.
   SimulatedExecutor* _venueExecutor{nullptr};

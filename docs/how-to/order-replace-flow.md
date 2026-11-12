@@ -102,6 +102,11 @@ is configured through BacktestConfig in C++.
   replace call. A backtest replace is emitted from the strategy
   (modify_order / emitModify); the runner turns that Modify signal
   into replaceOrder on its own executor.
+- A Modify names an order id, a new price and a new quantity. The
+  replacement is that order with the two fields changed: it keeps its
+  id, symbol, side, type and flags, so a later cancel or modify by the
+  same id still finds it. The new quantity is the quantity left to
+  work; what the original had already filled is not carried over.
 - The pending replace is dropped if the order is canceled by other
   means before the ack arrives. Replace ack finalization runs on
   the next simulator tick after the deadline passes.

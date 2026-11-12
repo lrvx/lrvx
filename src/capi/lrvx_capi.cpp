@@ -5037,6 +5037,48 @@ void lrvx_backtest_result_ingest_executor(LrvxBacktestResultHandle h, LrvxSimula
   LRVX_CAPI_LEAVE_VOID;
 }
 
+namespace
+{
+// Every field LrvxBacktestStats declares, so no caller reads what an earlier
+// call or an uninitialised buffer left there.
+void fillStatsStruct(const BacktestStats& s, LrvxBacktestStats* out)
+{
+  out->totalTrades = s.totalTrades;
+  out->winningTrades = s.winningTrades;
+  out->losingTrades = s.losingTrades;
+  out->maxConsecutiveWins = s.maxConsecutiveWins;
+  out->maxConsecutiveLosses = s.maxConsecutiveLosses;
+  out->initialCapital = s.initialCapital;
+  out->finalCapital = s.finalCapital;
+  out->totalPnl = s.totalPnl;
+  out->totalFees = s.totalFees;
+  out->netPnl = s.netPnl;
+  out->grossProfit = s.grossProfit;
+  out->grossLoss = s.grossLoss;
+  out->maxDrawdown = s.maxDrawdown;
+  out->maxDrawdownPct = s.maxDrawdownPct;
+  out->winRate = s.winRate;
+  out->profitFactor = s.profitFactor;
+  out->avgWin = s.avgWin;
+  out->avgLoss = s.avgLoss;
+  out->avgWinLossRatio = s.avgWinLossRatio;
+  out->avgTradeDurationNs = s.avgTradeDurationNs;
+  out->medianTradeDurationNs = s.medianTradeDurationNs;
+  out->maxTradeDurationNs = s.maxTradeDurationNs;
+  out->sharpeRatio = s.sharpeRatio;
+  out->sortinoRatio = s.sortinoRatio;
+  out->calmarRatio = s.calmarRatio;
+  out->timeWeightedReturn = s.timeWeightedReturn;
+  out->returnPct = s.returnPct;
+  out->startTimeNs = s.startTimeNs.raw();
+  out->endTimeNs = s.endTimeNs.raw();
+  // Record counts belong to a run, not to a result: a runner overwrites
+  // these with what its run read.
+  out->optionQuoteCount = 0;
+  out->poolStateCount = 0;
+}
+}  // namespace
+
 void lrvx_backtest_result_stats(LrvxBacktestResultHandle h, LrvxBacktestStats* out)
 {
   LRVX_CAPI_ENTER_VOID(h);
@@ -5044,36 +5086,7 @@ void lrvx_backtest_result_stats(LrvxBacktestResultHandle h, LrvxBacktestStats* o
   {
     return;
   }
-  auto stats = static_cast<LrvxBacktestResultImpl*>(h)->result->computeStats();
-  out->totalTrades = stats.totalTrades;
-  out->winningTrades = stats.winningTrades;
-  out->losingTrades = stats.losingTrades;
-  out->maxConsecutiveWins = stats.maxConsecutiveWins;
-  out->maxConsecutiveLosses = stats.maxConsecutiveLosses;
-  out->initialCapital = stats.initialCapital;
-  out->finalCapital = stats.finalCapital;
-  out->totalPnl = stats.totalPnl;
-  out->totalFees = stats.totalFees;
-  out->netPnl = stats.netPnl;
-  out->grossProfit = stats.grossProfit;
-  out->grossLoss = stats.grossLoss;
-  out->maxDrawdown = stats.maxDrawdown;
-  out->maxDrawdownPct = stats.maxDrawdownPct;
-  out->winRate = stats.winRate;
-  out->profitFactor = stats.profitFactor;
-  out->avgWin = stats.avgWin;
-  out->avgLoss = stats.avgLoss;
-  out->avgWinLossRatio = stats.avgWinLossRatio;
-  out->avgTradeDurationNs = stats.avgTradeDurationNs;
-  out->medianTradeDurationNs = stats.medianTradeDurationNs;
-  out->maxTradeDurationNs = stats.maxTradeDurationNs;
-  out->sharpeRatio = stats.sharpeRatio;
-  out->sortinoRatio = stats.sortinoRatio;
-  out->calmarRatio = stats.calmarRatio;
-  out->timeWeightedReturn = stats.timeWeightedReturn;
-  out->returnPct = stats.returnPct;
-  out->startTimeNs = stats.startTimeNs.raw();
-  out->endTimeNs = stats.endTimeNs.raw();
+  fillStatsStruct(static_cast<LrvxBacktestResultImpl*>(h)->result->computeStats(), out);
   LRVX_CAPI_LEAVE_VOID;
 }
 
@@ -8192,34 +8205,12 @@ struct LrvxBacktestRunnerImpl
 
   void fillStats(const BacktestStats& s, LrvxBacktestStats* out) const
   {
+    fillStatsStruct(s, out);
     // Every run starts from cleared counters, so a run that read no tape
     // reports zero here.
     const BacktestState st = runner->state();
     out->optionQuoteCount = st.optionQuoteCount;
     out->poolStateCount = st.poolStateCount;
-    out->totalTrades = s.totalTrades;
-    out->winningTrades = s.winningTrades;
-    out->losingTrades = s.losingTrades;
-    out->maxConsecutiveWins = s.maxConsecutiveWins;
-    out->maxConsecutiveLosses = s.maxConsecutiveLosses;
-    out->initialCapital = s.initialCapital;
-    out->finalCapital = s.finalCapital;
-    out->totalPnl = s.totalPnl;
-    out->totalFees = s.totalFees;
-    out->netPnl = s.netPnl;
-    out->grossProfit = s.grossProfit;
-    out->grossLoss = s.grossLoss;
-    out->maxDrawdown = s.maxDrawdown;
-    out->maxDrawdownPct = s.maxDrawdownPct;
-    out->winRate = s.winRate;
-    out->profitFactor = s.profitFactor;
-    out->avgWin = s.avgWin;
-    out->avgLoss = s.avgLoss;
-    out->avgWinLossRatio = s.avgWinLossRatio;
-    out->sharpeRatio = s.sharpeRatio;
-    out->sortinoRatio = s.sortinoRatio;
-    out->calmarRatio = s.calmarRatio;
-    out->returnPct = s.returnPct;
   }
 
   int runBars(std::vector<OhlcvBacktestReader::Bar> bars, LrvxBacktestStats* out)
@@ -8236,53 +8227,31 @@ struct LrvxBacktestRunnerImpl
 
   int runTape(const char* tape_dir, LrvxBacktestStats* out)
   {
-    if (!runner)
+    BacktestResult result = runner->runTape(std::filesystem::path(tape_dir));
+    if (out)
     {
-      return 0;
+      fillStats(result.computeStats(), out);
     }
-    try
-    {
-      BacktestResult result = runner->runTape(std::filesystem::path(tape_dir));
-      if (out)
-      {
-        fillStats(result.computeStats(), out);
-      }
-      lastResult = std::move(result);
-      return 1;
-    }
-    catch (const std::exception&)
-    {
-      return 0;
-    }
+    lastResult = std::move(result);
+    return 1;
   }
 
   int runTapes(const char* const* tape_dirs, uint32_t n_dirs,
                LrvxBacktestStats* out)
   {
-    if (!runner || !tape_dirs || n_dirs == 0)
+    std::vector<std::filesystem::path> paths;
+    paths.reserve(n_dirs);
+    for (uint32_t i = 0; i < n_dirs; ++i)
     {
-      return 0;
+      paths.emplace_back(tape_dirs[i] ? tape_dirs[i] : "");
     }
-    try
+    BacktestResult result = runner->runTapes(paths);
+    if (out)
     {
-      std::vector<std::filesystem::path> paths;
-      paths.reserve(n_dirs);
-      for (uint32_t i = 0; i < n_dirs; ++i)
-      {
-        paths.emplace_back(tape_dirs[i] ? tape_dirs[i] : "");
-      }
-      BacktestResult result = runner->runTapes(paths);
-      if (out)
-      {
-        fillStats(result.computeStats(), out);
-      }
-      lastResult = std::move(result);
-      return 1;
+      fillStats(result.computeStats(), out);
     }
-    catch (const std::exception&)
-    {
-      return 0;
-    }
+    lastResult = std::move(result);
+    return 1;
   }
 
   int runCsv(const char* path, const char* symbol, LrvxBacktestStats* out)
@@ -9310,6 +9279,7 @@ int lrvx_backtest_runner_run_tape(LrvxBacktestRunnerHandle h,
                                   LrvxBacktestStats* out)
 {
   LRVX_CAPI_ENTER(h);
+  LRVX_CAPI_REQUIRE(tape_dir);
   return toBacktestRunner(h)->runTape(tape_dir, out);
   LRVX_CAPI_LEAVE;
 }
@@ -9394,6 +9364,12 @@ int lrvx_backtest_runner_run_tapes(LrvxBacktestRunnerHandle h,
                                    LrvxBacktestStats* out)
 {
   LRVX_CAPI_ENTER(h);
+  // An empty list may come with no array behind it; it fails below as an
+  // empty list, not as a missing argument.
+  if (n_dirs > 0)
+  {
+    LRVX_CAPI_REQUIRE(tape_dirs);
+  }
   return toBacktestRunner(h)->runTapes(tape_dirs, n_dirs, out);
   LRVX_CAPI_LEAVE;
 }
@@ -9615,42 +9591,6 @@ std::vector<OhlcvReplaySource::Bar> loadOhlcvBarsCsv(const char* path,
   {
     return {};
   }
-}
-
-void fillStatsStruct(const BacktestStats& s, LrvxBacktestStats* out)
-{
-  out->totalTrades = s.totalTrades;
-  out->winningTrades = s.winningTrades;
-  out->losingTrades = s.losingTrades;
-  out->maxConsecutiveWins = s.maxConsecutiveWins;
-  out->maxConsecutiveLosses = s.maxConsecutiveLosses;
-  out->initialCapital = s.initialCapital;
-  out->finalCapital = s.finalCapital;
-  out->totalPnl = s.totalPnl;
-  out->totalFees = s.totalFees;
-  out->netPnl = s.netPnl;
-  out->grossProfit = s.grossProfit;
-  out->grossLoss = s.grossLoss;
-  out->maxDrawdown = s.maxDrawdown;
-  out->maxDrawdownPct = s.maxDrawdownPct;
-  out->winRate = s.winRate;
-  out->profitFactor = s.profitFactor;
-  out->avgWin = s.avgWin;
-  out->avgLoss = s.avgLoss;
-  out->avgWinLossRatio = s.avgWinLossRatio;
-  out->avgTradeDurationNs = s.avgTradeDurationNs;
-  out->medianTradeDurationNs = s.medianTradeDurationNs;
-  out->maxTradeDurationNs = s.maxTradeDurationNs;
-  out->sharpeRatio = s.sharpeRatio;
-  out->sortinoRatio = s.sortinoRatio;
-  out->calmarRatio = s.calmarRatio;
-  out->timeWeightedReturn = s.timeWeightedReturn;
-  out->returnPct = s.returnPct;
-  out->startTimeNs = s.startTimeNs.raw();
-  out->endTimeNs = s.endTimeNs.raw();
-  // A result handle carries no record counts of the run that produced it.
-  out->optionQuoteCount = 0;
-  out->poolStateCount = 0;
 }
 
 }  // namespace

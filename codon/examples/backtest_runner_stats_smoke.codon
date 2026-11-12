@@ -1,0 +1,136 @@
+# Smoke test: what BacktestRunner.run_tape and run_tapes hand back.
+#   * a run with a closed trade reports its duration, its time bounds and
+#     its time-weighted return, the same from run_tape and run_tapes
+#   * a tape that cannot be opened raises ValueError carrying the reason
+
+import os
+
+from C import lrvx_registry_create() -> cobj
+from C import lrvx_registry_destroy(cobj)
+from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+from C import lrvx_runner_create(cobj, cobj, cobj) -> cobj
+from C import lrvx_runner_destroy(cobj)
+from C import lrvx_runner_start(cobj)
+from C import lrvx_runner_stop(cobj)
+from C import lrvx_runner_on_trade(cobj, u32, float, float, u8, i64)
+from C import lrvx_runner_set_market_data_recorder(cobj, cobj)
+from C import lrvx_binary_log_recorder_hook_as_recorder(cobj) -> cobj
+
+from lrvx.runner import BacktestRunner
+from lrvx.strategy import Strategy, SymbolContext
+from lrvx.types import TradeData
+from lrvx.tools import BinaryLogRecorderHook
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+class RoundTrip(Strategy):
+    """Buys on the first trade and sells on the tenth: one closed trade."""
+    seen: int
+
+    def __init__(self, symbols: List[int]):
+        super().__init__(symbols)
+        self.seen = 0
+
+    def on_trade(self, ctx: SymbolContext, trade: TradeData):
+        self.seen += 1
+        if self.seen == 1:
+            self.market_buy(1.0)
+        elif self.seen == 10:
+            self.market_sell(1.0)
+
+
+SEC = 1_000_000_000
+T0 = 1_767_225_600 * SEC
+
+root = "/tmp/codon_backtest_runner_stats_smoke"
+tape = root + "/tape"
+os.system("rm -rf " + root)
+os.system("mkdir -p " + tape)
+
+
+def write_tape():
+    """Recorded through a Runner so the tape carries the manifest run_tapes
+    keys its symbols by."""
+    reg = lrvx_registry_create()
+    sym = int(lrvx_registry_add_symbol(reg, "test".c_str(), "AAA".c_str(), 0.01))
+    hook = BinaryLogRecorderHook(tape, max_segment_mb=4, exchange_id=1, compression="none",
+                                 exchange_name="test", instrument_type="spot")
+    hook.add_symbol(sym, "AAA", "", "", 2, 6)
+    runner = lrvx_runner_create(reg, cobj(), cobj())
+    lrvx_runner_set_market_data_recorder(
+        runner, lrvx_binary_log_recorder_hook_as_recorder(hook._h))
+    lrvx_runner_start(runner)
+    for i in range(20):
+        lrvx_runner_on_trade(runner, u32(sym), 100.0 + float(i), 1.0, u8(1), i64(T0 + i * SEC))
+    lrvx_runner_stop(runner)
+    lrvx_runner_destroy(runner)
+    hook.close()
+    lrvx_registry_destroy(reg)
+
+
+write_tape()
+
+
+def round_trip(merged: bool):
+    reg = lrvx_registry_create()
+    sym = int(lrvx_registry_add_symbol(reg, "test".c_str(), "AAA".c_str(), 0.01))
+    strat = RoundTrip([sym])
+    bt = BacktestRunner(reg, 0.0, 10_000.0)
+    bt.set_strategy(strat)
+    out = bt.run_tapes([tape]) if merged else bt.run_tape(tape)
+    bt.close()
+    lrvx_registry_destroy(reg)
+    return out
+
+
+for merged in [False, True]:
+    tag = "run_tapes" if merged else "run_tape"
+    st = round_trip(merged)
+    check(st.total_trades == 1, tag + ": one closed trade")
+    # The position is held from the first trade to the tenth, one second apart.
+    check(st.avg_trade_duration_ns == 9e9, tag + ": avg_trade_duration_ns")
+    check(st.median_trade_duration_ns == 9e9, tag + ": median_trade_duration_ns")
+    check(st.max_trade_duration_ns == 9e9, tag + ": max_trade_duration_ns")
+    check(st.start_time_ns == T0, tag + ": start_time_ns is the first fill")
+    check(st.end_time_ns == T0 + 9 * SEC, tag + ": end_time_ns is the last fill")
+    check(st.time_weighted_return > 0.0, tag + ": time_weighted_return")
+
+reg = lrvx_registry_create()
+sym = int(lrvx_registry_add_symbol(reg, "test".c_str(), "AAA".c_str(), 0.01))
+idle = RoundTrip([sym])
+bt = BacktestRunner(reg, 0.0, 10_000.0)
+bt.set_strategy(idle)
+missing = root + "/no_such_tape"
+
+said = ""
+try:
+    bt.run_tape(missing)
+except ValueError as e:
+    said = e.message
+check("does not exist" in said and missing in said,
+      "run_tape on a missing directory names the reason: " + said)
+
+said = ""
+try:
+    bt.run_tapes([tape, missing])
+except ValueError as e:
+    said = e.message
+check("not a directory" in said and missing in said,
+      "run_tapes on a missing directory names the reason: " + said)
+bt.close()
+lrvx_registry_destroy(reg)
+
+os.system("rm -rf " + root)
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")

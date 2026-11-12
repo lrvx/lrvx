@@ -525,12 +525,13 @@ class BacktestRunner:
         The tape is the canonical recording format written by
         `lrvx tape record` (live) or `scripts/backfill_to_tape.py`
         (historical). Strategy.on_trade fires for each recorded
-        event; on_bar does not."""
+        event; on_bar does not. Raises ValueError with the reason on a
+        missing or unreadable tape."""
         buf = [i64(0)] * 31
         ok = lrvx_backtest_runner_run_tape(
             self._handle, path.c_str(), buf.arr.ptr)
         if ok == i32(0):
-            raise ValueError(f"BacktestRunner.run_tape failed: {path}")
+            raise ValueError(str.from_ptr(lrvx_last_error_message()))
         return self._parse_stats(buf)
 
     def run_tape_bars(self, path: str, interval_seconds: float,
@@ -592,9 +593,9 @@ class BacktestRunner:
         """Replay N `.lrvx` tape directories merged on read.
         Symbols are rekeyed by ``(metadata.exchange, name)``; events
         are delivered to Strategy.on_trade in global time order across
-        tapes. Returns the aggregated BacktestStats. Raises on bad
-        input, overlapping book streams, or any per-tape decode error
-        (the C ABI returns 0 in those cases)."""
+        tapes. Returns the aggregated BacktestStats. Raises ValueError
+        with the reason on bad input, overlapping book streams, or any
+        per-tape decode error."""
         n_paths = len(paths)
         if n_paths == 0:
             raise ValueError("BacktestRunner.run_tapes: paths must be non-empty")
@@ -611,7 +612,7 @@ class BacktestRunner:
         ok = lrvx_backtest_runner_run_tapes(
             self._handle, path_ptrs.arr.ptr, u32(n_paths), buf.arr.ptr)
         if ok == i32(0):
-            raise ValueError("BacktestRunner.run_tapes failed")
+            raise ValueError(str.from_ptr(lrvx_last_error_message()))
         return self._parse_stats(buf)
 
     def run_ohlcv(self, timestamps: List[int], closes: List[float],

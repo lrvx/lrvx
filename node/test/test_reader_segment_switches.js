@@ -50,7 +50,6 @@ function writeSegment(dir, first, n, step)
 
 function stamps(trades)
 {
-  // exchangeTsNs is a double: exact to well under a millisecond here.
   return trades.map((t) => t.exchangeTsNs);
 }
 
@@ -87,7 +86,7 @@ function main()
       const r = new lrvx.DataReader(dir, undefined, undefined, {orderSegmentsByTime: false});
       const ts = stamps(r.readTrades());
       check(ts.length === 200, 'file-name order returns 200 trades');
-      check(ts[0] === Number(BASE + 2n * MS),'file-name order reads the first file first');
+      check(ts[0] === BASE + 2n * MS,'file-name order reads the first file first');
       const s = r.stats();
       check(s.segmentsInterleaved === 0, 'file-name order interleaves nothing');
       check(s.segmentsReordered === 0, 'file-name order reorders nothing');

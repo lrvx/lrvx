@@ -125,7 +125,7 @@ These methods use the first registered symbol when `symbol` is omitted. `symbol`
 | `close_position(symbol=None)` | Close position (reduce-only) |
 | `cancel_order(order_id)` | Cancel an order |
 | `cancel_all_orders(symbol=None)` | Cancel every order for a symbol |
-| `modify_order(order_id, new_price, new_qty)` | Modify a resting order |
+| `modify_order(order_id, new_price, new_qty)` | Modify a resting order. It keeps its id, symbol and side; `new_qty` is the quantity left to work |
 
 `tif` accepts `"gtc"`, `"ioc"`, `"fok"`, `"gtd"`, `"post_only"`.
 

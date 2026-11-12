@@ -511,10 +511,10 @@ const trades: TradeRecord[] = dr.readTrades(100);
 void trades[0]?.price;
 check(trades.length === 1, `DataReader.readTrades returns the trade written above (got ${trades.length})`);
 if (trades[0]) {
-  // TradeRecord declares `number`, not `bigint` -- DataReader and
-  // MergedTapeReader must agree, or `a.exchangeTsNs === b.exchangeTsNs`
-  // is always false across the two readers.
-  check(typeof trades[0].exchangeTsNs === "number", "TradeRecord.exchangeTsNs is number at runtime");
+  // TradeRecord declares `bigint` -- DataReader and MergedTapeReader
+  // must agree, or `a.exchangeTsNs === b.exchangeTsNs` is always false
+  // across the two readers.
+  check(typeof trades[0].exchangeTsNs === "bigint", "TradeRecord.exchangeTsNs is bigint at runtime");
   // TradeRecord.side is declared "buy" | "sell", not a raw number.
   check(trades[0].side === "buy", `TradeRecord.side is the string "buy" (got ${JSON.stringify(trades[0].side)})`);
 }
