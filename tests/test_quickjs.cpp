@@ -271,6 +271,79 @@ TEST(JsIntegrationTest, AutoCorrelationBindings)
   JS_FreeValue(ctx, eq);
 }
 
+// Integer arguments below a registry indicator's floor (lrvx/indicator/params.h)
+// are refused by the constructor (the C handle is not created) and by the
+// batch call (the C function writes nothing and records E_IND_001), each as
+// a TypeError with the reason; at the floor both work.
+TEST(JsIntegrationTest, IndicatorArgumentsBelowTheFloorThrow)
+{
+  TempJsFile script(R"(
+    var d = []; var h = []; var l = []; var o = [];
+    for (var i = 0; i < 40; ++i) { var x = 100 + Math.sin(i) * 3 + i * 0.1; d.push(x); h.push(x + 1); l.push(x - 1); o.push(x + 0.2); }
+    // [label, construct below the floor, batch below the floor, batch at the floor]
+    var cases = [
+      ['SMA', function () { return new SMA(0); }, function () { return SMA.compute(d, 0); }, function () { return SMA.compute(d, 1); }],
+      ['EMA', function () { return new EMA(0); }, function () { return EMA.compute(d, 0); }, function () { return EMA.compute(d, 1); }],
+      ['RMA', function () { return new RMA(0); }, function () { return RMA.compute(d, 0); }, function () { return RMA.compute(d, 1); }],
+      ['RSI', function () { return new RSI(0); }, function () { return RSI.compute(d, 0); }, function () { return RSI.compute(d, 1); }],
+      ['DEMA', function () { return new DEMA(0); }, function () { return DEMA.compute(d, 0); }, function () { return DEMA.compute(d, 1); }],
+      ['TEMA', function () { return new TEMA(0); }, function () { return TEMA.compute(d, 0); }, function () { return TEMA.compute(d, 1); }],
+      ['Slope', function () { return new Slope(0); }, function () { return Slope.compute(d, 0); }, function () { return Slope.compute(d, 1); }],
+      ['KAMA', function () { return new KAMA(10, 0, 30); }, function () { return KAMA.compute(d, 10, 2, 0); }, function () { return KAMA.compute(d, 10, 1, 1); }],
+      ['Skewness', function () { return new Skewness(2); }, function () { return Skewness.compute(d, 2); }, function () { return Skewness.compute(d, 3); }],
+      ['Kurtosis', function () { return new Kurtosis(3); }, function () { return Kurtosis.compute(d, 3); }, function () { return Kurtosis.compute(d, 4); }],
+      ['RollingZScore', function () { return new RollingZScore(1); }, function () { return RollingZScore.compute(d, 1); }, function () { return RollingZScore.compute(d, 2); }],
+      ['ShannonEntropy', function () { return new ShannonEntropy(10, 0); }, function () { return ShannonEntropy.compute(d, 1, 5); }, function () { return ShannonEntropy.compute(d, 2, 2); }],
+      ['AutoCorrelation', function () { return new AutoCorrelation(10, 0); }, function () { return AutoCorrelation.compute(d, 1, 1); }, function () { return AutoCorrelation.compute(d, 2, 1); }],
+      ['ATR', function () { return new ATR(0); }, function () { return ATR.compute(h, l, d, 0); }, function () { return ATR.compute(h, l, d, 1); }],
+      ['CCI', function () { return new CCI(0); }, function () { return CCI.compute(h, l, d, 0); }, function () { return CCI.compute(h, l, d, 1); }],
+      ['CHOP', function () { return new CHOP(1); }, function () { return CHOP.compute(h, l, d, 1); }, function () { return CHOP.compute(h, l, d, 2); }],
+      ['Stochastic', function () { return new Stochastic(14, 0); }, function () { return Stochastic.compute(h, l, d, 0, 3); }, function () { return Stochastic.compute(h, l, d, 1, 1); }],
+      ['ParkinsonVol', function () { return new ParkinsonVol(0); }, function () { return ParkinsonVol.compute(h, l, 0); }, function () { return ParkinsonVol.compute(h, l, 1); }],
+      ['RogersSatchellVol', function () { return new RogersSatchellVol(0); }, function () { return RogersSatchellVol.compute(o, h, l, d, 0); }, function () { return RogersSatchellVol.compute(o, h, l, d, 1); }],
+      ['Correlation', function () { return new Correlation(1); }, function () { return Correlation.compute(d, h, 1); }, function () { return Correlation.compute(d, h, 2); }],
+      ['MACD', function () { return new MACD(12, 26, 0); }, function () { return MACD.compute(d, 0, 26, 9); }, function () { return MACD.compute(d, 1, 1, 1); }],
+      ['Bollinger', function () { return new Bollinger(0, 2.0); }, function () { return Bollinger.compute(d, 0, 2.0); }, function () { return Bollinger.compute(d, 1, 2.0); }],
+    ];
+    var failures = [];
+    var refusals = 0;
+    for (var k = 0; k < cases.length; ++k) {
+      var c = cases[k];
+      for (var j = 1; j <= 2; ++j) {
+        try { c[j](); failures.push(c[0] + (j === 1 ? ' constructor' : ' batch') + ' accepted'); }
+        catch (e) {
+          if (!(e instanceof TypeError) || String(e.message).indexOf('must be at least') < 0) failures.push(c[0] + ': ' + e);
+          else ++refusals;
+        }
+      }
+      try { c[3](); } catch (e) { failures.push(c[0] + ' at the floor: ' + e); }
+    }
+    var failure_text = failures.join('; ');
+    var refusal_count = refusals;
+    var case_count = cases.length;
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto* ctx = jsStrat.engine().context();
+
+  JSValue f = jsStrat.engine().getGlobalProperty("failure_text");
+  const char* text = JS_ToCString(ctx, f);
+  EXPECT_STREQ(text, "");
+  JS_FreeCString(ctx, text);
+  JS_FreeValue(ctx, f);
+
+  JSValue n = jsStrat.engine().getGlobalProperty("refusal_count");
+  JSValue cases = jsStrat.engine().getGlobalProperty("case_count");
+  int32_t refusals = 0, count = 0;
+  JS_ToInt32(ctx, &refusals, n);
+  JS_ToInt32(ctx, &count, cases);
+  JS_FreeValue(ctx, n);
+  JS_FreeValue(ctx, cases);
+  EXPECT_EQ(count, 22);
+  EXPECT_EQ(refusals, 2 * count);
+}
+
 TEST(JsIntegrationTest, IndicatorGraphBindings)
 {
   TempJsFile script(R"(

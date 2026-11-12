@@ -13346,6 +13346,11 @@
           "name": "ParallelReaderStats"
         },
         {
+          "header": "include/lrvx/indicator/params.h",
+          "kind": "type",
+          "name": "ParamFloor"
+        },
+        {
           "header": "include/lrvx/indicator/parkinson_vol.h",
           "kind": "type",
           "name": "ParkinsonVol"
@@ -13664,6 +13669,11 @@
           "header": "include/lrvx/indicator/rolling_zscore.h",
           "kind": "type",
           "name": "RollingZScoreKernel"
+        },
+        {
+          "header": "include/lrvx/indicator/params.h",
+          "kind": "type",
+          "name": "RowParamFloors"
         },
         {
           "header": "include/lrvx/indicator/rsi.h",
@@ -28498,6 +28508,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "ATR"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "ATR"
         },
@@ -28654,6 +28669,11 @@
         {
           "kind": "method",
           "name": "compute",
+          "parent": "AutoCorrelation"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "AutoCorrelation"
         },
         {
@@ -29158,6 +29178,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "Bollinger"
+        },
+        {
+          "kind": "method",
           "name": "lower",
           "parent": "Bollinger"
         },
@@ -29184,6 +29209,11 @@
         {
           "kind": "method",
           "name": "upper",
+          "parent": "Bollinger"
+        },
+        {
+          "kind": "method",
+          "name": "value",
           "parent": "Bollinger"
         },
         {
@@ -29283,6 +29313,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "CCI"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "CCI"
         },
@@ -29304,6 +29339,11 @@
         {
           "kind": "method",
           "name": "compute",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "CHOP"
         },
         {
@@ -29439,6 +29479,11 @@
         {
           "kind": "method",
           "name": "compute",
+          "parent": "Correlation"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "Correlation"
         },
         {
@@ -31188,6 +31233,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "MACD"
+        },
+        {
+          "kind": "method",
           "name": "histogram",
           "parent": "MACD"
         },
@@ -31214,6 +31264,11 @@
         {
           "kind": "method",
           "name": "update",
+          "parent": "MACD"
+        },
+        {
+          "kind": "method",
+          "name": "value",
           "parent": "MACD"
         },
         {
@@ -32108,6 +32163,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "ParkinsonVol"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "ParkinsonVol"
         },
@@ -32553,6 +32613,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "RogersSatchellVol"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "RogersSatchellVol"
         },
@@ -32859,6 +32924,11 @@
         {
           "kind": "method",
           "name": "compute",
+          "parent": "ShannonEntropy"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "ShannonEntropy"
         },
         {
@@ -33243,6 +33313,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "Stochastic"
+        },
+        {
+          "kind": "method",
           "name": "d",
           "parent": "Stochastic"
         },
@@ -33264,6 +33339,11 @@
         {
           "kind": "method",
           "name": "update",
+          "parent": "Stochastic"
+        },
+        {
+          "kind": "method",
+          "name": "value",
           "parent": "Stochastic"
         },
         {

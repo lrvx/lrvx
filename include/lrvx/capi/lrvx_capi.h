@@ -1746,6 +1746,14 @@ extern "C"
 
   // ============================================================
   // Indicator Functions
+  //
+  // The integer parameters of the indicators in
+  // include/lrvx/indicator/registry.def have a floor (a period of at least 1,
+  // at least 2 for a rolling standard deviation or correlation, 3 for
+  // skewness, 4 for kurtosis; the table is lrvx/indicator/params.h). A
+  // parameter below it writes nothing to the outputs and records code 2
+  // with an E_IND_001 message in lrvx_last_error_message, which is how a
+  // caller tells the failure apart: clear the error before the call.
   // ============================================================
 
   void lrvx_indicator_ema(const double* input, size_t len, size_t period, double* output);
@@ -1811,9 +1819,10 @@ extern "C"
   // Every row of include/lrvx/indicator/registry.def can be created here by
   // its snake_case name ("sma", "macd", "rogers_satchell_vol", ...), with
   // the constructor arguments of that row in order, passed as doubles. An
-  // integer (size_t) argument must be a non-negative whole number. An
-  // unknown name, a wrong argument count or an argument that does not fit
-  // returns NULL, with code 2 and the reason in lrvx_last_error_message.
+  // integer (size_t) argument must be a non-negative whole number, at least
+  // the row's floor (see the indicator functions above). An unknown name, a
+  // wrong argument count or an argument that does not fit returns NULL, with
+  // code 2 and the reason in lrvx_last_error_message.
   //
   //   double args[] = {12, 26, 9};
   //   LrvxStreamingIndicatorHandle h = lrvx_streaming_indicator_create("macd", args, 3);

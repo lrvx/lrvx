@@ -138,6 +138,9 @@ add_codon_executable(codon_indicator_bounds_smoke
 add_codon_executable(codon_indicator_streaming_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/indicator_streaming_smoke.codon)
 
+add_codon_executable(codon_indicator_params_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/indicator_params_smoke.codon)
+
 add_codon_executable(codon_signal_fields_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/signal_fields_smoke.codon)
 

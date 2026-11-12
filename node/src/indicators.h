@@ -15,6 +15,7 @@
 #include "lrvx/indicator/kama.h"
 #include "lrvx/indicator/macd.h"
 #include "lrvx/indicator/obv.h"
+#include "lrvx/indicator/params.h"
 #include "lrvx/indicator/rma.h"
 #include "lrvx/indicator/rsi.h"
 #include "lrvx/indicator/slope.h"
@@ -52,6 +53,29 @@ inline std::span<const double> arr2span(Napi::Float64Array& a)
   return {a.Data(), a.ElementLength()};
 }
 
+// A registry indicator built from a call's arguments. The C++ classes accept
+// any period and answer NaN for a window they cannot fill; the binding
+// refuses the arguments instead, with the floors of lrvx/indicator/params.h,
+// as a JS Error carrying code E_IND_001 (the shape tryLrvx gives an
+// LrvxError), so new SMA(0) and sma(data, 0) both throw.
+template <typename T, typename... A>
+T checkedIndicator(Napi::Env env, const char* row, A... args)
+{
+  try
+  {
+    lrvx::indicator::requireArgs(row, args...);
+  }
+  catch (const lrvx::LrvxError& e)
+  {
+    auto err = Napi::Error::New(env, e.message());
+    err.Value().Set("code", Napi::String::New(env, e.code()));
+    err.Value().Set("helpUrl", Napi::String::New(env, e.helpUrl()));
+    err.Value().Set("name", Napi::String::New(env, "LrvxError"));
+    throw err;
+  }
+  return T(args...);
+}
+
 // Every multi-array batch indicator below used to take its element count
 // from the FIRST array only and blindly index the rest at that length.
 // A caller passing mismatched arrays (e.g. `close` shorter than `high`)
@@ -75,11 +99,11 @@ Napi::Value batchSingle(const Napi::CallbackInfo& info, Indicator ind)
   return vec2arr(info.Env(), out);
 }
 
-#define BATCH_SINGLE(name, Ind)                                   \
-  inline Napi::Value batch_##name(const Napi::CallbackInfo& info) \
-  {                                                               \
-    size_t p = info[1].As<Napi::Number>().Uint32Value();          \
-    return batchSingle(info, lrvx::indicator::Ind(p));            \
+#define BATCH_SINGLE(name, Ind)                                                             \
+  inline Napi::Value batch_##name(const Napi::CallbackInfo& info)                           \
+  {                                                                                         \
+    size_t p = info[1].As<Napi::Number>().Uint32Value();                                    \
+    return batchSingle(info, checkedIndicator<lrvx::indicator::Ind>(info.Env(), #name, p)); \
   }
 
 BATCH_SINGLE(sma, SMA)
@@ -87,15 +111,21 @@ BATCH_SINGLE(ema, EMA)
 BATCH_SINGLE(rsi, RSI)
 BATCH_SINGLE(rma, RMA)
 BATCH_SINGLE(slope, Slope)
-BATCH_SINGLE(kama, KAMA)
 
 #undef BATCH_SINGLE
+
+inline Napi::Value batch_kama(const Napi::CallbackInfo& info)
+{
+  size_t p = info[1].As<Napi::Number>().Uint32Value();
+  return batchSingle(info, checkedIndicator<lrvx::indicator::KAMA>(info.Env(), "kama", p,
+                                                                   size_t{2}, size_t{30}));
+}
 
 inline Napi::Value batch_dema(const Napi::CallbackInfo& info)
 {
   auto in = info[0].As<Napi::Float64Array>();
   size_t p = info[1].As<Napi::Number>().Uint32Value();
-  auto r = lrvx::indicator::DEMA(p).compute(arr2span(in));
+  auto r = checkedIndicator<lrvx::indicator::DEMA>(info.Env(), "dema", p).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
@@ -103,7 +133,7 @@ inline Napi::Value batch_tema(const Napi::CallbackInfo& info)
 {
   auto in = info[0].As<Napi::Float64Array>();
   size_t p = info[1].As<Napi::Number>().Uint32Value();
-  auto r = lrvx::indicator::TEMA(p).compute(arr2span(in));
+  auto r = checkedIndicator<lrvx::indicator::TEMA>(info.Env(), "tema", p).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
@@ -120,7 +150,7 @@ inline Napi::Value batch_atr(const Napi::CallbackInfo& info)
     return info.Env().Undefined();
   }
   std::vector<double> out(n);
-  lrvx::indicator::ATR(p).compute({h.Data(), n}, {l.Data(), n}, {c.Data(), n}, {out.data(), n});
+  checkedIndicator<lrvx::indicator::ATR>(info.Env(), "atr", p).compute({h.Data(), n}, {l.Data(), n}, {c.Data(), n}, {out.data(), n});
   return vec2arr(info.Env(), out);
 }
 
@@ -154,7 +184,7 @@ inline Napi::Value batch_stochastic(const Napi::CallbackInfo& info)
   {
     return info.Env().Undefined();
   }
-  auto r = lrvx::indicator::Stochastic(kp, dp).compute({h.Data(), n}, {l.Data(), n}, {c.Data(), n});
+  auto r = checkedIndicator<lrvx::indicator::Stochastic>(info.Env(), "stochastic", kp, dp).compute({h.Data(), n}, {l.Data(), n}, {c.Data(), n});
   auto o = Napi::Object::New(info.Env());
   o.Set("k", vec2arr(info.Env(), r.k));
   o.Set("d", vec2arr(info.Env(), r.d));
@@ -171,7 +201,7 @@ inline Napi::Value batch_cci(const Napi::CallbackInfo& info)
   {
     return info.Env().Undefined();
   }
-  auto r = lrvx::indicator::CCI(p).compute({h.Data(), n}, {l.Data(), n}, {c.Data(), n});
+  auto r = checkedIndicator<lrvx::indicator::CCI>(info.Env(), "cci", p).compute({h.Data(), n}, {l.Data(), n}, {c.Data(), n});
   return vec2arr(info.Env(), r);
 }
 
@@ -185,7 +215,7 @@ inline Napi::Value batch_chop(const Napi::CallbackInfo& info)
   {
     return info.Env().Undefined();
   }
-  auto r = lrvx::indicator::CHOP(p).compute({h.Data(), n}, {l.Data(), n}, {c.Data(), n});
+  auto r = checkedIndicator<lrvx::indicator::CHOP>(info.Env(), "chop", p).compute({h.Data(), n}, {l.Data(), n}, {c.Data(), n});
   return vec2arr(info.Env(), r);
 }
 
@@ -199,8 +229,7 @@ inline Napi::Value batch_macd(const Napi::CallbackInfo& info)
   size_t s = info[2].As<Napi::Number>().Uint32Value();
   size_t sg = info[3].As<Napi::Number>().Uint32Value();
   std::vector<double> line(n), sig(n), hist(n);
-  lrvx::indicator::MACD(f, s, sg).compute({in.Data(), n}, {line.data(), n}, {sig.data(), n},
-                                          {hist.data(), n});
+  checkedIndicator<lrvx::indicator::MACD>(info.Env(), "macd", f, s, sg).compute({in.Data(), n}, {line.data(), n}, {sig.data(), n}, {hist.data(), n});
   auto o = Napi::Object::New(info.Env());
   o.Set("line", vec2arr(info.Env(), line));
   o.Set("signal", vec2arr(info.Env(), sig));
@@ -213,7 +242,7 @@ inline Napi::Value batch_bollinger(const Napi::CallbackInfo& info)
   auto in = info[0].As<Napi::Float64Array>();
   size_t n = in.ElementLength(), p = info[1].As<Napi::Number>().Uint32Value();
   double sd = info[2].As<Napi::Number>().DoubleValue();
-  auto r = lrvx::indicator::Bollinger(p, sd).compute({in.Data(), n});
+  auto r = checkedIndicator<lrvx::indicator::Bollinger>(info.Env(), "bollinger", p, sd).compute({in.Data(), n});
   auto o = Napi::Object::New(info.Env());
   o.Set("upper", vec2arr(info.Env(), r.upper));
   o.Set("middle", vec2arr(info.Env(), r.middle));
@@ -272,7 +301,7 @@ inline Napi::Value batch_skewness(const Napi::CallbackInfo& info)
 {
   auto in = info[0].As<Napi::Float64Array>();
   size_t p = info[1].As<Napi::Number>().Uint32Value();
-  auto r = lrvx::indicator::Skewness(p).compute(arr2span(in));
+  auto r = checkedIndicator<lrvx::indicator::Skewness>(info.Env(), "skewness", p).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
@@ -280,7 +309,7 @@ inline Napi::Value batch_kurtosis(const Napi::CallbackInfo& info)
 {
   auto in = info[0].As<Napi::Float64Array>();
   size_t p = info[1].As<Napi::Number>().Uint32Value();
-  auto r = lrvx::indicator::Kurtosis(p).compute(arr2span(in));
+  auto r = checkedIndicator<lrvx::indicator::Kurtosis>(info.Env(), "kurtosis", p).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
@@ -288,7 +317,7 @@ inline Napi::Value batch_rolling_zscore(const Napi::CallbackInfo& info)
 {
   auto in = info[0].As<Napi::Float64Array>();
   size_t p = info[1].As<Napi::Number>().Uint32Value();
-  auto r = lrvx::indicator::RollingZScore(p).compute(arr2span(in));
+  auto r = checkedIndicator<lrvx::indicator::RollingZScore>(info.Env(), "rolling_zscore", p).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
@@ -297,7 +326,7 @@ inline Napi::Value batch_shannon_entropy(const Napi::CallbackInfo& info)
   auto in = info[0].As<Napi::Float64Array>();
   size_t p = info[1].As<Napi::Number>().Uint32Value();
   size_t bins = info[2].As<Napi::Number>().Uint32Value();
-  auto r = lrvx::indicator::ShannonEntropy(p, bins).compute(arr2span(in));
+  auto r = checkedIndicator<lrvx::indicator::ShannonEntropy>(info.Env(), "shannon_entropy", p, bins).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
@@ -311,7 +340,7 @@ inline Napi::Value batch_parkinson_vol(const Napi::CallbackInfo& info)
     return info.Env().Undefined();
   }
   std::vector<double> out(n);
-  lrvx::indicator::ParkinsonVol(p).compute({h.Data(), n}, {l.Data(), n}, {out.data(), n});
+  checkedIndicator<lrvx::indicator::ParkinsonVol>(info.Env(), "parkinson_vol", p).compute({h.Data(), n}, {l.Data(), n}, {out.data(), n});
   return vec2arr(info.Env(), out);
 }
 
@@ -328,8 +357,7 @@ inline Napi::Value batch_rogers_satchell_vol(const Napi::CallbackInfo& info)
     return info.Env().Undefined();
   }
   std::vector<double> out(n);
-  lrvx::indicator::RogersSatchellVol(p).compute({o.Data(), n}, {h.Data(), n}, {l.Data(), n},
-                                                {c.Data(), n}, {out.data(), n});
+  checkedIndicator<lrvx::indicator::RogersSatchellVol>(info.Env(), "rogers_satchell_vol", p).compute({o.Data(), n}, {h.Data(), n}, {l.Data(), n}, {c.Data(), n}, {out.data(), n});
   return vec2arr(info.Env(), out);
 }
 
@@ -343,7 +371,7 @@ inline Napi::Value batch_correlation(const Napi::CallbackInfo& info)
     return info.Env().Undefined();
   }
   std::vector<double> out(n);
-  lrvx::indicator::Correlation(p).compute({x.Data(), n}, {y.Data(), n}, {out.data(), n});
+  checkedIndicator<lrvx::indicator::Correlation>(info.Env(), "correlation", p).compute({x.Data(), n}, {y.Data(), n}, {out.data(), n});
   return vec2arr(info.Env(), out);
 }
 
@@ -373,7 +401,7 @@ inline Napi::Value batch_autocorrelation(const Napi::CallbackInfo& info)
   size_t window = info[1].As<Napi::Number>().Uint32Value();
   size_t lag = info[2].As<Napi::Number>().Uint32Value();
   std::vector<double> out(n);
-  lrvx::indicator::AutoCorrelation(window, lag)
+  checkedIndicator<lrvx::indicator::AutoCorrelation>(info.Env(), "autocorrelation", window, lag)
       .compute(std::span<const double>(in.Data(), n), std::span<double>(out.data(), n));
   return vec2arr(info.Env(), out);
 }
@@ -396,7 +424,7 @@ inline Napi::Value optNum(Napi::Env env, double v)
 }  // namespace
 
 // Macro for indicators that take ONE size_t in their constructor.
-#define WRAP_SINGLE_1(Name)                                                                        \
+#define WRAP_SINGLE_1(Name, row)                                                                   \
   class Name##Wrap : public Napi::ObjectWrap<Name##Wrap>                                           \
   {                                                                                                \
    public:                                                                                         \
@@ -412,7 +440,11 @@ inline Napi::Value optNum(Napi::Env env, double v)
            InstanceAccessor("count", &Name##Wrap::Count, nullptr)});                               \
     }                                                                                              \
     Name##Wrap(const Napi::CallbackInfo& info)                                                     \
-        : Napi::ObjectWrap<Name##Wrap>(info), _ind(info[0].As<Napi::Number>().Uint32Value()) {}    \
+        : Napi::ObjectWrap<Name##Wrap>(info),                                                      \
+          _ind(checkedIndicator<lrvx::indicator::Name>(info.Env(), #row,                           \
+                                                       info[0].As<Napi::Number>().Uint32Value()))  \
+    {                                                                                              \
+    }                                                                                              \
                                                                                                    \
    private:                                                                                        \
     lrvx::indicator::Name _ind;                                                                    \
@@ -439,16 +471,16 @@ inline Napi::Value optNum(Napi::Env env, double v)
     void Reset(const Napi::CallbackInfo&) { _ind.reset(); }                                        \
   };
 
-WRAP_SINGLE_1(SMA)
-WRAP_SINGLE_1(EMA)
-WRAP_SINGLE_1(RMA)
-WRAP_SINGLE_1(RSI)
-WRAP_SINGLE_1(DEMA)
-WRAP_SINGLE_1(TEMA)
-WRAP_SINGLE_1(Slope)
-WRAP_SINGLE_1(Skewness)
-WRAP_SINGLE_1(Kurtosis)
-WRAP_SINGLE_1(RollingZScore)
+WRAP_SINGLE_1(SMA, sma)
+WRAP_SINGLE_1(EMA, ema)
+WRAP_SINGLE_1(RMA, rma)
+WRAP_SINGLE_1(RSI, rsi)
+WRAP_SINGLE_1(DEMA, dema)
+WRAP_SINGLE_1(TEMA, tema)
+WRAP_SINGLE_1(Slope, slope)
+WRAP_SINGLE_1(Skewness, skewness)
+WRAP_SINGLE_1(Kurtosis, kurtosis)
+WRAP_SINGLE_1(RollingZScore, rolling_zscore)
 
 #undef WRAP_SINGLE_1
 
@@ -468,9 +500,9 @@ class KAMAWrap : public Napi::ObjectWrap<KAMAWrap>
   }
   KAMAWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<KAMAWrap>(info),
-        _ind(info[0].As<Napi::Number>().Uint32Value(),
-             info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 2u,
-             info.Length() > 2 ? info[2].As<Napi::Number>().Uint32Value() : 30u)
+        _ind(checkedIndicator<lrvx::indicator::KAMA>(info.Env(), "kama", info[0].As<Napi::Number>().Uint32Value(),
+                                                     info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 2u,
+                                                     info.Length() > 2 ? info[2].As<Napi::Number>().Uint32Value() : 30u))
   {
   }
 
@@ -512,8 +544,8 @@ class ShannonEntropyWrap : public Napi::ObjectWrap<ShannonEntropyWrap>
   }
   ShannonEntropyWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<ShannonEntropyWrap>(info),
-        _ind(info[0].As<Napi::Number>().Uint32Value(),
-             info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 10u)
+        _ind(checkedIndicator<lrvx::indicator::ShannonEntropy>(info.Env(), "shannon_entropy", info[0].As<Napi::Number>().Uint32Value(),
+                                                               info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 10u))
   {
   }
 
@@ -555,8 +587,8 @@ class AutoCorrelationWrap : public Napi::ObjectWrap<AutoCorrelationWrap>
   }
   AutoCorrelationWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<AutoCorrelationWrap>(info),
-        _ind(info[0].As<Napi::Number>().Uint32Value(),
-             info[1].As<Napi::Number>().Uint32Value())
+        _ind(checkedIndicator<lrvx::indicator::AutoCorrelation>(info.Env(), "autocorrelation", info[0].As<Napi::Number>().Uint32Value(),
+                                                                info[1].As<Napi::Number>().Uint32Value()))
   {
   }
 
@@ -583,7 +615,7 @@ class AutoCorrelationWrap : public Napi::ObjectWrap<AutoCorrelationWrap>
 };
 
 // Macro for bar-input indicators (high, low, close), 1-arg ctor.
-#define WRAP_BAR_1(Name)                                                                           \
+#define WRAP_BAR_1(Name, row)                                                                      \
   class Name##Wrap : public Napi::ObjectWrap<Name##Wrap>                                           \
   {                                                                                                \
    public:                                                                                         \
@@ -598,7 +630,11 @@ class AutoCorrelationWrap : public Napi::ObjectWrap<AutoCorrelationWrap>
                           InstanceAccessor("count", &Name##Wrap::Count, nullptr)});                \
     }                                                                                              \
     Name##Wrap(const Napi::CallbackInfo& info)                                                     \
-        : Napi::ObjectWrap<Name##Wrap>(info), _ind(info[0].As<Napi::Number>().Uint32Value()) {}    \
+        : Napi::ObjectWrap<Name##Wrap>(info),                                                      \
+          _ind(checkedIndicator<lrvx::indicator::Name>(info.Env(), #row,                           \
+                                                       info[0].As<Napi::Number>().Uint32Value()))  \
+    {                                                                                              \
+    }                                                                                              \
                                                                                                    \
    private:                                                                                        \
     lrvx::indicator::Name _ind;                                                                    \
@@ -629,9 +665,9 @@ class AutoCorrelationWrap : public Napi::ObjectWrap<AutoCorrelationWrap>
     void Reset(const Napi::CallbackInfo&) { _ind.reset(); }                                        \
   };
 
-WRAP_BAR_1(ATR)
-WRAP_BAR_1(CCI)
-WRAP_BAR_1(CHOP)
+WRAP_BAR_1(ATR, atr)
+WRAP_BAR_1(CCI, cci)
+WRAP_BAR_1(CHOP, chop)
 
 #undef WRAP_BAR_1
 
@@ -650,7 +686,7 @@ class ParkinsonVolWrap : public Napi::ObjectWrap<ParkinsonVolWrap>
                         InstanceAccessor("count", &ParkinsonVolWrap::Count, nullptr)});
   }
   ParkinsonVolWrap(const Napi::CallbackInfo& info)
-      : Napi::ObjectWrap<ParkinsonVolWrap>(info), _ind(info[0].As<Napi::Number>().Uint32Value())
+      : Napi::ObjectWrap<ParkinsonVolWrap>(info), _ind(checkedIndicator<lrvx::indicator::ParkinsonVol>(info.Env(), "parkinson_vol", info[0].As<Napi::Number>().Uint32Value()))
   {
   }
 
@@ -694,7 +730,7 @@ class RogersSatchellVolWrap : public Napi::ObjectWrap<RogersSatchellVolWrap>
   }
   RogersSatchellVolWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<RogersSatchellVolWrap>(info),
-        _ind(info[0].As<Napi::Number>().Uint32Value())
+        _ind(checkedIndicator<lrvx::indicator::RogersSatchellVol>(info.Env(), "rogers_satchell_vol", info[0].As<Napi::Number>().Uint32Value()))
   {
   }
 
@@ -741,7 +777,7 @@ class CorrelationWrap : public Napi::ObjectWrap<CorrelationWrap>
                         InstanceAccessor("count", &CorrelationWrap::Count, nullptr)});
   }
   CorrelationWrap(const Napi::CallbackInfo& info)
-      : Napi::ObjectWrap<CorrelationWrap>(info), _ind(info[0].As<Napi::Number>().Uint32Value())
+      : Napi::ObjectWrap<CorrelationWrap>(info), _ind(checkedIndicator<lrvx::indicator::Correlation>(info.Env(), "correlation", info[0].As<Napi::Number>().Uint32Value()))
   {
   }
 
@@ -788,9 +824,9 @@ class MACDWrap : public Napi::ObjectWrap<MACDWrap>
   }
   MACDWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<MACDWrap>(info),
-        _ind(info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 12u,
-             info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 26u,
-             info.Length() > 2 ? info[2].As<Napi::Number>().Uint32Value() : 9u)
+        _ind(checkedIndicator<lrvx::indicator::MACD>(info.Env(), "macd", info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 12u,
+                                                     info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 26u,
+                                                     info.Length() > 2 ? info[2].As<Napi::Number>().Uint32Value() : 9u))
   {
   }
 
@@ -850,8 +886,8 @@ class BollingerWrap : public Napi::ObjectWrap<BollingerWrap>
   }
   BollingerWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<BollingerWrap>(info),
-        _ind(info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 20u,
-             info.Length() > 1 ? info[1].As<Napi::Number>().DoubleValue() : 2.0)
+        _ind(checkedIndicator<lrvx::indicator::Bollinger>(info.Env(), "bollinger", info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 20u,
+                                                          info.Length() > 1 ? info[1].As<Napi::Number>().DoubleValue() : 2.0))
   {
   }
 
@@ -907,8 +943,8 @@ class StochasticWrap : public Napi::ObjectWrap<StochasticWrap>
   }
   StochasticWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<StochasticWrap>(info),
-        _ind(info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 14u,
-             info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 3u)
+        _ind(checkedIndicator<lrvx::indicator::Stochastic>(info.Env(), "stochastic", info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 14u,
+                                                           info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 3u))
   {
   }
 
