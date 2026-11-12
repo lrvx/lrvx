@@ -185,7 +185,7 @@ All bindings expose the same core model: strategy callbacks, order emission, pos
 | Capability | Python | Node | Codon | JavaScript (QuickJS) |
 |---|---|---|---|---|
 | `Strategy` callbacks — trade, book, bar | yes | yes | yes | yes |
-| `BacktestRunner` — event-driven replay (`run_csv`, `run_tape`, `run_ohlcv`, `run_bars`) | yes | yes | yes | no |
+| `BacktestRunner` — event-driven replay (`run_csv`, `run_tape`, `run_ohlcv`, `run_bars`, `run_tape_bars`), slippage and latency arguments | yes | yes | yes | no |
 | `Engine` + `SignalBuilder` — backtest a pre-built signal list | yes | yes | yes | yes |
 | `SimulatedExecutor`, `BacktestResult` | yes | yes | yes | yes |
 | `DataReader`, `DataWriter` | yes | yes | yes | yes |
@@ -333,7 +333,7 @@ print(stats["return_pct"], stats["sharpe_ratio"], stats["max_drawdown_pct"])
 
 The constructor takes `(registry, fee_rate=0.0004, initial_capital=100000.0)` — nothing else. Flat fee rate, no funding, no liquidation, no rate limits, no queue position. Useful for an indicator sanity check; not enough for a decision about real capital.
 
-`run_csv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used; each bar is replayed as one trade, so `on_trade` fires and `on_bar` does not. Timestamps below `1e12` are treated as seconds and scaled to nanoseconds, because a raw CSV column's unit is genuinely unknown. `run_ohlcv(ts, close, symbol)` and `run_bars(...)` (full OHLC, fires `on_bar`) are both different: `ts` and `start_time_ns` / `end_time_ns` are nanoseconds by contract — the same contract the C ABI, Node, and Codon bindings use for the same calls — so they are used exactly as given, with no unit guessing at all. Other entry points: `run_tape(path)` and `run_tapes(paths)` for `.lrvx` tapes.
+`run_csv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used; each bar is replayed as one trade, so `on_trade` fires and `on_bar` does not. Timestamps below `1e12` are treated as seconds and scaled to nanoseconds, because a raw CSV column's unit is genuinely unknown. `run_ohlcv(ts, close, symbol)` and `run_bars(...)` (full OHLC, fires `on_bar`) are both different: `ts` and `start_time_ns` / `end_time_ns` are nanoseconds by contract — the same contract the C ABI, Node, and Codon bindings use for the same calls — so they are used exactly as given, with no unit guessing at all. Other entry points: `run_tape(path)` and `run_tapes(paths)` replay `.lrvx` tapes tick by tick (`on_trade`), and `run_tape_bars(path, interval_seconds=..., symbol=...)` replays a tape as time bars (`on_bar`, `run_bars`' fill rules).
 
 Returns a plain dict. Keys: `total_trades`, `winning_trades`, `losing_trades`, `initial_capital`, `final_capital`, `total_pnl`, `total_fees`, `net_pnl`, `gross_profit`, `gross_loss`, `max_drawdown`, `max_drawdown_pct`, `win_rate`, `profit_factor`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `return_pct`.
 
@@ -639,7 +639,7 @@ const stats = bt.runCsv('/path/to/btcusdt_1m.csv', 'BTCUSDT');
 
 The constructor takes `(registry, feeRate, initialCapital)` — nothing else. Flat fee rate, no funding, no liquidation, no rate limits, no queue position. Good for an indicator sanity check; not enough before live.
 
-`runCsv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used, and each bar is replayed as one trade. Other entry points: `runOhlcv(timestamps, closes, symbol)`, `runTape(path)`, `runTapes(paths)`.
+`runCsv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used, and each bar is replayed as one trade. Other entry points: `runOhlcv(timestamps, closes, symbol)`, `runTape(path)`, `runTapes(paths)`, and `runTapeBars(path, intervalSeconds, symbol)`, which replays a tape as time bars.
 
 Hooks attach after construction: `setExecutor(executor)` (an object implementing the `Executor` interface, or `null`), `addExecutionListener(listener)`. Run artifacts: `equityCurve()`, `trades()`.
 
@@ -4435,6 +4435,86 @@ A 10/20 SMA crossover. Buy when fast crosses above slow, sell on the reverse.
     }
     ```
 
+## Bars from a tape in one call
+
+A bar strategy over a recorded `.lrvx` tape is one call: `run_tape_bars`
+aggregates the tape's trades into time bars while it streams and hands each
+closed bar to `on_bar`. The trades never reach Python, so a three-month tape
+runs in the memory its bars need.
+
+=== "Python"
+
+    ```python
+    bt = lrvx.BacktestRunner(reg, fee_rate=0.0004, initial_capital=10_000,
+                             slippage_model="fixed_bps", slippage_bps=1.0)
+    bt.set_strategy(strat)
+    stats = bt.run_tape_bars("data/tape", interval_seconds=300, symbol="BTCUSDT")
+    ```
+
+=== "Node.js"
+
+    ```javascript
+    const bt = new lrvx.BacktestRunner(reg, 0.0004, 10000,
+        {slippageModel: "fixed_bps", slippageBps: 1.0});
+    bt.setStrategy(strat);
+    const stats = bt.runTapeBars("data/tape", 300, "BTCUSDT");
+    ```
+
+=== "Codon"
+
+    ```python
+    bt = BacktestRunner(reg, 0.0004, 10_000.0,
+                        slippage_model="fixed_bps", slippage_bps=1.0)
+    bt.set_strategy(strat)
+    stats = bt.run_tape_bars("data/tape", 300.0, "BTCUSDT")
+    ```
+
+=== "C++"
+
+    ```cpp
+    BacktestRunner runner(config);
+    runner.setStrategy(&strat);
+    auto result = runner.runTapeBars("data/tape", std::chrono::minutes(5), btcId);
+    ```
+
+What it does, exactly:
+
+- Bars are wall-clock aligned (a 300 s bar starts on a multiple of five
+  minutes, UTC), built by the same time-bar policy as `aggregate_time_bars`: a
+  trade later than its bar's bucket is dropped, and the last bar, still open
+  when the tape ends, is not delivered. An interval with no trades has no bar.
+- The executor is fed the bars, not the ticks, so the fill rules are
+  `run_bars`' rules: an order sent from `on_bar` fills at that symbol's next
+  bar open, and resting and conditional orders walk open, low, high, close.
+  `on_trade` does not fire, and book records in the tape are not used.
+- One symbol per run. `symbol` names the registered symbol whose registry id is
+  the tape's symbol id; it may be left out only when the tape holds a single
+  symbol, and a tape with more than one raises instead of mixing them.
+- Each bar carries `bar_type` 0 (time), `bar_type_param` = the interval in
+  nanoseconds, and its buy volume, as a live time aggregator would set them.
+
+The result is the result of the explicit route -- `DataReader.read_trades`,
+`aggregate_time_bars`, `run_bars` -- for the same interval: same fills, same
+`trades()`, same `equity_curve()`. This example runs both and checks it:
+
+```python
+--8<-- "examples/python_run_tape_bars.py"
+```
+
+Two differences a strategy can see, neither of which reaches a fill: the
+explicit route passes no buy volume (`run_bars` takes none), and it carries
+each bar's volume through a float, so a bar whose notional exceeds about
+9e7 quote units arrives rounded to the nearest representable value where the
+one-call route delivers it exact. Use the explicit form when the bars are
+reused across many runs -- load or aggregate them once and hand the same arrays
+to every run, as in [Sweep parameters over bars](sweep-over-bars.md).
+
+Slippage and latency arguments are covered in
+[Realistic backtest fills](backtest-realistic-fills.md) and
+[Add latency to a backtest](backtest-with-latency.md). On bars, any positive
+submit latency moves a fill to a later bar's open:
+[Latency on bar replay](backtest-with-latency.md#latency-on-bar-replay).
+
 ## Output
 
 ```
@@ -4601,6 +4681,42 @@ Details and the exact bounds: [SimulatedExecutor](../reference/api/backtest/simu
 
 ## 1. Configure the simulator
 
+`BacktestRunner` takes the default slippage profile as constructor arguments --
+`slippage_model` (`none`, `fixed_ticks`, `fixed_bps`, `volume_impact`) and the
+one parameter that model reads: `slippage_ticks` with `slippage_tick_size`,
+`slippage_bps`, or `slippage_impact_coeff` (camelCase in Node). Every model
+moves the fill against the taker. A parameter the chosen model does not read is
+refused rather than ignored, and `volume_impact` is refused by the bar and
+trade-only runs (`run_bars`, `run_tape_bars`, `run_csv`, `run_ohlcv`), which
+carry no book depth for it to divide by.
+
+=== "Python"
+
+    ```python
+    import lrvx
+
+    bt = lrvx.BacktestRunner(reg, fee_rate=0.0002, initial_capital=100_000,
+                             slippage_model="fixed_bps", slippage_bps=1.0)
+    ```
+
+=== "Node.js"
+
+    ```javascript
+    const bt = new lrvx.BacktestRunner(reg, 0.0002, 100_000,
+        {slippageModel: "fixed_bps", slippageBps: 1.0});
+    ```
+
+=== "Codon"
+
+    ```python
+    bt = BacktestRunner(reg, 0.0002, 100_000.0,
+                        slippage_model="fixed_bps", slippage_bps=1.0)
+    ```
+
+The queue model, per-symbol slippage and the rest of the executor's knobs are
+set on a `SimulatedExecutor` you drive yourself, or through `BacktestConfig` in
+C++:
+
 === "Python"
 
     ```python
@@ -4656,17 +4772,19 @@ Details and the exact bounds: [SimulatedExecutor](../reference/api/backtest/simu
 === "Python"
 
     ```python
-    bt = lrvx.BacktestRunner(reg, fee_rate=0.0002, initial_capital=100_000)
+    bt = lrvx.BacktestRunner(reg, fee_rate=0.0002, initial_capital=100_000,
+                             slippage_model="fixed_bps", slippage_bps=1.0)
     bt.set_strategy(my_strategy)
-    stats = bt.run_csv("data.csv", "BTCUSDT")
+    stats = bt.run_tape_bars("data/tape", interval_seconds=300, symbol="BTCUSDT")
     ```
 
 === "Node.js"
 
     ```javascript
-    const bt = new lrvx.BacktestRunner(reg, 0.0002, 100_000);
+    const bt = new lrvx.BacktestRunner(reg, 0.0002, 100_000,
+        {slippageModel: "fixed_bps", slippageBps: 1.0});
     bt.setStrategy(myStrategy);
-    const stats = bt.runCsv("data.csv", "BTCUSDT");
+    const stats = bt.runTapeBars("data/tape", 300, "BTCUSDT");
     ```
 
 === "C++"
@@ -5277,6 +5395,13 @@ Compose with [walk-forward](walk-forward.md): run a `GridSearch` on each fold's 
 # Sweep parameters over bars
 
 Run one bar strategy over many parameter combinations fast enough to iterate on the grid, not wait for it.
+
+A single run over a recorded tape does not need the arrays at all:
+`run_tape_bars(path, interval_seconds=..., symbol=...)` aggregates the tape
+while it streams and gives the same result as the explicit route (see
+[Bars from a tape in one call](backtest.md#bars-from-a-tape-in-one-call)).
+A sweep repeats the run many times over the same bars, so it pays to build the
+bars once and reuse them, which is what this page does.
 
 ## Load the bars once
 
@@ -6471,8 +6596,13 @@ Same tool for every binding — it's a standalone CLI binary.
 ## 3. Load bars for backtesting
 
 `MmapBarStorage` / `MmapBarReplaySource` are C++-only — neither is exposed in
-the Python or Node.js bindings. From the bindings, aggregate the trade arrays
-in-process with the batch aggregators and feed the result to `run_bars`.
+the Python or Node.js bindings. From the bindings, a single run over a `.lrvx`
+tape is `run_tape_bars(path, interval_seconds=..., symbol=...)` (Node
+`runTapeBars`), which aggregates time bars while the tape streams -- see
+[Bars from a tape in one call](backtest.md#bars-from-a-tape-in-one-call). The
+explicit form, for bars reused across runs or for other bar types, aggregates
+the trade arrays in-process with the batch aggregators and feeds the result to
+`run_bars`.
 
 === "Python"
 
@@ -9753,7 +9883,7 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 
 **Constructor**
 
-- `BacktestRunner(registry: SymbolRegistry, fee_rate: typing.SupportsFloat | typing.SupportsIndex = 0.0004, initial_capital: typing.SupportsFloat | typing.SupportsIndex = 100000.0) -> None`
+- `BacktestRunner(registry: SymbolRegistry, fee_rate: typing.SupportsFloat | typing.SupportsIndex = 0.0004, initial_capital: typing.SupportsFloat | typing.SupportsIndex = 100000.0, *, slippage_model: str = 'none', slippage_ticks: typing.SupportsInt | typing.SupportsIndex = 0, slippage_tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.0, slippage_bps: typing.SupportsFloat | typing.SupportsIndex = 0.0, slippage_impact_coeff: typing.SupportsFloat | typing.SupportsIndex = 0.0, submit_ack_latency_ns: typing.SupportsInt | typing.SupportsIndex = 0, submit_ack_jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0, cancel_ack_latency_ns: typing.SupportsInt | typing.SupportsIndex = 0, cancel_ack_jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0, cancel_ack_seed: typing.SupportsInt | typing.SupportsIndex = 42, replace_ack_latency_ns: typing.SupportsInt | typing.SupportsIndex = 0, replace_ack_jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0, latency: typing.Any = None) -> None`
 
 **Members**
 
@@ -9763,6 +9893,7 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 - `run_csv(self, path: str, symbol: str = '') -> typing.Any`
 - `run_ohlcv(self, ts: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol: str = '') -> typing.Any`
 - `run_tape(self, path: str) -> typing.Any`
+- `run_tape_bars(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any`
 - `run_tapes(self, paths: collections.abc.Sequence[str]) -> typing.Any`
 - `set_executor(self, executor: Executor) -> None`
 - `set_executor(self, executor: VenueExecutor) -> None`
@@ -12325,7 +12456,7 @@ Passed to the `on_signal` callback.
 
 ## Class: `lrvx.BacktestRunner`
 
-Runs a strategy against historical CSV data.
+Runs a strategy against historical data: CSV, bar arrays, or `.lrvx` tapes.
 
 `fee_rate` defaults to `0.0004` here, a taker rate. `lrvx.BacktestResult` and the C++
 `BacktestConfig` default to `0.0001`, so pass the rate explicitly when a runner result is
@@ -12337,7 +12468,34 @@ bt.set_strategy(strategy)
 
 stats = bt.run_csv("data.csv")             # auto-detects symbol from registry
 stats = bt.run_csv("data.csv", "BTCUSDT")  # explicit symbol name
+stats = bt.run_tape_bars("data/tape", interval_seconds=300, symbol="BTCUSDT")
 ```
+
+### Constructor
+
+`BacktestRunner(registry, fee_rate=0.0004, initial_capital=100000.0, *, ...)`
+
+The keyword-only arguments configure the built-in simulated executor. Each is the `BacktestConfig`
+field of the same name (snake_cased) and means what it means there. All defaults reproduce the
+instant, slippage-free runner.
+
+| Keyword | Default | Meaning |
+|---------|---------|---------|
+| `slippage_model` | `"none"` | `"none"`, `"fixed_ticks"`, `"fixed_bps"` or `"volume_impact"`; every model moves a taker fill against the taker |
+| `slippage_ticks`, `slippage_tick_size` | `0`, `0.0` | `fixed_ticks`: both required and positive; the fill moves `ticks x tick_size` |
+| `slippage_bps` | `0.0` | `fixed_bps`: required and positive |
+| `slippage_impact_coeff` | `0.0` | `volume_impact`: required and positive; moves `coeff x order / level size`. Needs book depth, so `run_bars`, `run_tape_bars`, `run_csv` and `run_ohlcv` refuse it |
+| `submit_ack_latency_ns`, `submit_ack_jitter_ns` | `0`, `0` | Venue ack delay before a submitted order can match, drawn uniformly from `[latency - jitter, latency + jitter]` floored at 0 |
+| `cancel_ack_latency_ns`, `cancel_ack_jitter_ns` | `0`, `0` | Same for cancels; the order can still fill in the window |
+| `replace_ack_latency_ns`, `replace_ack_jitter_ns` | `0`, `0` | Same for replaces |
+| `cancel_ack_seed` | `42` | Seeds the ack-latency draws |
+| `latency` | `None` | A `lrvx.LatencyModel` (`ConstantLatency`, `GaussianLatency`, `ExponentialLatency`, `EmpiricalLatency` or a subclass); its `order_delay()` is added to every submit's deferral |
+
+A setting the chosen slippage model does not read, an unknown model, or a negative latency raises
+`LrvxError` (`E_VAL_002`). A runner built with any of these settings refuses `set_executor` and
+`set_venue_stack`, whose executors would not use them. On bar replay any positive submit deferral
+moves a fill to a later bar's open: see
+[Latency on bar replay](../../how-to/backtest-with-latency.md#latency-on-bar-replay).
 
 | Method | Description |
 |--------|-------------|
@@ -12346,6 +12504,7 @@ stats = bt.run_csv("data.csv", "BTCUSDT")  # explicit symbol name
 | `run_ohlcv(ts, close, symbol='')` | Replay close-only bars as synthetic trades (`Strategy.on_trade` fires) |
 | `run_bars(start_time_ns, end_time_ns, open, high, low, close, volume, symbol='', bar_type=0, bar_type_param=0)` | Replay full OHLCV bars (`Strategy.on_bar` fires) |
 | `run_tape(path)` | Run against a `.lrvx` tape directory — the canonical recorded artifact `lrvx tape record` writes. Same stats shape as `run_csv` |
+| `run_tape_bars(path, *, interval_seconds, symbol='')` | Replay a `.lrvx` tape as time bars of `interval_seconds` (`Strategy.on_bar` fires, `on_trade` does not). The trades are aggregated while the tape streams, never materialised in Python. Same bars, fills, `trades()` and `equity_curve()` as `read_trades` -> `aggregate_time_bars` -> `run_bars` for the same interval. `symbol` is required when the tape holds more than one. See [Bars from a tape in one call](../../how-to/backtest.md#bars-from-a-tape-in-one-call) |
 | `run_tapes(paths)` | Run against N `.lrvx` tapes merged on read. Symbols are rekeyed by `(metadata.exchange, name)`, so two captures of the same venue/symbol collapse and two venues stay distinct. `run_tapes([t])` equals `run_tape(t)` |
 | `equity_curve()` | Equity curve from the most recent run, as a dict of numpy arrays (`timestamp_ns`, `equity`, `drawdown_pct`). One point per closed trade; a position still open at the end adds none (see [A position open at the end](#a-position-open-at-the-end)) |
 | `trades()` | Closed trades from the most recent run, as a dict of numpy arrays (`symbol`, `side`, `entry_price`, `exit_price`, `quantity`, `pnl`, `fee`, `entry_time_ns`, `exit_time_ns`). A position still open at the end is not a trade and is not listed |
@@ -14540,7 +14699,7 @@ the market to `open` — releasing any order held from a prior
 `begin_bar_callback_window()` / `end_bar_callback_window()` pair at that
 price — then walks `low -> high -> close` so resting stops and targets match
 the bar's intrabar extremes, not just its close. Use this, not `on_bar`, when
-driving `SimulatedExecutor` by hand: `BacktestRunner.run_bars` uses this
+driving `SimulatedExecutor` by hand: `BacktestRunner.run_bars` (and `run_tape_bars`) uses this
 overload internally, so `on_bar` alone gives a caller neither the bar's open
 nor its intrabar extremes.
 
@@ -14615,6 +14774,11 @@ executor.set_default_slippage("fixed_bps", bps=2.0)
 | `"volume_impact"` | Volume-proportional impact — uses `impact_coeff` |
 
 `tick_size` is in price units; `0.0` falls back to one raw price unit.
+
+`BacktestRunner` takes the default profile as constructor keywords instead
+(`slippage_model`, `slippage_ticks`, `slippage_tick_size`, `slippage_bps`,
+`slippage_impact_coeff`), stricter than this setter: an unknown model, a missing
+parameter or one the model does not read raises there.
 
 #### `set_symbol_slippage(symbol, model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)`
 
@@ -15303,7 +15467,18 @@ bt.setStrategy(strategy);
 
 const stats = bt.runCsv('/path/to/data.csv', 'BTCUSDT');
 const stats = bt.runOhlcv(timestampsNs, closePrices, 'BTCUSDT');
+const stats = bt.runTapeBars('/path/to/tape', 300, 'BTCUSDT');
 ```
+
+`new BacktestRunner(registry, feeRate, initialCapital, options?)`: `options` sets the built-in
+executor's slippage and latency, the `BacktestConfig` fields camelCased -- `slippageModel`
+(`'none'`, `'fixed_ticks'`, `'fixed_bps'`, `'volume_impact'`), `slippageTicks`,
+`slippageTickSize`, `slippageBps`, `slippageImpactCoeff`, `submitAckLatencyNs`,
+`submitAckJitterNs`, `cancelAckLatencyNs`, `cancelAckJitterNs`, `cancelAckSeed`,
+`replaceAckLatencyNs`, `replaceAckJitterNs`, and `latency` (a `ConstantLatency`,
+`GaussianLatency`, `ExponentialLatency` or `EmpiricalLatency`). The meaning and the refusals are
+the Python ones: see [BacktestRunner constructor](../python/strategy.md#constructor). A runner
+built with options refuses `setExecutor`.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
@@ -15311,6 +15486,7 @@ const stats = bt.runOhlcv(timestampsNs, closePrices, 'BTCUSDT');
 | `runCsv(path, symbol)` | stats object | Replay a CSV file (timestamp, open, high, low, close, volume) |
 | `runOhlcv(timestamps, closes, symbol)` | stats object | Replay raw arrays (timestamps as Float64Array, closes as Float64Array) |
 | `runTape(path)` | stats object | Replay a `.lrvx` tape directory — the canonical recording written by `lrvx tape record` or `scripts/backfill_to_tape.py` |
+| `runTapeBars(path, intervalSeconds, symbol?)` | stats object | Replay a `.lrvx` tape as time bars: trades aggregated while the tape streams, each closed bar to `onBar` with `runBars`' fill rules. Same result as `readTrades` -> `aggregateTimeBars` -> `runBars` for the same interval. `symbol` is required when the tape holds more than one; throws `LrvxError` on a bad interval, unknown symbol, unreadable tape or a symbol with no trades |
 | `runTapes(paths)` | stats object | Merge N `.lrvx` tape directories on read and replay the merged stream. Symbols are rekeyed by `(metadata.exchange, name)` so two venues stay distinct. `runTapes([t])` equals `runTape(t)`; throws on bad paths or overlapping book streams |
 | `setExecutor(executor)` | `void` | Replace the built-in `SimulatedExecutor`. `null` detaches |
 | `addExecutionListener(listener)` | `void` | Attach an order-lifecycle listener. Multiple listeners may be attached; each fires for every order event |
@@ -17030,14 +17206,28 @@ bt.set_strategy(my_strategy)
 
 stats = bt.run_csv("data/btcusdt.csv", "BTCUSDT")
 stats = bt.run_ohlcv(timestamps, closes, "BTCUSDT")
+stats = bt.run_tape_bars("data/tape", 300.0, "BTCUSDT")
 print(stats.return_pct, stats.sharpe_ratio)
 ```
 
 ### Constructor
 
 ```codon
-BacktestRunner(registry: cobj, fee_rate: float = 0.0004, initial_capital: float = 10_000.0)
+BacktestRunner(registry: cobj, fee_rate: float = 0.0004, initial_capital: float = 10_000.0,
+               slippage_model: str = "none", slippage_ticks: int = 0,
+               slippage_tick_size: float = 0.0, slippage_bps: float = 0.0,
+               slippage_impact_coeff: float = 0.0,
+               submit_ack_latency_ns: int = 0, submit_ack_jitter_ns: int = 0,
+               cancel_ack_latency_ns: int = 0, cancel_ack_jitter_ns: int = 0,
+               cancel_ack_seed: int = 42,
+               replace_ack_latency_ns: int = 0, replace_ack_jitter_ns: int = 0,
+               latency = None)
 ```
+
+The arguments after `initial_capital` set the built-in executor's slippage and latency with the
+names and meaning of the Python runner (see
+[BacktestRunner constructor](../python/strategy.md#constructor)); `latency` is a model from
+`lrvx.latency` and must outlive the runner. An invalid setting raises `ValueError`.
 
 ### Methods
 
@@ -17048,6 +17238,7 @@ BacktestRunner(registry: cobj, fee_rate: float = 0.0004, initial_capital: float 
 | `run_ohlcv(timestamps, closes, symbol)` | `BacktestStats` | Replay raw arrays (`List[int]` timestamps in ns, `List[float]` closes) |
 | `run_bars(start_ns, end_ns, opens, highs, lows, closes, volumes, symbol, bar_type=0, bar_type_param=0)` | `BacktestStats` | Replay full OHLCV bars. `Strategy.on_bar` fires; `on_trade` does **not** |
 | `run_tape(path)` | `BacktestStats` | Replay one `.lrvx` tape directory |
+| `run_tape_bars(path, interval_seconds, symbol="")` | `BacktestStats` | Replay a `.lrvx` tape as time bars, aggregated while it streams; each closed bar goes to `on_bar` with `run_bars`' fill rules. Same result as `aggregate_time_bars` -> `run_bars` on the tape's trades. `symbol` is required when the tape holds more than one |
 | `run_tapes(paths)` | `BacktestStats` | Replay N `.lrvx` tapes merged on read |
 | `equity_curve()` | `Tuple[List[int], List[float], List[float]]` | `(timestamps_ns, equity, drawdown_pct)` from the most recent run, all the same length. Raises if no run has completed |
 | `trades()` | 9 parallel lists | `(symbol, side, entry_price, exit_price, quantity, pnl, fee, entry_time_ns, exit_time_ns)` for the closed trades of the most recent run. `side` is 0 for long, 1 for short |
@@ -18878,6 +19069,29 @@ int lrvx_backtest_runner_run_ohlcv(LrvxBacktestRunnerHandle runner,
                                    const double* close_prices, uint32_t n,
                                    const char* symbol,
                                    LrvxBacktestStats* stats_out);
+
+// Replay a `.lrvx` tape as time bars of interval_ns (aggregated while the
+// tape streams; each closed bar replayed as run_bars replays it). symbol may
+// be NULL when the tape holds one symbol. Returns 1 on success, 0 on error
+// with the reason in lrvx_last_error_message().
+int lrvx_backtest_runner_run_tape_bars(LrvxBacktestRunnerHandle runner,
+                                       const char* tape_dir, int64_t interval_ns,
+                                       const char* symbol,
+                                       LrvxBacktestStats* stats_out);
+
+// lrvx_backtest_runner_create with the built-in executor's slippage and
+// latency (BacktestConfig fields of the same names). slippage_model: 0 none,
+// 1 fixed_ticks, 2 fixed_bps, 3 volume_impact. latency is borrowed and must
+// outlive the runner. Returns NULL on an invalid value, naming it in
+// lrvx_last_error_message().
+LrvxBacktestRunnerHandle lrvx_backtest_runner_create_with_fill_settings(
+    LrvxRegistryHandle registry, double fee_rate, double initial_capital,
+    int32_t slippage_model, int32_t slippage_ticks, double slippage_tick_size,
+    double slippage_bps, double slippage_impact_coeff,
+    int64_t submit_ack_latency_ns, int64_t submit_ack_jitter_ns,
+    int64_t cancel_ack_latency_ns, int64_t cancel_ack_jitter_ns,
+    uint64_t cancel_ack_seed, int64_t replace_ack_latency_ns,
+    int64_t replace_ack_jitter_ns, LrvxLatencyModelHandle latency);
 ```
 
 ---

@@ -215,6 +215,11 @@
         {
           "group": "backtestrunner_replay",
           "kind": "function",
+          "name": "lrvx_backtest_runner_create_with_fill_settings"
+        },
+        {
+          "group": "backtestrunner_replay",
+          "kind": "function",
           "name": "lrvx_backtest_runner_destroy"
         },
         {
@@ -241,6 +246,11 @@
           "group": "backtestrunner_replay",
           "kind": "function",
           "name": "lrvx_backtest_runner_run_tape"
+        },
+        {
+          "group": "backtestrunner_replay",
+          "kind": "function",
+          "name": "lrvx_backtest_runner_run_tape_bars"
         },
         {
           "group": "backtestrunner_replay",
@@ -5395,6 +5405,11 @@
         },
         {
           "kind": "method",
+          "name": "run_tape_bars",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "run_tapes",
           "parent": "BacktestRunner"
         },
@@ -8848,6 +8863,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_backtest_runner_create_with_fill_settings"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_backtest_runner_destroy"
         },
         {
@@ -8869,6 +8888,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_backtest_runner_run_tape"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_backtest_runner_run_tape_bars"
         },
         {
           "kind": "c_import",
@@ -13595,6 +13618,11 @@
           "name": "RtSpinDecision"
         },
         {
+          "header": "include/lrvx/backtest/runner_fill_settings.h",
+          "kind": "type",
+          "name": "RunnerFillSettings"
+        },
+        {
           "header": "include/lrvx/indicator/sma.h",
           "kind": "type",
           "name": "SMA"
@@ -14821,6 +14849,11 @@
         },
         {
           "kind": "method",
+          "name": "beginBarRun",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "checkBreakpoints",
           "parent": "BacktestRunner"
         },
@@ -14842,6 +14875,11 @@
         {
           "kind": "method",
           "name": "customExecutor",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "endBarRun",
           "parent": "BacktestRunner"
         },
         {
@@ -14922,6 +14960,11 @@
         {
           "kind": "method",
           "name": "runTape",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "runTapeBars",
           "parent": "BacktestRunner"
         },
         {
@@ -15012,6 +15055,11 @@
         {
           "kind": "method",
           "name": "step",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "stepBar",
           "parent": "BacktestRunner"
         },
         {
@@ -24086,6 +24134,16 @@
         },
         {
           "kind": "method",
+          "name": "applyTo",
+          "parent": "RunnerFillSettings"
+        },
+        {
+          "kind": "method",
+          "name": "customized",
+          "parent": "RunnerFillSettings"
+        },
+        {
+          "kind": "method",
           "name": "compute",
           "parent": "SMA"
         },
@@ -27264,6 +27322,10 @@
         },
         {
           "kind": "class",
+          "name": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "class",
           "name": "BacktestStats"
         },
         {
@@ -28514,6 +28576,11 @@
         },
         {
           "kind": "method",
+          "name": "runTapeBars",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "runTapes",
           "parent": "BacktestRunner"
         },
@@ -28531,6 +28598,71 @@
           "kind": "method",
           "name": "trades",
           "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "cancelAckJitterNs",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "cancelAckLatencyNs",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "cancelAckSeed",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "latency",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "replaceAckJitterNs",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "replaceAckLatencyNs",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "slippageBps",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "slippageImpactCoeff",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "slippageModel",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "slippageTickSize",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "slippageTicks",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "submitAckJitterNs",
+          "parent": "BacktestRunnerOptions"
+        },
+        {
+          "kind": "method",
+          "name": "submitAckLatencyNs",
+          "parent": "BacktestRunnerOptions"
         },
         {
           "kind": "method",
@@ -35303,6 +35435,11 @@
         {
           "kind": "method",
           "name": "run_tape",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "run_tape_bars",
           "parent": "BacktestRunner"
         },
         {
@@ -42194,12 +42331,14 @@
     "backtestrunner_replay": {
       "capi_functions": [
         "lrvx_backtest_runner_create",
+        "lrvx_backtest_runner_create_with_fill_settings",
         "lrvx_backtest_runner_destroy",
         "lrvx_backtest_runner_run_bars",
         "lrvx_backtest_runner_run_csv",
         "lrvx_backtest_runner_run_ohlcv",
         "lrvx_backtest_runner_run_replay_source",
         "lrvx_backtest_runner_run_tape",
+        "lrvx_backtest_runner_run_tape_bars",
         "lrvx_backtest_runner_run_tapes",
         "lrvx_backtest_runner_set_kill_switch",
         "lrvx_backtest_runner_set_order_validator",

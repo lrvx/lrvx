@@ -25,28 +25,41 @@ Two `BacktestConfig` knobs:
 
 RNG sampling shares `cancelAckSeed`.
 
-The bindings expose the pair as one `SimulatedExecutor` setter,
-`set_submit_ack_latency(latency_ns, jitter_ns=0)`. `BacktestRunner`'s
-constructor takes only `(registry, fee_rate, initial_capital)` and
-owns its executor internally, so from Python / Node the knob applies
-to a `SimulatedExecutor` you drive yourself — a standalone one, or
-`PaperBroker.simulated_executor`. Set `BacktestConfig` in C++ to
-change the knob for a `BacktestRunner`.
+`BacktestRunner` takes the pair as constructor arguments
+(`submit_ack_latency_ns`, `submit_ack_jitter_ns`; Node
+`submitAckLatencyNs`, `submitAckJitterNs`) and applies them to its built-in
+executor. A `SimulatedExecutor` you drive yourself -- a standalone one, or
+`PaperBroker.simulated_executor` -- takes them through
+`set_submit_ack_latency(latency_ns, jitter_ns=0)`.
 
 === "Python"
 
     ```python
     import lrvx
 
+    bt = lrvx.BacktestRunner(reg, fee_rate=0.0004, initial_capital=10_000.0,
+                             submit_ack_latency_ns=5_000_000,   # 5 ms ± 2 ms
+                             submit_ack_jitter_ns=2_000_000)
+
     ex = lrvx.SimulatedExecutor()
-    ex.set_submit_ack_latency(5_000_000, 2_000_000)   # 5 ms ± 2 ms
+    ex.set_submit_ack_latency(5_000_000, 2_000_000)
     ```
 
 === "Node.js"
 
     ```javascript
+    const bt = new lrvx.BacktestRunner(reg, 0.0004, 10_000,
+        {submitAckLatencyNs: 5_000_000, submitAckJitterNs: 2_000_000});
+
     const ex = new lrvx.SimulatedExecutor();
     ex.setSubmitAckLatency(5_000_000, 2_000_000);
+    ```
+
+=== "Codon"
+
+    ```python
+    bt = BacktestRunner(reg, 0.0004, 10_000.0,
+                        submit_ack_latency_ns=5_000_000, submit_ack_jitter_ns=2_000_000)
     ```
 
 === "C++"
@@ -74,3 +87,6 @@ change the knob for a `BacktestRunner`.
   `PENDING_TRIGGER` at the ack deadline, not at submit time.
 - The clock source is the engine's simulated clock; live runs
   follow whichever clock the connector attached.
+- On bar replay the clock reads the bar's end, so any positive ack
+  latency moves a bar-callback order's fill to a later bar's open. See
+  [Latency on bar replay](backtest-with-latency.md#latency-on-bar-replay).

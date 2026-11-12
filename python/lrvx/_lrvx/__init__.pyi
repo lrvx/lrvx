@@ -238,8 +238,10 @@ class BacktestResult:
         Write equity curve to CSV (timestamp_ns,equity,drawdown_pct header)
         """
 class BacktestRunner:
-    def __init__(self, registry: SymbolRegistry, fee_rate: typing.SupportsFloat | typing.SupportsIndex = 0.0004, initial_capital: typing.SupportsFloat | typing.SupportsIndex = 100000.0) -> None:
-        ...
+    def __init__(self, registry: SymbolRegistry, fee_rate: typing.SupportsFloat | typing.SupportsIndex = 0.0004, initial_capital: typing.SupportsFloat | typing.SupportsIndex = 100000.0, *, slippage_model: str = 'none', slippage_ticks: typing.SupportsInt | typing.SupportsIndex = 0, slippage_tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.0, slippage_bps: typing.SupportsFloat | typing.SupportsIndex = 0.0, slippage_impact_coeff: typing.SupportsFloat | typing.SupportsIndex = 0.0, submit_ack_latency_ns: typing.SupportsInt | typing.SupportsIndex = 0, submit_ack_jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0, cancel_ack_latency_ns: typing.SupportsInt | typing.SupportsIndex = 0, cancel_ack_jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0, cancel_ack_seed: typing.SupportsInt | typing.SupportsIndex = 42, replace_ack_latency_ns: typing.SupportsInt | typing.SupportsIndex = 0, replace_ack_jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0, latency: typing.Any = None) -> None:
+        """
+        Backtest runner over the built-in SimulatedExecutor. The keyword-only arguments are BacktestConfig's executor fields under their snake_case names. slippage_model: none | fixed_ticks (slippage_ticks x slippage_tick_size) | fixed_bps (slippage_bps) | volume_impact (slippage_impact_coeff x order/level size; needs book depth), each against the taker; a setting the chosen model does not read is refused. submit/cancel/replace_ack_latency_ns and *_jitter_ns: venue ack delay, drawn uniformly from [latency - jitter, latency + jitter] floored at 0, with cancel_ack_seed seeding the draw. latency: a lrvx.LatencyModel whose order_delay() is added to the submit deferral. On bar replay the clock reads the bar's end, so any positive submit deferral moves a fill to a later bar's open (docs/how-to/backtest-with-latency.md). The defaults reproduce the instant, slippage-free run.
+        """
     def add_execution_listener(self, listener: ExecutionListener) -> None:
         ...
     def equity_curve(self) -> typing.Any:
@@ -255,6 +257,10 @@ class BacktestRunner:
     def run_tape(self, path: str) -> typing.Any:
         """
         Run a backtest off a `.lrvx` tape directory. The tape is the canonical recorded artifact (`lrvx tape record` writes it). Returns the same stats dict shape as run_csv / run_bars.
+        """
+    def run_tape_bars(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any:
+        """
+        Replay a `.lrvx` tape as time bars of interval_seconds: the trades are aggregated while the tape streams (wall-clock aligned, the last still-open bar dropped, exactly as aggregate_time_bars does) and every closed bar goes to Strategy.on_bar with run_bars' fill rules -- an order sent from on_bar fills at the next bar's open. on_trade does not fire. symbol names the registry symbol to replay and is required when the tape holds more than one; its registry id must be the tape's symbol id. Same result as read_trades -> aggregate_time_bars -> run_bars for the same interval, without the trade array ever reaching Python.
         """
     def run_tapes(self, paths: collections.abc.Sequence[str]) -> typing.Any:
         """

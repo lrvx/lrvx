@@ -120,7 +120,7 @@ const stats = bt.runCsv('/path/to/btcusdt_1m.csv', 'BTCUSDT');
 
 The constructor takes `(registry, feeRate, initialCapital)` — nothing else. Flat fee rate, no funding, no liquidation, no rate limits, no queue position. Good for an indicator sanity check; not enough before live.
 
-`runCsv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used, and each bar is replayed as one trade. Other entry points: `runOhlcv(timestamps, closes, symbol)`, `runTape(path)`, `runTapes(paths)`.
+`runCsv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used, and each bar is replayed as one trade. Other entry points: `runOhlcv(timestamps, closes, symbol)`, `runTape(path)`, `runTapes(paths)`, and `runTapeBars(path, intervalSeconds, symbol)`, which replays a tape as time bars.
 
 Hooks attach after construction: `setExecutor(executor)` (an object implementing the `Executor` interface, or `null`), `addExecutionListener(listener)`. Run artifacts: `equityCurve()`, `trades()`.
 

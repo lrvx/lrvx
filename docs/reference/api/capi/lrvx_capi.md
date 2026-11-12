@@ -564,6 +564,29 @@ int lrvx_backtest_runner_run_ohlcv(LrvxBacktestRunnerHandle runner,
                                    const double* close_prices, uint32_t n,
                                    const char* symbol,
                                    LrvxBacktestStats* stats_out);
+
+// Replay a `.lrvx` tape as time bars of interval_ns (aggregated while the
+// tape streams; each closed bar replayed as run_bars replays it). symbol may
+// be NULL when the tape holds one symbol. Returns 1 on success, 0 on error
+// with the reason in lrvx_last_error_message().
+int lrvx_backtest_runner_run_tape_bars(LrvxBacktestRunnerHandle runner,
+                                       const char* tape_dir, int64_t interval_ns,
+                                       const char* symbol,
+                                       LrvxBacktestStats* stats_out);
+
+// lrvx_backtest_runner_create with the built-in executor's slippage and
+// latency (BacktestConfig fields of the same names). slippage_model: 0 none,
+// 1 fixed_ticks, 2 fixed_bps, 3 volume_impact. latency is borrowed and must
+// outlive the runner. Returns NULL on an invalid value, naming it in
+// lrvx_last_error_message().
+LrvxBacktestRunnerHandle lrvx_backtest_runner_create_with_fill_settings(
+    LrvxRegistryHandle registry, double fee_rate, double initial_capital,
+    int32_t slippage_model, int32_t slippage_ticks, double slippage_tick_size,
+    double slippage_bps, double slippage_impact_coeff,
+    int64_t submit_ack_latency_ns, int64_t submit_ack_jitter_ns,
+    int64_t cancel_ack_latency_ns, int64_t cancel_ack_jitter_ns,
+    uint64_t cancel_ack_seed, int64_t replace_ack_latency_ns,
+    int64_t replace_ack_jitter_ns, LrvxLatencyModelHandle latency);
 ```
 
 ---

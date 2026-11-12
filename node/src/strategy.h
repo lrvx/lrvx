@@ -8,6 +8,7 @@
 #include "data_ops.h"
 #include "error_translator.h"
 #include "hooks.h"
+#include "latency.h"
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/capi/order_type_names.hpp"
@@ -15,8 +16,12 @@
 #include "run_trace.h"
 #include "tsfn_util.h"
 
+#include <chrono>
+#include <cmath>
+#include <cstring>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace node_lrvx
@@ -1032,6 +1037,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
             InstanceMethod("runBars", &BacktestRunnerNode::runBars),
             InstanceMethod("runTape", &BacktestRunnerNode::runTape),
             InstanceMethod("runTapes", &BacktestRunnerNode::runTapes),
+            InstanceMethod("runTapeBars", &BacktestRunnerNode::runTapeBars),
             InstanceMethod("setExecutor", &BacktestRunnerNode::setExecutor),
             InstanceMethod("addExecutionListener", &BacktestRunnerNode::addExecutionListener),
             InstanceMethod("equityCurve", &BacktestRunnerNode::equityCurve),
@@ -1039,14 +1045,112 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
         });
   }
 
-  // new BacktestRunner(registry, feeRate, initialCapital)
+  // new BacktestRunner(registry, feeRate, initialCapital, options?)
+  //
+  // options carries the built-in executor's slippage and latency, the same
+  // BacktestConfig fields Python takes as keywords, camelCased. Without it
+  // (or with every key at its default) the runner is the plain one.
   BacktestRunnerNode(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<BacktestRunnerNode>(info)
   {
+    auto env = info.Env();
     _reg = Napi::ObjectWrap<SymbolRegistryNode>::Unwrap(info[0].As<Napi::Object>())->get();
     double fee = info[1].As<Napi::Number>().DoubleValue();
     double cap = info[2].As<Napi::Number>().DoubleValue();
-    _handle = lrvx_backtest_runner_create(static_cast<LrvxRegistryHandle>(_reg), fee, cap);
+    if (info.Length() < 4 || info[3].IsUndefined())
+    {
+      _handle = lrvx_backtest_runner_create(static_cast<LrvxRegistryHandle>(_reg), fee, cap);
+      return;
+    }
+    if (!info[3].IsObject())
+    {
+      throw Napi::TypeError::New(env, "BacktestRunner: options must be an object");
+    }
+    auto opts = info[3].As<Napi::Object>();
+    static const char* const kKeys[] = {
+        "slippageModel", "slippageTicks", "slippageTickSize", "slippageBps",
+        "slippageImpactCoeff", "submitAckLatencyNs", "submitAckJitterNs",
+        "cancelAckLatencyNs", "cancelAckJitterNs", "cancelAckSeed",
+        "replaceAckLatencyNs", "replaceAckJitterNs", "latency"};
+    auto names = opts.GetPropertyNames();
+    for (uint32_t i = 0; i < names.Length(); ++i)
+    {
+      const std::string key = names.Get(i).As<Napi::String>().Utf8Value();
+      bool known = false;
+      for (const char* k : kKeys)
+      {
+        known = known || key == k;
+      }
+      if (!known)
+      {
+        throw lrvxError(env, "BacktestRunner: unknown option '" + key + "'");
+      }
+    }
+    const auto num = [&](const char* key, double fallback)
+    {
+      auto v = opts.Get(key);
+      if (v.IsUndefined())
+      {
+        return fallback;
+      }
+      if (!v.IsNumber())
+      {
+        throw Napi::TypeError::New(env, std::string("BacktestRunner: ") + key +
+                                            " must be a number");
+      }
+      return v.As<Napi::Number>().DoubleValue();
+    };
+    const auto i64 = [&](const char* key, double fallback)
+    { return static_cast<int64_t>(num(key, fallback)); };
+
+    int32_t model = 0;
+    auto modelV = opts.Get("slippageModel");
+    if (!modelV.IsUndefined())
+    {
+      const std::string m = modelV.ToString().Utf8Value();
+      static const char* const kModels[] = {"none", "fixed_ticks", "fixed_bps", "volume_impact"};
+      model = -1;
+      for (int32_t k = 0; k < 4; ++k)
+      {
+        if (m == kModels[k])
+        {
+          model = k;
+        }
+      }
+      if (model < 0)
+      {
+        throw lrvxError(env,
+                        "BacktestRunner: slippageModel must be one of 'none', 'fixed_ticks', "
+                        "'fixed_bps', 'volume_impact'; got '" +
+                            m + "'");
+      }
+    }
+    LrvxLatencyModelHandle latency = nullptr;
+    auto latencyV = opts.Get("latency");
+    if (!latencyV.IsUndefined() && !latencyV.IsNull())
+    {
+      latency = latencyHandleOf(latencyV);
+      if (latency == nullptr)
+      {
+        throw Napi::TypeError::New(
+            env,
+            "BacktestRunner: latency must be a ConstantLatency, GaussianLatency, "
+            "ExponentialLatency or EmpiricalLatency");
+      }
+      // The runner borrows the model; keep the JS object (and its handle) alive.
+      _latencyRef = Napi::Persistent(latencyV.As<Napi::Object>());
+    }
+    _handle = lrvx_backtest_runner_create_with_fill_settings(
+        static_cast<LrvxRegistryHandle>(_reg), fee, cap, model,
+        static_cast<int32_t>(num("slippageTicks", 0)), num("slippageTickSize", 0.0),
+        num("slippageBps", 0.0), num("slippageImpactCoeff", 0.0), i64("submitAckLatencyNs", 0),
+        i64("submitAckJitterNs", 0), i64("cancelAckLatencyNs", 0), i64("cancelAckJitterNs", 0),
+        static_cast<uint64_t>(num("cancelAckSeed", 42)), i64("replaceAckLatencyNs", 0),
+        i64("replaceAckJitterNs", 0), latency);
+    if (_handle == nullptr)
+    {
+      throw lrvxError(env, "BacktestRunner: " + camelCaseNames(lrvx_last_error_message()));
+    }
   }
 
   ~BacktestRunnerNode()
@@ -1061,6 +1165,91 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
   LrvxBacktestRunnerHandle _handle{nullptr};
   SymbolRegistry* _reg{nullptr};
   std::unique_ptr<NodeStrategyHost> _host;
+  Napi::ObjectReference _latencyRef;
+
+  static Napi::Error lrvxError(Napi::Env env, const std::string& msg)
+  {
+    auto err = Napi::Error::New(env, msg);
+    err.Value().Set("code", Napi::String::New(env, "E_VAL_002"));
+    err.Value().Set("name", Napi::String::New(env, "LrvxError"));
+    return err;
+  }
+
+  // The C ABI names arguments the way Python spells them; this binding's
+  // options are camelCase, so the message is translated before it is shown.
+  static std::string camelCaseNames(std::string msg)
+  {
+    static const std::pair<const char*, const char*> kNames[] = {
+        {"slippage_impact_coeff", "slippageImpactCoeff"},
+        {"slippage_tick_size", "slippageTickSize"},
+        {"slippage_ticks", "slippageTicks"},
+        {"slippage_bps", "slippageBps"},
+        {"slippage_model", "slippageModel"},
+        {"submit_ack_latency_ns", "submitAckLatencyNs"},
+        {"submit_ack_jitter_ns", "submitAckJitterNs"},
+        {"cancel_ack_latency_ns", "cancelAckLatencyNs"},
+        {"cancel_ack_jitter_ns", "cancelAckJitterNs"},
+        {"replace_ack_latency_ns", "replaceAckLatencyNs"},
+        {"replace_ack_jitter_ns", "replaceAckJitterNs"},
+        {"interval_ns", "intervalSeconds"},
+        {"lrvx_backtest_runner_create_with_fill_settings: ", ""},
+        {"lrvx_backtest_runner_run_tape_bars: ", ""},
+    };
+    for (const auto& [from, to] : kNames)
+    {
+      for (auto pos = msg.find(from); pos != std::string::npos; pos = msg.find(from, pos))
+      {
+        msg.replace(pos, std::strlen(from), to);
+        pos += std::strlen(to);
+      }
+    }
+    return msg;
+  }
+
+  // runner.runTapeBars(path, intervalSeconds, symbol?) -> stats. The tape
+  // replayed as time bars with runBars' fill rules; throws on error.
+  Napi::Value runTapeBars(const Napi::CallbackInfo& info)
+  {
+    auto env = info.Env();
+    if (info.Length() < 2 || !info[0].IsString() || !info[1].IsNumber())
+    {
+      Napi::TypeError::New(env,
+                           "BacktestRunner.runTapeBars(path, intervalSeconds, symbol?): expected "
+                           "a string and a number")
+          .ThrowAsJavaScriptException();
+      return env.Undefined();
+    }
+    const std::string path = info[0].As<Napi::String>().Utf8Value();
+    const double seconds = info[1].As<Napi::Number>().DoubleValue();
+    // Converted the way aggregateTimeBars converts its interval.
+    const auto ns = std::isfinite(seconds)
+                        ? std::chrono::duration_cast<std::chrono::nanoseconds>(
+                              std::chrono::duration<double>(seconds))
+                              .count()
+                        : 0;
+    if (ns <= 0)
+    {
+      lrvxError(env,
+                "BacktestRunner.runTapeBars: intervalSeconds must be a finite number of "
+                "seconds of at least one nanosecond, got " +
+                    std::to_string(seconds))
+          .ThrowAsJavaScriptException();
+      return env.Undefined();
+    }
+    std::string symbol;
+    if (info.Length() > 2 && info[2].IsString())
+    {
+      symbol = info[2].As<Napi::String>().Utf8Value();
+    }
+    LrvxBacktestStats s{};
+    if (!lrvx_backtest_runner_run_tape_bars(_handle, path.c_str(), ns,
+                                            symbol.empty() ? nullptr : symbol.c_str(), &s))
+    {
+      lrvxError(env, camelCaseNames(lrvx_last_error_message())).ThrowAsJavaScriptException();
+      return env.Undefined();
+    }
+    return statsToJs(env, s);
+  }
 
   // runner.setStrategy(strategyObj) — plain JS object with callbacks
   Napi::Value setStrategy(const Napi::CallbackInfo& info)
@@ -1364,8 +1553,17 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
       _executor_host.reset();
       return env.Undefined();
     }
-    _executor_host = std::make_unique<lrvx_node::ExecutorHost>(env, info[0].As<Napi::Object>());
-    lrvx_backtest_runner_set_executor(_handle, _executor_host->handle);
+    auto host = std::make_unique<lrvx_node::ExecutorHost>(env, info[0].As<Napi::Object>());
+    lrvx_clear_last_error();
+    lrvx_backtest_runner_set_executor(_handle, host->handle);
+    if (lrvx_last_error_code() != 0)
+    {
+      // Refused: the runner was built with slippage / latency options.
+      lrvxError(env, "BacktestRunner.setExecutor: " + camelCaseNames(lrvx_last_error_message()))
+          .ThrowAsJavaScriptException();
+      return env.Undefined();
+    }
+    _executor_host = std::move(host);
     return env.Undefined();
   }
 

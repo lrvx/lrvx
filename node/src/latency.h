@@ -97,14 +97,26 @@ inline double getDouble(const Napi::Object& o, const char* key, double fallback)
     }                                                                            \
     lrvx_latency_reset(_h, seed);                                                \
   }                                                                              \
+  LrvxLatencyModelHandle handle() const { return _h; }                           \
+  /* Cached at module init so a BacktestRunner can InstanceOf-check a model */   \
+  /* before unwrapping it. */                                                    \
+  static Napi::FunctionReference& Ctor()                                         \
+  {                                                                              \
+    static Napi::FunctionReference ref;                                          \
+    return ref;                                                                  \
+  }                                                                              \
   static Napi::Function InitClass(Napi::Env env, const char* name)               \
   {                                                                              \
-    return DefineClass(env, name,                                                \
-                       {InstanceMethod("feedDelay", &Cls::FeedDelay),            \
-                        InstanceMethod("orderDelay", &Cls::OrderDelay),          \
-                        InstanceMethod("fillDelay", &Cls::FillDelay),            \
-                        InstanceMethod("sample", &Cls::Sample),                  \
-                        InstanceMethod("reset", &Cls::Reset)});                  \
+    Napi::Function fn =                                                          \
+        DefineClass(env, name,                                                   \
+                    {InstanceMethod("feedDelay", &Cls::FeedDelay),               \
+                     InstanceMethod("orderDelay", &Cls::OrderDelay),             \
+                     InstanceMethod("fillDelay", &Cls::FillDelay),               \
+                     InstanceMethod("sample", &Cls::Sample),                     \
+                     InstanceMethod("reset", &Cls::Reset)});                     \
+    Ctor() = Napi::Persistent(fn);                                               \
+    Ctor().SuppressDestruct();                                                   \
+    return fn;                                                                   \
   }
 
 class ConstantLatencyWrap : public Napi::ObjectWrap<ConstantLatencyWrap>
@@ -279,6 +291,34 @@ class EmpiricalLatencyWrap : public Napi::ObjectWrap<EmpiricalLatencyWrap>
 };
 
 #undef LRVX_LATENCY_INSTANCE_METHODS
+
+// The C handle behind one of the latency model classes above, or nullptr when
+// `v` is not one of them.
+inline LrvxLatencyModelHandle latencyHandleOf(const Napi::Value& v)
+{
+  if (!v.IsObject())
+  {
+    return nullptr;
+  }
+  auto obj = v.As<Napi::Object>();
+  if (obj.InstanceOf(ConstantLatencyWrap::Ctor().Value()))
+  {
+    return Napi::ObjectWrap<ConstantLatencyWrap>::Unwrap(obj)->handle();
+  }
+  if (obj.InstanceOf(GaussianLatencyWrap::Ctor().Value()))
+  {
+    return Napi::ObjectWrap<GaussianLatencyWrap>::Unwrap(obj)->handle();
+  }
+  if (obj.InstanceOf(ExponentialLatencyWrap::Ctor().Value()))
+  {
+    return Napi::ObjectWrap<ExponentialLatencyWrap>::Unwrap(obj)->handle();
+  }
+  if (obj.InstanceOf(EmpiricalLatencyWrap::Ctor().Value()))
+  {
+    return Napi::ObjectWrap<EmpiricalLatencyWrap>::Unwrap(obj)->handle();
+  }
+  return nullptr;
+}
 
 inline void registerLatency(Napi::Env env, Napi::Object exports)
 {

@@ -43,12 +43,14 @@ lrvx_backtest_result_write_equity_curve_csv|uint8_t|LrvxBacktestResultHandle|con
 lrvx_backtest_runner_add_execution_listener|void|LrvxBacktestRunnerHandle|LrvxExecutionListenerHandle
 lrvx_backtest_runner_add_journey_tracer|void|LrvxBacktestRunnerHandle|LrvxOrderJourneyTracerHandle
 lrvx_backtest_runner_create|LrvxBacktestRunnerHandle|LrvxRegistryHandle|double|double
+lrvx_backtest_runner_create_with_fill_settings|LrvxBacktestRunnerHandle|LrvxRegistryHandle|double|double|int32_t|int32_t|double|double|double|int64_t|int64_t|int64_t|int64_t|uint64_t|int64_t|int64_t|LrvxLatencyModelHandle
 lrvx_backtest_runner_destroy|void|LrvxBacktestRunnerHandle
 lrvx_backtest_runner_run_bars|int|LrvxBacktestRunnerHandle|const int64_t *|const int64_t *|const double *|const double *|const double *|const double *|const double *|uint32_t|const char *|uint8_t|uint64_t|LrvxBacktestStats *
 lrvx_backtest_runner_run_csv|int|LrvxBacktestRunnerHandle|const char *|const char *|LrvxBacktestStats *
 lrvx_backtest_runner_run_ohlcv|int|LrvxBacktestRunnerHandle|const int64_t *|const double *|uint32_t|const char *|LrvxBacktestStats *
 lrvx_backtest_runner_run_replay_source|int|LrvxBacktestRunnerHandle|LrvxReplaySourceHandle|LrvxBacktestStats *
 lrvx_backtest_runner_run_tape|int|LrvxBacktestRunnerHandle|const char *|LrvxBacktestStats *
+lrvx_backtest_runner_run_tape_bars|int|LrvxBacktestRunnerHandle|const char *|int64_t|const char *|LrvxBacktestStats *
 lrvx_backtest_runner_run_tapes|int|LrvxBacktestRunnerHandle|const char *const *|uint32_t|LrvxBacktestStats *
 lrvx_backtest_runner_set_executor|void|LrvxBacktestRunnerHandle|LrvxExecutorHandle
 lrvx_backtest_runner_set_kill_switch|void|LrvxBacktestRunnerHandle|LrvxKillSwitchHandle
