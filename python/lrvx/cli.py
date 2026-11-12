@@ -1298,21 +1298,24 @@ def _build_parser() -> argparse.ArgumentParser:
     # ── archive ─────────────────────────────────────────────────────
     p_archive = sub.add_parser(
         "archive",
-        help="Import public historical archives (Binance public aggTrades "
-             "today; other venues land as separate subcommands).",
+        help="Import public historical archives into a `.lrvx` tape: "
+             "trades from Binance (aggTrades), Bybit, OKX, Bitget and "
+             "Deribit, and Binance bookTicker (`binance --book t1`).",
     )
     archive_sub = p_archive.add_subparsers(dest="archive_command", required=True)
 
     p_binance = archive_sub.add_parser(
         "binance",
-        help="Convert Binance public aggTrades zip archives into a "
-             "`.lrvx` tape (single day via --csv, or a date range "
-             "via --symbol/--from/--to).",
+        help="Convert Binance public aggTrades zip archives, or "
+             "bookTicker archives with --book t1, into a `.lrvx` tape "
+             "(single day via --csv, or a date range via "
+             "--symbol/--from/--to).",
     )
     p_binance.add_argument(
         "--csv", default=None,
-        help="Path to a single aggTrades zip or extracted CSV. When set, "
-             "--from / --to are ignored and a one-file conversion is run.",
+        help="Path to a single aggTrades (or, with --book, bookTicker) "
+             "zip or extracted CSV. When set, --from / --to are ignored "
+             "and a one-file conversion is run.",
     )
     p_binance.add_argument(
         "--symbol", default=None,

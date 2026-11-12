@@ -283,7 +283,6 @@ def trades_to_lrvx(
     write_metadata: bool = True,
 ) -> ConvertStats:
     """Convert one Deribit archive CSV (zipped, gzipped, or extracted) into lrvx."""
-    import lrvx
     import numpy as np
 
     csv_path = Path(csv_path).expanduser()
@@ -301,14 +300,42 @@ def trades_to_lrvx(
             stem = stem[:-11]   # strip "-YYYY-MM-DD"
         symbol_name = stem
 
-    rows: List[Tuple[int, float, float, int, int, float, float, float]] = list(_iter_rows(csv_path))
-    rows_read = len(rows)
-    last_seen_id = max((r[0] for r in rows), default=0)
-    rows_skipped = 0
-    if append:
-        rows, rows_skipped = _dedup.drop_trades_on_tape(rows, out_tape, symbol_id)
+    def _option_quotes(writer, batches) -> None:
+        # For option instruments, preserve the mark/iv/index side channels as
+        # OptionQuote frames, after every trade of the file. iv is stored
+        # exactly as the Deribit archive provides it (Deribit reports trade IV
+        # in percent), so the tape value round-trips the source; a consumer
+        # applies its own unit convention. Open interest is not in the trade
+        # archive, so it stays 0. Rows missing every side channel (all NaN)
+        # are skipped.
+        for batch in batches:
+            mark, iv, index = batch["mark"], batch["iv"], batch["index"]
+            valid = ~(np.isnan(mark) & np.isnan(iv) & np.isnan(index))
+            if not valid.any():
+                continue
+            ts = batch["ts"][valid].astype(np.int64)
+            writer.write_option_quotes(
+                exchange_ts_ns=ts, recv_ts_ns=ts,
+                mark_prices=np.nan_to_num(mark[valid]),
+                index_prices=np.nan_to_num(index[valid]),
+                ivs=np.nan_to_num(iv[valid]),
+                open_interest=np.zeros(int(valid.sum()), dtype=np.float64),
+                symbol_ids=np.full(int(valid.sum()), int(symbol_id),
+                                   dtype=np.uint32),
+            )
 
-    if not rows:
+    with _dedup.TradeFile(_iter_rows(csv_path),
+                          _dedup.trade_dtype(extra=("mark", "iv", "index")),
+                          sort=True) as rows:
+        done = _dedup.write_trade_file(
+            rows, out_tape, append=append, symbol_id=symbol_id,
+            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+            compression=compression,
+            then=_option_quotes if market == "option" else None)
+        rows_read, rows_skipped = rows.rows_read, rows.rows_skipped
+        kept, last_seen_id = rows.rows_kept, rows.id_max
+
+    if not kept:
         if write_metadata and rows_read:
             _write_metadata(
                 out_tape, exchange_name=exchange_name, market=market,
@@ -320,71 +347,22 @@ def trades_to_lrvx(
                             files_processed=1,
                             last_trade_id=last_seen_id)
 
-    rows.sort(key=lambda t: t[3])
-
-    n = len(rows)
-    ids = np.fromiter((r[0] for r in rows), dtype=np.uint64, count=n)
-    prices = np.fromiter((r[1] for r in rows), dtype=np.float64, count=n)
-    qty = np.fromiter((r[2] for r in rows), dtype=np.float64, count=n)
-    ts_ns = np.fromiter((r[3] for r in rows), dtype=np.int64, count=n)
-    sides = np.fromiter((r[4] for r in rows), dtype=np.uint8, count=n)
-    sym_ids = np.full(n, int(symbol_id), dtype=np.uint32)
-
-    out_tape.mkdir(parents=True, exist_ok=True)
-    writer = lrvx.DataWriter(
-        str(out_tape),
-        max_segment_mb=int(max_segment_mb),
-        exchange_id=int(exchange_id),
-        compression=compression,
-    )
-    try:
-        n_written = writer.write_trades(
-            exchange_ts_ns=ts_ns, recv_ts_ns=ts_ns,
-            prices=prices, quantities=qty,
-            trade_ids=ids, symbol_ids=sym_ids, sides=sides,
-        )
-        # For option instruments, preserve the mark/iv/index side channels as
-        # OptionQuote frames. iv is stored exactly as the Deribit archive
-        # provides it (Deribit reports trade IV in percent), so the tape value
-        # round-trips the source; a consumer applies its own unit convention.
-        # Open interest is not in the trade archive, so it stays 0. Rows
-        # missing every side channel (all NaN) are skipped.
-        if market == "option":
-            mark = np.fromiter((r[5] for r in rows), dtype=np.float64, count=n)
-            iv = np.fromiter((r[6] for r in rows), dtype=np.float64, count=n)
-            index = np.fromiter((r[7] for r in rows), dtype=np.float64, count=n)
-            valid = ~(np.isnan(mark) & np.isnan(iv) & np.isnan(index))
-            if valid.any():
-                writer.write_option_quotes(
-                    exchange_ts_ns=ts_ns[valid], recv_ts_ns=ts_ns[valid],
-                    mark_prices=np.nan_to_num(mark[valid]),
-                    index_prices=np.nan_to_num(index[valid]),
-                    ivs=np.nan_to_num(iv[valid]),
-                    open_interest=np.zeros(int(valid.sum()), dtype=np.float64),
-                    symbol_ids=sym_ids[valid],
-                )
-    finally:
-        writer.close()
-
-    first_ts = int(ts_ns[0])
-    last_ts = int(ts_ns[-1])
-
     if write_metadata:
         _write_metadata(
             out_tape, exchange_name=exchange_name, market=market,
             symbol_id=symbol_id, symbol_name=symbol_name,
-            first_ts_ns=first_ts, last_ts_ns=last_ts,
-            trades_added=int(n_written),
+            first_ts_ns=done.first_ts_ns, last_ts_ns=done.last_ts_ns,
+            trades_added=done.count,
         )
 
     return ConvertStats(
-        trades_written=int(n_written),
+        trades_written=done.count,
         rows_read=rows_read,
         rows_skipped=rows_skipped,
         files_processed=1,
-        first_ts_ns=first_ts,
-        last_ts_ns=last_ts,
-        last_trade_id=int(ids[-1]),
+        first_ts_ns=done.first_ts_ns,
+        last_ts_ns=done.last_ts_ns,
+        last_trade_id=done.last_id,
     )
 
 

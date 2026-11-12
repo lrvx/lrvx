@@ -320,9 +320,6 @@ def aggtrades_to_lrvx(
     present in ``out_tape`` returns ``trades_written=0`` and updates
     only ``rows_skipped``.
     """
-    import lrvx
-    import numpy as np
-
     csv_path = Path(csv_path).expanduser()
     out_tape = Path(out_tape).expanduser()
     if not csv_path.exists():
@@ -331,18 +328,19 @@ def aggtrades_to_lrvx(
         # "BTCUSDT-aggTrades-2024-01-15.zip" → "BTCUSDT"
         symbol_name = csv_path.stem.split("-", 1)[0]
 
-    # Stream-then-batch: the daily file is small enough (typically
-    # <100 MB extracted) that one numpy round-trip beats the per-row
-    # call overhead of write_trade.
-    rows: List[Tuple[int, float, float, int, bool]] = list(_iter_rows(csv_path))
-    rows_read = len(rows)
-    last_seen_id = max((r[0] for r in rows), default=0)
-    rows_skipped = 0
-    if append:
-        rows, rows_skipped = _dedup.drop_trades_on_tape(
-            rows, out_tape, symbol_id, ts_ns_per_unit=1_000_000)
+    # Rows keep file order; the side is resolved from is_buyer_maker as
+    # they are parsed.
+    parsed = ((agg_id, price, qty, ts_ms, _SIDE_SELL if maker else _SIDE_BUY)
+              for agg_id, price, qty, ts_ms, maker in _iter_rows(csv_path))
+    with _dedup.TradeFile(parsed, _dedup.trade_dtype("i8"), sort=False) as rows:
+        done = _dedup.write_trade_file(
+            rows, out_tape, append=append, symbol_id=symbol_id,
+            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+            compression=compression, ts_ns_per_unit=1_000_000)
+        rows_read, rows_skipped = rows.rows_read, rows.rows_skipped
+        kept, last_seen_id = rows.rows_kept, rows.id_max
 
-    if not rows:
+    if not kept:
         if write_metadata and rows_read:
             _write_metadata(
                 out_tape,
@@ -362,40 +360,6 @@ def aggtrades_to_lrvx(
             last_trade_id=last_seen_id,
         )
 
-    n = len(rows)
-    agg_ids = np.fromiter((r[0] for r in rows), dtype=np.int64, count=n)
-    prices = np.fromiter((r[1] for r in rows), dtype=np.float64, count=n)
-    qty = np.fromiter((r[2] for r in rows), dtype=np.float64, count=n)
-    ts_ms = np.fromiter((r[3] for r in rows), dtype=np.int64, count=n)
-    maker = np.fromiter((1 if r[4] else 0 for r in rows), dtype=np.uint8, count=n)
-    exchange_ts_ns = ts_ms * 1_000_000
-    sides = np.where(maker.astype(bool), _SIDE_SELL, _SIDE_BUY).astype(np.uint8)
-    trade_ids = agg_ids.astype(np.uint64)
-    sym_ids = np.full(n, int(symbol_id), dtype=np.uint32)
-
-    out_tape.mkdir(parents=True, exist_ok=True)
-    writer = lrvx.DataWriter(
-        str(out_tape),
-        max_segment_mb=int(max_segment_mb),
-        exchange_id=int(exchange_id),
-        compression=compression,
-    )
-    try:
-        n_written = writer.write_trades(
-            exchange_ts_ns=exchange_ts_ns,
-            recv_ts_ns=exchange_ts_ns,
-            prices=prices,
-            quantities=qty,
-            trade_ids=trade_ids,
-            symbol_ids=sym_ids,
-            sides=sides,
-        )
-    finally:
-        writer.close()
-
-    first_ts = int(exchange_ts_ns[0])
-    last_ts = int(exchange_ts_ns[-1])
-
     if write_metadata:
         _write_metadata(
             out_tape,
@@ -403,19 +367,19 @@ def aggtrades_to_lrvx(
             market=market,
             symbol_id=symbol_id,
             symbol_name=symbol_name,
-            first_ts_ns=first_ts,
-            last_ts_ns=last_ts,
-            trades_added=int(n_written),
+            first_ts_ns=done.first_ts_ns,
+            last_ts_ns=done.last_ts_ns,
+            trades_added=done.count,
         )
 
     return ConvertStats(
-        trades_written=int(n_written),
+        trades_written=done.count,
         rows_read=rows_read,
         rows_skipped=rows_skipped,
         files_processed=1,
-        first_ts_ns=first_ts,
-        last_ts_ns=last_ts,
-        last_trade_id=int(trade_ids[-1]),
+        first_ts_ns=done.first_ts_ns,
+        last_ts_ns=done.last_ts_ns,
+        last_trade_id=done.last_id,
     )
 
 
