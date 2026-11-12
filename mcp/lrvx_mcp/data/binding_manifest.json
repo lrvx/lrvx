@@ -24778,6 +24778,11 @@
         },
         {
           "kind": "method",
+          "name": "cancelAllOrdersAsync",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "cancelBracket",
           "parent": "SimulatedExecutor"
         },

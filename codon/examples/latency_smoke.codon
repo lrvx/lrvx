@@ -61,4 +61,55 @@ assert_eq(emp.order_delay(), 0, "empirical order_delay (no samples)")
 emp.destroy()
 
 
+# cancel_all goes through the cancel ack latency like cancel_order: a trade
+# inside the ack window still fills the order it is pulling.
+from lrvx.backtest import SimulatedExecutor
+
+
+def cancel_all_then_trade(cancel_ack_ns: int) -> int:
+    ex = SimulatedExecutor()
+    ex.set_queue_model(1, 1)
+    if cancel_ack_ns > 0:
+        ex.set_cancel_ack_latency(cancel_ack_ns)
+    ex.advance_clock(1_000_000_000)
+    ex.on_best_levels(1, 100.0, 0.0, 101.0, 5.0)
+    ex.submit_order(1, "buy", 100.0, 1.0, "limit", 1)
+    ex.cancel_all(1)
+    ex.advance_clock(1_001_000_000)
+    ex.on_trade_qty(1, 100.0, 1.0, False)
+    n = ex.fill_count()
+    ex.close()
+    return n
+
+
+assert_eq(cancel_all_then_trade(0), 0, "cancel_all without ack latency cancels at once")
+assert_eq(cancel_all_then_trade(10_000_000), 1, "cancel_all waits for the cancel ack")
+
+
+# An unknown slippage model code raises instead of reading as none.
+ex = SimulatedExecutor()
+for bad in [4, -1]:
+    raised = False
+    try:
+        ex.set_default_slippage(bad)
+    except ValueError as err:
+        raised = "volume_impact" in err.message
+    if raised:
+        print("ok  set_default_slippage refuses model", bad)
+    else:
+        print("FAIL: set_default_slippage accepted model", bad)
+raised = False
+try:
+    ex.set_symbol_slippage(1, 9)
+except ValueError as err:
+    raised = "fixed_bps" in err.message
+if raised:
+    print("ok  set_symbol_slippage refuses model 9")
+else:
+    print("FAIL: set_symbol_slippage accepted model 9")
+ex.set_default_slippage(2, 0, 0.0, 5.0)
+print("ok  set_default_slippage accepts fixed_bps")
+ex.close()
+
+
 print("done")

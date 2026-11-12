@@ -72,6 +72,28 @@ function check(cond, msg) {
     check(threw2, 'all-empty empirical rejected');
 }
 
+// ── Slippage model names ───────────────────────────────────────────
+// An unknown model name throws, listing the valid ones, instead of
+// silently reading as "none".
+{
+    var ex = new SimulatedExecutor();
+    var msg = '';
+    try { ex.setDefaultSlippage('fixed_tick', 1, 0.01); }
+    catch (e) { msg = String(e.message); }
+    check(msg.indexOf("'fixed_ticks'") >= 0 && msg.indexOf("'volume_impact'") >= 0 &&
+          msg.indexOf("'fixed_tick'") >= 0,
+          'setDefaultSlippage rejects an unknown model: ' + msg);
+    msg = '';
+    try { ex.setSymbolSlippage(1, 'toString'); }
+    catch (e) { msg = String(e.message); }
+    check(msg.indexOf("'none'") >= 0, 'setSymbolSlippage rejects an unknown model: ' + msg);
+    var ok = true;
+    try { ex.setDefaultSlippage('fixed_bps', 0, 0, 5); ex.setSymbolSlippage(1, 'none'); }
+    catch (e) { ok = false; }
+    check(ok, 'valid slippage model names are accepted');
+    ex.destroy();
+}
+
 if (failed > 0) {
     console.log('\n' + failed + ' check(s) failed');
     throw new Error('latency smoke test failed');

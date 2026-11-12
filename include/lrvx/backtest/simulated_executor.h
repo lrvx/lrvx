@@ -204,6 +204,11 @@ class SimulatedExecutor : public IOrderExecutor
 
   void submitOrder(const Order& order) override;
   void cancelOrder(OrderId orderId) override;
+  // Without a cancel ack latency every order of the symbol is CANCELED before
+  // this returns. With one it is the same request as cancelOrder() on each of
+  // them: held orders cancel at once, the rest go PENDING_CANCEL and stay live
+  // until their own sampled ack. Like today, cancel-all spends no rate-limit
+  // token per order.
   void cancelAllOrders(SymbolId symbol) override;
   void replaceOrder(OrderId oldOrderId, const Order& newOrder) override;
 
@@ -413,6 +418,7 @@ class SimulatedExecutor : public IOrderExecutor
   // pending cancel when its order has just filled and emits the
   // late-cancel-after-fill REJECTED notification.
   void enqueuePendingCancel(const Order& order);
+  void cancelAllOrdersAsync(SymbolId symbol);
   void finalizePendingCancels();
   void resolveLateCancelOnFill(const Order& order);
   int64_t sampleCancelAckLatency();

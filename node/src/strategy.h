@@ -9,6 +9,7 @@
 #include "error_translator.h"
 #include "hooks.h"
 #include "latency.h"
+#include "lrvx/backtest/runner_fill_settings.h"
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/capi/order_type_names.hpp"
@@ -1108,22 +1109,13 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     if (!modelV.IsUndefined())
     {
       const std::string m = modelV.ToString().Utf8Value();
-      static const char* const kModels[] = {"none", "fixed_ticks", "fixed_bps", "volume_impact"};
-      model = -1;
-      for (int32_t k = 0; k < 4; ++k)
+      const auto parsed = lrvx::slippageModelFromName(m);
+      if (!parsed)
       {
-        if (m == kModels[k])
-        {
-          model = k;
-        }
+        throw lrvxError(env, "BacktestRunner: slippageModel must be one of " +
+                                 lrvx::slippageModelNameList() + "; got '" + m + "'");
       }
-      if (model < 0)
-      {
-        throw lrvxError(env,
-                        "BacktestRunner: slippageModel must be one of 'none', 'fixed_ticks', "
-                        "'fixed_bps', 'volume_impact'; got '" +
-                            m + "'");
-      }
+      model = static_cast<int32_t>(*parsed);
     }
     LrvxLatencyModelHandle latency = nullptr;
     auto latencyV = opts.Get("latency");

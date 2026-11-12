@@ -256,7 +256,7 @@ class BacktestRunner:
         ...
     def run_tape(self, path: str) -> typing.Any:
         """
-        Run a backtest off a `.lrvx` tape directory. The tape is the canonical recorded artifact (`lrvx tape record` writes it). Returns the same stats dict shape as run_csv / run_bars.
+        Run a backtest off a `.lrvx` tape directory. The tape is the canonical recorded artifact (`lrvx tape record` writes it). Returns the same stats dict shape as run_csv / run_bars, plus skipped_option_quotes and skipped_pool_states: option-quote and pool-state records on the tape are read but reach no strategy callback and do not move the simulated executor, and these count them.
         """
     def run_tape_bars(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any:
         """
@@ -264,7 +264,7 @@ class BacktestRunner:
         """
     def run_tapes(self, paths: collections.abc.Sequence[str]) -> typing.Any:
         """
-        Run a backtest off N `.lrvx` tapes merged on read. Symbols are rekeyed by (metadata.exchange, name) so two captures of the same venue/symbol collapse, and two different venues stay distinct. `run_tapes([t])` is equivalent to `run_tape(t)`. Stats shape mirrors run_tape.
+        Run a backtest off N `.lrvx` tapes merged on read. Symbols are rekeyed by (metadata.exchange, name) so two captures of the same venue/symbol collapse, and two different venues stay distinct. `run_tapes([t])` is equivalent to `run_tape(t)`. Stats shape mirrors run_tape, including skipped_option_quotes and skipped_pool_states.
         """
     @typing.overload
     def set_executor(self, executor: Executor) -> None:

@@ -34,6 +34,53 @@ const char* slippageModelName(SlippageModel model) noexcept
   return "unknown";
 }
 
+namespace
+{
+constexpr SlippageModel kSlippageModels[] = {SlippageModel::NONE, SlippageModel::FIXED_TICKS,
+                                             SlippageModel::FIXED_BPS,
+                                             SlippageModel::VOLUME_IMPACT};
+}  // namespace
+
+std::optional<SlippageModel> slippageModelFromName(std::string_view name) noexcept
+{
+  for (SlippageModel m : kSlippageModels)
+  {
+    if (name == slippageModelName(m))
+    {
+      return m;
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<SlippageModel> slippageModelFromCode(int32_t code) noexcept
+{
+  for (SlippageModel m : kSlippageModels)
+  {
+    if (code == static_cast<int32_t>(m))
+    {
+      return m;
+    }
+  }
+  return std::nullopt;
+}
+
+std::string slippageModelNameList()
+{
+  std::string out;
+  for (SlippageModel m : kSlippageModels)
+  {
+    if (!out.empty())
+    {
+      out += ", ";
+    }
+    out += "'";
+    out += slippageModelName(m);
+    out += "'";
+  }
+  return out;
+}
+
 bool RunnerFillSettings::customized() const noexcept
 {
   return slippageModel != SlippageModel::NONE || slippageTicks != 0 || slippageTickSize != 0.0 ||

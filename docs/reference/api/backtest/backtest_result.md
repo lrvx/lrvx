@@ -190,6 +190,8 @@ public:
 
 Each `TradeRecord` now carries both the entry and exit price, the closed quantity, and the entry/exit timestamps. These fields drive the duration statistics and enable equity-curve analysis per trade.
 
+`entryTimeNs` and `exitTimeNs` are the timestamps of the fills that opened and closed the position, and a fill is stamped with the simulated clock when it happens. On bar replay (`runBars`, `runTapeBars`) the clock reads each bar's end time while that bar is walked, so both are the **end of the bar in which the fill happened** -- whether it matched at that bar's open (an order held from the previous bar's callback), at an intrabar high or low (a stop or take-profit), or at its close. A fill inside a daily bar is therefore stamped with the next day's 00:00. On tick and book replay they are the timestamp of the event that filled the order.
+
 ## Usage
 
 ```cpp

@@ -138,6 +138,15 @@ void LrvxJsStrategy::loadStdlib()
     }
 
     const _slippageMap = { none: 0, fixed_ticks: 1, fixed_bps: 2, volume_impact: 3 };
+    // An unknown model name throws instead of reading as "none".
+    const _slippageCode = (where, model) => {
+      if (!Object.prototype.hasOwnProperty.call(_slippageMap, model)) {
+        throw new TypeError(where + ": model must be one of " +
+          Object.keys(_slippageMap).map((k) => "'" + k + "'").join(", ") +
+          "; got '" + model + "'");
+      }
+      return _slippageMap[model];
+    };
     const _queueMap = { none: 0, tob: 1, full: 2, pro_rata: 3, pro_rata_with_fifo: 4 };
 
     class SimulatedExecutor {
@@ -189,12 +198,14 @@ void LrvxJsStrategy::loadStdlib()
       }
       advanceClock(timestampNs) { __lrvx_simulated_executor_advance_clock(this._h, timestampNs); }
       setDefaultSlippage(model, ticks, tickSize, bps, impactCoeff) {
-        __lrvx_simulated_executor_set_default_slippage(this._h, _slippageMap[model] || 0,
+        __lrvx_simulated_executor_set_default_slippage(this._h,
+                                             _slippageCode("setDefaultSlippage", model),
                                              ticks || 0, tickSize || 0,
                                              bps || 0, impactCoeff || 0);
       }
       setSymbolSlippage(symbol, model, ticks, tickSize, bps, impactCoeff) {
-        __lrvx_simulated_executor_set_symbol_slippage(this._h, symbol, _slippageMap[model] || 0,
+        __lrvx_simulated_executor_set_symbol_slippage(this._h, symbol,
+                                            _slippageCode("setSymbolSlippage", model),
                                             ticks || 0, tickSize || 0,
                                             bps || 0, impactCoeff || 0);
       }

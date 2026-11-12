@@ -106,6 +106,46 @@ console.log('=== EmpiricalLatency ===');
   check(threw, 'all-empty empirical rejected');
 }
 
+// ── SimulatedExecutor: cancel-all and the cancel ack latency ───────
+
+console.log('=== cancelAll honours the cancel ack latency ===');
+{
+  // A cross inside the ack window still fills the order cancelAll is
+  // pulling, exactly as it would under cancelOrder.
+  const cancelAllThenTrade = (cancelAckNs) => {
+    const ex = new lrvx.SimulatedExecutor();
+    if (cancelAckNs > 0) ex.setCancelAckLatency(cancelAckNs, 0);
+    ex.advanceClock(1_000_000_000);
+    ex.onTopOfBook(1, { price: 100, qty: 1 }, { price: 101, qty: 5 });
+    ex.submitOrder(1, 'buy', 100, 1, 'limit', 1);
+    ex.cancelAll(1);
+    ex.advanceClock(1_001_000_000);
+    // The ask drops through the resting buy inside the ack window.
+    ex.onTopOfBook(1, { price: 99, qty: 1 }, { price: 99.5, qty: 5 });
+    return ex.fillCount;
+  };
+  check(cancelAllThenTrade(0) === 0, 'without an ack latency cancelAll cancels at once');
+  check(cancelAllThenTrade(10_000_000) === 1, 'with an ack latency the order stays live until the ack');
+}
+
+console.log('=== setDefaultSlippage refuses an unknown model ===');
+{
+  const ex = new lrvx.SimulatedExecutor();
+  let msg = '';
+  try { ex.setDefaultSlippage('fixed_tick', 1, 0.01, 0, 0); } catch (e) { msg = String(e.message); }
+  check(msg.includes("'fixed_ticks'") && msg.includes("'volume_impact'") && msg.includes("'fixed_tick'"),
+        `unknown name throws with the valid names: ${msg}`);
+  msg = '';
+  try { ex.setDefaultSlippage(9, 0, 0, 0, 0); } catch (e) { msg = String(e.message); }
+  check(msg.includes('3 (volume_impact)'), `out-of-range code throws: ${msg}`);
+  let ok = true;
+  try {
+    ex.setDefaultSlippage('fixed_bps', 0, 0, 5, 0);
+    ex.setDefaultSlippage(lrvx.SLIPPAGE_NONE, 0, 0, 0, 0);
+  } catch (e) { ok = false; }
+  check(ok, 'valid names and SLIPPAGE_* codes are accepted');
+}
+
 if (failed > 0) {
   console.error(`\n${failed} check(s) failed`);
   process.exit(1);

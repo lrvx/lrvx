@@ -59,6 +59,9 @@ class Planned(lrvx.Strategy):
                 px = round(bar.close + step[2], 2)
                 self.live.append(
                     (self.limit_buy if step[1] == "buy" else self.limit_sell)(px, step[3]))
+            elif step[0] == "cancel_all":
+                self.cancel_all_orders()
+                self.live.clear()
             else:
                 for oid in self.live:
                     self.cancel_order(oid)
@@ -110,6 +113,9 @@ def _by_hand(configure, bars=None):
                 oid += 1
                 ex.submit_order(oid, step[1], round(bars["close"][i] + step[2], 2), step[3], "limit", 1)
                 live.append(oid)
+            elif step[0] == "cancel_all":
+                ex.cancel_all(1)
+                live.clear()
             else:
                 for o in live:
                     ex.cancel_order(o)
@@ -241,6 +247,21 @@ def test_cancel_ack_latency_matches_hand_driven_executor(monkeypatch):
     assert _run(cancel_ack_latency_ns=30 * 1_000_000_000)[3] == instant
 
 
+def test_cancel_all_honours_cancel_ack_latency(monkeypatch):
+    # The same scenario as above, pulled with cancel_all_orders(): cancel-all is the
+    # same request as cancelling each order, so the ack latency lets bar 18 fill it.
+    monkeypatch.setitem(PLAN, 16, [("limit", "buy", -1.27, 1.0)])
+    instant = _run()[3]
+    each = _run(cancel_ack_latency_ns=3 * MIN)[3]
+    monkeypatch.setitem(PLAN, 17, [("cancel_all",)])
+    assert _run()[3] == instant
+    fills = _run(cancel_ack_latency_ns=3 * MIN)[3]
+    assert fills == each
+    assert fills == _by_hand(lambda ex: ex.set_cancel_ack_latency(3 * MIN))
+    assert ("buy", 96.4, 1.0) in fills and ("buy", 96.4, 1.0) not in instant
+    assert _run(cancel_ack_latency_ns=30 * 1_000_000_000)[3] == instant
+
+
 def test_settings_survive_across_runs():
     reg, sid = _registry()
     bt = lrvx.BacktestRunner(reg, 0.0004, 10_000.0, slippage_model="fixed_bps", slippage_bps=5.0)
@@ -278,6 +299,28 @@ def test_invalid_settings_raise(kw, match):
     reg, _ = _registry()
     with pytest.raises(lrvx.LrvxError, match=match):
         lrvx.BacktestRunner(reg, 0.0004, 10_000.0, **kw)
+
+
+@pytest.mark.parametrize("setter", [
+    lambda ex, model: ex.set_default_slippage(model, ticks=1, tick_size=0.01),
+    lambda ex, model: ex.set_symbol_slippage(1, model, ticks=1, tick_size=0.01),
+])
+def test_executor_slippage_setters_refuse_an_unknown_model(setter):
+    """The hand-driven executor takes the runner's model names, and refuses the rest
+    the way the runner does rather than reading them as 'none'."""
+    ex = lrvx.SimulatedExecutor()
+    with pytest.raises(lrvx.LrvxError) as err:
+        setter(ex, "fixed_tick")
+    msg = str(err.value)
+    for name in ("'none'", "'fixed_ticks'", "'fixed_bps'", "'volume_impact'", "'fixed_tick'"):
+        assert name in msg, msg
+    # the refused call left the executor without slippage, as it was
+    ex.on_best_levels(1, 100.0, 10.0, 100.0, 10.0)
+    ex.submit_order(1, "buy", 0.0, 1.0, "market", 1)
+    assert ex.fills()[0]["price_raw"] == 100 * lrvx.PRICE_SCALE
+    setter(ex, "fixed_ticks")
+    ex.submit_order(2, "buy", 0.0, 1.0, "market", 1)
+    assert ex.fills()[1]["price_raw"] == round(100.01 * lrvx.PRICE_SCALE)
 
 
 def test_latency_must_be_a_latency_model():

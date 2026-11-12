@@ -207,7 +207,8 @@ void BacktestRunner::resetRunState()
   _tradeCount = 0;
   _bookUpdateCount = 0;
   _signalCount = 0;
-  _skippedRecordCount = 0;
+  _optionQuoteCount = 0;
+  _poolStateCount = 0;
   _lastEventType.reset();
   _signalEmitted = false;
 }
@@ -618,15 +619,25 @@ void BacktestRunner::processEvent(const replay::ReplayEvent& event)
   else if (event.type == replay::EventType::OptionQuote ||
            event.type == replay::EventType::PoolState)
   {
-    // Not dispatched: there is no strategy/subscriber handler for option-quote
-    // or pool-state records. Count them and warn once so a tape that is mostly
-    // these records does not look like it was fully replayed.
-    if (_skippedRecordCount++ == 0)
+    // Not dispatched: no strategy callback, market-data subscriber or the
+    // simulated executor takes option-quote or pool-state records. Count each
+    // kind (BacktestState, and the bindings' run stats) and warn once, so a
+    // tape that is mostly these records does not look fully replayed.
+    const bool firstSkipped = _optionQuoteCount + _poolStateCount == 0;
+    if (event.type == replay::EventType::OptionQuote)
+    {
+      ++_optionQuoteCount;
+    }
+    else
+    {
+      ++_poolStateCount;
+    }
+    if (firstSkipped)
     {
       LRVX_LOG_WARN(
           "[BacktestRunner] tape contains OptionQuote/PoolState records "
           "that this runner does not dispatch; they are counted in "
-          "skippedRecordCount, not delivered to the strategy");
+          "optionQuoteCount / poolStateCount, not delivered to the strategy");
     }
   }
 
@@ -782,6 +793,8 @@ BacktestState BacktestRunner::state() const
                        .tradeCount = _tradeCount,
                        .bookUpdateCount = _bookUpdateCount,
                        .signalCount = _signalCount,
+                       .optionQuoteCount = _optionQuoteCount,
+                       .poolStateCount = _poolStateCount,
                        .isRunning = _running.load(std::memory_order_acquire),
                        .isPaused = _paused.load(std::memory_order_acquire),
                        .isFinished = _finished.load(std::memory_order_acquire),
