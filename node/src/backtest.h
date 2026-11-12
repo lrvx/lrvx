@@ -220,7 +220,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       }
       if (opts.Has("expiresAtNs"))
       {
-        expiresAtNs = opts.Get("expiresAtNs").As<Napi::Number>().Int64Value();
+        expiresAtNs = toInt64Ns(opts.Get("expiresAtNs"));
       }
       lrvx_simulated_executor_submit_order_ex(_h, id, s, price, qty, t, sym, tif,
                                               reduceOnly ? 1 : 0, expiresAtNs);

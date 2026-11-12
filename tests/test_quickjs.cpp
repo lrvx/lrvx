@@ -4294,6 +4294,77 @@ TEST(JsIntegrationTest, DataReaderCountsTruncatedSegments)
   std::filesystem::remove_all(dir);
 }
 
+// The runner's position tracker takes a fill before the script hears of it,
+// so ctx.position inside onFill is the position after that fill.
+TEST(JsIntegrationTest, ContextPositionInOnFillCountsTheFill)
+{
+  TempJsFile script(R"(
+    var bars = 0;
+    var fills = 0;
+    var afterEntry = -1, afterPartialExit = -1, afterClose = -1;
+    var askedAfterEntry = -1;
+
+    class TestStrat extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+      onBar(ctx, bar) {
+        bars += 1;
+        if (bars === 1) {
+          this.marketBuy({ symbol: "BTCUSDT", qty: 1.0 });
+        } else if (bars === 3) {
+          this.marketSell({ symbol: "BTCUSDT", qty: 0.4 });
+        } else if (bars === 5) {
+          this.closePosition("BTCUSDT");
+        }
+      }
+      onFill(ctx, ev) {
+        fills += 1;
+        if (fills === 1) { afterEntry = ctx.position; askedAfterEntry = this.position("BTCUSDT"); }
+        else if (fills === 2) { afterPartialExit = ctx.position; }
+        else if (fills === 3) { afterClose = ctx.position; }
+      }
+    }
+    lrvx.register(new TestStrat());
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+  ASSERT_FALSE(symIds.empty());
+
+  auto bridge = std::make_unique<BridgeStrategy>(
+      1, std::vector<SymbolId>(symIds.begin(), symIds.end()), registry, callbacks);
+  jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+
+  constexpr int64_t kMinuteNs = 60'000'000'000LL;
+  std::vector<BarEvent> bars;
+  for (int i = 0; i < 8; ++i)
+  {
+    BarEvent ev{};
+    ev.symbol = symIds[0];
+    ev.barType = BarType::Time;
+    ev.barTypeParam = static_cast<uint64_t>(kMinuteNs);
+    ev.bar.open = Price::fromDouble(100.0);
+    ev.bar.high = Price::fromDouble(100.5);
+    ev.bar.low = Price::fromDouble(99.5);
+    ev.bar.close = Price::fromDouble(100.0);
+    ev.bar.startTime = TimePoint{std::chrono::nanoseconds{kMinuteNs * i}};
+    ev.bar.endTime = TimePoint{std::chrono::nanoseconds{kMinuteNs * (i + 1)}};
+    bars.push_back(ev);
+  }
+
+  BacktestRunner runner;
+  runner.setSymbolRegistry(&registry);
+  runner.setStrategy(bridge.get());
+  runner.runBars(bars);
+
+  ASSERT_EQ(readGlobalInt32(jsStrat, "fills"), 3);
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "askedAfterEntry"), 1.0);
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "afterEntry"), 1.0);
+  EXPECT_NEAR(readGlobalDouble(jsStrat, "afterPartialExit"), 0.6, 1e-9);
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "afterClose"), 0.0);
+}
+
 // A script's modify() goes out as a Modify signal, which names only the order
 // id. Hosted on a BacktestRunner the replacement has to stay the order the
 // script placed: on its symbol and side, under the id the script holds, and

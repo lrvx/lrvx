@@ -97,9 +97,11 @@ When a strategy emits a signal (via `self.market_buy(...)` etc.), the broker's s
 | `TRAILING_STOP`             | `create_order(sym, "trailing_stop_market", side, qty, None, {"trailingDelta": offset})` |
 | `TRAILING_STOP_PERCENT`     | `create_order(sym, "trailing_stop_market", side, qty, None, {"callbackRate": bps/100})` |
 | `CLOSE_POSITION`            | `create_order(sym, "market", side, qty, None, {"reduceOnly": True})`              |
-| `CANCEL`                    | `cancel_order(ccxt_id, ccxt_sym)` using the tracked id from the original signal   |
+| `CANCEL`                    | `cancel_order(ccxt_id, ccxt_sym)` using the id and symbol tracked from the original signal |
 | `CANCEL_ALL`                | `cancel_order` for every tracked id on the symbol                                 |
-| `MODIFY`                    | `edit_order(ccxt_id, sym, "limit", side, new_qty, new_price)`                     |
+| `MODIFY`                    | `edit_order(ccxt_id, ccxt_sym, type, side, new_qty, new_price)` with the symbol, side and type the order was placed with |
+
+A `CANCEL` or `MODIFY` signal names an order id and nothing else, so the broker keeps the symbol, side and ccxt type of every order it places and sends those. The new price of a modify is the limit price; for a stop-market, take-profit-market or trailing order, which has none, it is the trigger and goes out as `edit_order(ccxt_id, ccxt_sym, type, side, new_qty, None, {"stopPrice": new_price})`. A stop-limit or take-profit-limit keeps its trigger: `{"stopPrice": <the original trigger>}` rides along with the new limit price. When the exchange answers an edit with a new order id, later cancels and modifies use it. A modify for an id the broker did not place, or one already cancelled, goes to `on_error`.
 
 Stop, take-profit, and trailing parameter shapes differ across exchanges. The broker uses ccxt's unified-API defaults. If your exchange wants a different params dict (Binance futures uses `triggerPrice` instead of `stopPrice`, OKX uses `triggerPx`), subclass and override `_place_stop_market`, `_place_trailing`, etc.
 

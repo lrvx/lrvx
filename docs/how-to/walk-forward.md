@@ -101,6 +101,10 @@ const folds = wfr.runCsv('data/btcusdt_sample.csv', 'BTCUSDT');
 folds.forEach(f => console.log(f.foldIndex, f.testStats.returnPct));
 ```
 
+`runCsv` throws an `LrvxError` with the reason when the CSV cannot be opened,
+a row cannot be parsed or the symbol is not registered. An empty array means
+the file was read and is too short for one fold.
+
 ## What you get back per fold
 
 ```

@@ -116,9 +116,9 @@ names and meaning of the Python runner (see
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `set_strategy(strategy)` | `None` | Attach a strategy and install its event callbacks |
-| `run_csv(path, symbol)` | `BacktestStats` | Replay a CSV file (columns: timestamp, open, high, low, close, volume). Raises `ValueError` with the reason on a file that cannot be opened or a row that cannot be parsed |
-| `run_ohlcv(timestamps, closes, symbol)` | `BacktestStats` | Replay raw arrays (`List[int]` timestamps in ns, `List[float]` closes) |
-| `run_bars(start_ns, end_ns, opens, highs, lows, closes, volumes, symbol, bar_type=0, bar_type_param=0)` | `BacktestStats` | Replay full OHLCV bars. `Strategy.on_bar` fires; `on_trade` does **not** |
+| `run_csv(path, symbol)` | `BacktestStats` | Replay a CSV file (columns: timestamp, open, high, low, close, volume). Raises `ValueError` with the reason on a file that cannot be opened, a row that cannot be parsed or a `symbol` the registry does not hold |
+| `run_ohlcv(timestamps, closes, symbol)` | `BacktestStats` | Replay raw arrays (`List[int]` timestamps in ns, `List[float]` closes). Raises `ValueError` on a `symbol` the registry does not hold |
+| `run_bars(start_ns, end_ns, opens, highs, lows, closes, volumes, symbol, bar_type=0, bar_type_param=0)` | `BacktestStats` | Replay full OHLCV bars. `Strategy.on_bar` fires; `on_trade` does **not**. Raises `ValueError` on a `symbol` the registry does not hold |
 | `run_tape(path)` | `BacktestStats` | Replay one `.lrvx` tape directory. Raises `ValueError` with the reason on a missing or unreadable tape |
 | `run_tape_bars(path, interval_seconds, symbol="")` | `BacktestStats` | Replay a `.lrvx` tape as time bars, aggregated while it streams; each closed bar goes to `on_bar` with `run_bars`' fill rules. Same result as `aggregate_time_bars` -> `run_bars` on the tape's trades. `symbol` is required when the tape holds more than one |
 | `run_tape_bars_on_ticks(path, interval_seconds, symbol="")` | `BacktestStats` | Decide on bars, fill on ticks: `on_bar` receives the `run_tape_bars` bars, the executor is fed every trade and book record as `run_tape` feeds it. An order sent from bar n's `on_bar` can first match against the first trade stamped at or after the end of bar n (with a submit latency L, the first record at or after the end + L). `symbol` as for `run_tape_bars`. See [Decide on bars, fill on ticks](../../how-to/backtest.md#decide-on-bars-fill-on-ticks) |

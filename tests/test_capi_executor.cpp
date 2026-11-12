@@ -12,6 +12,7 @@
 // instead of the built-in SimulatedExecutor. Lifecycle (on_start /
 // on_stop) is balanced against runner / live engine / backtest start.
 
+#include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/capi/lrvx_capi.h"
 
 #include <gtest/gtest.h>
@@ -44,6 +45,8 @@ struct ExecState
   uint32_t last_cancel_all_symbol{0};
   uint64_t last_replace_old_id{0};
   LrvxOrder last_replace_order{};
+  LrvxOrder last_oco_first{};
+  LrvxOrder last_oco_second{};
 };
 
 void ex_submit(void* ud, const LrvxOrder* o)
@@ -76,7 +79,13 @@ void ex_replace(void* ud, uint64_t old_id, const LrvxOrder* o)
   s->last_replace_old_id = old_id;
   s->last_replace_order = *o;
 }
-void ex_oco(void* ud, const LrvxOrder*, const LrvxOrder*) { static_cast<ExecState*>(ud)->oco++; }
+void ex_oco(void* ud, const LrvxOrder* first, const LrvxOrder* second)
+{
+  auto* s = static_cast<ExecState*>(ud);
+  s->oco++;
+  s->last_oco_first = *first;
+  s->last_oco_second = *second;
+}
 void ex_caps(void* ud, LrvxExchangeCapabilities* out)
 {
   static_cast<ExecState*>(ud)->caps_calls++;
@@ -394,6 +403,120 @@ TEST(CapiExecutor, RunnerModifyAfterCancelNamesNoOrder)
   EXPECT_EQ(ctx.state.last_replace_order.id, b);
   EXPECT_EQ(ctx.state.last_replace_order.symbol, 0u);
   EXPECT_EQ(ctx.state.replace.load(), 2);
+}
+
+namespace
+{
+// The C API has no emitter for an OCO, so the signal goes in through the
+// bridge, the way a binding built on it would send one.
+void emitOco(LrvxStrategyHandle strategy, uint32_t symbol, uint64_t id)
+{
+  static_cast<lrvx::BridgeStrategy*>(strategy)->emit(
+      lrvx::Signal::oco(symbol, lrvx::Side::SELL, lrvx::Price::fromRaw(10500000000LL),
+                        lrvx::Price::fromRaw(9500000000LL), lrvx::Quantity::fromRaw(100000000LL),
+                        id));
+}
+}  // namespace
+
+TEST(CapiExecutor, RunnerOcoLegsCarryDifferentIds)
+{
+  ModifyCtx ctx;
+  const uint64_t id = (uint64_t{1} << 32) + 77;
+  emitOco(ctx.strategy, ctx.symbol, id);
+
+  ASSERT_EQ(ctx.state.oco.load(), 1);
+  const LrvxOrder& first = ctx.state.last_oco_first;
+  const LrvxOrder& second = ctx.state.last_oco_second;
+  EXPECT_EQ(first.id, id) << "the first leg keeps the id the strategy chose";
+  EXPECT_NE(second.id, 0u);
+  EXPECT_NE(second.id, first.id) << "a cancel or modify has to be able to name one leg";
+  EXPECT_EQ(first.price_raw, 10500000000LL);
+  EXPECT_EQ(second.price_raw, 9500000000LL);
+  EXPECT_EQ(second.symbol, ctx.symbol);
+  EXPECT_EQ(second.side, 1u);
+
+  // A second pair does not reuse the first pair's second-leg id.
+  const uint64_t firstPairSecondId = second.id;
+  emitOco(ctx.strategy, ctx.symbol, id + 1);
+  EXPECT_NE(ctx.state.last_oco_second.id, firstPairSecondId);
+  EXPECT_NE(ctx.state.last_oco_second.id, ctx.state.last_oco_first.id);
+}
+
+TEST(CapiExecutor, RunnerModifyNamesOneOcoLeg)
+{
+  ModifyCtx ctx;
+  const uint64_t id = (uint64_t{1} << 32) + 77;
+  emitOco(ctx.strategy, ctx.symbol, id);
+  ASSERT_EQ(ctx.state.oco.load(), 1);
+  const uint64_t secondId = ctx.state.last_oco_second.id;
+  ASSERT_NE(secondId, id);
+
+  lrvx_emit_modify(ctx.strategy, secondId, 9400000000LL, 50000000LL);
+  ASSERT_EQ(ctx.state.replace.load(), 1);
+  EXPECT_EQ(ctx.state.last_replace_old_id, secondId);
+  EXPECT_EQ(ctx.state.last_replace_order.id, secondId);
+  EXPECT_EQ(ctx.state.last_replace_order.symbol, ctx.symbol);
+  EXPECT_EQ(ctx.state.last_replace_order.side, 1u);
+  EXPECT_EQ(ctx.state.last_replace_order.type, 0u) << "LIMIT";
+  EXPECT_EQ(ctx.state.last_replace_order.price_raw, 9400000000LL);
+  EXPECT_EQ(ctx.state.last_replace_order.quantity_raw, 50000000LL);
+
+  lrvx_emit_modify(ctx.strategy, id, 10600000000LL, 100000000LL);
+  ASSERT_EQ(ctx.state.replace.load(), 2);
+  EXPECT_EQ(ctx.state.last_replace_order.id, id);
+  EXPECT_EQ(ctx.state.last_replace_order.symbol, ctx.symbol);
+  EXPECT_EQ(ctx.state.last_replace_order.price_raw, 10600000000LL);
+
+  // Cancelling one leg forgets that leg only.
+  lrvx_emit_cancel(ctx.strategy, secondId);
+  lrvx_emit_modify(ctx.strategy, secondId, 9300000000LL, 50000000LL);
+  EXPECT_EQ(ctx.state.last_replace_order.symbol, 0u);
+  lrvx_emit_modify(ctx.strategy, id, 10700000000LL, 100000000LL);
+  EXPECT_EQ(ctx.state.last_replace_order.symbol, ctx.symbol);
+}
+
+// Order ids carry the strategy's subscriber id in their upper half, so two
+// strategies on one runner number their orders apart and the handler's record
+// of forwarded orders, keyed by id alone, cannot mix them up.
+TEST(CapiExecutor, TwoStrategiesOnOneRunnerNeverShareAnOrderId)
+{
+  // Declared first so it outlives the runner that holds it.
+  struct Owned
+  {
+    LrvxStrategyHandle handle{nullptr};
+    ~Owned() { lrvx_strategy_destroy(handle); }
+  } owned;
+  ModifyCtx ctx;
+  LrvxStrategyCallbacks scb{};
+  uint32_t syms[] = {ctx.other, ctx.symbol};
+  owned.handle = lrvx_strategy_create(2, syms, 2, ctx.registry, scb);
+  LrvxStrategyHandle second = owned.handle;
+  ASSERT_NE(second, nullptr);
+  lrvx_runner_add_strategy(ctx.runner, second);
+
+  // Each strategy's first order: the same position in its own numbering.
+  const uint64_t a = lrvx_emit_limit_sell(ctx.strategy, ctx.symbol, 10100000000LL, 300000000LL);
+  const uint64_t b = lrvx_emit_limit_buy(second, ctx.other, 9900000000LL, 500000000LL);
+  ASSERT_NE(a, b);
+  EXPECT_EQ(a >> 32, 1u);
+  EXPECT_EQ(b >> 32, 2u);
+  EXPECT_EQ(a & 0xFFFFFFFFu, b & 0xFFFFFFFFu);
+
+  lrvx_emit_modify(second, b, 9800000000LL, 400000000LL);
+  EXPECT_EQ(ctx.state.last_replace_order.id, b);
+  EXPECT_EQ(ctx.state.last_replace_order.symbol, ctx.other);
+  EXPECT_EQ(ctx.state.last_replace_order.side, 0u);
+  EXPECT_EQ(ctx.state.last_replace_order.price_raw, 9800000000LL);
+
+  lrvx_emit_modify(ctx.strategy, a, 10200000000LL, 200000000LL);
+  EXPECT_EQ(ctx.state.last_replace_order.id, a);
+  EXPECT_EQ(ctx.state.last_replace_order.symbol, ctx.symbol);
+  EXPECT_EQ(ctx.state.last_replace_order.side, 1u);
+
+  // One strategy cancelling its order leaves the other's on record.
+  lrvx_emit_cancel(ctx.strategy, a);
+  lrvx_emit_modify(second, b, 9700000000LL, 400000000LL);
+  EXPECT_EQ(ctx.state.last_replace_order.symbol, ctx.other);
 }
 
 TEST(CapiExecutor, NullDetachesExecutor)

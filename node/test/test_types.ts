@@ -137,12 +137,17 @@ const strategy: Strategy = {
     // TradeData.timestampNs is declared bigint -- a plain `number` here
     // would silently lose precision on a real nanosecond timestamp.
     check(typeof trade.timestampNs === "bigint", "TradeData.timestampNs is bigint at runtime");
-    emit.marketBuy(0.1);
-    emit.marketSell(0.1);
-    emit.limitBuy(100, 0.1);
-    emit.limitSell(100, 0.1);
-    emit.cancel(1);
-    emit.closePosition();
+    // The order-emitting functions return the order id.
+    const bought: number = emit.marketBuy(0.1);
+    const sold: number = emit.marketSell(0.1);
+    const bid: number = emit.limitBuy(100, 0.1);
+    const ask: number = emit.limitSell(100, 0.1);
+    check(typeof bought === "number" && typeof sold === "number" && typeof bid === "number" &&
+          typeof ask === "number", "emit.* returns the order id as a number at runtime");
+    emit.modify(bid, 99, 0.1);
+    emit.cancel(ask);
+    const closed: number = emit.closePosition();
+    void closed;
   },
   onBar(_ctx, bar: BarData, _emit) {
     void bar.open;
@@ -611,6 +616,54 @@ const fr: Float64Array = targets.future_return(arr, 5);
 void fr;
 void targets.future_ctc_volatility(arr, 5);
 void targets.future_linear_slope(arr, 5);
+
+// ── Clock inputs accept bigint ───────────────────────────────────────
+{
+  const T = 1757000000123456789n;
+  const va = new lrvx.VenueAvailability();
+  checkAcceptsBigint(() => va.scheduleOutage(T, 10), "VenueAvailability.scheduleOutage accepts bigint startNs");
+  checkAcceptsBigint(() => va.scheduleOutageEx(T, 10, "total"), "VenueAvailability.scheduleOutageEx accepts bigint startNs");
+  checkAcceptsBigint(() => {
+    const up: boolean = va.isUp(T);
+    void up;
+    void va.submitsAllowed(T);
+    void va.cancelsAllowed(T);
+    void va.bookUpdatesAllowed(T);
+    void va.tradesAllowed(T);
+    const mult: number = va.latencyMultiplier(T);
+    void mult;
+  }, "VenueAvailability queries accept bigint nowNs");
+
+  const acct = new lrvx.Account(1, 1000);
+  checkAcceptsBigint(() => acct.setMark(1, 100, T), "Account.setMark accepts bigint tsNs");
+  checkAcceptsBigint(() => void acct.hasStaleMarks(T, 100), "Account.hasStaleMarks accepts bigint nowNs");
+  checkAcceptsBigint(() => acct.recordFill(T, 100, 1), "Account.recordFill accepts bigint tsNs");
+
+  const fs = new lrvx.FundingSchedule();
+  checkAcceptsBigint(() => fs.setTape([T, 5], [0.001, 0.002]), "FundingSchedule.setTape accepts bigint timestamps");
+  checkAcceptsBigint(() => fs.setTapeBySymbol([T], [1], [0.001]), "FundingSchedule.setTapeBySymbol accepts bigint timestamps");
+  checkAcceptsBigint(() => void fs.tick(T, [1], [1], [100]), "FundingSchedule.tick accepts bigint nowNs");
+
+  const group = new lrvx.OrderGroup();
+  checkAcceptsBigint(() => void group.pairLatencyDecision({ leaderSubmitTsNs: T, leaderAckTsNs: T + 5n, ackReceived: true }),
+                     "OrderGroup.pairLatencyDecision accepts bigint timestamps");
+
+  const liq = new lrvx.LiquidationEngine();
+  checkAcceptsBigint(() => void liq.onMarks([[1, 100]], T), "LiquidationEngine.onMarks accepts bigint tsNs");
+
+  const stack = lrvx.VenueStack.binanceUmFutures(1, 1000);
+  checkAcceptsBigint(() => stack.feesRecordFill(T, 100), "VenueStack.feesRecordFill accepts bigint tsNs");
+  checkAcceptsBigint(() => void stack.feesFor(T, 100, true), "VenueStack.feesFor accepts bigint tsNs");
+
+  const tape = lrvx.poolTapeCreate();
+  lrvx.poolTapeDescriptorConstantProduct(tape, 3, 1000, 18, 6);
+  checkAcceptsBigint(() => lrvx.poolTapeCheckpoint(tape, T, 1000000n, 1000000n), "poolTapeCheckpoint accepts bigint tsNs");
+  checkAcceptsBigint(() => lrvx.poolTapeSwap(tape, T + 1n, true, 1000n), "poolTapeSwap accepts bigint tsNs");
+
+  const recorder = new lrvx.BarDispatchRecorder();
+  recorder.addTimeIntervalSeconds(1);
+  checkAcceptsBigint(() => recorder.onTrade(1, 100, 1, T), "BarDispatchRecorder.onTrade accepts bigint tsNs");
+}
 
 // ── Constants exist ──────────────────────────────────────────────────
 void SLIPPAGE_NONE;

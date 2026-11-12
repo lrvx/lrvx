@@ -119,7 +119,7 @@ public:
 | `getSymbolName`        | Reverse lookup from `SymbolId` to `(exchange, symbol)` string pair. |
 | `getSymbolInfo`        | Returns `std::optional<SymbolInfo>` for the given ID.               |
 | `getExchangeForSymbol` | Returns `ExchangeId` for a given symbol.                            |
-| `applyVenueTick`       | Writes a venue's tick into an existing entry whose tick is not declared (see below). |
+| `applyVenueTick`       | Writes a venue's tick into an existing entry whose tick is not declared, or was applied by an earlier call (see below). |
 | `venueTickLog`         | The ticks `applyVenueTick` wrote, shared with copies taken earlier.  |
 
 ## The venue's tick for an entry registered first
@@ -134,10 +134,16 @@ exclusive lock:
 | Entry's tick before the call | Outcome | Entry after |
 | --- | --- | --- |
 | Not declared (`tickSizeKnown` false and the 0.01 default) | `Applied` | The venue's tick, known |
+| A tick an earlier `applyVenueTick` applied, now different from the venue's | `Applied` | The venue's new tick, known |
 | Declared, equal to the venue's | `Unchanged` | Unchanged |
 | Declared, different | `Conflict` | Unchanged: the declared tick is kept |
 | No entry with this id | `UnknownSymbol` | - |
 | Venue tick not positive | `InvalidTick` | Unchanged |
+
+A tick the venue applied is not a declaration. A venue can move a market's tick while it trades
+(Polymarket does, and says so on its market channel); the connector calls `applyVenueTick` again and
+the entry follows, each change recorded in `venueTickLog()`. The connectors register their own
+symbols the same way, with the tick applied after registration, so those follow too.
 
 A declared tick is never overwritten. The caller may know better than the venue's metadata (a
 product the venue lists under a different increment, or a test that wants the refusal path), and

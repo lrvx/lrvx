@@ -32,8 +32,8 @@ built with options refuses `setExecutor`.
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `setStrategy(strategy)` | `void` | Attach a strategy |
-| `runCsv(path, symbol)` | stats object | Replay a CSV file (timestamp, open, high, low, close, volume). Throws `LrvxError` with the reason on a file that cannot be opened or a row that cannot be parsed |
-| `runOhlcv(timestamps, closes, symbol)` | stats object | Replay raw arrays (timestamps as Float64Array, closes as Float64Array) |
+| `runCsv(path, symbol)` | stats object | Replay a CSV file (timestamp, open, high, low, close, volume). Throws `LrvxError` with the reason on a file that cannot be opened, a row that cannot be parsed or a `symbol` the registry does not hold |
+| `runOhlcv(timestamps, closes, symbol)` | stats object | Replay raw arrays (timestamps as BigInt64Array in nanoseconds, closes as Float64Array). Throws `LrvxError` on a `symbol` the registry does not hold |
 | `runTape(path)` | stats object | Replay a `.lrvx` tape directory — the canonical recording written by `lrvx tape record` or `scripts/backfill_to_tape.py`. Throws `LrvxError` with the reason on a missing or unreadable tape |
 | `runTapeBars(path, intervalSeconds, symbol?)` | stats object | Replay a `.lrvx` tape as time bars: trades aggregated while the tape streams, each closed bar to `onBar` with `runBars`' fill rules. Same result as `readTrades` -> `aggregateTimeBars` -> `runBars` for the same interval. `symbol` is required when the tape holds more than one; throws `LrvxError` on a bad interval, unknown symbol, unreadable tape or a symbol with no trades |
 | `runTapeBarsOnTicks(path, intervalSeconds, symbol?)` | stats object | Decide on bars, fill on ticks: `onBar` receives the `runTapeBars` bars, the executor is fed every trade and book record as `runTape` feeds it (`onTrade` and `onBookUpdate` do not fire). An order sent from bar n's `onBar` can first match against the first trade stamped at or after the end of bar n (with a submit latency L, the first record at or after the end + L). `symbol` and the errors as for `runTapeBars`. See [Decide on bars, fill on ticks](../../how-to/backtest.md#decide-on-bars-fill-on-ticks) |
@@ -121,7 +121,7 @@ tick; `BacktestRunner` checks them.
 
 `submitOrder`'s `type` is one of `"market"`, `"limit"`, `"stop_market"`,
 `"stop_limit"`, `"trailing_stop"`. The optional seventh argument carries
-`{ tif?: 'gtc' | 'ioc' | 'fok' | 'gtd' | 'post_only', reduceOnly?: boolean, expiresAtNs?: number }`.
+`{ tif?: 'gtc' | 'ioc' | 'fok' | 'gtd' | 'post_only', reduceOnly?: boolean, expiresAtNs?: number | bigint }`.
 
 ### The manual bar path
 

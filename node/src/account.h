@@ -4,6 +4,8 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
+
 #include <string>
 
 #include "lrvx/capi/lrvx_capi.h"
@@ -126,10 +128,9 @@ class AccountWrap : public Napi::ObjectWrap<AccountWrap>
   {
     const uint32_t sym = info[0].As<Napi::Number>().Uint32Value();
     const double price = info[1].As<Napi::Number>().DoubleValue();
-    if (info.Length() >= 3 && info[2].IsNumber())
+    if (info.Length() >= 3 && (info[2].IsNumber() || info[2].IsBigInt()))
     {
-      lrvx_account_set_mark_at(_h, sym, price,
-                               info[2].As<Napi::Number>().Int64Value());
+      lrvx_account_set_mark_at(_h, sym, price, toInt64Ns(info[2]));
     }
     else
     {
@@ -147,7 +148,7 @@ class AccountWrap : public Napi::ObjectWrap<AccountWrap>
   {
     return Napi::Boolean::New(
         info.Env(),
-        lrvx_account_has_stale_marks(_h, info[0].As<Napi::Number>().Int64Value(),
+        lrvx_account_has_stale_marks(_h, toInt64Ns(info[0]),
                                      info[1].As<Napi::Number>().Int64Value()) != 0);
   }
   Napi::Value TotalNotional(const Napi::CallbackInfo& info)
@@ -160,7 +161,7 @@ class AccountWrap : public Napi::ObjectWrap<AccountWrap>
   }
   void RecordFill(const Napi::CallbackInfo& info)
   {
-    const int64_t ts = info[0].As<Napi::Number>().Int64Value();
+    const int64_t ts = toInt64Ns(info[0]);
     const double notional = info[1].As<Napi::Number>().DoubleValue();
     if (info.Length() >= 3 && info[2].IsNumber())
     {

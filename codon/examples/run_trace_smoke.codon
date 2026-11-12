@@ -51,6 +51,13 @@ def run():
     check("fill count", counts.fills == 1)
     reader.close()
     os.system("rm -rf " + path)
+
+    said = ""
+    try:
+        TraceReader(path)
+    except ValueError as e:
+        said = e.message
+    check("a missing trace raises with the reason: " + said, path in said)
     print("codon run-trace smoke ok")
 
 

@@ -9,6 +9,8 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
+
 #include "amm_curve.h"
 #include "dex_amount.h"
 #include "lrvx/capi/lrvx_capi.h"
@@ -77,7 +79,7 @@ inline Napi::Value poolTapeCheckpoint(const Napi::CallbackInfo& info)
   const std::string r0 = detail_curve::bigintToDecimal(env, info[2].As<Napi::BigInt>());
   const std::string r1 = detail_curve::bigintToDecimal(env, info[3].As<Napi::BigInt>());
   if (!lrvx_pool_tape_checkpoint(detail_tape::tapeOf(info[0]),
-                                 info[1].As<Napi::Number>().Int64Value(), r0.c_str(), r1.c_str()))
+                                 toInt64Ns(info[1]), r0.c_str(), r1.c_str()))
   {
     throw Napi::Error::New(env, "poolTapeCheckpoint: bad reserve");
   }
@@ -88,7 +90,7 @@ inline Napi::Value poolTapeSwap(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   const std::string amt = detail_curve::bigintToDecimal(env, info[3].As<Napi::BigInt>());
-  if (!lrvx_pool_tape_swap(detail_tape::tapeOf(info[0]), info[1].As<Napi::Number>().Int64Value(),
+  if (!lrvx_pool_tape_swap(detail_tape::tapeOf(info[0]), toInt64Ns(info[1]),
                            info[2].As<Napi::Boolean>().Value() ? 1 : 0, amt.c_str()))
   {
     throw Napi::Error::New(env, "poolTapeSwap: bad amount");

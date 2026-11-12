@@ -888,6 +888,9 @@ extern "C"
   typedef void (*LrvxExecutorCancelFn)(void*, uint64_t);
   typedef void (*LrvxExecutorCancelAllFn)(void*, uint32_t);
   typedef void (*LrvxExecutorReplaceFn)(void*, uint64_t, const LrvxOrder*);
+  // The two legs carry different ids: the first the id of the strategy's OCO
+  // signal, the second one the runner assigns. Either id names its leg in a
+  // later cancel or replace.
   typedef void (*LrvxExecutorSubmitOCOFn)(void*, const LrvxOrder*, const LrvxOrder*);
   typedef void (*LrvxExecutorCapabilitiesFn)(void*, LrvxExchangeCapabilities*);
   typedef void (*LrvxExecutorLifecycleFn)(void*);
@@ -1221,6 +1224,11 @@ extern "C"
   void lrvx_backtest_runner_destroy(LrvxBacktestRunnerHandle runner);
   void lrvx_backtest_runner_set_strategy(LrvxBacktestRunnerHandle runner,
                                          LrvxStrategyHandle strategy);
+  // run_csv, run_ohlcv and run_bars take a registered symbol's name; NULL or
+  // "" means the registry's first symbol. A name the registry does not hold
+  // is an error: they return 0, replay nothing, and lrvx_last_error_message
+  // names it. Every run_* returns 1 on success and 0 on failure with the
+  // reason there.
   int lrvx_backtest_runner_run_csv(LrvxBacktestRunnerHandle runner, const char* path,
                                    const char* symbol, LrvxBacktestStats* stats_out);
   int lrvx_backtest_runner_run_tape(LrvxBacktestRunnerHandle runner, const char* tape_dir,
@@ -1712,6 +1720,8 @@ extern "C"
                                                 const int64_t* timestamps_ns,
                                                 const uint32_t* symbols, const double* rates,
                                                 uint32_t n_entries);
+  // 0 when the file cannot be opened: the schedule keeps the tape it had and
+  // lrvx_last_error_message names the path.
   uint8_t lrvx_funding_schedule_load_tape(LrvxFundingScheduleHandle h, const char* path);
   int lrvx_funding_schedule_load_profile(LrvxFundingScheduleHandle h, const char* profile_name);
   void lrvx_funding_schedule_set_constant_rate(LrvxFundingScheduleHandle h, double rate);
@@ -2814,6 +2824,11 @@ extern "C"
   // Walk Forward
   // ============================================================
 
+  // Returns the fold count. Zero is a result (a file too short for one fold)
+  // and also the failure value: a CSV that cannot be opened, a row that
+  // cannot be parsed and a symbol name the registry does not hold each return
+  // 0 with the reason in lrvx_last_error_message. Call lrvx_clear_last_error
+  // first and read lrvx_last_error_code after to tell the two apart.
   uint32_t lrvx_walk_forward_run_csv(LrvxRegistryHandle registry, const char* csv_path,
                                      const char* symbol, double fee_rate, double initial_capital,
                                      const LrvxWalkForwardConfig* cfg,
@@ -2838,9 +2853,14 @@ extern "C"
   int lrvx_last_error_code(void);
 
   /* Text for the code above: the function that failed, and what the
-   * exception said. Never NULL -- an empty string means nothing has been
-   * recorded on this thread. Valid until the next failure on this
-   * thread or the next lrvx_clear_last_error. */
+   * exception said. The functions that open a path -- the run_* calls,
+   * lrvx_walk_forward_run_csv, lrvx_run_reader_open,
+   * lrvx_run_recorder_create, lrvx_tape_diff_create,
+   * lrvx_merged_tape_reader_create, lrvx_funding_schedule_load_tape, and a
+   * segment merge, split or export that ends with success = 0 -- leave the
+   * reason here beside their failure value. Never NULL -- an empty string
+   * means nothing has been recorded on this thread. Valid until the next
+   * failure on this thread or the next lrvx_clear_last_error. */
   const char* lrvx_last_error_message(void);
 
   void lrvx_clear_last_error(void);

@@ -11,6 +11,7 @@
 # pulls it in, so no entry point into the binding skips it.
 from lrvx.abi import check_abi_version
 
+from C import lrvx_last_error_message() -> cobj
 from C import lrvx_run_recorder_create(cobj, cobj, cobj, int) -> cobj
 from C import lrvx_run_recorder_destroy(cobj)
 from C import lrvx_run_recorder_add_tape_ref(cobj, cobj, cobj, int, int)
@@ -80,6 +81,8 @@ class TraceRecorder:
                  strategy_hash: str = "", run_started_ns: int = 0):
         self._h = lrvx_run_recorder_create(_cstr(path), _cstr(strategy_id),
                                             _cstr(strategy_hash), run_started_ns)
+        if not self._h:
+            raise ValueError("TraceRecorder: " + str.from_ptr(lrvx_last_error_message()))
 
     def add_tape_ref(self, path: str, content_hash: str = "",
                      first_event_ns: int = 0, last_event_ns: int = 0):
@@ -135,6 +138,8 @@ class TraceReader:
 
     def __init__(self, path: str):
         self._h = lrvx_run_reader_open(_cstr(path))
+        if not self._h:
+            raise ValueError("TraceReader: " + str.from_ptr(lrvx_last_error_message()))
 
     def run_started_ns(self) -> int:
         return lrvx_run_reader_run_started_ns(self._h)

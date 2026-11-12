@@ -344,6 +344,7 @@ from C import lrvx_data_reader_summary_p(cobj, Ptr[byte])
 from C import lrvx_data_reader_stats_p(cobj, Ptr[byte])
 
 # MergedTapeReader -- N-tape merged consumption.
+from C import lrvx_last_error_message() -> cobj
 from C import lrvx_merged_tape_reader_create(Ptr[cobj], u32, i64, i64,
                                               Ptr[u32], u32) -> cobj
 from C import lrvx_merged_tape_reader_destroy(cobj)
@@ -1541,9 +1542,7 @@ class MergedTapeReader:
             i64(from_ns), i64(to_ns),
             sym_ptr, n_filter)
         if self._handle == cobj():
-            raise ValueError(
-                "MergedTapeReader: failed to open tapes "
-                "(bad input or overlapping book streams)")
+            raise ValueError(str.from_ptr(lrvx_last_error_message()))
 
     def __del__(self):
         if self._handle != cobj():

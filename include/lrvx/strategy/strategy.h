@@ -247,6 +247,10 @@ class Strategy : public IStrategy
     std::lock_guard<SymbolLock> owned(lockFor(sym));
     auto& c = _contexts[sym];
     followVenueTick(c, sym);
+    // The runner hands a fill to the position manager before it reaches the
+    // strategy, so the context a fill or order-update hook reads already
+    // counts that fill, as position() does.
+    refreshPosition(c, sym);
     if (ev.status == OrderEventStatus::FILLED ||
         ev.status == OrderEventStatus::PARTIALLY_FILLED)
     {

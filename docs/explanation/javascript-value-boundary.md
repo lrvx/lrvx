@@ -82,6 +82,25 @@ records listed above, these read as `BigInt`:
 `FundingSchedule.tick()` payments still report `timestampNs` as a
 `Number`: the C API hands that value over as a double.
 
+On the write side the addon takes a `BigInt` or a `Number` wherever the
+argument is a clock reading, and uses a `BigInt` to the nanosecond:
+
+- `VenueAvailability`: `isUp`, `submitsAllowed`, `cancelsAllowed`,
+  `bookUpdatesAllowed`, `tradesAllowed`, `latencyMultiplier`, and the
+  `startNs` of `scheduleOutage` / `scheduleOutageEx`
+- `Account`: `setMark` (`tsNs`), `hasStaleMarks` (`nowNs`), `recordFill`
+- `VenueStack`: `feesRecordFill`, `feesFor`
+- `LiquidationEngine.onMarks` (`tsNs`)
+- `FundingSchedule`: `tick` (`nowNs`), and the timestamps of `setTape` /
+  `setTapeBySymbol`
+- `OrderGroup.pairLatencyDecision`: `leaderSubmitTsNs`, `leaderAckTsNs`
+- `poolTapeCheckpoint`, `poolTapeSwap`
+- `BarDispatchRecorder.onTrade`
+- `SimulatedExecutor.submitOrder`: `expiresAtNs`
+
+The durations next to them (`durationNs`, `budgetNs`, `gtcTtlNs`) stay
+`Number`.
+
 ### What did not change
 
 Durations stay `Number`. A latency, a bar interval or a trade duration is

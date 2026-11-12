@@ -67,10 +67,10 @@ check(r3.equal === false, 'shorter: equal=false');
 check(r3.firstDivergenceIndex === 2, 'shorter: divergence at len(shorter)=2');
 
 // Invalid path
-var threw = false;
+var said = '';
 try { lrvx.tapeDiff('/tmp/does-not-exist-xyz-qjs', leftDir); }
-catch (e) { threw = true; }
-check(threw, 'invalid path rejected');
+catch (e) { said = String(e.message); }
+check(said.indexOf('/tmp/does-not-exist-xyz-qjs') >= 0, 'invalid path rejected by name: ' + said);
 
 if (failed > 0) {
     console.log('\n' + failed + ' check(s) failed');

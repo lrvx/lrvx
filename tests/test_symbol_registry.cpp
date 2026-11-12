@@ -885,6 +885,50 @@ TEST(SymbolRegistryVenueTick, ADeclaredTickIsKept)
   EXPECT_EQ(registry.venueTickLog()->revision(), rev) << "nothing changed, nothing to follow";
 }
 
+// A venue moves a market's tick while it trades. A tick the venue applied is
+// not a declaration: the venue's next one replaces it, and each change is
+// there for a strategy to follow.
+TEST(SymbolRegistryVenueTick, AnAppliedTickFollowsTheVenueAgain)
+{
+  SymbolRegistry registry;
+  const SymbolId id = registry.registerSymbol(undeclared("polymarket", "TOKEN"));
+  ASSERT_EQ(registry.applyVenueTick(id, Price::fromDouble(0.01)).outcome,
+            VenueTickOutcome::Applied);
+  const uint64_t rev = registry.venueTickLog()->revision();
+
+  auto r = registry.applyVenueTick(id, Price::fromDouble(0.001));
+  EXPECT_EQ(r.outcome, VenueTickOutcome::Applied);
+  EXPECT_EQ(r.heldTick.raw(), Price::fromDouble(0.001).raw());
+  EXPECT_TRUE(registry.getSymbolInfo(id)->tickSizeKnown);
+  EXPECT_EQ(orderTickRaw(*registry.getSymbolInfo(id)), Price::fromDouble(0.001).raw());
+  EXPECT_GT(registry.venueTickLog()->revision(), rev);
+  EXPECT_EQ(registry.venueTickLog()->tickFor(id)->raw(), Price::fromDouble(0.001).raw());
+
+  r = registry.applyVenueTick(id, Price::fromDouble(0.001));
+  EXPECT_EQ(r.outcome, VenueTickOutcome::Unchanged);
+  r = registry.applyVenueTick(id, Price::fromDouble(0.01));
+  EXPECT_EQ(r.outcome, VenueTickOutcome::Applied);
+  EXPECT_EQ(registry.getSymbolInfo(id)->tickSize.raw(), Price::fromDouble(0.01).raw());
+}
+
+// A declared tick that happens to equal the venue's first tick is still the
+// caller's when the venue moves on.
+TEST(SymbolRegistryVenueTick, ADeclaredTickEqualToTheVenuesStaysDeclared)
+{
+  SymbolRegistry registry;
+  SymbolInfo info = undeclared("polymarket", "TOKEN");
+  info.tickSize = Price::fromDouble(0.01);
+  info.tickSizeKnown = true;
+  const SymbolId id = registry.registerSymbol(info);
+
+  ASSERT_EQ(registry.applyVenueTick(id, Price::fromDouble(0.01)).outcome,
+            VenueTickOutcome::Unchanged);
+  const auto r = registry.applyVenueTick(id, Price::fromDouble(0.001));
+  EXPECT_EQ(r.outcome, VenueTickOutcome::Conflict);
+  EXPECT_EQ(r.heldTick.raw(), Price::fromDouble(0.01).raw());
+  EXPECT_EQ(registry.getSymbolInfo(id)->tickSize.raw(), Price::fromDouble(0.01).raw());
+}
+
 TEST(SymbolRegistryVenueTick, UnknownIdsAndNonPositiveTicksAreRefused)
 {
   SymbolRegistry registry;
@@ -1002,6 +1046,25 @@ TEST(SymbolRegistryVenueTick, AStrategyBuiltEarlierFollowsTheAppliedTick)
   EXPECT_EQ(strategy.bookTick(b).raw(), kDefaultTickSize.raw());
   // The construction-time copy stays as documented.
   EXPECT_FALSE(strategy.symbolInfos()[0].tickSizeKnown);
+}
+
+// The venue's second tick reaches the strategy the way its first did.
+TEST(SymbolRegistryVenueTick, AStrategyFollowsEachChangeOfTheVenueTick)
+{
+  SymbolRegistry registry;
+  const SymbolId a = registry.registerSymbol(undeclared("polymarket", "TOKEN"));
+  TickReader strategy({a}, registry);
+
+  registry.applyVenueTick(a, Price::fromDouble(0.01));
+  trade(strategy, a);
+  EXPECT_EQ(strategy.bookTick(a).raw(), Price::fromDouble(0.01).raw());
+
+  registry.applyVenueTick(a, Price::fromDouble(0.001));
+  EXPECT_EQ(strategy.bookTick(a).raw(), Price::fromDouble(0.01).raw()) << "until its next event";
+  trade(strategy, a);
+  ASSERT_TRUE(strategy.tickInTrade);
+  EXPECT_EQ(strategy.tickInTrade->raw(), Price::fromDouble(0.001).raw());
+  EXPECT_EQ(strategy.bookTick(a).raw(), Price::fromDouble(0.001).raw());
 }
 
 // The strategy holds the log, not the registry: a registry gone before the

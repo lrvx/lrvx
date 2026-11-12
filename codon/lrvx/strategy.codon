@@ -35,7 +35,7 @@ from C import lrvx_strategy_last_n_closed_bars(cobj, u32, u8, u64, cobj, u32) ->
 from C import lrvx_strategy_get_bar_ring_capacity(cobj) -> u32
 from C import lrvx_strategy_set_bar_ring_capacity(cobj, u32)
 
-from lrvx.types import SCALE, Price, Quantity, TradeData, BarData, BUY, SELL
+from lrvx.types import SCALE, Price, Quantity, TradeData, BarData, OrderEventData, BUY, SELL
 from lrvx.types import TIF_GTC, TIF_IOC, TIF_FOK, TIF_POST_ONLY
 from lrvx.context import SymbolContext
 
@@ -208,14 +208,14 @@ class Strategy:
         """Called when strategy stops. Override in subclass."""
         pass
 
-    def on_fill(self, ctx: SymbolContext, ev):
+    def on_fill(self, ctx: SymbolContext, ev: OrderEventData):
         """Called on each fill (status PARTIALLY_FILLED or FILLED)
         for orders this strategy emitted. `ev` carries `order_id`,
         `side`, `fill_qty`, `fill_price`, `exchange_ts_ns`. Override
         in subclass to react to your own fills."""
         pass
 
-    def on_order_update(self, ctx: SymbolContext, ev):
+    def on_order_update(self, ctx: SymbolContext, ev: OrderEventData):
         """Called on every order-lifecycle status change for orders
         this strategy emitted (NEW / ACCEPTED / CANCELED / REJECTED /
         REPLACED / TRIGGERED / TRAILING_UPDATED and the rest). A
@@ -223,13 +223,13 @@ class Strategy:
         `on_fill` only."""
         pass
 
-    def on_queue_position_change(self, ctx: SymbolContext, ev):
+    def on_queue_position_change(self, ctx: SymbolContext, ev: OrderEventData):
         """Resting limit order's queue position moved without any
         other lifecycle transition. `ev.queue_ahead` and
         `ev.queue_total` carry the current snapshot. Backtest only."""
         pass
 
-    def on_market_position_change(self, ctx: SymbolContext, ev):
+    def on_market_position_change(self, ctx: SymbolContext, ev: OrderEventData):
         """Resting limit order's categorical market position
         transitioned (best, behind_best, mid_spread, level_empty,
         crossed). `ev.market_position` is the new state;

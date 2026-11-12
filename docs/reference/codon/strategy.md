@@ -94,19 +94,27 @@ def on_bar(self, ctx: SymbolContext, bar: BarData):
 
 Lifecycle callbacks.
 
-#### `on_fill(ctx, ev)`
+#### `on_fill(ctx: SymbolContext, ev: OrderEventData)`
 
 Called on each fill (status `PARTIALLY_FILLED` or `FILLED`) for orders this strategy emitted. `ev` is
 an `OrderEventData`, described under [Types](types.md); it carries `order_id`, `side`, `fill_qty`,
 `fill_price`, `exchange_ts_ns`.
 
-#### `on_order_update(ctx, ev)`
+`ctx.position()` in `on_fill` and `on_order_update` already counts the fill being delivered: the
+runner's position tracker takes a fill before the strategy hears of it. After a buy of 1 from flat,
+`ctx.position()` in that fill's `on_fill` is 1.
+
+The four order callbacks take their event as `OrderEventData` in the base class too, so one program
+can attach a plain `Strategy` and a subclass that overrides them. An override declares the same
+parameter types.
+
+#### `on_order_update(ctx: SymbolContext, ev: OrderEventData)`
 
 Called on every order-lifecycle status change for orders this strategy emitted: `NEW`, `ACCEPTED`,
 `CANCELED`, `REJECTED`, `REPLACED`, `TRIGGERED`, `TRAILING_UPDATED` and the rest. A fill does not
 come through here: a `PARTIALLY_FILLED` or `FILLED` event reaches `on_fill` only.
 
-#### `on_queue_position_change(ctx, ev)`
+#### `on_queue_position_change(ctx: SymbolContext, ev: OrderEventData)`
 
 A resting limit order's queue position moved with no other lifecycle transition. `ev.queue_ahead` and
 `ev.queue_total` carry the current snapshot. Backtest only.

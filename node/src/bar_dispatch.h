@@ -9,6 +9,8 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
+
 #include "lrvx/capi/lrvx_capi.h"
 
 namespace node_lrvx
@@ -58,7 +60,7 @@ class BarDispatchRecorderWrap : public Napi::ObjectWrap<BarDispatchRecorderWrap>
     uint32_t symbol = info[0].As<Napi::Number>().Uint32Value();
     double price = info[1].As<Napi::Number>().DoubleValue();
     double qty = info[2].As<Napi::Number>().DoubleValue();
-    int64_t ts_ns = info[3].As<Napi::Number>().Int64Value();
+    int64_t ts_ns = toInt64Ns(info[3]);
     lrvx_bar_dispatch_recorder_on_trade(_h, symbol, price, qty, ts_ns);
   }
 

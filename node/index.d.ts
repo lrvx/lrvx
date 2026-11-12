@@ -248,27 +248,28 @@ export interface ClosedBar {
 
 /** Order-emission helper passed as the third arg to strategy callbacks.
  *  Every `symbol` argument is optional and defaults to the strategy's
- *  first subscribed symbol. */
+ *  first subscribed symbol. The functions that send an order return its id:
+ *  the `orderId` its events carry, and what `cancel` and `modify` take. */
 export interface EmitMethods {
-  marketBuy(qty: number, symbol?: Symbol | number): void;
-  marketSell(qty: number, symbol?: Symbol | number): void;
-  limitBuy(price: number, qty: number, symbol?: Symbol | number): void;
-  limitSell(price: number, qty: number, symbol?: Symbol | number): void;
+  marketBuy(qty: number, symbol?: Symbol | number): number;
+  marketSell(qty: number, symbol?: Symbol | number): number;
+  limitBuy(price: number, qty: number, symbol?: Symbol | number): number;
+  limitSell(price: number, qty: number, symbol?: Symbol | number): number;
   provideLiquidity(
     priceLower: number,
     priceUpper: number,
     liquidity: number,
     symbol?: Symbol | number,
-  ): void;
-  withdrawLiquidity(liquidity: number, symbol?: Symbol | number): void;
+  ): number;
+  withdrawLiquidity(liquidity: number, symbol?: Symbol | number): number;
   cancel(orderId: number): void;
   /** Change the price and quantity of a working order. It keeps its id,
    *  symbol, side and type; `newQty` is the quantity left to work. The id
-   *  comes from the order's events (`ev.orderId` in `onOrderUpdate`). A
-   *  refused modify arrives as a `REPLACE_REJECTED` event and leaves the
-   *  order as it was. */
+   *  is the one the emitting function returned, which is also `ev.orderId`
+   *  in the order's events. A refused modify arrives as a
+   *  `REPLACE_REJECTED` event and leaves the order as it was. */
   modify(orderId: number, newPrice: number, newQty: number): void;
-  closePosition(symbol?: Symbol | number): void;
+  closePosition(symbol?: Symbol | number): number;
   /** Most recent closed bar for `(symbol, barType, barTypeParam)`, or
    *  `null` when none has closed yet. `barType` uses the `BarData.barType`
    *  encoding; `barTypeParam` is the interval / threshold. */
@@ -1029,15 +1030,15 @@ export class Account {
   ): void;
   closePosition(symbol: number): void;
   positionCount(): number;
-  setMark(symbol: number, price: number, tsNs?: number): void;
+  setMark(symbol: number, price: number, tsNs?: number | bigint): void;
   /** Last timestamp the symbol was marked. Very negative when never marked. */
   markTsFor(symbol: number): number;
   /** Returns true when any position's mark is older than budgetNs
    *  relative to nowNs, or has never been marked. */
-  hasStaleMarks(nowNs: number, budgetNs: number): boolean;
+  hasStaleMarks(nowNs: number | bigint, budgetNs: number): boolean;
   totalNotional(): number;
   totalUnrealisedPnl(): number;
-  recordFill(tsNs: number, notional: number, symbol?: number): void;
+  recordFill(tsNs: number | bigint, notional: number, symbol?: number): void;
   /** Per-symbol breakdown of rolling 30d notional. Returned as a list
    *  of `{ symbol, notional }` pairs. Symbol 0 is the "unknown / no
    *  symbol" bucket used by recordFill calls without a symbol arg. */
@@ -1089,9 +1090,9 @@ export class VenueStack {
   liquidationsCount(): number;
   insuranceFundBalance(): number;
   // Fees proxies.
-  feesRecordFill(tsNs: number, notional: number): void;
+  feesRecordFill(tsNs: number | bigint, notional: number): void;
   feesCurrentTierIndex(): number;
-  feesFor(tsNs: number, notional: number, isMaker: boolean): number;
+  feesFor(tsNs: number | bigint, notional: number, isMaker: boolean): number;
 }
 
 export interface FundingPaymentEvent {
@@ -1134,7 +1135,7 @@ export class LiquidationEngine {
   /** Multi-symbol atomic mark update + liquidation walk. Pass tuples
    *  `[symbol, price]` and an optional ts_ns for the stale-mark guard.
    *  Returns aggregated liquidations count across all walked symbols. */
-  onMarks(marks: Array<[number, number]>, tsNs?: number): number;
+  onMarks(marks: Array<[number, number]>, tsNs?: number | bigint): number;
   liquidationsCount(): number;
   insurancePaymentsCount(): number;
   adlCloseoutsCount(): number;
@@ -1183,13 +1184,13 @@ export class LiquidationEngine {
 export class FundingSchedule {
   constructor();
   setConstant(intervalNs: number, rate: number): void;
-  setTape(timestampsNs: number[], rates: number[]): void;
+  setTape(timestampsNs: Array<number | bigint>, rates: number[]): void;
   /** Per-symbol tape: each row settles only the matching symbol at that
    *  timestamp. symbols[i] == 0 acts as a wildcard. Symbols without an
    *  entry at a given settlement timestamp fall back to the constant
    *  rate (defaults to 0). */
   setTapeBySymbol(
-    timestampsNs: number[],
+    timestampsNs: Array<number | bigint>,
     symbols: number[],
     rates: number[],
   ): void;
@@ -1202,7 +1203,7 @@ export class FundingSchedule {
   setConstantRate(rate: number): void;
   reset(): void;
   tick(
-    nowNs: number,
+    nowNs: number | bigint,
     symbols: number[],
     positions: number[],
     markPrices: number[],
@@ -1229,7 +1230,7 @@ export class VenueAvailability {
    *  `gtcTtlNs` is honored only when `onOpenOrders` is
    *  `'expire_gtc_after'`. */
   scheduleOutage(
-    startNs: number,
+    startNs: number | bigint,
     durationNs: number,
     onOpenOrders?: OnOutage,
     gtcTtlNs?: number,
@@ -1248,7 +1249,7 @@ export class VenueAvailability {
    *  'total' (default) | 'submit_only_down' | 'cancel_only_down' |
    *  'slow_degradation' | 'stale_book' | 'wrong_side_recovery'. */
   scheduleOutageEx(
-    startNs: number,
+    startNs: number | bigint,
     durationNs: number,
     outageType?:
       | 'total'
@@ -1262,14 +1263,14 @@ export class VenueAvailability {
     degradationLatencyMultiplier?: number,
     wrongSideRecoveryBps?: number,
   ): void;
-  isUp(nowNs: number): boolean;
-  submitsAllowed(nowNs: number): boolean;
-  cancelsAllowed(nowNs: number): boolean;
-  bookUpdatesAllowed(nowNs: number): boolean;
-  tradesAllowed(nowNs: number): boolean;
+  isUp(nowNs: number | bigint): boolean;
+  submitsAllowed(nowNs: number | bigint): boolean;
+  cancelsAllowed(nowNs: number | bigint): boolean;
+  bookUpdatesAllowed(nowNs: number | bigint): boolean;
+  tradesAllowed(nowNs: number | bigint): boolean;
   /** Latency multiplier applied to submit/cancel/replace ack times
    *  while a SlowDegradation outage is active; 1.0 otherwise. */
-  latencyMultiplier(nowNs: number): number;
+  latencyMultiplier(nowNs: number | bigint): number;
   /** Pop the wrong-side-recovery bps accumulated when a
    *  WrongSideRecovery outage just ended. Idempotent — subsequent
    *  calls return 0 until the next such outage ends. */
@@ -1318,7 +1319,7 @@ export class SimulatedExecutor {
     opts?: {
       tif?: 'gtc' | 'ioc' | 'fok' | 'gtd' | 'post_only';
       reduceOnly?: boolean;
-      expiresAtNs?: number;
+      expiresAtNs?: number | bigint;
     },
   ): void;
   cancelOrder(orderId: number): void;
@@ -2965,10 +2966,10 @@ export function poolTapeDescriptorRaydiumCp(tape: PoolTapeHandle, tradeFeeRate: 
 export function poolTapeDescriptorClmm(tape: PoolTapeHandle, venue: number, feePips: number,
                                        baseDec: number, quoteDec: number): void;
 /** Write a checkpoint (the two reserves, native wei) at a timestamp. */
-export function poolTapeCheckpoint(tape: PoolTapeHandle, tsNs: number, reserve0: bigint,
+export function poolTapeCheckpoint(tape: PoolTapeHandle, tsNs: number | bigint, reserve0: bigint,
                                    reserve1: bigint): void;
 /** Write a swap delta (baseForQuote sells base into the pool). */
-export function poolTapeSwap(tape: PoolTapeHandle, tsNs: number, baseForQuote: boolean,
+export function poolTapeSwap(tape: PoolTapeHandle, tsNs: number | bigint, baseForQuote: boolean,
                              amountIn: bigint): void;
 /** Replay the tape through the exact curve, presenting the pair base/quote. */
 export function poolTapeReplay(tape: PoolTapeHandle, baseIdx: number, quoteIdx: number,
@@ -3108,8 +3109,8 @@ export class OrderGroup {
   }): { denied: boolean; rule: string; detail: string };
   setPairLatencyBudgetNs(budgetNs: number): void;
   pairLatencyDecision(opts: {
-    leaderSubmitTsNs: number;
-    leaderAckTsNs: number;
+    leaderSubmitTsNs: number | bigint;
+    leaderAckTsNs: number | bigint;
     ackReceived?: boolean;
   }): 'wait' | 'submit_follower' | 'cancel_leader';
 }
@@ -3158,7 +3159,7 @@ export class BarDispatchRecorder {
   constructor();
   /** Register a time-bar timeframe. Returns its slot index (or 8 if full). */
   addTimeIntervalSeconds(seconds: number): number;
-  onTrade(symbol: number, price: number, qty: number, tsNs: number): void;
+  onTrade(symbol: number, price: number, qty: number, tsNs: number | bigint): void;
   /** Drain the bus so all bars at the final tied close fire. */
   finalize(): void;
   count(): number;

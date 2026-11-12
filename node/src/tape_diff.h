@@ -9,6 +9,7 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
 #include "error_translator.h"
 #include "lrvx/capi/lrvx_capi.h"
 
@@ -65,8 +66,7 @@ inline Napi::Value tapeDiff(const Napi::CallbackInfo& info)
                                                   max_mismatches, tolerance_ns);
     if (!h)
     {
-      throw lrvx::LrvxError("E_IO_001",
-          "tapeDiff: failed to read tape directory(ies).");
+      throw lrvx::LrvxError("E_IO_001", "tapeDiff: " + capiReason());
     }
 
     Napi::Object out = Napi::Object::New(env);

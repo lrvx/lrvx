@@ -80,7 +80,13 @@ Mapped to ccxt's unified ``create_order`` API:
   ``CLOSE_POSITION``          → ``create_order(type='market', params={'reduceOnly': True})``
   ``CANCEL``                  → ``cancel_order(ccxt_id, ccxt_sym)``
   ``CANCEL_ALL``              → ``cancel_order`` for every tracked id on this symbol
-  ``MODIFY``                  → ``edit_order(...)``
+  ``MODIFY``                  → ``edit_order(ccxt_id, ccxt_sym, type, side, new_qty, new_price)``
+
+A ``CANCEL`` or ``MODIFY`` signal names an order id and nothing else, so
+the symbol, side and type of the call are the ones the order was placed
+with. The new price of a modify is the limit price, or the trigger of a
+stop-market, take-profit-market or trailing order, passed as
+``params={'stopPrice': new_price}``.
 
 Stop, take-profit, and trailing param shapes differ across
 exchanges (Binance futures: ``triggerPrice``; OKX: ``triggerPx``;
@@ -204,6 +210,32 @@ class UnsupportedOrderType(RuntimeError):
     """Raised when a strategy emits an order type the adapter can't route."""
 
 
+# The ccxt `type` each signal type is placed with (see the _place_* methods).
+_CCXT_ORDER_TYPE = {
+    "MARKET": "market",
+    "LIMIT": "limit",
+    "STOP_MARKET": "stop_market",
+    "STOP_LIMIT": "stop_limit",
+    "TAKE_PROFIT_MARKET": "take_profit_market",
+    "TAKE_PROFIT_LIMIT": "take_profit_limit",
+    "TRAILING_STOP": "trailing_stop_market",
+    "TRAILING_STOP_PERCENT": "trailing_stop_market",
+    "CLOSE_POSITION": "market",
+}
+
+# Types with a trigger and no limit price.
+_TRIGGER_AT_MARKET_TYPES = frozenset(
+    {"stop_market", "take_profit_market", "trailing_stop_market"})
+
+
+@dataclass
+class _PlacedOrder:
+    symbol: Optional[str]
+    side: str
+    ccxt_type: str
+    trigger_price: float
+
+
 # Per-exchange override for ccxt's order-book depth. ccxt.pro's default
 # for bitget USDT-FUTURES is `books50`, which the venue rejects with
 # error 30016 (`books15` / `books5` only). Other exchanges use ccxt's
@@ -276,6 +308,9 @@ class CcxtBroker:
     # always send regardless of the market's actual precision.
     _sym_precision: dict = field(default_factory=dict, init=False, repr=False)
     _lrvx_to_ccxt_order: dict = field(default_factory=dict, init=False, repr=False)
+    # lrvx order id -> _PlacedOrder: what a later CANCEL or MODIFY, which
+    # carries the id alone, has to tell the exchange about the order.
+    _placed_orders: dict = field(default_factory=dict, init=False, repr=False)
     _ccxt_orders_by_sym: dict = field(default_factory=dict, init=False, repr=False)
     _tasks: list = field(default_factory=list, init=False, repr=False)
     _loop: Optional[asyncio.AbstractEventLoop] = field(default=None, init=False, repr=False)
@@ -656,9 +691,9 @@ class CcxtBroker:
                 self.on_error("?", e)
             return
         ccxt_sym = self._sym_to_ccxt.get(sym_id)
-        if ccxt_sym is None and (sig.order_type or "").upper() != "CANCEL":
-            # CANCEL signals carry order_id, not necessarily a tracked
-            # symbol — let _handle_signal sort it out.
+        if ccxt_sym is None and (sig.order_type or "").upper() not in ("CANCEL", "MODIFY"):
+            # CANCEL and MODIFY signals carry an order id and no symbol;
+            # _handle_signal finds the symbol the order was placed on.
             if self.on_error:
                 self.on_error(
                     f"sym_id={sym_id}",
@@ -749,6 +784,13 @@ class CcxtBroker:
             return
         if lrvx_id:
             self._lrvx_to_ccxt_order[lrvx_id] = str(ccxt_id)
+            order_type = (getattr(sig, "order_type", "") or "").upper()
+            self._placed_orders[lrvx_id] = _PlacedOrder(
+                symbol=ccxt_sym,
+                side=(getattr(sig, "side", "") or "").lower(),
+                ccxt_type=_CCXT_ORDER_TYPE.get(order_type, "limit"),
+                trigger_price=float(getattr(sig, "trigger_price", 0.0) or 0.0),
+            )
         if ccxt_sym:
             self._ccxt_orders_by_sym.setdefault(ccxt_sym, set()).add(str(ccxt_id))
 
@@ -848,6 +890,9 @@ class CcxtBroker:
             raise ValueError(
                 f"CANCEL: no ccxt order id tracked for lrvx order_id={lrvx_id}"
             )
+        placed = self._placed_orders.pop(lrvx_id, None)
+        if not sym and placed is not None:
+            sym = placed.symbol
         await self.exchange.cancel_order(ccxt_id, sym)
         self._lrvx_to_ccxt_order.pop(lrvx_id, None)
         if sym and sym in self._ccxt_orders_by_sym:
@@ -869,6 +914,7 @@ class CcxtBroker:
         # Drop reverse-lookup entries that pointed at this symbol's ids.
         for fid in [f for f, c in self._lrvx_to_ccxt_order.items() if c in ids]:
             self._lrvx_to_ccxt_order.pop(fid, None)
+            self._placed_orders.pop(fid, None)
 
     async def _modify(self, sym: Optional[str], side: str, sig: Any) -> None:
         lrvx_id = int(getattr(sig, "order_id", 0) or 0)
@@ -886,10 +932,32 @@ class CcxtBroker:
             raise UnsupportedOrderType(
                 f"exchange {self.exchange_id} does not support edit_order"
             )
-        # ccxt uses the same `type` value the original order had — without
-        # tracking it we use 'limit' as the most common modify target.
-        await edit(ccxt_id, sym, "limit", side, new_qty,
-                   new_price if new_price > 0 else None)
+        # The signal carries no symbol, side or type: they are the order's.
+        # An order placed outside _track_order falls back to what the signal
+        # says and to 'limit'.
+        placed = self._placed_orders.get(lrvx_id)
+        ccxt_type = "limit"
+        if placed is not None:
+            sym = placed.symbol or sym
+            side = placed.side or side
+            ccxt_type = placed.ccxt_type
+        price = new_price if new_price > 0 else None
+        if ccxt_type in _TRIGGER_AT_MARKET_TYPES:
+            # No limit price: the one price a modify carries is the trigger.
+            res = await edit(ccxt_id, sym, ccxt_type, side, new_qty, None,
+                             {"stopPrice": price})
+        elif placed is not None and placed.trigger_price > 0:
+            res = await edit(ccxt_id, sym, ccxt_type, side, new_qty, price,
+                             {"stopPrice": placed.trigger_price})
+        else:
+            res = await edit(ccxt_id, sym, ccxt_type, side, new_qty, price)
+        # An exchange that edits by cancel-and-replace answers with a new id.
+        new_id = res.get("id") if isinstance(res, dict) else None
+        if new_id and str(new_id) != ccxt_id:
+            self._lrvx_to_ccxt_order[lrvx_id] = str(new_id)
+            if sym and sym in self._ccxt_orders_by_sym:
+                self._ccxt_orders_by_sym[sym].discard(ccxt_id)
+                self._ccxt_orders_by_sym[sym].add(str(new_id))
 
     # ── Position reconciliation ───────────────────────────────────────
 

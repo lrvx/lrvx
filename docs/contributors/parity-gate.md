@@ -6,7 +6,7 @@ How `scripts/check_binding_parity.py` makes "I added a function to the C ABI but
 
 The C ABI surface (`lrvx_capi.h`) grows whenever someone adds a `LRVX_EXPORT` to the IDL. Each binding (pybind11, NAPI, Codon, QuickJS) is supposed to expose that addition, and all four are hand-written, so all four drift.
 
-The gate used to promise this and not deliver it. It matched **class names** in `.pyi` / `.d.ts`, so a single name satisfied a whole group however many functions the group gained; it checked Codon against `tools/codegen/golden/lrvx_capi.codon`, a file generated from the same IDL the gate had just parsed, which cannot disagree with it; and it skipped QuickJS for any group that carried no `quickjs` entry, which was 59 of the 73 groups. All three holes are closed: parity is now checked **per C function**.
+The gate used to promise this and not deliver it. It matched **class names** in `.pyi` / `.d.ts`, so a single name satisfied a whole group however many functions the group gained; it checked Codon against `tools/codegen/golden/lrvx_capi.codon`, a file generated from the same IDL the gate had just parsed, which cannot disagree with it; and it skipped QuickJS for any group that carried no `quickjs` entry, which was most of them. All three holes are closed: parity is now checked **per C function**.
 
 ## How it works
 
@@ -64,16 +64,22 @@ The group's status stays `required`: demoting a group to `allowlist` would hide 
 
 ### What each binding does not reach
 
-Counts as of the change that introduced the function-level rule, out of 736 C functions:
+The gate prints the current counts itself. Its last line on a passing run names the number of IDL groups and C functions and, per binding, how many functions it checked and how many of those are allowlisted:
 
-| binding  | reachable | allowlisted | what the gap is |
-|----------|-----------|-------------|-----------------|
-| pybind11 | 55        | 681         | the Python binding wraps the C++ API directly rather than calling the C ABI, so most entry points have no call site under `python/` at all |
-| napi     | 585       | 151         | individual wrappers never written |
-| codon    | 566       | 170         | functions no module under `codon/lrvx/` imports |
-| quickjs  | 524       | 212         | 208 with no `addGlobalFunc` registration; 4 called only inside other wrappers, with no global of their own |
+```bash
+python3 scripts/check_binding_parity.py | tail -1
+```
 
-`allowlist_functions:` is the source of truth for these numbers — this table is a summary and will age. The pybind11 figure is not a claim that Python cannot do those things: it says the Python binding is a parallel implementation over the C++ headers, so fixes made at the C boundary (NULL-safety, the exception guard, the error accessors) do not reach it.
+No count is repeated here: `allowlist_functions:` is the source of truth and that line is always computed from it. What stays true as the numbers move is the kind of gap each binding has:
+
+| binding  | what the gap is |
+|----------|-----------------|
+| pybind11 | the Python binding wraps the C++ API directly rather than calling the C ABI, so most entry points have no call site under `python/` at all |
+| napi     | individual wrappers never written |
+| codon    | functions no module under `codon/lrvx/` imports |
+| quickjs  | functions with no `addGlobalFunc` registration, and a few called only inside other wrappers, with no global of their own |
+
+The size of the pybind11 allowlist is not a claim that Python cannot do those things: it says the Python binding is a parallel implementation over the C++ headers, so fixes made at the C boundary (NULL-safety, the exception guard, the error accessors) do not reach it.
 
 ## The struct-layout tables
 
@@ -195,8 +201,9 @@ This gate asserts a symbol *exists*. Every defect the binding-surface audit
 found had an existing symbol — `VenueStack.clock()` raised "Unregistered type",
 the five Node `VenueStack` factories threw `SyntaxError`.
 [`check_binding_smoke.py`](../../scripts/check_binding_smoke.py) closes that by
-walking both bindings by reflection and *calling* what it finds (~760 zero-arg
-calls), failing only on binding-level errors and ignoring rejected inputs.
+walking both bindings by reflection and *calling* what it finds with no
+arguments, failing only on binding-level errors and ignoring rejected inputs
+(it prints, per binding, how many calls it made).
 
 **A binding that cannot be imported fails that gate.** It used to print
 `python: SKIP (cannot import lrvx: ...)` and exit 0, so a wheel that did not

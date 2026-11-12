@@ -41,6 +41,26 @@ inline int64_t toInt64Ns(const Napi::Value& v)
   return v.As<Napi::Number>().Int64Value();
 }
 
+// An order id as JavaScript sees it everywhere: the Number that order events
+// carry in orderId and that emit.cancel / emit.modify take back.
+inline Napi::Value orderIdToJs(Napi::Env env, uint64_t id)
+{
+  return Napi::Number::New(env, static_cast<double>(id));
+}
+
+// lrvx_last_error_message() without the C function name it opens with: a
+// JavaScript caller called a method, not lrvx_run_reader_open.
+inline std::string capiReason()
+{
+  std::string msg = lrvx_last_error_message();
+  const auto colon = msg.find(": ");
+  if (msg.rfind("lrvx_", 0) == 0 && colon != std::string::npos)
+  {
+    msg.erase(0, colon + 2);
+  }
+  return msg;
+}
+
 // The trade durations, time-weighted return and time bounds every stats
 // object carries, whichever struct they were computed into. Durations are
 // differences and fit a double; the bounds are clock readings and do not.

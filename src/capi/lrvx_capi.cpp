@@ -5079,6 +5079,111 @@ void fillStatsStruct(const BacktestStats& s, LrvxBacktestStats* out)
   out->optionQuoteCount = 0;
   out->poolStateCount = 0;
 }
+
+// The symbol a bar run is for. No name means the registry's first symbol. A
+// name the registry does not hold is refused: resolving it to id 0 ran the
+// whole backtest against a symbol nobody registered.
+uint32_t resolveRunSymbol(const SymbolRegistry* registry, const char* symbol)
+{
+  const auto all = registry->getAllSymbols();
+  if (symbol == nullptr || symbol[0] == '\0')
+  {
+    return all.empty() ? 0 : all.front().id;
+  }
+  for (const auto& info : all)
+  {
+    if (info.symbol == symbol)
+    {
+      return info.id;
+    }
+  }
+  throw std::invalid_argument(std::string("symbol '") + symbol + "' is not registered");
+}
+
+// Guesses a timestamp's unit from its magnitude and scales it to
+// nanoseconds. This is ONLY valid where the unit is genuinely unknown --
+// a CSV column can hold seconds, milliseconds, microseconds, or
+// nanoseconds depending on who wrote the file, and there is no contract
+// to consult. readOhlcvCsv() is the one caller with that excuse.
+//
+// run_ohlcv and run_bars are not: their C ABI parameters are
+// documented and named as nanoseconds already (timestamps_ns,
+// start_time_ns / end_time_ns). Running an already-correct nanosecond
+// value back through this guesser corrupts it instead of leaving it
+// alone -- anything under 1e12 ns (the first eleven and a half days
+// after the epoch, an ordinary timestamp for synthetic/offset test data)
+// reads as "probably seconds" and gets rescaled by another 1e9, which
+// silently wraps on overflow in a release build and aborts under a
+// sanitizer. Contract-known callers pass their values through untouched.
+int64_t normalizeTs(int64_t t)
+{
+  if (t < static_cast<int64_t>(1e12))
+  {
+    return t * 1'000'000'000LL;
+  }
+  if (t < static_cast<int64_t>(1e15))
+  {
+    return t * 1'000'000LL;
+  }
+  if (t < static_cast<int64_t>(1e18))
+  {
+    return t * 1'000LL;
+  }
+  return t;
+}
+
+// Reads timestamp,open,high,low,close[,volume] rows after a header line and
+// hands each row's timestamp (in nanoseconds) and close to onBar. A file that
+// cannot be opened or a row that cannot be parsed throws with the path and
+// the line: a partly read file would be a backtest over data the caller
+// never supplied.
+template <typename OnBar>
+void readOhlcvCsv(const char* path, OnBar&& onBar)
+{
+  errno = 0;
+  std::ifstream f(path);
+  if (!f.is_open())
+  {
+    std::string why = std::string("cannot open '") + path + "'";
+    if (errno != 0)
+    {
+      why += std::string(": ") + std::strerror(errno);
+    }
+    throw std::runtime_error(why);
+  }
+
+  std::string line;
+  std::getline(f, line);  // skip header
+  size_t lineNo = 1;
+  while (std::getline(f, line))
+  {
+    ++lineNo;
+    if (line.empty())
+    {
+      continue;
+    }
+    try
+    {
+      std::istringstream ss(line);
+      std::string tok;
+      std::getline(ss, tok, ',');
+      const int64_t ts = normalizeTs(std::stoll(tok));
+      std::getline(ss, tok, ',');  // open
+      std::getline(ss, tok, ',');  // high
+      std::getline(ss, tok, ',');  // low
+      std::getline(ss, tok, ',');
+      const double close = std::stod(tok);
+      onBar(ts, close);
+    }
+    catch (const std::logic_error&)
+    {
+      // std::stoll / std::stod say only "no conversion".
+      throw std::runtime_error(std::string("'") + path + "' line " + std::to_string(lineNo) +
+                               ": expected timestamp,open,high,low,close[,volume], got '" +
+                               line + "'");
+    }
+  }
+}
 }  // namespace
 
 void lrvx_backtest_result_stats(LrvxBacktestResultHandle h, LrvxBacktestStats* out)
@@ -5161,6 +5266,18 @@ static replay::CompressionType toCompression(uint8_t c)
   return c == 1 ? replay::CompressionType::LZ4 : replay::CompressionType::None;
 }
 
+// The merge, split and export results carry the counts of what was done
+// before the failure, so they are returned as they are and the reason goes to
+// lrvx_last_error_message beside them.
+template <typename Result>
+static void noteSegmentOpFailure(const char* fn, const Result& r)
+{
+  if (!r.success)
+  {
+    lrvxCapiNoteException(fn, r.errors.empty() ? "failed" : r.errors.front().c_str());
+  }
+}
+
 LrvxMergeResult lrvx_segment_merge_full(const char* input_paths, size_t num_paths,
                                         const char* output_dir, const char* output_name,
                                         uint8_t sort)
@@ -5180,6 +5297,7 @@ LrvxMergeResult lrvx_segment_merge_full(const char* input_paths, size_t num_path
   cfg.output_name = output_name ? output_name : "merged";
   cfg.sort_by_timestamp = sort != 0;
   auto r = replay::SegmentOps::merge(paths, cfg);
+  noteSegmentOpFailure(__func__, r);
   return {r.success ? (uint8_t)1 : (uint8_t)0, r.segments_merged, r.events_written,
           r.bytes_written};
   LRVX_CAPI_LEAVE;
@@ -5191,6 +5309,7 @@ LrvxMergeResult lrvx_segment_merge_dir(const char* input_dir, const char* output
   LRVX_CAPI_REQUIRE(input_dir);
   LRVX_CAPI_REQUIRE(output_dir);
   auto r = replay::quickMerge(input_dir, output_dir);
+  noteSegmentOpFailure(__func__, r);
   return {r.success ? (uint8_t)1 : (uint8_t)0, r.segments_merged, r.events_written,
           r.bytes_written};
   LRVX_CAPI_LEAVE;
@@ -5208,6 +5327,7 @@ LrvxSplitResult lrvx_segment_split(const char* input_path, const char* output_di
   cfg.time_interval_ns = time_interval_ns;
   cfg.events_per_file = events_per_file;
   auto r = replay::SegmentOps::split(input_path, cfg);
+  noteSegmentOpFailure(__func__, r);
   return {r.success ? (uint8_t)1 : (uint8_t)0, r.segments_created, r.events_written};
   LRVX_CAPI_LEAVE;
 }
@@ -5235,6 +5355,7 @@ LrvxExportResult lrvx_segment_export(const char* input_path, const char* output_
     cfg.symbols.insert(symbols, symbols + num_symbols);
   }
   auto r = replay::SegmentOps::exportData(input_path, cfg);
+  noteSegmentOpFailure(__func__, r);
   return {r.success ? (uint8_t)1 : (uint8_t)0, r.events_exported, r.bytes_written};
   LRVX_CAPI_LEAVE;
 }
@@ -5801,10 +5922,7 @@ lrvx_merged_tape_reader_create(const char* const* paths, uint32_t n_paths,
                                uint32_t n_filter)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
-  if (!paths || n_paths == 0)
-  {
-    return nullptr;
-  }
+  LRVX_CAPI_REQUIRE(paths);
   lrvx::replay::MergedTapeReaderConfig cfg{};
   cfg.tape_dirs.reserve(n_paths);
   for (uint32_t i = 0; i < n_paths; ++i)
@@ -5824,29 +5942,21 @@ lrvx_merged_tape_reader_create(const char* const* paths, uint32_t n_paths,
     cfg.symbol_filter.assign(symbol_filter, symbol_filter + n_filter);
   }
 
-  try
+  // Construction throws on a directory that is not a tape and on overlapping
+  // book streams; the guard records which.
+  auto impl = std::make_unique<capi_impl::LrvxMergedTapeReaderImpl>();
+  impl->reader = std::make_unique<lrvx::replay::MergedTapeReader>(std::move(cfg));
+  // Cache symbol / path strings now so const char* pointers stay stable.
+  for (const auto& sym : impl->reader->symbols())
   {
-    auto impl = std::make_unique<capi_impl::LrvxMergedTapeReaderImpl>();
-    impl->reader =
-        std::make_unique<lrvx::replay::MergedTapeReader>(std::move(cfg));
-    // Cache symbol / path strings now so const char* pointers stay stable.
-    for (const auto& s : impl->reader->symbols())
-    {
-      impl->sym_exchanges.push_back(s.exchange);
-      impl->sym_names.push_back(s.name);
-    }
-    for (const auto& t : impl->reader->perTapeStats())
-    {
-      impl->tape_paths.push_back(t.path.string());
-    }
-    return static_cast<LrvxMergedTapeReaderHandle>(impl.release());
+    impl->sym_exchanges.push_back(sym.exchange);
+    impl->sym_names.push_back(sym.name);
   }
-  catch (...)
+  for (const auto& t : impl->reader->perTapeStats())
   {
-    // Construction may throw on bad input or overlapping book streams;
-    // surface as a NULL handle, leaving caller to decide.
-    return nullptr;
+    impl->tape_paths.push_back(t.path.string());
   }
+  return static_cast<LrvxMergedTapeReaderHandle>(impl.release());
   LRVX_CAPI_LEAVE;
 }
 
@@ -6113,6 +6223,7 @@ uint64_t lrvx_merged_tape_reader_read_books(LrvxMergedTapeReaderHandle h,
 LrvxPartitionerHandle lrvx_partitioner_create(const char* data_dir)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
+  LRVX_CAPI_REQUIRE(data_dir);
   return new replay::Partitioner(std::filesystem::path(data_dir));
   LRVX_CAPI_LEAVE;
 }
@@ -7110,15 +7221,27 @@ class RunnerSignalHandler : public ISignalHandler
           break;
         }
         case SignalType::OCO:
+        {
+          // Two limit orders, as in the backtest runner: the first keeps the
+          // signal's id and price, the second takes an id of the handler's
+          // own and the signal's second price, which travels in triggerPrice.
+          LrvxOrder fo1 = signalToLrvxOrder(sig);
+          fo1.type = static_cast<uint8_t>(OrderType::LIMIT);
+          LrvxOrder fo2 = fo1;
+          fo2.id = nextLegId();
+          fo2.price_raw = sig.triggerPrice.raw();
+          fo2.trigger_price_raw = 0;
+          {
+            std::lock_guard lock(_forwardedMutex);
+            _forwarded[fo1.id] = fo1;
+            _forwarded[fo2.id] = fo2;
+          }
           if (exec->cb.submit_oco != nullptr)
           {
-            LrvxOrder fo1 = signalToLrvxOrder(sig);
-            fo1.type = static_cast<uint8_t>(OrderType::LIMIT);
-            LrvxOrder fo2 = fo1;
-            fo2.price_raw = sig.triggerPrice.raw();
             exec->cb.submit_oco(exec->cb.user_data, &fo1, &fo2);
           }
           break;
+        }
         case SignalType::ProvideLiquidity:
         case SignalType::WithdrawLiquidity:
           // DEX/AMM liquidity ops are handled by the on-chain connector,
@@ -7190,6 +7313,16 @@ class RunnerSignalHandler : public ISignalHandler
   // handler from more than one consumer thread, hence the lock.
   std::mutex _forwardedMutex;
   std::unordered_map<uint64_t, LrvxOrder> _forwarded;
+  // Ids for the second leg of an OCO, small numbers counted from 1 as the
+  // backtest runner counts them. A strategy's own ids carry its subscriber id
+  // above bit 32, so they stay clear of these for every subscriber id but 0.
+  // One counter for the process: a live engine gives each strategy its own
+  // handler and all of them one executor, which must not see an id twice.
+  static uint64_t nextLegId() noexcept
+  {
+    static std::atomic<uint64_t> next{1};
+    return next.fetch_add(1, std::memory_order_relaxed);
+  }
   TrackerSlot<LrvxRiskManagerImpl> _risk;
   TrackerSlot<LrvxKillSwitchImpl> _kill;
   TrackerSlot<LrvxOrderValidatorImpl> _validator;
@@ -8096,12 +8229,7 @@ struct LrvxBacktestRunnerImpl
     std::optional<SymbolId> sid;
     if (symbol != nullptr && symbol[0] != '\0')
     {
-      const uint32_t id = resolveSymbol(symbol);
-      if (id == 0)
-      {
-        throw std::invalid_argument(std::string("symbol '") + symbol + "' is not registered");
-      }
-      sid = id;
+      sid = resolveSymbol(symbol);
     }
     BacktestResult result =
         runner->runTapeBars(std::filesystem::path(tapeDir), std::chrono::nanoseconds{intervalNs}, sid);
@@ -8124,12 +8252,7 @@ struct LrvxBacktestRunnerImpl
     std::optional<SymbolId> sid;
     if (symbol != nullptr && symbol[0] != '\0')
     {
-      const uint32_t id = resolveSymbol(symbol);
-      if (id == 0)
-      {
-        throw std::invalid_argument(std::string("symbol '") + symbol + "' is not registered");
-      }
-      sid = id;
+      sid = resolveSymbol(symbol);
     }
     BacktestResult result = runner->runTapeBarsOnTicks(
         std::filesystem::path(tapeDir), std::chrono::nanoseconds{intervalNs}, sid);
@@ -8224,54 +8347,9 @@ struct LrvxBacktestRunnerImpl
     runner->setPnLTracker(pnlAdapter.get());
   }
 
-  // Guesses a timestamp's unit from its magnitude and scales it to
-  // nanoseconds. This is ONLY valid where the unit is genuinely unknown --
-  // a CSV column can hold seconds, milliseconds, microseconds, or
-  // nanoseconds depending on who wrote the file, and there is no contract
-  // to consult. runCsv() is the one caller with that excuse.
-  //
-  // runOhlcv() and runFullBars() are not: their C ABI parameters are
-  // documented and named as nanoseconds already (timestamps_ns,
-  // start_time_ns / end_time_ns). Running an already-correct nanosecond
-  // value back through this guesser corrupts it instead of leaving it
-  // alone -- anything under 1e12 ns (the first eleven and a half days
-  // after the epoch, an ordinary timestamp for synthetic/offset test data)
-  // reads as "probably seconds" and gets rescaled by another 1e9, which
-  // silently wraps on overflow in a release build and aborts under a
-  // sanitizer. Contract-known callers pass their values through untouched.
-  static int64_t normalizeTs(int64_t t)
-  {
-    if (t < static_cast<int64_t>(1e12))
-    {
-      return t * 1'000'000'000LL;
-    }
-    if (t < static_cast<int64_t>(1e15))
-    {
-      return t * 1'000'000LL;
-    }
-    if (t < static_cast<int64_t>(1e18))
-    {
-      return t * 1'000LL;
-    }
-    return t;
-  }
-
   uint32_t resolveSymbol(const char* symbol) const
   {
-    if (!symbol || symbol[0] == '\0')
-    {
-      auto all = registry->getAllSymbols();
-      return all.empty() ? 0 : all.front().id;
-    }
-    auto all = registry->getAllSymbols();
-    for (const auto& info : all)
-    {
-      if (info.symbol == symbol)
-      {
-        return info.id;
-      }
-    }
-    return 0;
+    return resolveRunSymbol(registry, symbol);
   }
 
   void fillStats(const BacktestStats& s, LrvxBacktestStats* out) const
@@ -8328,51 +8406,10 @@ struct LrvxBacktestRunnerImpl
   int runCsv(const char* path, const char* symbol, LrvxBacktestStats* out)
   {
     refuseWithoutDepth("run_csv");
-    uint32_t id = resolveSymbol(symbol);
-    errno = 0;
-    std::ifstream f(path);
-    if (!f.is_open())
-    {
-      std::string why = std::string("cannot open '") + path + "'";
-      if (errno != 0)
-      {
-        why += std::string(": ") + std::strerror(errno);
-      }
-      throw std::runtime_error(why);
-    }
-
+    const uint32_t id = resolveSymbol(symbol);
     std::vector<OhlcvBacktestReader::Bar> bars;
-    std::string line;
-    std::getline(f, line);  // skip header
-    size_t lineNo = 1;
-    while (std::getline(f, line))
-    {
-      ++lineNo;
-      if (line.empty())
-      {
-        continue;
-      }
-      try
-      {
-        std::istringstream ss(line);
-        std::string tok;
-        std::getline(ss, tok, ',');
-        int64_t ts = normalizeTs(std::stoll(tok));
-        std::getline(ss, tok, ',');  // open
-        std::getline(ss, tok, ',');  // high
-        std::getline(ss, tok, ',');  // low
-        std::getline(ss, tok, ',');
-        double c = std::stod(tok);
-        bars.push_back({ts, Price::fromDouble(c).raw(), id});
-      }
-      catch (const std::logic_error&)
-      {
-        // std::stoll / std::stod say only "no conversion".
-        throw std::runtime_error(std::string("'") + path + "' line " + std::to_string(lineNo) +
-                                 ": expected timestamp,open,high,low,close[,volume], got '" +
-                                 line + "'");
-      }
-    }
+    readOhlcvCsv(path, [&](int64_t ts, double close)
+                 { bars.push_back({ts, Price::fromDouble(close).raw(), id}); });
     return runBars(std::move(bars), out);
   }
 
@@ -9610,94 +9647,6 @@ void lrvx_backtest_runner_set_pnl_tracker(LrvxBacktestRunnerHandle h,
 // Walk-forward
 // ============================================================
 
-namespace
-{
-
-uint32_t resolveSymbolId(SymbolRegistry* reg, const char* symbol)
-{
-  if (!symbol || symbol[0] == '\0')
-  {
-    auto all = reg->getAllSymbols();
-    return all.empty() ? 0 : all.front().id;
-  }
-  for (const auto& info : reg->getAllSymbols())
-  {
-    if (info.symbol == symbol)
-    {
-      return info.id;
-    }
-  }
-  return 0;
-}
-
-int64_t normalizeWfTs(int64_t t)
-{
-  if (t < static_cast<int64_t>(1e12))
-  {
-    return t * 1'000'000'000LL;
-  }
-  if (t < static_cast<int64_t>(1e15))
-  {
-    return t * 1'000'000LL;
-  }
-  if (t < static_cast<int64_t>(1e18))
-  {
-    return t * 1'000LL;
-  }
-  return t;
-}
-
-// Callers treat an empty result as "could not load" (see the bars.empty()
-// check in lrvx_walk_forward_run_csv), which is the only failure channel this
-// signature has. std::stoll/std::stod throw std::invalid_argument on a
-// malformed row, and this runs under extern "C", where an escaping exception
-// is undefined behaviour rather than a catchable error. Abort the whole load
-// instead of skipping bad rows: a partially-parsed tape would silently produce
-// a backtest over data the caller never supplied.
-std::vector<OhlcvReplaySource::Bar> loadOhlcvBarsCsv(const char* path,
-                                                     uint32_t symbolId) noexcept
-{
-  try
-  {
-    std::vector<OhlcvReplaySource::Bar> out;
-    std::ifstream f(path);
-    if (!f.is_open())
-    {
-      return out;
-    }
-    std::string line;
-    std::getline(f, line);  // header
-    while (std::getline(f, line))
-    {
-      if (line.empty())
-      {
-        continue;
-      }
-      std::istringstream ss(line);
-      std::string tok;
-      std::getline(ss, tok, ',');
-      int64_t ts = normalizeWfTs(std::stoll(tok));
-      std::getline(ss, tok, ',');  // open
-      std::getline(ss, tok, ',');  // high
-      std::getline(ss, tok, ',');  // low
-      std::getline(ss, tok, ',');
-      double c = std::stod(tok);
-      OhlcvReplaySource::Bar bar;
-      bar.ts_ns = ts;
-      bar.price_raw = Price::fromDouble(c).raw();
-      bar.symbol_id = symbolId;
-      out.push_back(bar);
-    }
-    return out;
-  }
-  catch (const std::exception&)
-  {
-    return {};
-  }
-}
-
-}  // namespace
-
 uint32_t lrvx_walk_forward_run_csv(LrvxRegistryHandle reg_handle,
                                    const char* csv_path, const char* symbol,
                                    double fee_rate, double initial_capital,
@@ -9708,13 +9657,20 @@ uint32_t lrvx_walk_forward_run_csv(LrvxRegistryHandle reg_handle,
                                    uint32_t max_folds)
 {
   LRVX_CAPI_ENTER(reg_handle);
-  if (!cfg || !csv_path || !factory)
-  {
-    return 0;
-  }
-  SymbolRegistry* reg = toRegistry(reg_handle);
-  uint32_t symId = resolveSymbolId(reg, symbol);
-  std::vector<OhlcvReplaySource::Bar> bars = loadOhlcvBarsCsv(csv_path, symId);
+  LRVX_CAPI_REQUIRE(csv_path);
+  LRVX_CAPI_REQUIRE(cfg);
+  LRVX_CAPI_REQUIRE(factory);
+  const uint32_t symId = resolveRunSymbol(toRegistry(reg_handle), symbol);
+  std::vector<OhlcvReplaySource::Bar> bars;
+  readOhlcvCsv(csv_path, [&](int64_t ts, double close)
+               {
+                 OhlcvReplaySource::Bar bar;
+                 bar.ts_ns = ts;
+                 bar.price_raw = Price::fromDouble(close).raw();
+                 bar.symbol_id = symId;
+                 bars.push_back(bar); });
+  // A file with a header and no rows is no data, not an error: zero folds,
+  // like any file too short for one.
   if (bars.empty())
   {
     return 0;
@@ -10110,28 +10066,19 @@ extern "C" LrvxTapeDiffHandle lrvx_tape_diff_create(const char* left_path,
                                                     int64_t field_tolerance_ns)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
-  if (!left_path || !right_path)
+  LRVX_CAPI_REQUIRE(left_path);
+  LRVX_CAPI_REQUIRE(right_path);
+  for (const char* side : {left_path, right_path})
   {
-    return nullptr;
+    if (!std::filesystem::is_directory(side))
+    {
+      throw std::runtime_error(std::string("'") + side + "' is not a tape directory");
+    }
   }
-  if (!std::filesystem::is_directory(left_path) ||
-      !std::filesystem::is_directory(right_path))
-  {
-    return nullptr;
-  }
-  try
-  {
-    lrvx::replay::TapeDiffOptions opts;
-    opts.max_mismatches = max_mismatches;
-    opts.field_tolerance_ns = field_tolerance_ns;
-    auto* result = new lrvx::replay::TapeDiffResult(
-        lrvx::replay::diffTapes(left_path, right_path, opts));
-    return result;
-  }
-  catch (...)
-  {
-    return nullptr;
-  }
+  lrvx::replay::TapeDiffOptions opts;
+  opts.max_mismatches = max_mismatches;
+  opts.field_tolerance_ns = field_tolerance_ns;
+  return new lrvx::replay::TapeDiffResult(lrvx::replay::diffTapes(left_path, right_path, opts));
   LRVX_CAPI_LEAVE;
 }
 
@@ -11020,22 +10967,12 @@ extern "C" LrvxRunRecorderHandle lrvx_run_recorder_create(const char* path,
                                                           int64_t run_started_ns)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
-  if (path == nullptr)
-  {
-    return nullptr;
-  }
+  LRVX_CAPI_REQUIRE(path);
   lrvx::run::TraceRecorderOptions opts;
   opts.strategy_id = strategy_id ? strategy_id : "";
   opts.strategy_hash = strategy_hash ? strategy_hash : "";
   opts.run_started_ns = run_started_ns;
-  try
-  {
-    return new lrvx::run::TraceRecorder(path, std::move(opts));
-  }
-  catch (...)
-  {
-    return nullptr;
-  }
+  return new lrvx::run::TraceRecorder(path, std::move(opts));
   LRVX_CAPI_LEAVE;
 }
 
@@ -11188,23 +11125,13 @@ extern "C" void lrvx_run_recorder_close(LrvxRunRecorderHandle handle)
 extern "C" LrvxRunReaderHandle lrvx_run_reader_open(const char* path)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
-  if (path == nullptr)
-  {
-    return nullptr;
-  }
-  try
-  {
-    auto state = std::make_unique<RunReaderState>();
-    state->reader = std::make_unique<lrvx::run::TraceReader>(path);
-    state->signals = state->reader->readAllSignals();
-    state->orders = state->reader->readAllOrderEvents();
-    state->fills = state->reader->readAllFills();
-    return state.release();
-  }
-  catch (...)
-  {
-    return nullptr;
-  }
+  LRVX_CAPI_REQUIRE(path);
+  auto state = std::make_unique<RunReaderState>();
+  state->reader = std::make_unique<lrvx::run::TraceReader>(path);
+  state->signals = state->reader->readAllSignals();
+  state->orders = state->reader->readAllOrderEvents();
+  state->fills = state->reader->readAllFills();
+  return state.release();
   LRVX_CAPI_LEAVE;
 }
 
@@ -12329,11 +12256,14 @@ extern "C" uint8_t lrvx_funding_schedule_load_tape(LrvxFundingScheduleHandle h,
                                                    const char* path)
 {
   LRVX_CAPI_ENTER(h);
-  if (!h || !path)
+  LRVX_CAPI_REQUIRE(path);
+  if (!toFunding(h)->loadTape(std::string(path)))
   {
+    // The only way loadTape fails; the schedule keeps the tape it had.
+    lrvxCapiNoteException(__func__, (std::string("cannot open '") + path + "'").c_str());
     return 0;
   }
-  return toFunding(h)->loadTape(std::string(path)) ? 1 : 0;
+  return 1;
   LRVX_CAPI_LEAVE;
 }
 extern "C" int lrvx_funding_schedule_load_profile(LrvxFundingScheduleHandle h,

@@ -112,7 +112,11 @@ frame can reach both hooks.
 
 `onOrderEvent` routes by status: `FILLED` / `PARTIALLY_FILLED` to `onSymbolFill`,
 `QUEUE_POSITION_UPDATED` to `onSymbolQueuePositionChange`, `MARKET_POSITION_CHANGED` to
-`onSymbolMarketPositionChange`, everything else to `onSymbolOrderUpdate`.
+`onSymbolMarketPositionChange`, everything else to `onSymbolOrderUpdate`. Before it routes, it
+reads the position from the attached position manager into the context, as the market-data
+handlers do. The backtest runner hands a fill to its position tracker before the strategy, so
+`ctx.position` and `ctx.avgEntryPrice` inside `onSymbolFill` already count that fill and agree with
+`position(sym)`.
 
 The base class automatically:
 1. Filters events by subscription
@@ -158,7 +162,9 @@ connector then applies the venue's tick to the registry entry
 ([applyVenueTick](../engine/symbol_registry.md#the-venues-tick-for-an-entry-registered-first)),
 the strategy rebuilds that symbol's book on it at the symbol's next event, before any callback
 runs. The connector applies it in `start()` before its socket opens, so the book is still empty
-then. `symbolInfos()` keeps the values from construction.
+then. A venue that moves a market's tick while connected (Polymarket's `tick_size_change`) is
+followed the same way: the book is rebuilt on the new tick at the next event, empty, and the
+venue's next snapshot fills it. `symbolInfos()` keeps the values from construction.
 
 ## Signal Emission
 

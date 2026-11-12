@@ -349,6 +349,10 @@ void PolymarketExchangeConnector::handleMessage(std::string_view payload)
       // book stale between snapshots).
       processPriceChanges(std::move(obj), recvNs, venueTs);
     }
+    else if (eventType == "tick_size_change")
+    {
+      processTickSizeChange(payload);
+    }
     else if (eventType == "last_trade_price" || eventType == "trade")
     {
       auto assetIdField = obj["asset_id"];
@@ -399,6 +403,78 @@ void PolymarketExchangeConnector::handleMessage(std::string_view payload)
     {
       _logger->warn(std::string("[Polymarket] simdjson error: ") + e.what());
     }
+  }
+}
+
+// {"event_type":"tick_size_change","market":"0x..","asset_id":"..",
+//  "old_tick_size":"0.01","new_tick_size":"0.001","timestamp":"<ms>"}
+// The venue moves a market to a finer tick as its price nears 0 or 1, and
+// back. The new tick takes the place of the one read at start: in the spec
+// table, and in the registry through the same call start() makes, so a
+// strategy re-sizes its book on its next event and a declared tick that
+// differs is kept and reported.
+void PolymarketExchangeConnector::processTickSizeChange(std::string_view payload)
+{
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded(payload);
+  auto parsed = parser.parse(padded);
+  if (parsed.error())
+  {
+    return;
+  }
+  auto doc = parsed.value();
+  std::string_view assetId;
+  auto tickField = doc["new_tick_size"];
+  if (doc["asset_id"].get_string().get(assetId) != simdjson::SUCCESS || tickField.error())
+  {
+    if (_logger)
+    {
+      _logger->warn("[Polymarket] tick_size_change without asset_id or new_tick_size");
+    }
+    return;
+  }
+  const std::string tokenId(assetId);
+  // Only a market this connector subscribed to: a tick message does not
+  // register one.
+  if (std::find(_config.tokenIds.begin(), _config.tokenIds.end(), tokenId) ==
+      _config.tokenIds.end())
+  {
+    return;
+  }
+
+  // The text of the value, not its double: 0.001 must become exactly 100000
+  // raw. The venue sends a string; a bare number reads the same way.
+  std::string text = simdjson::minify(tickField.value_unsafe());
+  if (!text.empty() && text.front() == '"')
+  {
+    text = text.substr(1, text.size() >= 2 ? text.size() - 2 : 0);
+  }
+  const auto tick = util::parsePrice(text);
+  if (!tick || tick->raw() <= 0)
+  {
+    if (_logger)
+    {
+      _logger->warn("[Polymarket] tick_size_change for " + tokenId + ": new_tick_size " + text +
+                    " is not a positive decimal");
+    }
+    return;
+  }
+
+  const auto held = _specs.find(tokenId);
+  if (held && held->tickSize.raw() == tick->raw())
+  {
+    return;
+  }
+  InstrumentSpec spec = held.value_or(InstrumentSpec{});
+  spec.tickSize = *tick;
+  _specs.add(tokenId, spec);
+  if (_logger)
+  {
+    _logger->info("[Polymarket] " + tokenId + " tick is now " + tick->toString());
+  }
+  if (_registry)
+  {
+    _tokenToSymbol[tokenId] = registerToken(tokenId);
   }
 }
 
