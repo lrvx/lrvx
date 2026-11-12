@@ -619,14 +619,20 @@ void SegmentValidator::addIssue(SegmentValidationResult& result, IssueType type,
 namespace
 {
 
-// Dataset-level check. Two segments whose [first_event_ns, last_event_ns]
-// ranges intersect mean the same wall-clock window was recorded twice, and no
-// reader can make that whole again: segments are walked in filename order, so
-// the overlap replays as duplicated events, as events out of order, or -- on
-// the streaming path, through the reorder buffer's late drop -- as events that
-// silently disappear. Reporting it is the only honest answer; each segment on
-// its own is perfectly well formed, which is why the per-segment pass sees
-// nothing.
+// Dataset-level check. Two segments whose actual [first, last] event ranges
+// intersect mean the same wall-clock window was recorded twice, and no reader
+// can make that whole again: merging overlapping Sorted segments keeps time
+// moving forward but replays the window's events twice, and a segment without
+// the Sorted flag is not merged with its neighbours at all, so the overlap
+// also replays out of order or, on the streaming path, through the reorder
+// buffer's late drop, as events that silently disappear. Reporting it is the
+// only honest answer; each segment on its own is perfectly well formed, which
+// is why the per-segment pass sees nothing.
+//
+// Segments that do not overlap but whose file names list them out of time
+// order (an archive import of a later day before an earlier one) are not
+// reported: nothing is recorded twice, and BinaryLogReader delivers them in
+// time order wherever their bounds are proven.
 //
 // The comparison is strict. Rotation cuts a segment between frames, so two
 // events that share a timestamp can land either side of the seam and leave

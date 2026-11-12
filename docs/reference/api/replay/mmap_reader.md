@@ -41,6 +41,8 @@ public:
 * Enable direct pointer access to event records without buffer copying.
 * Support fast timestamp-based seeking using segment indexes.
 
+`MmapSegmentReader::seekToTimestamp(t)` follows `BinaryLogIterator::seekToTimestamp`: it moves to the last index entry strictly below `t`, and only in a segment flagged `Sorted` whose index is usable. Otherwise it returns `false` and goes back to the first event.
+
 ## MmapReader (Multi-Segment)
 
 ```cpp
@@ -137,3 +139,13 @@ uint64_t count = replay::mmapCount("/data/market");
 * Segments remain mapped until the reader is destroyed.
 * `prefault_pages` can improve first-access latency at the cost of startup time.
 * Does not support compressed segments (use `BinaryLogReader` for those).
+
+## Ordering
+
+`MmapReader` visits segments in `BinaryLogReader::segmentsInReadOrder()` order: by proven first event where a segment proves one, by file name otherwise (see [BinaryLogReader, Ordering guarantee](binary_log_reader.md#ordering-guarantee)). `segments()` lists them in that order. Each segment's events are delivered as stored, one segment after another:
+
+* A tape of uncompressed `Sorted` segments whose time ranges do not overlap arrives in timestamp order.
+* Segments whose ranges overlap are not merged; time steps back where the next one starts.
+* A segment without the `Sorted` flag is not sorted.
+
+Use `BinaryLogReader` when ordered output is required. `forEachFrom(start)` passes over a segment only when it is `Sorted` and its last event lies before `start`, and enters a `Sorted` segment at its last index entry strictly below `start`.

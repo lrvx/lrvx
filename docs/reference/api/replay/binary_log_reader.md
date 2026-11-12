@@ -183,16 +183,16 @@ struct SegmentInfo
 ## Time-ranged reads
 
 With `from_ns` or `to_ns` set, `forEach`, `streamForEach` and `run` leave out
-segments whose recorded time bounds lie outside the range (the `*From` variants
-apply the header check of the first case below only).
-Only bounds the writer guarantees are used, so the result is exactly the full
-read filtered to the range:
+segments whose recorded time bounds lie outside the range. `forEachFrom` and
+`streamForEachFrom` pass over a segment only when its proven maximum (first
+case below) lies before the start. Only bounds the writer guarantees are used,
+so the result is exactly the full read filtered to the range:
 
 * **Uncompressed segment flagged `Sorted`.** Written in non-decreasing
-  `exchange_ts_ns` order, so the header's `first_event_ns` / `last_event_ns`
+  `exchange_ts_ns` order, so its first frame and the header's `last_event_ns`
   are its minimum and maximum. A segment outside the range is not opened. (The
-  writer records `first_event_ns` from the first non-zero timestamp, so a
-  segment opening with events stamped 0 is still read when 0 is in range.)
+  header's `first_event_ns` is not used: the writer records it from the first
+  non-zero timestamp, past any leading events stamped 0.)
 * **Compressed segment flagged `Sorted`.** The header records the first and
   last events in arrival order, which the writer re-sorts inside each block, so
   it is not a bound. The block index is: each entry holds its block's minimum
@@ -204,10 +204,13 @@ read filtered to the range:
   index) is read in full, as before.
 
 Inside a `Sorted` segment the reader also starts at the last index entry
-strictly below `from_ns` and stops at the first event past `to_ns`. Bounds and
-the range filter are both on `exchange_ts_ns`. `stats().segments_skipped`
-counts the segments left out; `skip_segments_by_time = false` restores the full
-walk.
+strictly below `from_ns` (or the `*From` start) and stops at the first event
+past `to_ns`. Strictly below: when several events share the start timestamp,
+an entry stamped with it can have some of them before it. A segment without
+the `Sorted` flag is never entered by its index, whose entries are in arrival
+order. Bounds and the range filter are both on `exchange_ts_ns`.
+`stats().segments_skipped` counts the segments left out;
+`skip_segments_by_time = false` restores the full walk.
 
 ## Usage
 
@@ -269,6 +272,13 @@ public:
 };
 ```
 
+`seekToTimestamp(t)` moves to the last index entry strictly below `t`, so that
+reading on from there and skipping events below `t` yields every event at or
+after `t`. It positions only a `Sorted` segment with a usable index (entries
+ascending, starting at the first frame; on a compressed segment, a first block
+minimum above 0). Otherwise it returns `false` and leaves the iterator at the
+first event, so the caller reads the whole segment.
+
 ## Ordering guarantee
 
 Segment files are named by the wall-clock time they were opened. A tape filled out of order, such as an archive import of day 3 followed by one of day 1, therefore lists its segments out of time order. The reader does not read them in file-name order. It orders them by time wherever a segment's recorded bounds prove where it starts.
@@ -281,7 +291,7 @@ Segment files are named by the wall-clock time they were opened. A tape filled o
 Between two segments that are not bounded, the bounded segments form a run. Within a run, `forEach`, `forEachFrom`, `streamForEach`, `streamForEachFrom` and `run(aggregators, 1)` deliver every event in non-decreasing `timestamp_ns` order:
 
 * Segments are sorted by first event.
-* Segments whose ranges overlap are merged event by event. Each overlapping segment has one cursor open (one decompressed block for a compressed segment); nothing is buffered beyond that.
+* Segments whose ranges overlap are merged event by event. Each overlapping segment has one cursor open (one decompressed block for a compressed segment); nothing is buffered beyond that. Segments overlapping one point in time are all open at once, so a tape of very many fully overlapping segments needs as many open files: past the process's open-file limit the read returns `false` and logs the segment it could not open.
 * Equal timestamps go first to the segment whose file name sorts first, then to the earlier event inside the segment.
 * A tape recorded in order is read exactly as in file-name order: the same events, in the same order, from the same segments. A segment is opened only when the previous one is exhausted, and a `false` return from the callback stops at once.
 
@@ -290,13 +300,17 @@ Between two segments that are not bounded, the bounded segments form a run. With
 * `forEach` / `forEachFrom` buffer the whole segment and sort it: O(segment events) memory, and early exit stops delivery after the segment has been read in full.
 * the streaming paths use the bounded reorder buffer (`reorder_window_ns`).
 
+Either way, events sharing a timestamp keep the order they have in the segment.
+
 Nothing orders such a segment against the runs around it. If an unsorted segment or a later run starts before the previous run ends, time steps back at that boundary. A live recording by one writer is not affected: the segment still being written is the newest file and holds the newest events, so it stays last.
 
 `run(aggregators, n)` with more than one thread visits segments in the same order, but partitions each segment across workers and merges their panels. Overlapping segments are not interleaved there, any more than one segment's blocks are.
 
 `stats().segments_reordered` counts the segments visited at a different position than their file name gives them. `stats().segments_interleaved` counts the segments whose events were merged with another segment's. `order_segments_by_time = false` restores plain file-name order. `segmentsInReadOrder()` lists the segments in the order they are visited; `segments()` keeps file-name order.
 
-`MergedTapeReader::streamEvents` walks each tape's segments in this read order. It merges overlapping segments of one tape only inside its per-tape reorder window.
+`MergedTapeReader::streamEvents` walks each tape's segments in this read order. It merges overlapping segments of one tape only inside its per-tape reorder window. With `from_ns` / `to_ns` it leaves out a segment only on the proven bounds above, and the first event past `to_ns` ends the current `Sorted` segment, not the tape.
+
+`ParallelReader` and `MmapReader` visit segments in the same read order (`segmentsInReadOrder()`); see their pages for what each delivers.
 
 `BinaryLogIterator` is a low-level block-by-block streaming API with **no ordering guarantee**. Use `BinaryLogReader` when ordered output is required.
 
