@@ -90,6 +90,11 @@ def _by_hand(configure, bars=None):
     then submit the callback's orders inside the bar-callback window."""
     bars = bars or _bars()
     ex = lrvx.SimulatedExecutor()
+    # The runner checks and snaps against the symbol's declared tick, so the
+    # hand-driven reference has to know the same tick.
+    reg = lrvx.SymbolRegistry()
+    assert int(reg.add_symbol("test", "AAA", tick_size=0.01)) == 1
+    ex.set_symbol_registry(reg)
     configure(ex)
     oid = 0
     live = []

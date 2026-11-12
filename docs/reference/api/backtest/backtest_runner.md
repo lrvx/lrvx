@@ -171,11 +171,14 @@ t.join();
 void setStrategy(IStrategy* strategy);
 void addMarketDataSubscriber(IMarketDataSubscriber* subscriber);
 void setSymbolRegistry(const SymbolRegistry* registry);
+const SymbolRegistry* symbolRegistry() const noexcept;
 ```
 
 `setStrategy` connects the strategy to receive market events. Use `addMarketDataSubscriber` to add additional subscribers (e.g., bar aggregators, analytics).
 
-`setSymbolRegistry` gives the simulator the symbols' ticks, so an order priced off a known tick is rejected the way a venue rejects it (see [SimulatedExecutor](./simulated_executor.md#order-prices-and-the-tick)). A venue stack attached with `setSimulatedExecutor` gets the same registry. The Python, Node and Codon `BacktestRunner` and `lrvx_backtest_runner_create` pass the registry they are constructed with; a C++ `BacktestRunner` checks nothing until this is called.
+The simulator reads each symbol's tick and rejects an order priced off a known tick the way a venue rejects it (see [SimulatedExecutor](./simulated_executor.md#order-prices-and-the-tick)). By default a C++ `BacktestRunner` takes the ticks from the strategy: an `lrvx::Strategy` keeps a copy of each symbol's registry entry from its constructor (`symbolInfos()`), so the same strategy and data are checked the same way in C++ as in the Python, Node and Codon `BacktestRunner` and `lrvx_backtest_runner_create`, which pass the registry they are constructed with. The copy means the registry does not have to outlive the strategy.
+
+`setSymbolRegistry` overrides that source, whether it is called before or after `setStrategy`; `nullptr` goes back to the strategy's symbols, and `symbolRegistry()` returns the one in use. A strategy that implements `IStrategy` directly, without deriving from `lrvx::Strategy`, carries no symbol entries: its orders are checked only when a registry is passed here. A venue stack attached with `setSimulatedExecutor` reads the same source. `WalkForwardRunner` builds a runner per fold and gets the same default from the strategy each fold's factory returns.
 
 ## Data Flow
 

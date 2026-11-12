@@ -97,6 +97,9 @@ exec.setQueueModel('tob', 1);
 | `setQueueModel(model, depth)` | Configure limit order queue. `model` is one of `"none"`, `"tob"`, `"full"`, `"pro_rata"`, `"pro_rata_with_fifo"`, `"top_pro_lmm"`, `"pro_rata_with_priority"` |
 | `fillCount` | Number of fills (property) |
 
+No symbol registry can be attached to this executor, so order prices are not checked against a
+tick; `BacktestRunner` checks them.
+
 `submitOrder`'s `type` is one of `"market"`, `"limit"`, `"stop_market"`,
 `"stop_limit"`, `"trailing_stop"`. The optional seventh argument carries
 `{ tif?: 'gtc' | 'ioc' | 'fok' | 'gtd' | 'post_only', reduceOnly?: boolean, expiresAtNs?: number }`.
@@ -178,6 +181,10 @@ const stats = engine.run(signals);
 `run()` returns the full `BacktestStats` shape, not the narrower runner
 shape — see [Stats object](#stats-object). The key names are the same in
 both; only the field set differs.
+
+`Engine` symbols are names with no tick, so limit prices are not checked
+against one; a `BacktestRunner` on a registry with a tick rejects an
+off-tick price ([SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick)).
 
 ---
 
