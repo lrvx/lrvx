@@ -4474,6 +4474,10 @@
         },
         {
           "kind": "class",
+          "name": "CHOP"
+        },
+        {
+          "kind": "class",
           "name": "Compare"
         },
         {
@@ -5577,6 +5581,41 @@
           "kind": "method",
           "name": "value",
           "parent": "CCI"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "compute",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "value",
+          "parent": "CHOP"
         },
         {
           "kind": "method",
@@ -12117,6 +12156,11 @@
           "name": "ChildOrder"
         },
         {
+          "header": "include/lrvx/indicator/chop.h",
+          "kind": "type",
+          "name": "ChopKernel"
+        },
+        {
           "header": "include/lrvx/backtest/concentrated_liquidity_curve.h",
           "kind": "type",
           "name": "ClTick"
@@ -16330,6 +16374,16 @@
           "kind": "method",
           "name": "update",
           "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "ChopKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "ChopKernel"
         },
         {
           "kind": "method",
@@ -27415,6 +27469,10 @@
         },
         {
           "kind": "class",
+          "name": "CHOP"
+        },
+        {
+          "kind": "class",
           "name": "ClosedBar"
         },
         {
@@ -29182,6 +29240,31 @@
           "kind": "method",
           "name": "value",
           "parent": "CCI"
+        },
+        {
+          "kind": "method",
+          "name": "compute",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "value",
+          "parent": "CHOP"
         },
         {
           "kind": "method",
@@ -34404,6 +34487,10 @@
         },
         {
           "kind": "class",
+          "name": "CHOP"
+        },
+        {
+          "kind": "class",
           "name": "CompositeBookMatrix"
         },
         {
@@ -35740,6 +35827,36 @@
           "kind": "method",
           "name": "value",
           "parent": "CCI"
+        },
+        {
+          "kind": "method",
+          "name": "compute",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "value",
+          "parent": "CHOP"
         },
         {
           "kind": "method",

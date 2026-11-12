@@ -35,6 +35,7 @@ LRVX_INDICATOR(AutoCorrelation,   autocorrelation,     SingleInput,  (size_t win
 // ---- Bar (high, low, close) ----------------------------------------------
 LRVX_INDICATOR(ATR,               atr,                 BarInput,     (size_t period))
 LRVX_INDICATOR(CCI,               cci,                 BarInput,     (size_t period))
+LRVX_INDICATOR(CHOP,              chop,                BarInput,     (size_t period))
 LRVX_INDICATOR(Stochastic,        stochastic,          BarInput,     (size_t k_period, size_t d_period))
 
 // ---- High/Low only -------------------------------------------------------

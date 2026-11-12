@@ -31,7 +31,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <limits>
+#include <random>
 #include <stdexcept>
 #include <vector>
 
@@ -805,6 +808,165 @@ TEST(CHOP, Range)
       EXPECT_LE(result[i], 100.0);
     }
   }
+}
+
+// The choppiness index written out the long way, as an oracle for the kernel.
+// A bar's term is its true range against the previous close; the first bar
+// has none (NaN), a bar whose true range is NaN repeats the previous term,
+// and once a term is NaN every later one is (Wilder's ATR(1) recursion, which
+// is what the term has always been computed with). A window with a NaN term,
+// or a NaN oldest high or low, or no range, is NaN.
+static std::vector<double> referenceChop(const std::vector<double>& h, const std::vector<double>& l,
+                                         const std::vector<double>& c, size_t period)
+{
+  const size_t n = h.size();
+  const double nan = std::nan("");
+  std::vector<double> term(n, nan);
+  for (size_t i = 1; i < n; ++i)
+  {
+    double tr = nan;
+    if (!std::isnan(h[i]) && !std::isnan(l[i]) && !std::isnan(c[i - 1]))
+    {
+      tr = std::max({h[i] - l[i], std::abs(h[i] - c[i - 1]), std::abs(l[i] - c[i - 1])});
+    }
+    if (i == 1)
+    {
+      term[i] = tr;
+    }
+    else if (std::isnan(tr))
+    {
+      term[i] = term[i - 1];
+    }
+    else
+    {
+      term[i] = std::isnan(term[i - 1]) ? nan : tr;
+    }
+  }
+  std::vector<double> out(n, nan);
+  if (period == 0)
+  {
+    return out;
+  }
+  for (size_t i = period - 1; i < n; ++i)
+  {
+    const size_t first = i + 1 - period;
+    double sum = 0.0;
+    bool complete = true;
+    for (size_t j = first; j <= i; ++j)
+    {
+      if (std::isnan(term[j]))
+      {
+        complete = false;
+        break;
+      }
+      sum += term[j];
+    }
+    if (!complete)
+    {
+      continue;
+    }
+    double highest = h[first];
+    double lowest = l[first];
+    for (size_t j = first + 1; j <= i; ++j)
+    {
+      highest = h[j] > highest ? h[j] : highest;
+      lowest = l[j] < lowest ? l[j] : lowest;
+    }
+    const double range = highest - lowest;
+    if (range > 0 && sum > 0)
+    {
+      out[i] = 100.0 * std::log10(sum / range) / std::log10(static_cast<double>(period));
+    }
+  }
+  return out;
+}
+
+static uint64_t chopBits(double v)
+{
+  uint64_t b = 0;
+  std::memcpy(&b, &v, sizeof b);
+  return b;
+}
+
+TEST(CHOP, MatchesTheLongFormBitForBit)
+{
+  std::mt19937 rng(20261112);
+  std::normal_distribution<double> walk(0.0, 1.0);
+  std::uniform_real_distribution<double> spread(0.0, 2.0);
+  std::uniform_real_distribution<double> unit(0.0, 1.0);
+  const size_t n = 3000;
+  std::vector<double> h(n), l(n), c(n);
+  double px = 100.0;
+  for (size_t i = 0; i < n; ++i)
+  {
+    const double open = px;
+    px += unit(rng) < 0.2 ? 0.0 : walk(rng);
+    c[i] = px;
+    h[i] = std::max(open, px) + (unit(rng) < 0.2 ? 0.0 : spread(rng));
+    l[i] = std::min(open, px) - (unit(rng) < 0.2 ? 0.0 : spread(rng));
+  }
+  const double nan = std::nan("");
+  for (size_t i : {200u, 201u, 202u, 900u, 1700u})
+  {
+    c[i] = nan;
+  }
+  for (size_t i : {450u, 1300u})
+  {
+    h[i] = nan;
+  }
+  for (size_t i : {700u, 2100u})
+  {
+    l[i] = nan;
+  }
+
+  for (size_t period : {0u, 1u, 2u, 3u, 14u, 50u})
+  {
+    const auto want = referenceChop(h, l, c, period);
+    const auto got = CHOP(period).compute(h, l, c);
+    CHOP stream(period);
+    size_t finite = 0;
+    for (size_t i = 0; i < n; ++i)
+    {
+      stream.update(h[i], l[i], c[i]);
+      ASSERT_EQ(chopBits(got[i]), chopBits(want[i]))
+          << "period " << period << " bar " << i << ": " << got[i] << " vs " << want[i];
+      ASSERT_EQ(chopBits(stream.value()), chopBits(want[i])) << "period " << period << " bar " << i;
+      finite += std::isfinite(want[i]) ? 1 : 0;
+    }
+    if (period >= 2)
+    {
+      EXPECT_GT(finite, n / 2) << "period " << period;
+    }
+  }
+
+  // The first bar has no previous close, so a window that includes it is
+  // never complete: the first value is at index `period`.
+  const auto out = CHOP(14).compute(h, l, c);
+  EXPECT_TRUE(std::isnan(out[13]));
+  EXPECT_TRUE(std::isfinite(out[14]));
+}
+
+TEST(CHOP, StreamingResetStartsOver)
+{
+  std::vector<double> h = {10, 11, 12, 11, 13, 12, 14};
+  std::vector<double> l = {9, 9.5, 10, 10, 11, 10.5, 12};
+  std::vector<double> c = {9.5, 10.5, 11, 10.5, 12.5, 11, 13};
+  CHOP s(3);
+  for (size_t i = 0; i < h.size(); ++i)
+  {
+    s.update(h[i], l[i], c[i]);
+  }
+  const double last = s.value();
+  ASSERT_TRUE(s.ready());
+  s.reset();
+  EXPECT_EQ(s.count(), 0u);
+  EXPECT_FALSE(s.ready());
+  for (size_t i = 0; i < h.size(); ++i)
+  {
+    s.update(h[i], l[i], c[i]);
+  }
+  EXPECT_EQ(chopBits(s.value()), chopBits(last));
+  EXPECT_EQ(s.count(), h.size());
 }
 
 // OBV

@@ -124,6 +124,28 @@ for i in range(20):
     atr.update(100.0 + i, 99.0 + i, 100.0 + i)
 check(atr.value > 0.0, "ATR > 0")
 
+# CHOP streams one kernel step per update; every step equals the batch
+# function at that index, bit for bit, NaN reading as None.
+rng = np.random.default_rng(7)
+closes = 100.0 + np.cumsum(rng.normal(size=300))
+highs = closes + rng.uniform(0.1, 2.0, size=300)
+lows = closes - rng.uniform(0.1, 2.0, size=300)
+highs[40] = np.nan
+closes[120:123] = np.nan
+lows[200] = np.nan
+chop_batch = lrvx.chop(highs, lows, closes, 14)
+chop = lrvx.CHOP(14)
+chop_mismatch = 0
+for i in range(len(closes)):
+    got = chop.update(highs[i], lows[i], closes[i])
+    want = None if math.isnan(chop_batch[i]) else float(chop_batch[i])
+    if got != want or chop.value != want or chop.ready != (want is not None):
+        chop_mismatch += 1
+check(chop_mismatch == 0, f"CHOP streaming equals chop() at every step ({chop_mismatch} mismatches)")
+check(chop.count == len(closes), "CHOP counts its updates")
+check(np.array_equal(chop.compute(highs, lows, closes), chop_batch, equal_nan=True),
+      "CHOP.compute equals chop()")
+
 # MACD
 macd = lrvx.MACD(3, 6, 2)
 for v in range(1, 20):
@@ -268,10 +290,13 @@ check(math.isnan(sg.current(0, "double_close")), "after reset current is NaN")
 print("=== Discovery ===")
 
 names = lrvx.list_indicators()
-check(len(names) >= 21, f"list_indicators returns at least 21 entries (got {len(names)})")
+check(len(names) >= 22, f"list_indicators returns at least 22 entries (got {len(names)})")
 check("EMA" in names, "EMA in list_indicators")
 check("MACD" in names, "MACD in list_indicators")
 check("AutoCorrelation" in names, "AutoCorrelation in list_indicators")
+check("CHOP" in names, "CHOP in list_indicators")
+check(all(hasattr(getattr(lrvx, n, None), "update") for n in names),
+      "every listed indicator is a streaming class")
 
 # ── Declarative DAG helper: g.indicator(name, factory, source=) ─────
 

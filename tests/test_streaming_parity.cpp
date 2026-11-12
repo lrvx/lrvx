@@ -19,6 +19,7 @@
 #include "lrvx/indicator/autocorrelation.h"
 #include "lrvx/indicator/bollinger.h"
 #include "lrvx/indicator/cci.h"
+#include "lrvx/indicator/chop.h"
 #include "lrvx/indicator/correlation.h"
 #include "lrvx/indicator/dema.h"
 #include "lrvx/indicator/ema.h"
@@ -218,6 +219,7 @@ void checkBarParity(const char* name, Args... args)
 
 TEST(StreamingParity, ATR) { checkBarParity<ATR>("ATR", size_t{14}); }
 TEST(StreamingParity, CCI) { checkBarParity<CCI>("CCI", size_t{20}); }
+TEST(StreamingParity, CHOP) { checkBarParity<CHOP>("CHOP", size_t{14}); }
 
 // Stochastic (multi-output bar)
 TEST(StreamingParity, Stochastic)
@@ -357,7 +359,7 @@ TEST(StreamingParity, CoversEveryRegistryRow)
       "EMA", "SMA", "RMA", "RSI", "KAMA",
       "DEMA", "TEMA", "Slope", "Skewness", "Kurtosis",
       "RollingZScore", "ShannonEntropy", "AutoCorrelation",
-      "ATR", "CCI", "Stochastic", "ParkinsonVol", "RogersSatchellVol",
+      "ATR", "CCI", "CHOP", "Stochastic", "ParkinsonVol", "RogersSatchellVol",
       "Correlation", "MACD", "Bollinger"};
   std::vector<std::string> registry;
 #define LRVX_INDICATOR(Cls, name, Kind, Args) registry.emplace_back(#Cls);

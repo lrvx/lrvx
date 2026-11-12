@@ -398,6 +398,8 @@ declare class CHOP {
     /** Updates since construction or the last reset(). */
     readonly count: number;
     reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
     static compute(high: number[], low: number[], close: number[], period: number): number[];
 }
 

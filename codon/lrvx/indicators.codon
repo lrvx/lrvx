@@ -573,6 +573,26 @@ class CCI:
     def close(self): self._s.close()
 
 
+class CHOP:
+    _period: int
+    _s: _Stream
+    def __init__(self, period: int):
+        self._period = period
+        self._s = _Stream("chop", [float(period)])
+    def update(self, high: float, low: float, close: float) -> float:
+        return self._s.update_bar(high, low, close)
+    @property
+    def value(self) -> float: return self._s.value()
+    @property
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
+    def compute(self, h: List[float], l: List[float], c: List[float]) -> List[float]:
+        return chop(h, l, c, self._period)
+
+
 class MACD:
     _fast: int
     _slow: int

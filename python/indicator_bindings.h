@@ -1040,6 +1040,9 @@ inline void bindIndicators(py::module_& m)
                }),
            py::arg("period") = 20);
 
+  bindBarIndicator<lrvx::indicator::CHOP>(m, "CHOP")
+      .def(py::init<size_t>(), py::arg("period") = 14);
+
   // OBV/VWAP/CVD: batch-only (top-level functions registered above);
   // streaming wrappers can be added in a follow-up if needed.
 

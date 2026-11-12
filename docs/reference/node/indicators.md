@@ -69,6 +69,7 @@ ind.reset()          // clear state, keep config
 `ATR(period)` — `update(high, low, close)`  
 `Stochastic(kPeriod, dPeriod?)` — `update(high, low, close)` → `.k`, `.d`  
 `CCI(period)` — `update(high, low, close)`  
+`CHOP(period)` — `update(high, low, close)`  
 `ParkinsonVol(period)` — `update(high, low)`  
 `RogersSatchellVol(period)` — `update(open, high, low, close)`  
 `Correlation(period)` — `update(x, y)`
@@ -110,6 +111,7 @@ for (const v of stream) {
 | `AutoCorrelation` | `new lrvx.AutoCorrelation(window, lag)` | SingleInput |
 | `ATR` | `new lrvx.ATR(period)` | BarInput |
 | `CCI` | `new lrvx.CCI(period)` | BarInput |
+| `CHOP` | `new lrvx.CHOP(period)` | BarInput |
 | `Stochastic` | `new lrvx.Stochastic(k_period, d_period)` | BarInput |
 | `ParkinsonVol` | `new lrvx.ParkinsonVol(period)` | HighLowInput |
 | `RogersSatchellVol` | `new lrvx.RogersSatchellVol(period)` | OhlcInput |

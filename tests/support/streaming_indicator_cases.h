@@ -11,6 +11,7 @@
 #include "lrvx/indicator/autocorrelation.h"
 #include "lrvx/indicator/bollinger.h"
 #include "lrvx/indicator/cci.h"
+#include "lrvx/indicator/chop.h"
 #include "lrvx/indicator/correlation.h"
 #include "lrvx/indicator/dema.h"
 #include "lrvx/indicator/ema.h"
@@ -66,6 +67,7 @@ inline const std::map<std::string, std::vector<double>> kCases = {
     {"autocorrelation", {20, 3}},
     {"atr", {14}},
     {"cci", {20}},
+    {"chop", {14}},
     {"stochastic", {14, 3}},
     {"parkinson_vol", {20}},
     {"rogers_satchell_vol", {20}},

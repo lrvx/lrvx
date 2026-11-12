@@ -51,6 +51,7 @@ import {
   BacktestRunner,
   Bollinger,
   CCI,
+  CHOP,
   CompositeBookMatrix,
   Correlation,
   DEMA,
@@ -262,6 +263,10 @@ void atrInd.compute(arr, arr, arr);
 
 const cciInd = new CCI(14);
 void cciInd.update(1, 0.5, 0.8);
+
+const chopInd = new CHOP(14);
+void chopInd.update(1, 0.5, 0.8);
+void chopInd.compute(arr, arr, arr);
 
 const stoch = new Stochastic(14, 3);
 const stochOut = stoch.update(1, 0.5, 0.8);

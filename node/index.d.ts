@@ -1552,6 +1552,14 @@ export class CCI {
   reset(): void;
   compute(high: Float64Array, low: Float64Array, close: Float64Array): Float64Array;
 }
+export class CHOP {
+  constructor(period: number);
+  update(high: number, low: number, close: number): number | null;
+  readonly value: number;
+  readonly ready: boolean;
+  reset(): void;
+  compute(high: Float64Array, low: Float64Array, close: Float64Array): Float64Array;
+}
 export class Stochastic {
   constructor(kPeriod: number, dPeriod?: number);
   update(high: number, low: number, close: number): { k: number | null; d: number | null };
