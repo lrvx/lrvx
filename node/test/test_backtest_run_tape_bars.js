@@ -177,10 +177,15 @@ function main()
   const bps = oneCall(tape, 1, 'AAA', 60, {slippageModel: 'fixed_bps', slippageBps: 10});
   const n = plain.trades.entryPrice.length;
   check(bps.trades.entryPrice.length === n && n > 0 &&
-            Array.from(bps.trades.entryPrice).every(
-                (p, i) => Math.abs(p - plain.trades.entryPrice[i] * 1.001) < 1e-6 &&
-                          Math.abs(bps.trades.exitPrice[i] - plain.trades.exitPrice[i] * 0.999) < 1e-6),
-        'fixed_bps moves every fill 10 bps against the taker');
+            Array.from(bps.trades.entryPrice).every((p, i) => {
+              // The symbol declares a 0.01 tick: a slipped fill is then put on
+              // the tick against the taker, a buy up and a sell down.
+              const buy = plain.trades.entryPrice[i] * 1.001;
+              const sell = plain.trades.exitPrice[i] * 0.999;
+              const x = bps.trades.exitPrice[i];
+              return p >= buy - 1e-9 && p < buy + 0.01 && x <= sell + 1e-9 && x > sell - 0.01;
+            }),
+        'fixed_bps moves every fill 10 bps against the taker, onto the tick');
   const acked = oneCall(tape, 1, 'AAA', 60, {submitAckLatencyNs: 5000000});
   const modelled = oneCall(tape, 1, 'AAA', 60,
                            {latency: new lrvx.ConstantLatency({feedNs: 0, orderNs: 5000000, fillNs: 0})});

@@ -25,7 +25,10 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <functional>
+#include <memory>
 #include <memory_resource>
 #include <string>
 #include <vector>
@@ -352,6 +355,172 @@ TEST(OrderPriceTick, ExecutorWithoutARegistryChecksNothing)
 }
 
 // ---------------------------------------------------------------------------
+// Which entries declare a tick, and whether the declaration survives a copy,
+// a save and a load
+// ---------------------------------------------------------------------------
+
+namespace
+{
+
+std::filesystem::path scratchFile(const std::string& name)
+{
+  return std::filesystem::temp_directory_path() /
+         (name + "_" + std::to_string(::testing::UnitTest::GetInstance()->random_seed()) +
+          ".json");
+}
+
+void writeText(const std::filesystem::path& path, const std::string& text)
+{
+  std::ofstream out(path, std::ios::binary);
+  out << text;
+}
+
+int64_t registryOrderTick(const SymbolRegistry& reg, SymbolId sym)
+{
+  const auto info = reg.getSymbolInfo(sym);
+  return info ? orderTickRaw(*info) : -1;
+}
+
+constexpr int64_t kCentRaw = Price::Scale / 100;
+
+}  // namespace
+
+TEST(OrderPriceTickDeclared, RegisterSymbolKeepsTheFlagOnTheStoredCopy)
+{
+  SymbolRegistry reg;
+  const SymbolId declared = addSymbol(reg, "BTCUSDT", 0.01, /*known=*/true);
+  ASSERT_TRUE(reg.getSymbolInfo(declared)->tickSizeKnown);
+  EXPECT_EQ(registryOrderTick(reg, declared), kCentRaw);
+  bool listed = false;
+  for (const auto& info : reg.getAllSymbols())
+  {
+    if (info.id == declared)
+    {
+      listed = info.tickSizeKnown;
+    }
+  }
+  EXPECT_TRUE(listed) << "getAllSymbols drops the declaration";
+}
+
+TEST(OrderPriceTickDeclared, CentTickAssignedWithoutTheFlagIsTheDefault)
+{
+  // A SymbolInfo cannot tell an assigned 0.01 from the default it starts
+  // with, so in C++ an explicit 0.01 is declared with tickSizeKnown.
+  SymbolRegistry reg;
+  const SymbolId sym = addSymbol(reg, "BTCUSDT", 0.01, /*known=*/false);
+  EXPECT_EQ(registryOrderTick(reg, sym), 0);
+}
+
+TEST(OrderPriceTickDeclared, NameOnlyRegistrationsDeclareNoTick)
+{
+  SymbolRegistry reg;
+  const SymbolId byName = reg.registerSymbol("test", "BTCUSDT");
+  const ExchangeId ex = reg.registerExchange("venue");
+  const SymbolId byExchange = reg.registerSymbol(ex, "ETHUSDT");
+  EXPECT_EQ(registryOrderTick(reg, byName), 0);
+  EXPECT_EQ(registryOrderTick(reg, byExchange), 0);
+}
+
+TEST(OrderPriceTickDeclared, EquivalenceMappingKeepsTheFlag)
+{
+  SymbolRegistry reg;
+  const SymbolId a = addSymbol(reg, "BTCUSDT", 0.01, /*known=*/true);
+  SymbolInfo other;
+  other.exchange = "other";
+  other.symbol = "BTCUSDT";
+  other.tickSize = kDefaultTickSize;
+  other.tickSizeKnown = true;
+  const SymbolId b = reg.registerSymbol(other);
+  const std::vector<SymbolId> both{a, b};
+  reg.mapEquivalentSymbols(both);
+  EXPECT_EQ(registryOrderTick(reg, a), kCentRaw);
+  EXPECT_EQ(registryOrderTick(reg, b), kCentRaw);
+}
+
+TEST(OrderPriceTickDeclared, SaveAndLoadKeepADeclaredCentTick)
+{
+  const auto path = scratchFile("lrvx_tick_declared");
+  std::filesystem::remove(path);
+  SymbolId declared = 0;
+  SymbolId undeclared = 0;
+  {
+    SymbolRegistry reg;
+    declared = addSymbol(reg, "BTCUSDT", 0.01, /*known=*/true);
+    undeclared = addSymbolWithoutTick(reg, "ETHUSDT");
+    ASSERT_TRUE(reg.saveToFile(path));
+  }
+  SymbolRegistry loaded;
+  ASSERT_TRUE(loaded.loadFromFile(path));
+  std::filesystem::remove(path);
+  EXPECT_EQ(registryOrderTick(loaded, declared), kCentRaw)
+      << "a 0.01 tick declared before the save is unchecked after the load";
+  EXPECT_EQ(registryOrderTick(loaded, undeclared), 0);
+
+  // And the executor reading the loaded registry refuses an off-tick price.
+  SimulatedClock clock;
+  SimulatedExecutor exec(clock);
+  exec.setSymbolRegistry(&loaded);
+  std::vector<OrderEvent> events;
+  exec.setOrderEventCallback([&](const OrderEvent& ev)
+                             { events.push_back(ev); });
+  exec.submitOrder(limitOrder(1, declared, Side::BUY, 100.005));
+  ASSERT_FALSE(events.empty());
+  EXPECT_EQ(events.front().status, OrderEventStatus::REJECTED);
+  EXPECT_EQ(events.front().rejectReason, "price_off_tick");
+}
+
+TEST(OrderPriceTickDeclared, SerializeAndDeserializeKeepADeclaredCentTick)
+{
+  SymbolRegistry reg;
+  const SymbolId declared = addSymbol(reg, "BTCUSDT", 0.01, /*known=*/true);
+  const SymbolId undeclared = addSymbolWithoutTick(reg, "ETHUSDT");
+  const auto bytes = reg.serialize();
+  SymbolRegistry restored;
+  ASSERT_TRUE(restored.deserialize(bytes));
+  EXPECT_EQ(registryOrderTick(restored, declared), kCentRaw)
+      << "a 0.01 tick declared before serialize is unchecked after deserialize";
+  EXPECT_EQ(registryOrderTick(restored, undeclared), 0);
+}
+
+TEST(OrderPriceTickDeclared, RegistryFileWithoutTheFlagLoadsAsBefore)
+{
+  // A file written before the flag was persisted: no "tick_size_known". Its
+  // 0.01 entry was never declared-checked and stays unchecked; any other tick
+  // is checked, as it is for a symbol registered with it.
+  const auto path = scratchFile("lrvx_tick_old_file");
+  writeText(path,
+            "{\n  \"version\": 1,\n  \"symbols\": [\n"
+            "    {\"id\": 1, \"exchange\": \"binance\", \"symbol\": \"BTCUSDT\", \"type\": 0, "
+            "\"tick_size\": 1000000, \"contract_multiplier\": 1, \"settlement_type\": 0, "
+            "\"exercise_style\": 0},\n"
+            "    {\"id\": 2, \"exchange\": \"binance\", \"symbol\": \"ETHUSDT\", \"type\": 0, "
+            "\"tick_size\": 10000000}\n"
+            "  ]\n}\n");
+  SymbolRegistry loaded;
+  ASSERT_TRUE(loaded.loadFromFile(path));
+  std::filesystem::remove(path);
+  ASSERT_EQ(loaded.size(), 2u);
+  EXPECT_FALSE(loaded.getSymbolInfo(1)->tickSizeKnown);
+  EXPECT_EQ(registryOrderTick(loaded, 1), 0);
+  EXPECT_EQ(registryOrderTick(loaded, 2), Price::fromDouble(0.1).raw());
+}
+
+TEST(OrderPriceTickDeclared, SerializedRegistryWithoutTheFlagBitLoadsAsBefore)
+{
+  // An undeclared symbol serializes without the flag bit, the bytes a
+  // registry written before the flag existed carries.
+  SymbolRegistry reg;
+  const SymbolId cent = addSymbol(reg, "BTCUSDT", 0.01, /*known=*/false);
+  const SymbolId tenth = addSymbol(reg, "ETHUSDT", 0.1, /*known=*/false);
+  const auto bytes = reg.serialize();
+  SymbolRegistry restored;
+  ASSERT_TRUE(restored.deserialize(bytes));
+  EXPECT_FALSE(restored.getSymbolInfo(cent)->tickSizeKnown);
+  EXPECT_EQ(registryOrderTick(restored, cent), 0);
+  EXPECT_EQ(registryOrderTick(restored, tenth), Price::fromDouble(0.1).raw());
+}
+
+// ---------------------------------------------------------------------------
 // Replace
 // ---------------------------------------------------------------------------
 
@@ -666,13 +835,146 @@ TEST_F(OrderPriceTickRunner, OnTickTakeProfitFillsAtItsTriggerOnBars)
   EXPECT_EQ(fills[1].price, Price::fromDouble(100.8));
 }
 
-TEST_F(OrderPriceTickRunner, RunnerWithoutARegistryFillsOffTickAsBefore)
+TEST_F(OrderPriceTickRunner, RunnerWithoutARegistryReadsTheStrategysTicks)
 {
+  // No setSymbolRegistry: the runner takes the ticks the strategy was built
+  // with, as the Python, Node, Codon and C API runners do.
   auto [exits, fills] =
       runBars([](EntryThenExit& s, double e)
               { s.exitTakeProfit(e * 1.005); }, false);
-  ASSERT_EQ(fills.size(), 2u);
-  EXPECT_NEAR(fills[1].price.toDouble(), 100.8015, 1e-9);
+  ASSERT_FALSE(exits.empty());
+  EXPECT_EQ(exits.front().status, OrderEventStatus::REJECTED);
+  EXPECT_EQ(exits.front().rejectReason, "trigger_off_tick");
+  EXPECT_EQ(fills.size(), 1u) << "only the entry fills";
+}
+
+TEST_F(OrderPriceTickRunner, StrategysTicksOutliveItsRegistry)
+{
+  // The strategy keeps a copy of each symbol's entry, so a registry that is
+  // gone by the time the run starts still decides the tick.
+  auto scratch = std::make_unique<SymbolRegistry>();
+  const SymbolId local = addSymbol(*scratch, "BTCUSDT", 0.1);
+  EntryThenExit strat(1, std::vector<SymbolId>{local}, *scratch);
+  scratch.reset();
+  strat.target = local;
+  strat.place = [](EntryThenExit& s, double e)
+  { s.exitLimit(e * 1.0037); };
+  strat.entry = 100.3;
+  BacktestRunner runner;
+  runner.setStrategy(&strat);
+  runner.runBars(bars());
+  bool rejected = false;
+  for (const auto& ev : strat.seen)
+  {
+    rejected = rejected || (ev.status == OrderEventStatus::REJECTED &&
+                            ev.rejectReason == "price_off_tick");
+  }
+  EXPECT_TRUE(rejected);
+}
+
+TEST_F(OrderPriceTickRunner, ExplicitRegistryWinsOverTheStrategys)
+{
+  // The same id with no declared tick in the runner's registry: unchecked,
+  // whichever of the two calls comes first.
+  SymbolRegistry undeclared;
+  ASSERT_EQ(addSymbolWithoutTick(undeclared, "BTCUSDT"), sym);
+  for (const bool registryFirst : {true, false})
+  {
+    EntryThenExit strat(1, std::vector<SymbolId>{sym}, reg);
+    strat.target = sym;
+    strat.place = [](EntryThenExit& s, double e)
+    { s.exitTakeProfit(e * 1.005); };
+    strat.entry = 100.3;
+    BacktestRunner runner;
+    if (registryFirst)
+    {
+      runner.setSymbolRegistry(&undeclared);
+      runner.setStrategy(&strat);
+    }
+    else
+    {
+      runner.setStrategy(&strat);
+      runner.setSymbolRegistry(&undeclared);
+    }
+    runner.runBars(bars());
+    const auto& fills = runner.executor().fills();
+    ASSERT_EQ(fills.size(), 2u) << "registryFirst=" << registryFirst;
+    EXPECT_NEAR(fills[1].price.toDouble(), 100.8015, 1e-9);
+  }
+}
+
+TEST_F(OrderPriceTickRunner, VenueExecutorGetsTheStrategysTicks)
+{
+  SimulatedClock venueClock;
+  SimulatedExecutor venue(venueClock);
+  EntryThenExit strat(1, std::vector<SymbolId>{sym}, reg);
+  strat.target = sym;
+  strat.place = [](EntryThenExit& s, double e)
+  { s.exitStop(e * 0.9963); };
+  strat.entry = 100.3;
+  BacktestRunner runner;
+  runner.setStrategy(&strat);
+  runner.setSimulatedExecutor(&venue, &venueClock);
+  EXPECT_EQ(venue.orderTickRaw(sym), Price::fromDouble(0.1).raw());
+  runner.runBars(bars());
+  bool rejected = false;
+  for (const auto& ev : strat.seen)
+  {
+    rejected = rejected || ev.rejectReason == "trigger_off_tick";
+  }
+  EXPECT_TRUE(rejected);
+}
+
+namespace
+{
+
+// An IStrategy that is not an lrvx::Strategy: it was never handed a registry,
+// so the runner has no tick to read from it.
+class BareStrategy : public IStrategy
+{
+ public:
+  SubscriberId id() const override { return 7; }
+  void setSignalHandler(ISignalHandler* h) override { _handler = h; }
+  void onBar(const BarEvent& ev) override
+  {
+    if (_bars++ == 0)
+    {
+      _handler->onSignal(
+          Signal::limitBuy(ev.symbol, Price::fromDouble(100.05), Quantity::fromDouble(1.0), 1));
+    }
+  }
+  void onOrderEvent(const OrderEvent& ev) override { seen.push_back(ev); }
+  std::vector<OrderEvent> seen;
+
+ private:
+  ISignalHandler* _handler{nullptr};
+  int _bars{0};
+};
+
+}  // namespace
+
+TEST_F(OrderPriceTickRunner, StrategyWithoutSymbolInfoNeedsTheRegistry)
+{
+  {
+    BareStrategy strat;
+    BacktestRunner runner;
+    runner.setStrategy(&strat);
+    runner.runBars(bars());
+    ASSERT_FALSE(strat.seen.empty());
+    for (const auto& ev : strat.seen)
+    {
+      EXPECT_NE(ev.status, OrderEventStatus::REJECTED);
+    }
+  }
+  {
+    BareStrategy strat;
+    BacktestRunner runner;
+    runner.setSymbolRegistry(&reg);
+    runner.setStrategy(&strat);
+    runner.runBars(bars());
+    ASSERT_FALSE(strat.seen.empty());
+    EXPECT_EQ(strat.seen.front().rejectReason, "price_off_tick");
+  }
 }
 
 TEST(OrderPriceTickTicks, TakeProfitFromTheFillIsRejectedOnTicks)

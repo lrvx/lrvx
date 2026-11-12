@@ -106,6 +106,7 @@ class Strategy : public IStrategy
       }
       _contexts[sym] = SymbolContext(info->tickSize);
       _contexts[sym].symbolId = sym;
+      _symbolInfos.push_back(*info);
     }
   }
 
@@ -115,6 +116,12 @@ class Strategy : public IStrategy
   }
 
   SubscriberId id() const override { return _id; }
+
+  // Each symbol's entry as the registry held it when the strategy was built, in
+  // symbols() order. A copy, so the registry need not outlive the strategy.
+  // BacktestRunner reads the declared ticks from here when it is not given a
+  // registry of its own.
+  const std::vector<SymbolInfo>& symbolInfos() const noexcept { return _symbolInfos; }
 
   void setSignalHandler(ISignalHandler* handler) override { _signalHandler = handler; }
   void setOrderTracker(OrderTracker* tracker) noexcept { _orderTracker = tracker; }
@@ -712,6 +719,7 @@ class Strategy : public IStrategy
   OrderTracker* _orderTracker{nullptr};
   IPositionManager* _positionManager{nullptr};
   std::vector<SymbolId> _symbols;
+  std::vector<SymbolInfo> _symbolInfos;
   std::set<SymbolId> _symbolSet;
   // 256 SymbolContext slots, each carrying a full 512-level book. The table
   // lives in one heap block owned by the map (see symbol_state_map.h), so a

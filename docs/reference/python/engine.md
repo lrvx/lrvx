@@ -94,6 +94,10 @@ print(stats.net_pnl, stats["sharpe_ratio"])
 
 Referencing an unregistered symbol name raises `LrvxError(code="E_SYM_001")`.
 
+`Engine` symbols are names with no tick, so limit prices are not checked against one; a
+`BacktestRunner` on a registry with a tick rejects an off-tick price
+([SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick)).
+
 ### Accessors
 
 | Member | Type | Description |
