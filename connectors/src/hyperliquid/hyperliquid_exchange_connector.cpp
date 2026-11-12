@@ -66,6 +66,10 @@ void HyperliquidExchangeConnector::start()
   // invoke them. A no-op when nothing is running.
   _wsClient->stop();
 
+  // Before the coin cache below is filled, so every configured coin is
+  // registered with the venue's tick.
+  loadInstrumentSpecs();
+
   _wsClient->onOpen(
       [this]()
       {
@@ -182,6 +186,50 @@ void HyperliquidExchangeConnector::stop()
   }
 }
 
+void HyperliquidExchangeConnector::loadInstrumentSpecs()
+{
+  _specs.clear();
+  if (_config.instrumentInfoUrl.empty() || !_registry)
+  {
+    return;
+  }
+  const InstrumentFetch fetch =
+      _config.instrumentFetch ? _config.instrumentFetch : defaultInstrumentFetch();
+
+  auto body = fetch(_config.instrumentInfoUrl, R"({"type":"meta"})");
+  if (!body)
+  {
+    _specs.addError("meta: " + body.error());
+  }
+  else if (auto specs = instrument_info::parseHyperliquidMeta(*body); !specs)
+  {
+    _specs.addError("meta: " + specs.error());
+  }
+  else
+  {
+    for (const auto& coin : _config.symbols)
+    {
+      auto it = specs->find(coin);
+      if (it == specs->end())
+      {
+        _specs.addError(coin + ": not listed in the meta universe");
+        continue;
+      }
+      _specs.add(coin, it->second);
+    }
+  }
+  reportInstrumentLoad(_specs, "Hyperliquid", _logger.get());
+
+  for (const auto& coin : _config.symbols)
+  {
+    SymbolInfo info;
+    info.exchange = "hyperliquid";
+    info.symbol = coin;
+    info.type = InstrumentType::Future;
+    registerVenueSymbol(*_registry, info, _specs, _logger.get());
+  }
+}
+
 SymbolId HyperliquidExchangeConnector::resolveSymbolId(std::string_view symbol)
 {
   if (auto existing = _registry->getSymbolId("hyperliquid", std::string(symbol)))
@@ -193,7 +241,7 @@ SymbolId HyperliquidExchangeConnector::resolveSymbolId(std::string_view symbol)
   info.exchange = "hyperliquid";
   info.symbol = std::string(symbol);
   info.type = InstrumentType::Future;
-  return _registry->registerSymbol(info);
+  return registerVenueSymbol(*_registry, info, _specs, _logger.get());
 }
 
 std::vector<std::string> HyperliquidExchangeConnector::subscriptionPayloads(

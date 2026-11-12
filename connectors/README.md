@@ -23,6 +23,10 @@ Every connector here reports fills under the same rules; see [docs/explanation/c
 
 `tests/unit_test_*_fill_contract.cpp` pins this per venue, offline.
 
+## Ticks and refusals
+
+At `start()` each connector reads its symbols' instrument info (price tick, size step) from the venue's public endpoint and registers the symbols with the venue's tick, marked known; the executors then refuse an off-tick price locally with the simulator's reason (`price_off_tick`, `trigger_off_tick`) and send on-tick prices exactly. A failed load is logged as an error and leaves the tick unknown, with prices sent as given. A refused or undelivered cancel, replace or position stop publishes an event with the venue's error text. The endpoints, fields and rules are in [docs/explanation/connectors.md](../docs/explanation/connectors.md#order-prices-and-the-tick); the recorded responses the parsers are tested against live in `tests/fixtures/instrument_info/`.
+
 ## Build
 
 The connectors are part of the lrvx repo and are built when the parent project is configured with `-DLRVX_BUILD_CONNECTORS=ON`. The static library exposes the target `lrvx::connectors` (alias of `lrvx-connectors`).

@@ -10,6 +10,7 @@
 #include "lrvx-connectors/bybit/bybit_order_executor.h"
 #include "lrvx-connectors/bybit/authenticated_rest_client.h"
 #include "lrvx-connectors/execution/order_tif.h"
+#include "lrvx-connectors/execution/venue_price.h"
 
 #include <lrvx/common.h>
 #include <lrvx/engine/symbol_registry.h>
@@ -70,6 +71,52 @@ bool isConditionalOrder(OrderType type)
          type == OrderType::TAKE_PROFIT_MARKET || type == OrderType::TAKE_PROFIT_LIMIT;
 }
 
+// Bybit v5 answers {"retCode":0,...} on success and a non-zero retCode with a
+// retMsg on refusal. A body that is not that shape (a gateway's HTML page, a
+// truncated answer) is reported as a refusal too: the order's fate is then
+// unknown, and saying nothing was the one answer known to be wrong.
+struct BybitAck
+{
+  bool ok{false};
+  std::string reason;
+  std::string orderId;
+};
+
+BybitAck readBybitAck(std::string_view response)
+{
+  BybitAck out;
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded(response);
+  auto parsed = parser.parse(padded);
+  if (parsed.error())
+  {
+    out.reason = "unparseable response: " + std::string(response.substr(0, 200));
+    return out;
+  }
+  auto doc = parsed.value();
+  auto retCode = doc["retCode"].get_int64();
+  if (retCode.error())
+  {
+    out.reason = "response has no retCode: " + std::string(response.substr(0, 200));
+    return out;
+  }
+  if (retCode.value_unsafe() != 0)
+  {
+    std::string_view msg;
+    (void)doc["retMsg"].get_string().get(msg);
+    out.reason =
+        "retCode=" + std::to_string(retCode.value_unsafe()) + " retMsg=" + std::string(msg);
+    return out;
+  }
+  out.ok = true;
+  std::string_view id;
+  if (!doc["result"]["orderId"].get_string().get(id))
+  {
+    out.orderId = std::string(id);
+  }
+  return out;
+}
+
 }  // namespace
 
 template <typename Policies>
@@ -81,6 +128,40 @@ void BybitOrderExecutorT<Policies>::publishRejection(const Order& order, const s
     OrderEvent ev;
     ev.status = OrderEventStatus::REJECTED;
     ev.order = order;
+    ev.rejectReason = reason;
+    _orderBus->publish(std::move(ev));
+  }
+}
+
+template <typename Policies>
+void BybitOrderExecutorT<Policies>::publishCancelRejected(const Order& order,
+                                                          const std::string& reason)
+{
+  LRVX_LOG_ERROR("[BybitOrderExecutor] cancel rejected: " << reason << " (orderId=" << order.id
+                                                          << ")");
+  if (_orderBus)
+  {
+    OrderEvent ev;
+    ev.status = OrderEventStatus::REJECTED;
+    ev.order = order;
+    ev.rejectReason = "cancel rejected: " + reason;
+    _orderBus->publish(std::move(ev));
+  }
+}
+
+template <typename Policies>
+void BybitOrderExecutorT<Policies>::publishReplaceRejected(const Order& order,
+                                                           const Order& newOrder,
+                                                           const std::string& reason)
+{
+  LRVX_LOG_ERROR("[BybitOrderExecutor] replace rejected: " << reason << " (orderId=" << order.id
+                                                           << ")");
+  if (_orderBus)
+  {
+    OrderEvent ev;
+    ev.status = OrderEventStatus::REPLACE_REJECTED;
+    ev.order = order;
+    ev.newOrder = newOrder;
     ev.rejectReason = reason;
     _orderBus->publish(std::move(ev));
   }
@@ -148,6 +229,14 @@ void BybitOrderExecutorT<Policies>::sendSubmitOrder(const Order& order)
     return;
   }
 
+  // The simulator's tick rule, when the tick is known: refused here with its
+  // reason rather than sent for the venue to refuse with another.
+  if (const char* offTick = venue_price::offTickReason(order, *info))
+  {
+    publishRejection(order, offTick);
+    return;
+  }
+
   const bool isConditional = isConditionalOrder(order.type);
   const bool priceIsLimit =
       (order.type == OrderType::LIMIT || order.type == OrderType::STOP_LIMIT ||
@@ -168,13 +257,15 @@ void BybitOrderExecutorT<Policies>::sendSubmitOrder(const Order& order)
   body.append("\"qty\":\"").append(order.quantity.toString()).append("\",");
   if (priceIsLimit)
   {
-    body.append("\"price\":\"").append(order.price.toString()).append("\",");
+    body.append("\"price\":\"").append(venue_price::wireDecimal(order.price)).append("\",");
   }
   body.append("\"timeInForce\":\"").append(bybitTifToken(tif)).append("\",");
   body.append("\"reduceOnly\":").append(order.flags.reduceOnly ? "true" : "false");
   if (isConditional)
   {
-    body.append(",\"triggerPrice\":\"").append(order.triggerPrice.toString()).append("\"");
+    body.append(",\"triggerPrice\":\"")
+        .append(venue_price::wireDecimal(order.triggerPrice))
+        .append("\"");
     body.append(",\"triggerDirection\":")
         .append(std::to_string(triggerDirectionFor(order.type, order.side)));
   }
@@ -191,26 +282,20 @@ void BybitOrderExecutorT<Policies>::sendSubmitOrder(const Order& order)
       "/v5/order/create", body,
       [this, order](std::string_view response)
       {
-        simdjson::ondemand::parser parser;
-        simdjson::padded_string padded(response);
-        auto doc = parser.iterate(padded);
-
-        int64_t retCode = doc["retCode"].get_int64().value();
-        if (retCode != 0)
+        const BybitAck ack = readBybitAck(response);
+        if (!ack.ok)
         {
-          std::string_view retMsg = doc["retMsg"].get_string().value();
           // clearPending() runs AFTER the retCode check now: on the old
           // ordering, a rejected submit disarmed the timeout watchdog in
           // the same line that discovered the rejection, so the one
           // safety net meant to catch a hung exchange never had a chance
           // to fire on a hung-then-erroring one either.
-          publishRejection(order, std::string("Order submission failed: retCode=") +
-                                      std::to_string(retCode) + " retMsg=" + std::string(retMsg));
+          publishRejection(order, "Order submission failed: " + ack.reason);
           _policies.timeout.clearPending(order.id);
           return;
         }
 
-        std::string_view orderId = doc["result"]["orderId"].get_string().value();
+        const std::string& orderId = ack.orderId;
 
         LRVX_LOG("[BybitOrderExecutor] Order submitted. id=" << order.id
                                                              << " → exchangeOrderId=" << orderId);
@@ -263,10 +348,11 @@ void BybitOrderExecutorT<Policies>::sendCancelOrder(OrderId orderId)
     return;
   }
 
-  auto info = _registry->getSymbolInfo(state->localOrder.symbol);
+  const Order target = state->localOrder;
+  auto info = _registry->getSymbolInfo(target.symbol);
   if (!info.has_value())
   {
-    LRVX_LOG_ERROR("[BybitOrderExecutor] No symbol info for symbolId=" << state->localOrder.symbol);
+    publishCancelRejected(target, "no symbol info registered");
     return;
   }
 
@@ -285,45 +371,29 @@ void BybitOrderExecutorT<Policies>::sendCancelOrder(OrderId orderId)
 
   _client->post(
       "/v5/order/cancel", body,
-      [this, orderId](std::string_view response)
+      [this, orderId, target](std::string_view response)
       {
         _policies.timeout.clearPending(orderId);
 
-        simdjson::ondemand::parser parser;
-        simdjson::padded_string padded(response);
-        auto doc = parser.iterate(padded);
-
-        int64_t retCode = doc["retCode"].get_int64().value();
-        if (retCode != 0)
+        const BybitAck ack = readBybitAck(response);
+        if (!ack.ok)
         {
-          std::string_view msg = doc["retMsg"].get_string().value();
-          LRVX_LOG_ERROR("[BybitOrderExecutor] Cancel failed: orderId="
-                         << orderId << " retCode=" << retCode << " msg=" << msg);
+          publishCancelRejected(target, ack.reason);
+          return;
         }
-        else
-        {
-          LRVX_LOG_INFO("[BybitOrderExecutor] Cancel successful: orderId=" << orderId);
-          _orderTracker->onCanceled(orderId);
-        }
+        LRVX_LOG_INFO("[BybitOrderExecutor] Cancel successful: orderId=" << orderId);
+        _orderTracker->onCanceled(orderId);
       },
-      [this, orderId](std::string_view err)
+      [this, orderId, target](std::string_view err)
       {
         _policies.timeout.clearPending(orderId);
-        LRVX_LOG_ERROR("[BybitOrderExecutor] Cancel transport error: orderId=" << orderId
-                                                                               << " err=" << err);
+        publishCancelRejected(target, "transport error: " + std::string(err));
       });
 }
 
 template <typename Policies>
 void BybitOrderExecutorT<Policies>::replaceOrder(OrderId oldOrderId, const Order& newOrder)
 {
-  auto info = _registry->getSymbolInfo(newOrder.symbol);
-  if (!info.has_value())
-  {
-    LRVX_LOG_ERROR("[BybitOrderExecutor] No symbol info for symbolId=" << newOrder.symbol);
-    return;
-  }
-
   auto state = _orderTracker->get(oldOrderId);
   if (!state)
   {
@@ -347,24 +417,33 @@ void BybitOrderExecutorT<Policies>::replaceOrder(OrderId oldOrderId, const Order
 template <typename Policies>
 void BybitOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldOrderId, const Order& newOrder)
 {
-  auto info = _registry->getSymbolInfo(newOrder.symbol);
-  if (!info.has_value())
-  {
-    LRVX_LOG_ERROR("[BybitOrderExecutor] No symbol info for symbolId=" << newOrder.symbol);
-    return;
-  }
-
   auto state = _orderTracker->get(oldOrderId);
   if (!state)
   {
     LRVX_LOG_ERROR("[BybitOrderExecutor] Cannot replace, unknown orderId=" << oldOrderId);
     return;
   }
+  const Order target = state->localOrder;
+
+  // The amended order lives on the original's symbol; a replacement built
+  // from a price and a size alone (what a strategy's modify sends) carries
+  // no symbol of its own.
+  auto info = _registry->getSymbolInfo(target.symbol);
+  if (!info.has_value())
+  {
+    publishReplaceRejected(target, newOrder, "no symbol info registered");
+    return;
+  }
+  if (venue_price::isOffTick(newOrder.price, *info))
+  {
+    publishReplaceRejected(target, newOrder, kRejectPriceOffTick);
+    return;
+  }
 
   const std::string& exchangeOrderId = state->exchangeOrderId;
 
   std::string qty = newOrder.quantity.toString();
-  std::string price = newOrder.price.toString();
+  std::string price = venue_price::wireDecimal(newOrder.price);
 
   std::string body;
   body.reserve(128 + qty.size() + price.size());
@@ -382,20 +461,14 @@ void BybitOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldOrderId, const O
 
   _client->post(
       "/v5/order/amend", body,
-      [this, oldOrderId, newOrder, exchangeOrderId](std::string_view response)
+      [this, oldOrderId, newOrder, exchangeOrderId, target](std::string_view response)
       {
         _policies.timeout.clearPending(oldOrderId);
 
-        simdjson::ondemand::parser parser;
-        simdjson::padded_string padded(response);
-        auto doc = parser.iterate(padded);
-
-        int64_t retCode = doc["retCode"].get_int64().value();
-        if (retCode != 0)
+        const BybitAck ack = readBybitAck(response);
+        if (!ack.ok)
         {
-          std::string_view msg = doc["retMsg"].get_string().value();
-          LRVX_LOG_ERROR("[BybitOrderExecutor] Replace failed: orderId="
-                         << oldOrderId << " retCode=" << retCode << " msg=" << msg);
+          publishReplaceRejected(target, newOrder, ack.reason);
           return;
         }
 
@@ -407,24 +480,18 @@ void BybitOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldOrderId, const O
         // itself swallowed, leaving the order live on the
         // exchange and locally stuck "active" forever.
         std::string_view newExchangeId = exchangeOrderId;
-        auto resultOrderId = doc["result"]["orderId"];
-        if (!resultOrderId.error())
+        if (!ack.orderId.empty())
         {
-          auto s = resultOrderId.get_string();
-          if (!s.error())
-          {
-            newExchangeId = s.value_unsafe();
-          }
+          newExchangeId = ack.orderId;
         }
 
         LRVX_LOG_INFO("[BybitOrderExecutor] Replace successful: orderId=" << oldOrderId);
         _orderTracker->onReplaced(oldOrderId, newOrder, newExchangeId);
       },
-      [this, oldOrderId](std::string_view err)
+      [this, oldOrderId, newOrder, target](std::string_view err)
       {
         _policies.timeout.clearPending(oldOrderId);
-        LRVX_LOG_ERROR("[BybitOrderExecutor] Replace transport error: orderId=" << oldOrderId
-                                                                                << " err=" << err);
+        publishReplaceRejected(target, newOrder, "transport error: " + std::string(err));
       });
 }
 

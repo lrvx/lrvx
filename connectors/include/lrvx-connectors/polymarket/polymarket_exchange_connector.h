@@ -23,6 +23,7 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -42,6 +43,20 @@ class PolymarketExchangeConnector : public IExchangeConnector
   std::string exchangeId() const override { return "polymarket"; }
 
   SymbolId resolveSymbolId(std::string_view tokenId);
+
+  // Reads every configured token's tick size (see
+  // PolymarketConfig::instrumentInfoUrl) and registers the tokens with it.
+  // start() calls it; public so a test can drive it with a recorded response.
+  void loadInstrumentSpecs();
+
+  // What the venue reported for a token, when it was loaded.
+  std::optional<InstrumentSpec> instrumentSpec(std::string_view tokenId) const
+  {
+    return _specs.find(tokenId);
+  }
+
+  // Why some tick sizes are missing; empty when everything loaded.
+  std::string instrumentInfoError() const { return _specs.error(); }
 
   // Public so protocol behaviour (snapshot vs incremental price_change) is
   // testable offline by feeding raw frames without a live socket.
@@ -82,6 +97,8 @@ class PolymarketExchangeConnector : public IExchangeConnector
   pool::Pool<BookUpdateEvent, config::DEFAULT_CONNECTOR_POOL_CAPACITY> _bookPool;
 
   std::unordered_map<std::string, SymbolId> _tokenToSymbol;
+
+  InstrumentSpecTable _specs;
 };
 
 }  // namespace lrvx

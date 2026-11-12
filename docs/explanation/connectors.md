@@ -26,10 +26,39 @@ The "Orders" column above means "submit/cancel/replace exists," not "every `Orde
 - `TimeInForce` and reduce-only are serialized on all four venues. Post-only maps to the venue's maker-only token (Bybit `PostOnly`, Bitget `post_only`, Hyperliquid `Alo`); `GTD` has no native equivalent on any of the four and is rejected rather than silently downgraded to `GTC`.
 - Stop-market, stop-limit, take-profit-market and take-profit-limit route through Bitget's plan-order endpoint, Bybit's conditional-order fields on the regular order endpoint, and Hyperliquid's `trigger` order object (see [Hyperliquid executor](#hyperliquid-executor) below).
 - A conditional order carries its execution price. Bitget's plan-order endpoint takes an order type of its own, so `STOP_LIMIT` and `TAKE_PROFIT_LIMIT` are sent as plan orders of type `limit` with the `price` field the strategy asked for; the market variants are sent as `market` with no price at all. A limit-typed conditional order with no limit price is rejected rather than downgraded to a stop-market, which would silently remove the bound on what it may fill at.
-- Prices are formatted at the instrument's own precision, taken from `SymbolInfo::tickSize` in the registry the executor already holds (Hyperliquid, which has no fixed tick, follows its own significant-figure rule instead; see below). Venues validate a price against the symbol's precision and reject one with more digits than the instrument quotes, and rounding to a fixed digit count instead moves a protective trigger — on a symbol priced below the rounding granularity, to zero.
+- Prices follow the simulator's tick rule ([order prices and the tick](#order-prices-and-the-tick) below): with the instrument's tick known, an off-tick limit price, trigger or trailing distance is refused before anything is sent, with the simulator's reason; an on-tick price is sent exactly. No executor rounds a price the strategy chose.
 - `TRAILING_STOP` and `ICEBERG` are not implemented on any of the three CEX connectors (Polymarket has no order-side concept of either) and are rejected at submit time. Bybit's trailing stop in particular lives on a different endpoint (`/v5/position/trading-stop`) than the rest of order submission, which this connector does not call.
 
 A rejected order publishes `OrderEventStatus::REJECTED` on the venue's `OrderExecutionBus` with a reason string identifying the unsupported type or flag — it never reaches the exchange as a same-looking order with the unsupported part silently dropped.
+
+### Order prices and the tick
+
+Each connector reads the instrument metadata of its configured symbols from the venue's public endpoint at `start()`, before the socket opens, and registers every symbol with the venue's tick and `tickSizeKnown = true`:
+
+| Venue | Endpoint | Tick | Size step |
+|---|---|---|---|
+| Bybit | `GET /v5/market/instruments-info?category=<spot\|linear\|inverse\|option>&symbol=<s>` ([docs](https://bybit-exchange.github.io/docs/v5/market/instrument)) | `priceFilter.tickSize` | `lotSizeFilter.qtyStep` (spot: `basePrecision`) |
+| Bitget | `GET /api/v2/mix/market/contracts?productType=<type>&symbol=<s>` ([docs](https://www.bitget.com/api-doc/contract/market/Get-All-Symbols-Contracts)); spot `GET /api/v2/spot/public/symbols?symbol=<s>` ([docs](https://www.bitget.com/api-doc/spot/market/Get-Symbols)) | `priceEndStep` x 10^-`pricePlace`; spot 10^-`pricePrecision` | `sizeMultiplier`; spot 10^-`quantityPrecision` |
+| Hyperliquid | `POST /info {"type":"meta"}` ([docs](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/tick-and-lot-size)) | 10^-(6 - `szDecimals`), the finest increment a perp accepts | 10^-`szDecimals` |
+| Polymarket | `GET /tick-size?token_id=<id>` ([docs](https://docs.polymarket.com/api-reference/market-data/get-tick-size)) | `minimum_tick_size` | not stated there |
+
+The base URL is `<Config>::instrumentInfoUrl` (the venue's public REST host by default; empty skips the load) and the request goes through `<Config>::instrumentFetch` (libcurl by default), so a test answers with a recorded body. The size step is not in `SymbolInfo`; the connector keeps it and exposes it through `instrumentSpec(symbol)`.
+
+With the tick in the registry, the executor applies the rule the simulator applies (`execution/order_price_rule.h`): a limit price, trigger price or trailing distance that is not a whole number of ticks is refused locally with `REJECTED` and the simulator's reason — `price_off_tick`, `trigger_off_tick`, `trailing_offset_off_tick` — and a modify with `REPLACE_REJECTED`; the same order, strategy and data are refused alike in a backtest, in paper mode and live. An on-tick price is sent as its exact decimal: Bybit and Bitget's regular endpoints with at least six fractional digits (the form they always had), Bitget's plan and position TP/SL endpoints and Hyperliquid with trailing zeros dropped. No price the strategy chose is rounded, so none is ever moved to one better for it.
+
+Hyperliquid has no fixed tick: a perp price has at most five significant figures and at most 6 - `szDecimals` decimals, and an integer is always accepted. The registry holds the finest increment, so a backtest refuses what the venue refuses on decimals; the executor checks the significant-figure half itself and refuses a limit or trigger price off that grid with the same reasons. A price the executor computes — the IOC limit of a `MARKET` order, the limit of a market trigger — only bounds the fill, and is moved onto the grid on the side worse for the order's owner (up for a buy, down for a sell), as the simulator snaps the prices it computes.
+
+When the load fails — the venue is unreachable, answers an error, or does not list the symbol — `start()` still goes on, because market data is worth having, and the failure is logged at error level and kept in `instrumentInfoError()`. After a request that gets no answer the connector asks for no more, so an unreachable venue costs `start()` one timeout, not one per symbol; a venue that answers with a refusal has its own message reported. The symbol is registered with its tick **unknown**: the registry's 0.01 placeholder is used for its book only, and no order price on it is checked or rounded; it is sent exactly as given, the venue applies its own rule, and its refusal reaches the strategy as an event. A symbol registered before `start()` keeps the entry it was given — the registry has no update — and when that entry's tick is not the venue's, the mismatch is logged at error level; register such a symbol with `applyInstrumentSpec(info, *connector.instrumentSpec(name))`, or let the connector register it. Polymarket can change a market's tick while it trades (the `tick_size_change` message); the connector does not follow that yet.
+
+### Refusals reach the strategy
+
+A request the venue refuses, or that never reaches it (a transport error, an answer that is not the venue's shape), publishes an event carrying the venue's own error text; none ends in a log line alone:
+
+- a submit, or a Bitget position TP/SL: `REJECTED`;
+- a cancel: `REJECTED` on the order the cancel targeted, reason `cancel rejected: <text>` — the simulator's convention for a cancel it cannot carry out; the tracker keeps the order live, because it still is;
+- a replace (Bybit amend, Bitget modify and position TP/SL modify, Hyperliquid modify): `REPLACE_REJECTED` with the order that stays live as `order` and the refused replacement as `newOrder`.
+
+Hyperliquid answers HTTP 200 whatever happens, and a cancel or modify can carry `"status":"ok"` with a per-order `{"error":...}`; that is a refusal too. Two paths carry no order to report against and stay log lines: a stand-alone `setLeverage` (Hyperliquid's takes a result callback) and a Hyperliquid `placePosTpsl` given neither trigger.
 
 ### Hyperliquid executor
 

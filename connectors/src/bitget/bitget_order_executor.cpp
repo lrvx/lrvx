@@ -10,6 +10,7 @@
 #include "lrvx-connectors/bitget/bitget_order_executor.h"
 #include "lrvx-connectors/bitget/authenticated_rest_client.h"
 #include "lrvx-connectors/execution/order_tif.h"
+#include "lrvx-connectors/execution/venue_price.h"
 
 #include <lrvx/common.h>
 #include <lrvx/engine/symbol_registry.h>
@@ -38,12 +39,8 @@ static constexpr std::string_view kPathPosTpsl = "/api/v2/mix/order/place-pos-tp
 static constexpr std::string_view kPathModifyTpsl = "/api/v2/mix/order/modify-tpsl-order";
 
 // Format a double as a fixed-point decimal with up to `max_decimals` fractional
-// digits, rounded half-to-even, trailing zeros stripped. Bitget validates
-// prices against the symbol's own precision and rejects values like
-// "73577.65" on an instrument that quotes to one digit, even though they
-// parse to the same number -- so the digit count is a property of the
-// instrument and must come from the registry (decimalsForTick below), never
-// from a default.
+// digits, rounded to nearest, trailing zeros stripped. Only the size of a
+// position TP/SL modify still goes through it; prices never do (see below).
 static std::string trimDouble(double v, int max_decimals)
 {
   // Round to max_decimals first.
@@ -70,47 +67,81 @@ static std::string trimDouble(double v, int max_decimals)
   return s;
 }
 
-// Fractional digits the Price type itself can carry (its scale is a power of
-// ten), which is the cap on anything formatted below.
-static constexpr int priceDecimals()
-{
-  int digits = 0;
-  for (int64_t scale = Price::Scale; scale > 1; scale /= 10)
-  {
-    ++digits;
-  }
-  return digits;
-}
-
-static constexpr int kPriceDecimals = priceDecimals();
-
-// How many fractional digits this instrument quotes in, from the tick size the
-// registry already holds: 0.1 -> 1, 0.0001 -> 4, 1e-8 -> 8. Every trigger and
-// limit price this connector sends used to be formatted with one digit, an
-// assumption spelled out in trimDouble's own comment ("BTC perp = 1 digit"),
-// which moved a protective stop on anything finer and sent "0" for a symbol
-// priced below 0.05.
-static int decimalsForTick(Price tickSize)
-{
-  int64_t raw = tickSize.raw();
-  if (raw <= 0)
-  {
-    // No usable tick in the registry: send everything the fixed-point type can
-    // carry rather than silently rounding the strategy's price away.
-    return kPriceDecimals;
-  }
-
-  int decimals = kPriceDecimals;
-  while (decimals > 0 && raw % 10 == 0)
-  {
-    raw /= 10;
-    --decimals;
-  }
-  return decimals;
-}
+// Prices are not rounded here at all. Bitget refuses a price with more digits
+// than the instrument quotes, so the digit count is a property of the
+// instrument -- but rounding to it moves the price the strategy asked for, and
+// rounding to the registry default (two digits, which every live symbol had
+// before the venue's tick was loaded) moved protective triggers on anything
+// quoted finer. A price off a known tick is refused before a request is built
+// (venue_price::offTickReason, the simulator's rule and reason), so whatever
+// is sent is on the tick and its exact decimal is the venue's own format; with
+// the tick unknown the price goes out exactly as given.
 
 namespace
 {
+
+// Bitget answers {"code":"00000","msg":"success","data":...} on success and
+// another code with a msg on refusal. A body that is not that shape is
+// reported as a refusal too: the request's fate is then unknown, and saying
+// nothing was the one answer known to be wrong.
+struct BitgetAck
+{
+  bool ok{false};
+  std::string reason;
+  std::string orderId;
+};
+
+BitgetAck readBitgetAck(std::string_view resp)
+{
+  BitgetAck out;
+  simdjson::dom::parser parser;
+  simdjson::padded_string padded(resp);
+  auto parsed = parser.parse(padded);
+  if (parsed.error())
+  {
+    out.reason = "unparseable response: " + std::string(resp.substr(0, 200));
+    return out;
+  }
+  auto doc = parsed.value();
+  std::string_view code;
+  if (doc["code"].get_string().get(code))
+  {
+    out.reason = "response has no code: " + std::string(resp.substr(0, 200));
+    return out;
+  }
+  if (code != "00000")
+  {
+    std::string_view msg;
+    (void)doc["msg"].get_string().get(msg);
+    out.reason = msg.empty() ? "code=" + std::string(code)
+                             : std::string(msg) + " (code=" + std::string(code) + ")";
+    return out;
+  }
+  out.ok = true;
+  auto data = doc["data"];
+  std::string_view id;
+  if (!data.error())
+  {
+    const simdjson::dom::element dataEl = data.value_unsafe();
+    simdjson::dom::array arr;
+    if (!dataEl.get_array().get(arr))
+    {
+      for (auto el : arr)
+      {
+        if (!el["orderId"].get_string().get(id))
+        {
+          out.orderId = std::string(id);
+          break;
+        }
+      }
+    }
+    else if (!dataEl["orderId"].get_string().get(id))
+    {
+      out.orderId = std::string(id);
+    }
+  }
+  return out;
+}
 
 std::string_view bitgetForceToken(NormalizedTif tif)
 {
@@ -200,13 +231,10 @@ void BitgetOrderExecutorT<Policies>::sendSetLeverage(const std::string& symbol, 
       std::string(kPathSetLeverage), body,
       [symbol, leverage](std::string_view resp)
       {
-        simdjson::ondemand::parser p;
-        simdjson::padded_string ps(resp);
-        auto doc = p.iterate(ps);
-        if (std::string_view(doc["code"]) != "00000")
+        const BitgetAck ack = readBitgetAck(resp);
+        if (!ack.ok)
         {
-          LRVX_LOG_ERROR("[BitgetOE] setLeverage failed for " << symbol << ": "
-                                                              << doc["msg"].get_string().value());
+          LRVX_LOG_ERROR("[BitgetOE] setLeverage failed for " << symbol << ": " << ack.reason);
         }
         else
         {
@@ -266,14 +294,11 @@ void BitgetOrderExecutorT<Policies>::sendSubmitOrderWithLeverage(const Order& or
       std::string(kPathSetLeverage), levBody,
       [this, order, leverage, slPrice, tpPrice](std::string_view resp)
       {
-        simdjson::ondemand::parser p;
-        simdjson::padded_string ps(resp);
-        auto doc = p.iterate(ps);
-        if (std::string_view(doc["code"]) != "00000")
+        const BitgetAck levAck = readBitgetAck(resp);
+        if (!levAck.ok)
         {
-          auto msg = std::string(doc["msg"].get_string().value());
-          LRVX_LOG_ERROR("[BitgetOE] setLeverage failed: " << msg);
-          publishRejection(order, "setLeverage failed: " + msg);
+          LRVX_LOG_ERROR("[BitgetOE] setLeverage failed: " << levAck.reason);
+          publishRejection(order, "setLeverage failed: " + levAck.reason);
           return;
         }
         LRVX_LOG_INFO("[BitgetOE] Leverage " << leverage << "x, submitting order");
@@ -304,6 +329,18 @@ void BitgetOrderExecutorT<Policies>::sendSubmitOrderWithLeverage(const Order& or
           publishRejection(order, "Bitget has no native good-till-date order");
           return;
         }
+        if (const char* offTick = venue_price::offTickReason(order, *info2))
+        {
+          publishRejection(order, offTick);
+          return;
+        }
+        const Price slPx = slPrice > 0 ? Price::fromDouble(slPrice) : Price{};
+        const Price tpPx = tpPrice > 0 ? Price::fromDouble(tpPrice) : Price{};
+        if (venue_price::isOffTick(slPx, *info2) || venue_price::isOffTick(tpPx, *info2))
+        {
+          publishRejection(order, kRejectTriggerOffTick);
+          return;
+        }
 
         std::string body;
         body.reserve(384);
@@ -325,7 +362,7 @@ void BitgetOrderExecutorT<Policies>::sendSubmitOrderWithLeverage(const Order& or
 
         if (!isMarket)
         {
-          body.append("\"price\":\"").append(order.price.toString()).append("\",");
+          body.append("\"price\":\"").append(venue_price::wireDecimal(order.price)).append("\",");
         }
 
         body.append("\"side\":\"").append(order.side == Side::BUY ? "buy" : "sell").append("\",");
@@ -342,13 +379,13 @@ void BitgetOrderExecutorT<Policies>::sendSubmitOrderWithLeverage(const Order& or
         if (slPrice > 0)
         {
           body.append("\"presetStopLossPrice\":\"")
-              .append(Price::fromDouble(slPrice).toString())
+              .append(venue_price::wireDecimal(slPx))
               .append("\",");
         }
         if (tpPrice > 0)
         {
           body.append("\"presetStopSurplusPrice\":\"")
-              .append(Price::fromDouble(tpPrice).toString())
+              .append(venue_price::wireDecimal(tpPx))
               .append("\",");
         }
 
@@ -361,18 +398,14 @@ void BitgetOrderExecutorT<Policies>::sendSubmitOrderWithLeverage(const Order& or
             [this, order](std::string_view resp2)
             {
               _policies.timeout.clearPending(order.id);
-              simdjson::ondemand::parser p2;
-              simdjson::padded_string ps2(resp2);
-              auto doc2 = p2.iterate(ps2);
-              if (std::string_view(doc2["code"]) != "00000")
+              const BitgetAck ack = readBitgetAck(resp2);
+              if (!ack.ok)
               {
-                auto msg = std::string(doc2["msg"].get_string().value());
-                LRVX_LOG_ERROR("[BitgetOE] submitOrder failed: " << msg);
-                publishRejection(order, msg);
+                LRVX_LOG_ERROR("[BitgetOE] submitOrder failed: " << ack.reason);
+                publishRejection(order, ack.reason);
                 return;
               }
-              std::string exchId = std::string(doc2["data"]["orderId"].get_string().value());
-              _orderTracker->onSubmitted(order, exchId);
+              _orderTracker->onSubmitted(order, ack.orderId);
             },
             [this, order](std::string_view err2)
             {
@@ -399,6 +432,38 @@ void BitgetOrderExecutorT<Policies>::publishRejection(const Order& order, const 
     OrderEvent ev;
     ev.status = OrderEventStatus::REJECTED;
     ev.order = order;
+    ev.rejectReason = reason;
+    _orderBus->publish(std::move(ev));
+  }
+}
+
+template <typename Policies>
+void BitgetOrderExecutorT<Policies>::publishCancelRejected(const Order& order,
+                                                           const std::string& reason)
+{
+  LRVX_LOG_ERROR("[BitgetOE] cancel rejected: " << reason << " (orderId=" << order.id << ")");
+  if (_orderBus)
+  {
+    OrderEvent ev;
+    ev.status = OrderEventStatus::REJECTED;
+    ev.order = order;
+    ev.rejectReason = "cancel rejected: " + reason;
+    _orderBus->publish(std::move(ev));
+  }
+}
+
+template <typename Policies>
+void BitgetOrderExecutorT<Policies>::publishReplaceRejected(const Order& order,
+                                                            const Order& newOrder,
+                                                            const std::string& reason)
+{
+  LRVX_LOG_ERROR("[BitgetOE] replace rejected: " << reason << " (orderId=" << order.id << ")");
+  if (_orderBus)
+  {
+    OrderEvent ev;
+    ev.status = OrderEventStatus::REPLACE_REJECTED;
+    ev.order = order;
+    ev.newOrder = newOrder;
     ev.rejectReason = reason;
     _orderBus->publish(std::move(ev));
   }
@@ -445,6 +510,14 @@ void BitgetOrderExecutorT<Policies>::sendSubmitOrder(const Order& order)
   {
     LRVX_LOG_ERROR("[BitgetOE] submitOrder: unknown symbolId=" << order.symbol);
     publishRejection(order, "unknown symbol");
+    return;
+  }
+
+  // The simulator's tick rule, when the tick is known: refused here with its
+  // reason rather than sent for the venue to refuse with another.
+  if (const char* offTick = venue_price::offTickReason(order, *info))
+  {
+    publishRejection(order, offTick);
     return;
   }
 
@@ -498,7 +571,7 @@ void BitgetOrderExecutorT<Policies>::sendSubmitOrder(const Order& order)
 
   if (!isMarket)
   {
-    body.append("\"price\":\"").append(order.price.toString()).append("\",");
+    body.append("\"price\":\"").append(venue_price::wireDecimal(order.price)).append("\",");
   }
 
   body.append("\"side\":\"").append(order.side == Side::BUY ? "buy" : "sell").append("\",");
@@ -524,19 +597,14 @@ void BitgetOrderExecutorT<Policies>::sendSubmitOrder(const Order& order)
       {
         _policies.timeout.clearPending(order.id);
 
-        simdjson::ondemand::parser p;
-        simdjson::padded_string ps(resp);
-        auto doc = p.iterate(ps);
-        if (std::string_view(doc["code"]) != "00000")
+        const BitgetAck ack = readBitgetAck(resp);
+        if (!ack.ok)
         {
-          auto msg = std::string(doc["msg"].get_string().value());
-          LRVX_LOG_ERROR("[BitgetOE] submitOrder failed: " << msg);
-          publishRejection(order, msg);
+          LRVX_LOG_ERROR("[BitgetOE] submitOrder failed: " << ack.reason);
+          publishRejection(order, ack.reason);
           return;
         }
-
-        std::string exchId = std::string(doc["data"]["orderId"].get_string().value());
-        _orderTracker->onSubmitted(order, exchId);
+        _orderTracker->onSubmitted(order, ack.orderId);
       },
       [this, order](std::string_view err)
       {
@@ -564,8 +632,6 @@ void BitgetOrderExecutorT<Policies>::submitPlanOrder(const Order& order, const S
     return;
   }
 
-  const int decimals = decimalsForTick(info.tickSize);
-
   std::string body;
   body.reserve(320);
   body.append("{\"planType\":\"normal_plan\",")
@@ -585,7 +651,7 @@ void BitgetOrderExecutorT<Policies>::submitPlanOrder(const Order& order, const S
       .append(order.quantity.toString())
       .append("\",")
       .append("\"triggerPrice\":\"")
-      .append(trimDouble(order.triggerPrice.toDouble(), decimals))
+      .append(venue_price::trimmedDecimal(order.triggerPrice))
       .append("\",")
       .append("\"triggerType\":\"mark_price\",")
       .append("\"side\":\"")
@@ -598,7 +664,7 @@ void BitgetOrderExecutorT<Policies>::submitPlanOrder(const Order& order, const S
 
   if (isLimitPlan)
   {
-    body.append("\"price\":\"").append(trimDouble(order.price.toDouble(), decimals)).append("\",");
+    body.append("\"price\":\"").append(venue_price::trimmedDecimal(order.price)).append("\",");
   }
 
   body.append("\"clientOid\":\"").append(std::to_string(order.id)).append("\"}");
@@ -611,19 +677,14 @@ void BitgetOrderExecutorT<Policies>::submitPlanOrder(const Order& order, const S
       {
         _policies.timeout.clearPending(order.id);
 
-        simdjson::ondemand::parser p;
-        simdjson::padded_string ps(resp);
-        auto doc = p.iterate(ps);
-        if (std::string_view(doc["code"]) != "00000")
+        const BitgetAck ack = readBitgetAck(resp);
+        if (!ack.ok)
         {
-          auto msg = std::string(doc["msg"].get_string().value());
-          LRVX_LOG_ERROR("[BitgetOE] submitPlanOrder failed: " << msg);
-          publishRejection(order, msg);
+          LRVX_LOG_ERROR("[BitgetOE] submitPlanOrder failed: " << ack.reason);
+          publishRejection(order, ack.reason);
           return;
         }
-
-        std::string exchId = std::string(doc["data"]["orderId"].get_string().value());
-        _orderTracker->onSubmitted(order, exchId);
+        _orderTracker->onSubmitted(order, ack.orderId);
       },
       [this, order](std::string_view err)
       {
@@ -672,10 +733,11 @@ void BitgetOrderExecutorT<Policies>::sendCancelOrder(OrderId id)
     return;
   }
 
-  auto info = _registry->getSymbolInfo(st->localOrder.symbol);
+  const Order target = st->localOrder;
+  auto info = _registry->getSymbolInfo(target.symbol);
   if (!info)
   {
-    LRVX_LOG_ERROR("[BitgetOE] cancelOrder: no symbol info for id=" << st->localOrder.symbol);
+    publishCancelRejected(target, "no symbol info registered");
     return;
   }
 
@@ -711,26 +773,24 @@ void BitgetOrderExecutorT<Policies>::sendCancelOrder(OrderId id)
 
   _client->post(
       std::string(endpoint), body,
-      [this, id](std::string_view resp)
+      [this, id, target](std::string_view resp)
       {
         _policies.timeout.clearPending(id);
 
-        simdjson::ondemand::parser p;
-        simdjson::padded_string ps(resp);
-        auto doc = p.iterate(ps);
-        if (std::string_view(doc["code"]) == "00000")
+        const BitgetAck ack = readBitgetAck(resp);
+        if (ack.ok)
         {
           _orderTracker->onCanceled(id);
         }
         else
         {
-          LRVX_LOG_ERROR("[BitgetOE] cancelOrder failed: " << doc["msg"].get_string().value());
+          publishCancelRejected(target, ack.reason);
         }
       },
-      [this, id](std::string_view err)
+      [this, id, target](std::string_view err)
       {
         _policies.timeout.clearPending(id);
-        LRVX_LOG_ERROR("[BitgetOE] cancelOrder transport: " << err);
+        publishCancelRejected(target, "transport error: " + std::string(err));
       });
 }
 
@@ -767,10 +827,16 @@ void BitgetOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldId, const Order
     return;
   }
 
-  auto info = _registry->getSymbolInfo(st->localOrder.symbol);
+  const Order target = st->localOrder;
+  auto info = _registry->getSymbolInfo(target.symbol);
   if (!info)
   {
-    LRVX_LOG_ERROR("[BitgetOE] replaceOrder: no symbol info for id=" << st->localOrder.symbol);
+    publishReplaceRejected(target, newOrd, "no symbol info registered");
+    return;
+  }
+  if (venue_price::isOffTick(newOrd.price, *info))
+  {
+    publishReplaceRejected(target, newOrd, kRejectPriceOffTick);
     return;
   }
 
@@ -789,7 +855,7 @@ void BitgetOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldId, const Order
       .append(_params.marginCoin)
       .append("\",")
       .append("\"newPrice\":\"")
-      .append(newOrd.price.toString())
+      .append(venue_price::wireDecimal(newOrd.price))
       .append("\",")
       .append("\"newSize\":\"")
       .append(newOrd.quantity.toString())
@@ -802,29 +868,22 @@ void BitgetOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldId, const Order
 
   _client->post(
       std::string(kPathModify), body,
-      [this, oldId, newOrd](std::string_view resp)
+      [this, oldId, newOrd, target](std::string_view resp)
       {
         _policies.timeout.clearPending(oldId);
 
-        simdjson::ondemand::parser p;
-        simdjson::padded_string ps(resp);
-        auto doc = p.iterate(ps);
-        if (std::string_view(doc["code"]) != "00000")
+        const BitgetAck ack = readBitgetAck(resp);
+        if (!ack.ok)
         {
-          LRVX_LOG_ERROR("[BitgetOE] replaceOrder failed: " << doc["msg"].get_string().value());
+          publishReplaceRejected(target, newOrd, ack.reason);
           return;
         }
-
-        auto ordIdField = doc["data"]["orderId"];
-        std::string exch = ordIdField.type() == simdjson::ondemand::json_type::string
-                               ? std::string(ordIdField.get_string().value())
-                               : std::string();
-        _orderTracker->onReplaced(oldId, newOrd, exch);
+        _orderTracker->onReplaced(oldId, newOrd, ack.orderId);
       },
-      [this, oldId](std::string_view err)
+      [this, oldId, newOrd, target](std::string_view err)
       {
         _policies.timeout.clearPending(oldId);
-        LRVX_LOG_ERROR("[BitgetOE] replaceOrder transport: " << err);
+        publishReplaceRejected(target, newOrd, "transport error: " + std::string(err));
       });
 }
 
@@ -854,15 +913,28 @@ void BitgetOrderExecutorT<Policies>::sendPlacePosTpsl(SymbolId symbol, HoldSide 
                                                       double slPrice, double tpPrice,
                                                       OrderId localId)
 {
+  // The order this protective request is reported against: the local id the
+  // caller tracks it by, on the position's symbol.
+  Order tracked;
+  tracked.id = localId;
+  tracked.symbol = symbol;
+
   auto info = _registry->getSymbolInfo(symbol);
   if (!info)
   {
-    LRVX_LOG_ERROR("[BitgetOE] placePosTpsl: unknown symbolId=" << symbol);
+    publishRejection(tracked, "placePosTpsl: unknown symbol");
     return;
   }
   if (holdSide == HoldSide::Unspecified)
   {
-    LRVX_LOG_ERROR("[BitgetOE] placePosTpsl: holdSide must be Long or Short");
+    publishRejection(tracked, "placePosTpsl: holdSide must be Long or Short");
+    return;
+  }
+  const Price slPx = slPrice > 0 ? Price::fromDouble(slPrice) : Price{};
+  const Price tpPx = tpPrice > 0 ? Price::fromDouble(tpPrice) : Price{};
+  if (venue_price::isOffTick(slPx, *info) || venue_price::isOffTick(tpPx, *info))
+  {
+    publishRejection(tracked, kRejectTriggerOffTick);
     return;
   }
 
@@ -885,18 +957,17 @@ void BitgetOrderExecutorT<Policies>::sendPlacePosTpsl(SymbolId symbol, HoldSide 
               : slPrice > 0              ? "pos_loss"
                                          : "pos_profit")
       .append("\",");
-  const int decimals = decimalsForTick(info->tickSize);
   if (slPrice > 0)
   {
     body.append("\"stopLossTriggerPrice\":\"")
-        .append(trimDouble(slPrice, decimals))
+        .append(venue_price::trimmedDecimal(slPx))
         .append("\",")
         .append("\"stopLossTriggerType\":\"mark_price\",");
   }
   if (tpPrice > 0)
   {
     body.append("\"stopSurplusTriggerPrice\":\"")
-        .append(trimDouble(tpPrice, decimals))
+        .append(venue_price::trimmedDecimal(tpPx))
         .append("\",")
         .append("\"stopSurplusTriggerType\":\"mark_price\",");
   }
@@ -904,46 +975,23 @@ void BitgetOrderExecutorT<Policies>::sendPlacePosTpsl(SymbolId symbol, HoldSide 
 
   _client->post(
       std::string(kPathPosTpsl), body,
-      [this, localId](std::string_view resp)
+      [this, tracked](std::string_view resp)
       {
-        simdjson::ondemand::parser p;
-        simdjson::padded_string ps(resp);
-        simdjson::ondemand::document doc;
-        if (p.iterate(ps).get(doc))
+        const BitgetAck ack = readBitgetAck(resp);
+        if (!ack.ok)
         {
-          LRVX_LOG_ERROR("[BitgetOE] placePosTpsl: bad json");
+          publishRejection(tracked, "placePosTpsl: " + ack.reason);
           return;
         }
-        std::string_view code;
-        if (doc["code"].get_string().get(code) || code != "00000")
+        // /data is an array; the first orderId is the one tracked.
+        if (!ack.orderId.empty())
         {
-          std::string_view msg;
-          (void)doc["msg"].get_string().get(msg);
-          LRVX_LOG_ERROR("[BitgetOE] placePosTpsl failed: " << std::string(msg));
-          return;
-        }
-        // /data is an array; extract first orderId.
-        simdjson::ondemand::array arr;
-        if (doc["data"].get_array().get(arr))
-        {
-          return;
-        }
-        for (auto el : arr)
-        {
-          std::string_view oid;
-          if (el["orderId"].get_string().get(oid))
-          {
-            continue;
-          }
-          Order tmp;
-          tmp.id = localId;
-          _orderTracker->onSubmitted(tmp, std::string(oid));
-          break;
+          _orderTracker->onSubmitted(tracked, ack.orderId);
         }
       },
-      [](std::string_view err)
+      [this, tracked](std::string_view err)
       {
-        LRVX_LOG_ERROR("[BitgetOE] placePosTpsl transport: " << err);
+        publishRejection(tracked, "placePosTpsl: transport error: " + std::string(err));
       });
 }
 
@@ -972,9 +1020,31 @@ void BitgetOrderExecutorT<Policies>::sendModifyPosTpsl(SymbolId symbol,
                                                        const std::string& exchangeOrderId,
                                                        double newTriggerPrice, double qty)
 {
+  // The order being moved, as the tracker knows it, so a refusal reaches the
+  // strategy as REPLACE_REJECTED on that order rather than as a log line
+  // while the stop stays where the venue last accepted it.
+  Order current;
+  current.symbol = symbol;
+  if (auto localId = _orderTracker->findLocalIdByExchangeOrderId(exchangeOrderId))
+  {
+    if (auto st = _orderTracker->get(*localId))
+    {
+      current = st->localOrder;
+    }
+  }
+  Order moved = current;
+  moved.triggerPrice = Price::fromDouble(newTriggerPrice);
+  moved.quantity = Quantity::fromDouble(qty);
+
   auto info = _registry->getSymbolInfo(symbol);
   if (!info)
   {
+    publishReplaceRejected(current, moved, "modifyPosTpsl: unknown symbol");
+    return;
+  }
+  if (venue_price::isOffTick(moved.triggerPrice, *info))
+  {
+    publishReplaceRejected(current, moved, kRejectTriggerOffTick);
     return;
   }
 
@@ -996,34 +1066,27 @@ void BitgetOrderExecutorT<Policies>::sendModifyPosTpsl(SymbolId symbol,
       .append(trimDouble(qty, /*max_decimals=*/4))
       .append("\",")
       .append("\"triggerPrice\":\"")
-      .append(trimDouble(newTriggerPrice, decimalsForTick(info->tickSize)))
+      .append(venue_price::trimmedDecimal(moved.triggerPrice))
       .append("\",")
       .append("\"triggerType\":\"mark_price\"}");
 
   _client->post(
       std::string(kPathModifyTpsl), body,
-      [exchangeOrderId, newTriggerPrice](std::string_view resp)
+      [this, current, moved, exchangeOrderId](std::string_view resp)
       {
-        simdjson::ondemand::parser p;
-        simdjson::padded_string ps(resp);
-        simdjson::ondemand::document doc;
-        if (p.iterate(ps).get(doc))
+        const BitgetAck ack = readBitgetAck(resp);
+        if (!ack.ok)
         {
-          return;
-        }
-        std::string_view code;
-        if (doc["code"].get_string().get(code) || code != "00000")
-        {
-          std::string_view msg;
-          (void)doc["msg"].get_string().get(msg);
-          LRVX_LOG_ERROR("[BitgetOE] modifyPosTpsl failed: " << std::string(msg)
-                                                             << " (orderId=" << exchangeOrderId
-                                                             << " new=" << newTriggerPrice << ")");
+          publishReplaceRejected(
+              current, moved,
+              "modifyPosTpsl: " + ack.reason + " (orderId=" + exchangeOrderId + ")");
         }
       },
-      [](std::string_view err)
+      [this, current, moved, exchangeOrderId](std::string_view err)
       {
-        LRVX_LOG_ERROR("[BitgetOE] modifyPosTpsl transport: " << err);
+        publishReplaceRejected(current, moved,
+                               "modifyPosTpsl: transport error: " + std::string(err) +
+                                   " (orderId=" + exchangeOrderId + ")");
       });
 }
 

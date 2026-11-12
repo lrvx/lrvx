@@ -245,6 +245,10 @@ void BitgetExchangeConnector::start()
     return;
   }
 
+  // Before the socket opens, so the first frame already finds every
+  // configured symbol registered with the venue's tick.
+  loadInstrumentSpecs();
+
   // stop() releases the public client, so a start() after it builds a fresh
   // one.
   if (!_wsClient)
@@ -1040,6 +1044,74 @@ void BitgetExchangeConnector::handlePrivateMessage(std::string_view payload)
   }
 }
 
+void BitgetExchangeConnector::loadInstrumentSpecs()
+{
+  _specs.clear();
+  if (_config.instrumentInfoUrl.empty() || !_registry)
+  {
+    return;
+  }
+  const InstrumentFetch fetch =
+      _config.instrumentFetch ? _config.instrumentFetch : defaultInstrumentFetch();
+  std::string unreachable;
+
+  for (const auto& entry : _config.symbols)
+  {
+    const bool spot = entry.type == InstrumentType::Spot;
+    const std::string url =
+        spot ? _config.instrumentInfoUrl + "/api/v2/spot/public/symbols?symbol=" + entry.name
+             : _config.instrumentInfoUrl + "/api/v2/mix/market/contracts?productType=" +
+                   std::string(bitgetWsInstType(entry.type)) + "&symbol=" + entry.name;
+    // One unreachable venue is enough to know: the rest would each wait out
+    // the same timeout inside start().
+    if (!unreachable.empty())
+    {
+      _specs.addError(entry.name + ": not requested, " + unreachable);
+      continue;
+    }
+    auto body = fetch(url, "");
+    if (!body)
+    {
+      _specs.addError(entry.name + ": " + body.error());
+      unreachable = "the previous request failed";
+      continue;
+    }
+    auto specs = spot ? instrument_info::parseBitgetSpot(*body)
+                      : instrument_info::parseBitgetContracts(*body);
+    if (!specs)
+    {
+      _specs.addError(entry.name + ": " + specs.error());
+      continue;
+    }
+    auto it = specs->find(entry.name);
+    if (it == specs->end())
+    {
+      _specs.addError(entry.name + ": not listed in the symbol-info response");
+      continue;
+    }
+    _specs.add(entry.name, it->second);
+  }
+  reportInstrumentLoad(_specs, "Bitget", _logger.get());
+
+  // A symbol the caller registered before start() keeps that entry; the
+  // registry has no update, so a tick that differs from the venue's is
+  // reported instead.
+  for (const auto& entry : _config.symbols)
+  {
+    if (_registry->getSymbolId("bitget", entry.name))
+    {
+      SymbolInfo held;
+      held.exchange = "bitget";
+      held.symbol = entry.name;
+      registerVenueSymbol(*_registry, held, _specs, _logger.get());
+    }
+    else
+    {
+      resolveSymbolId(entry.name);
+    }
+  }
+}
+
 SymbolId BitgetExchangeConnector::resolveSymbolId(std::string_view sym)
 {
   if (auto existing = _registry->getSymbolId("bitget", std::string(sym)))
@@ -1060,7 +1132,7 @@ SymbolId BitgetExchangeConnector::resolveSymbolId(std::string_view sym)
       break;
     }
   }
-  return _registry->registerSymbol(info);
+  return registerVenueSymbol(*_registry, info, _specs, _logger.get());
 }
 
 bool BitgetConfig::isValid() const

@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include "lrvx-connectors/execution/instrument_spec.h"
+
 #include <lrvx/book/bus/book_update_bus.h>
 #include <lrvx/book/bus/trade_bus.h>
 #include <lrvx/common.h>
@@ -20,6 +22,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -51,6 +54,15 @@ struct HyperliquidConfig
   // cross-venue matrix consumes them, a depth book ignores them, so this is
   // safe to leave on. Turn it off to shed the extra per-tick events.
   bool subscribeBbo{true};
+  // Info endpoint the perp universe is read from at start(): POST
+  // {"type":"meta"}. Each configured coin is registered with the finest
+  // price increment the venue accepts on it, 10^-(6 - szDecimals), marked
+  // known; the executor applies the rest of the venue's price rule (five
+  // significant figures). Empty skips the load. A coin the response does not
+  // list is logged as an error and registered with its tick unknown.
+  std::string instrumentInfoUrl{"https://api.hyperliquid.xyz/info"};
+  // The request the load goes through; empty uses defaultInstrumentFetch().
+  InstrumentFetch instrumentFetch;
 };
 
 class HyperliquidExchangeConnector : public IExchangeConnector
@@ -80,6 +92,20 @@ class HyperliquidExchangeConnector : public IExchangeConnector
   std::string exchangeId() const override { return "hyperliquid"; }
 
   SymbolId resolveSymbolId(std::string_view symbol);
+
+  // Reads every configured symbol's instrument info (see the config's
+  // instrumentInfoUrl) and registers the symbols with it. start() calls it;
+  // public so a test can drive it with a recorded response.
+  void loadInstrumentSpecs();
+
+  // What the venue reported for a symbol, when it was loaded.
+  std::optional<InstrumentSpec> instrumentSpec(std::string_view symbol) const
+  {
+    return _specs.find(symbol);
+  }
+
+  // Why some instrument info is missing; empty when everything loaded.
+  std::string instrumentInfoError() const { return _specs.error(); }
 
   // The subscribe frames start() sends for one coin, in send order. Static
   // and public so a test can pin the wire payloads — the WS client is built
@@ -113,6 +139,8 @@ class HyperliquidExchangeConnector : public IExchangeConnector
   ExchangeId _exchangeId{InvalidExchangeId};
 
   std::shared_ptr<ILogger> _logger;
+
+  InstrumentSpecTable _specs;
 
   std::unique_ptr<IWebSocketClient> _wsClient;
   std::atomic<bool> _running{false};

@@ -222,6 +222,13 @@ class HyperliquidOrderExecutorT
 
   void publishRejection(const Order& order, const std::string& reason);
   void publishRateLimited(const Order& order);
+  // A cancel the venue refused, or that never reached it: REJECTED on the
+  // order the cancel targeted, as the simulator reports a cancel it cannot
+  // carry out. The tracker is left alone, because the order is still live.
+  void publishCancelRejected(const Order& order, const std::string& reason);
+  // A modify the venue refused, or that never reached it: REPLACE_REJECTED
+  // with the order that stays live and the replacement that was refused.
+  void publishReplaceRejected(const Order& order, const Order& newOrder, const std::string& reason);
   void publishSubmitted(const Order& order);
   void publishPendingTrigger(const Order& order);
   void publishFill(const Order& order, Quantity fillQty, Price fillPrice);

@@ -49,6 +49,7 @@ struct NullLogger final : public lrvx::ILogger
 BybitConfig makeConfig()
 {
   BybitConfig cfg;
+  cfg.instrumentInfoUrl.clear();  // offline: start() reads no instrument info
   // Port 1 on loopback: nothing listens there, so every attempt is refused
   // instantly and the ping thread actually starts (start() only bails out
   // early on an INVALID config, not an unreachable one).

@@ -38,6 +38,10 @@ foreach(test_src IN LISTS TEST_SOURCES)
 
     target_compile_features(${test_name} PRIVATE cxx_std_23)
 
+    # Recorded venue responses (fixtures/), read by the offline tests.
+    target_compile_definitions(${test_name} PRIVATE
+        LRVX_CONNECTOR_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/fixtures")
+
     # unit_test_* are offline (no network) and always registered; the
     # integration_test_* ones hit live exchanges and stay opt-in.
     if(test_name MATCHES "^unit_test_")

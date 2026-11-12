@@ -10,6 +10,7 @@
 #pragma once
 
 #include "lrvx-connectors/execution/fill_watermark.h"
+#include "lrvx-connectors/execution/instrument_spec.h"
 
 #include <lrvx/book/bus/book_update_bus.h>
 #include <lrvx/book/bus/trade_bus.h>
@@ -23,6 +24,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -75,6 +77,18 @@ struct BybitConfig
   // already takes its depth from that topic and gets no second subscription;
   // options have no level-1 topic and are skipped.
   bool subscribeBbo{false};
+  // Public REST base the instrument info (price tick, size step) of every
+  // configured symbol is read from at start(): GET
+  // /v5/market/instruments-info?category=...&symbol=... per symbol. Each
+  // symbol is then registered with the venue's tick, marked known, so the
+  // executor refuses an off-tick price locally (price_off_tick /
+  // trigger_off_tick, as the simulator does) and formats on-tick prices
+  // exactly. Empty skips the load. A symbol whose info could not be read is
+  // logged as an error and registered with its tick unknown: its prices are
+  // sent as given and the venue's own refusal comes back as an event.
+  std::string instrumentInfoUrl{"https://api.bybit.com"};
+  // The request the load goes through; empty uses defaultInstrumentFetch().
+  InstrumentFetch instrumentFetch;
 };
 
 class BybitExchangeConnector : public IExchangeConnector
@@ -96,6 +110,20 @@ class BybitExchangeConnector : public IExchangeConnector
   std::string exchangeId() const override { return "bybit"; }
 
   SymbolId resolveSymbolId(std::string_view symbol);
+
+  // Reads every configured symbol's instrument info (see
+  // BybitConfig::instrumentInfoUrl) and registers the symbols with it.
+  // start() calls it; public so a test can drive it with a recorded response.
+  void loadInstrumentSpecs();
+
+  // What the venue reported for a symbol, when it was loaded.
+  std::optional<InstrumentSpec> instrumentSpec(std::string_view symbol) const
+  {
+    return _specs.find(symbol);
+  }
+
+  // Why some instrument info is missing; empty when everything loaded.
+  std::string instrumentInfoError() const { return _specs.error(); }
 
   // The topics start() subscribes, in send order: each symbol's depth topic
   // and publicTrade, then orderbook.1 for the symbols subscribeBbo covers.
@@ -196,6 +224,8 @@ class BybitExchangeConnector : public IExchangeConnector
   // OrderEvent::fillQty at zero. Both are the watermark's job; see
   // FillWatermark.
   FillWatermark _reportedFill;
+
+  InstrumentSpecTable _specs;
 
   std::shared_ptr<ILogger> _logger;
 
