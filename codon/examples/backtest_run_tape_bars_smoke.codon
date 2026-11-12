@@ -153,8 +153,13 @@ bps.run_tape_bars(root, 60.0, "AAA")
 st = bps.trades()
 ok = len(st[2]) == len(pt[2]) and len(pt[2]) > 0
 for i in range(len(pt[2])):
-    ok = ok and abs(st[2][i] - pt[2][i] * 1.001) < 1e-6 and abs(st[3][i] - pt[3][i] * 0.999) < 1e-6
-check(ok, "fixed_bps moves every fill 10 bps against the taker")
+    # The symbol declares a 0.01 tick: a slipped fill is then put on the tick
+    # against the taker, a buy up and a sell down.
+    buy = pt[2][i] * 1.001
+    sell = pt[3][i] * 0.999
+    ok = ok and st[2][i] >= buy - 1e-9 and st[2][i] < buy + 0.01
+    ok = ok and st[3][i] <= sell + 1e-9 and st[3][i] > sell - 0.01
+check(ok, "fixed_bps moves every fill 10 bps against the taker, onto the tick")
 
 acked = BacktestRunner(reg, 0.0004, 10_000.0, submit_ack_latency_ns=5_000_000)
 acked.set_strategy(Swing([1]))
