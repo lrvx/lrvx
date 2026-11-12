@@ -19,6 +19,7 @@
 #include "lrvx/util/base/decimal.h"
 
 #include <gtest/gtest.h>
+#include <cmath>
 
 #include <algorithm>
 #include <cstring>
@@ -330,6 +331,7 @@ TEST_F(TapeBars, DefaultFillSettingsEqualThePlainRunner)
 
 TEST_F(TapeBars, FixedBpsSlippageMovesEveryFillAgainstTheTaker)
 {
+  constexpr double kTick = 0.01;
   auto plain = oneCall(1, "AAA", 60.0);
   auto slipped = oneCall(1, "AAA", 60.0,
                          lrvx_backtest_runner_create_with_fill_settings(
@@ -340,9 +342,17 @@ TEST_F(TapeBars, FixedBpsSlippageMovesEveryFillAgainstTheTaker)
   ASSERT_FALSE(plain.trades.empty());
   for (size_t i = 0; i < plain.trades.size(); ++i)
   {
-    // long round trips: bought higher, sold lower, 10 bps each way
-    EXPECT_NEAR(slipped.trades[i].entry_price, plain.trades[i].entry_price * 1.001, 1e-6);
-    EXPECT_NEAR(slipped.trades[i].exit_price, plain.trades[i].exit_price * 0.999, 1e-6);
+    // long round trips: bought higher, sold lower, 10 bps each way. The
+    // symbol declares a 0.01 tick, so a slipped fill is then put on the tick
+    // against the taker: a buy up, a sell down, by less than one tick.
+    const double slippedBuy = plain.trades[i].entry_price * 1.001;
+    const double slippedSell = plain.trades[i].exit_price * 0.999;
+    EXPECT_GE(slipped.trades[i].entry_price, slippedBuy - 1e-9);
+    EXPECT_LT(slipped.trades[i].entry_price, slippedBuy + kTick);
+    EXPECT_LE(slipped.trades[i].exit_price, slippedSell + 1e-9);
+    EXPECT_GT(slipped.trades[i].exit_price, slippedSell - kTick);
+    EXPECT_NEAR(std::remainder(slipped.trades[i].entry_price, kTick), 0.0, 1e-9);
+    EXPECT_NEAR(std::remainder(slipped.trades[i].exit_price, kTick), 0.0, 1e-9);
   }
   EXPECT_LT(slipped.stats.netPnl, plain.stats.netPnl);
 }
