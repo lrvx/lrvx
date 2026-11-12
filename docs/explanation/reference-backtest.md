@@ -22,6 +22,7 @@ These are the rules the numbers below follow. They are the behaviour of `Backtes
 - **The strategy is called once per bar, after the walk.** `on_bar` runs with the bar fully in the past, and every price it can react to is a price that has already printed.
 - **An order from the callback fills at the next bar's open.** While the callback runs, every order it submits is held; the next bar for that symbol releases it at its open step, where a market order takes the open price. Nothing fills on the bar that produced the signal, and an order submitted from the last bar's callback never fills.
 - **Fill timestamps are bar end times.** The runner moves its clock to a bar's end time before walking it, so a fill in bar N carries bar N's end time, not the signal bar's.
+- **Order prices are checked against the symbol's tick.** A limit price, trigger or trailing distance off the tick is rejected at submit, as a venue rejects it. This run sends market orders only, so the check never fires here.
 - **Fees are charged per fill on notional.** A round trip pays the rate twice: once on the entry notional and once on the exit notional.
 - **A trade is an entry fill matched with the exit fill that flattens it.** `pnl` is price difference times quantity, before fees; `fee` is the two fills' fees; `net_pnl` across the run is `total_pnl` minus `total_fees`, and `final_capital` is the initial capital plus `net_pnl`.
 

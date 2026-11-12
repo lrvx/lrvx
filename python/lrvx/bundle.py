@@ -164,6 +164,7 @@ def _run_strategy_against_tape(
     sym = registry.add_symbol(exchange, symbol_name, tick_size=tick_size)
 
     sim = lrvx.SimulatedExecutor()
+    sim.set_symbol_registry(registry)
     sim.set_default_slippage(
         model=slippage_model,
         ticks=int((slippage_params or {}).get("ticks", 0)),

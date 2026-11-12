@@ -27,8 +27,10 @@ btc = registry.add_symbol("binance", "BTCUSDT", tick_size=0.01)
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `add_symbol(exchange, symbol, tick_size=0.01)` | `Symbol` | Register a symbol and return its `Symbol` object |
+| `add_symbol(exchange, symbol, tick_size=None)` | `Symbol` | Register a symbol and return its `Symbol` object |
 | `symbol_count()` | `int` | Number of registered symbols |
+
+`tick_size` is the venue's price increment, and a backtest rejects orders priced off it. Left out, the symbol's book uses 0.01 and order prices are not checked; `Symbol.tick_size` then reads 0.01.
 
 ## Class: `lrvx.Strategy`
 
@@ -126,6 +128,8 @@ These methods use the first registered symbol when `symbol` is omitted. `symbol`
 | `modify_order(order_id, new_price, new_qty)` | Modify a resting order |
 
 `tif` accepts `"gtc"`, `"ioc"`, `"fok"`, `"gtd"`, `"post_only"`.
+
+In a backtest, `price`, `trigger`, `limit_price`, `offset` and `modify_order`'s `new_price` must be whole numbers of the symbol's tick when the symbol was registered with one. An order off the tick is rejected: `on_order_update` receives `status == "REJECTED"` and `reject_reason` `"price_off_tick"`, `"trigger_off_tick"` or `"trailing_offset_off_tick"` (a modify gets `"REPLACE_REJECTED"`). Round a computed price before sending it, for example `round(price / tick) * tick`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
 
 ### Order Emission — Explicit (emit_* variants)
 

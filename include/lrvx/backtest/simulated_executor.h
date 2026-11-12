@@ -19,6 +19,7 @@
 #include "lrvx/backtest/venue_availability.h"
 #include "lrvx/book/book_update.h"
 #include "lrvx/clearing/fee_schedule.h"
+#include "lrvx/engine/symbol_registry.h"
 #include "lrvx/execution/abstract_executor.h"
 #include "lrvx/execution/composite_order_logic.h"
 #include "lrvx/execution/events/order_event.h"
@@ -67,6 +68,18 @@ class SimulatedExecutor : public IOrderExecutor
   explicit SimulatedExecutor(IClock& clock);
 
   void setOrderEventCallback(OrderEventCallback cb);
+
+  // Where the executor reads each symbol's tick. An order whose limit price,
+  // trigger price or trailing distance is off a known tick is rejected at
+  // submit (OrderEventStatus::REJECTED) and on replace (REPLACE_REJECTED),
+  // with the reason from execution/order_price_rule.h. Fills moved by a
+  // slippage model and percentage trailing triggers are snapped onto the tick
+  // against the order's owner. Without a registry nothing is checked. The
+  // registry must outlive the executor or be detached with nullptr.
+  void setSymbolRegistry(const SymbolRegistry* registry);
+  // The tick orders on `symbol` are checked against, as a raw price; 0 when
+  // none is known.
+  int64_t orderTickRaw(SymbolId symbol) const;
 
   // Apply slippage and queue-simulation settings from a BacktestConfig. May be
   // called after construction; existing orders keep their prior behavior.
@@ -343,6 +356,7 @@ class SimulatedExecutor : public IOrderExecutor
     int64_t worstPriceRaw{0};  // deepest level the walk reached
     Volume notional{};         // sum(price * qty) over the levels consumed
     bool walked{false};        // false when the symbol has no visible ladder
+    size_t levels{0};          // price levels the walk took size from
   };
 
   MarketState& getMarketState(SymbolId symbol);
@@ -374,6 +388,7 @@ class SimulatedExecutor : public IOrderExecutor
   bool isConditionalOrder(OrderType type) const;
   void executeFill(Order& order, Price price, Quantity qty, bool isMaker = false);
   void emitEvent(OrderEventStatus status, const Order& order);
+  void emitRejected(const Order& order, const char* reason);
   void emitTrailingUpdate(const Order& order, Price newTrigger);
 
   // Emit QUEUE_POSITION_UPDATED for every resting order whose
@@ -505,6 +520,10 @@ class SimulatedExecutor : public IOrderExecutor
   std::array<bool, kMaxSymbols> _slippageSetFlat{};
   std::vector<std::pair<SymbolId, SlippageProfile>> _slippageOverflow;
   SlippageProfile _defaultSlippage{};
+
+  // Per-symbol order tick, read from the registry on first use. -1 = not read.
+  const SymbolRegistry* _registry{nullptr};
+  mutable std::array<int64_t, kMaxSymbols> _orderTickFlat{};
 
   // Seeds as configured, kept so reset() can put the generators back where a
   // fresh executor would have them.

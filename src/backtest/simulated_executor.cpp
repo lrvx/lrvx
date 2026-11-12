@@ -8,6 +8,7 @@
  */
 
 #include "lrvx/backtest/simulated_executor.h"
+#include "lrvx/execution/order_price_rule.h"
 
 #include "lrvx/backtest/latency_profiles.h"
 
@@ -53,6 +54,53 @@ SimulatedExecutor::SimulatedExecutor(IClock& clock) : _clock(clock)
   _fills.reserve(kDefaultFillCapacity);
   _compositeLogic.setExecutor(this);
   _slippageSetFlat.fill(false);
+  _orderTickFlat.fill(-1);
+}
+
+void SimulatedExecutor::setSymbolRegistry(const SymbolRegistry* registry)
+{
+  _registry = registry;
+  _orderTickFlat.fill(-1);
+}
+
+int64_t SimulatedExecutor::orderTickRaw(SymbolId symbol) const
+{
+  if (_registry == nullptr)
+  {
+    return 0;
+  }
+  if (symbol < kMaxSymbols && _orderTickFlat[symbol] >= 0)
+  {
+    return _orderTickFlat[symbol];
+  }
+  const auto info = _registry->getSymbolInfo(symbol);
+  if (!info)
+  {
+    // Not registered yet: answer "unknown" without caching, so a symbol added
+    // later is still read.
+    return 0;
+  }
+  const int64_t tick = lrvx::orderTickRaw(*info);
+  if (symbol < kMaxSymbols)
+  {
+    _orderTickFlat[symbol] = tick;
+  }
+  return tick;
+}
+
+void SimulatedExecutor::emitRejected(const Order& order, const char* reason)
+{
+  OrderEvent ev;
+  ev.status = OrderEventStatus::REJECTED;
+  ev.order = order;
+  ev.exchangeTsNs = _clock.nowNs();
+  ev.timestamps = timestampsFor(order.id);
+  ev.timestamps.rejectedAtNs = ev.exchangeTsNs;
+  ev.rejectReason = reason;
+  if (_callback)
+  {
+    _callback(ev);
+  }
 }
 
 void SimulatedExecutor::setOrderEventCallback(OrderEventCallback cb)
@@ -428,6 +476,13 @@ void SimulatedExecutor::submitOrder(const Order& order)
     return;
   }
 
+  // A venue refuses a price that is not a whole number of ticks.
+  if (const char* why = offTickReason(order, orderTickRaw(accepted.symbol)))
+  {
+    emitRejected(accepted, why);
+    return;
+  }
+
   // reduce_only: order may only reduce existing position. Computed
   // against the simulator-side net position (updated in executeFill).
   // If the order would open or grow the position it is rejected; if
@@ -721,9 +776,11 @@ void SimulatedExecutor::finishSubmission(Order accepted, bool fromAck)
       else if (accepted.trailingCallbackRate > 0)
       {
         int64_t offsetRaw = (currentPrice.raw() * accepted.trailingCallbackRate) / 10000;
-        trailing.currentTrigger = (accepted.side == Side::SELL)
-                                      ? Price::fromRaw(currentPrice.raw() - offsetRaw)
-                                      : Price::fromRaw(currentPrice.raw() + offsetRaw);
+        const int64_t triggerRaw = (accepted.side == Side::SELL)
+                                       ? currentPrice.raw() - offsetRaw
+                                       : currentPrice.raw() + offsetRaw;
+        trailing.currentTrigger = Price::fromRaw(
+            snapAgainstOwner(triggerRaw, orderTickRaw(accepted.symbol), accepted.side));
       }
 
       _trailing_states.emplace_back(accepted.id, trailing);
@@ -989,6 +1046,47 @@ void SimulatedExecutor::cancelAllOrders(SymbolId symbol)
 
 void SimulatedExecutor::replaceOrder(OrderId oldOrderId, const Order& newOrder)
 {
+  // An off-tick replacement is refused and the original order stays as it was.
+  if (const char* why = offTickReason(newOrder, orderTickRaw(newOrder.symbol)))
+  {
+    const Order* old = nullptr;
+    for (const Order& held : _heldBarOrders)
+    {
+      if (held.id == oldOrderId)
+      {
+        old = &held;
+        break;
+      }
+    }
+    if (old == nullptr)
+    {
+      old = findPendingOrder(oldOrderId);
+    }
+    if (old == nullptr)
+    {
+      for (const Order& cond : _conditional_orders)
+      {
+        if (cond.id == oldOrderId)
+        {
+          old = &cond;
+          break;
+        }
+      }
+    }
+    if (_callback)
+    {
+      OrderEvent ev;
+      ev.status = OrderEventStatus::REPLACE_REJECTED;
+      ev.order = old != nullptr ? *old : newOrder;
+      ev.newOrder = newOrder;
+      ev.rejectReason = why;
+      ev.exchangeTsNs = _clock.nowNs();
+      ev.timestamps = timestampsFor(ev.order.id);
+      _callback(ev);
+    }
+    return;
+  }
+
   // Replacing an order that is still held for the next bar's open rewrites it
   // in place: the venue never saw the original, so there is nothing to cancel
   // and the replacement inherits its place in the hold list.
@@ -1929,6 +2027,7 @@ SimulatedExecutor::LadderWalk SimulatedExecutor::consumeLadder(SymbolId symbol, 
       walk.notional = walk.notional + (Quantity::fromRaw(take) * Price::fromRaw(priceRaw));
       walk.takenRaw += take;
       walk.worstPriceRaw = priceRaw;
+      ++walk.levels;
       left -= take;
       levelQtyRaw -= take;
     }
@@ -2053,6 +2152,7 @@ bool SimulatedExecutor::tryFillOrder(Order& order, bool resting, int64_t trigger
   // the one answer that is certainly wrong: it makes size free, which is the
   // bug this replaces. The order still fills in full, so a thin book slows
   // nothing down; it just stops being cheap.
+  bool averaged = false;
   if (!isMaker)
   {
     const int64_t limitRaw = fillsAsMarket(order.type) ? 0 : order.price.raw();
@@ -2060,6 +2160,7 @@ bool SimulatedExecutor::tryFillOrder(Order& order, bool resting, int64_t trigger
         consumeLadder(order.symbol, order.side, remainingQty.raw(), limitRaw);
     if (walk.walked && walk.takenRaw > 0)
     {
+      averaged = walk.takenRaw >= remainingQty.raw() && walk.levels > 1;
       fillPriceRaw = (walk.takenRaw >= remainingQty.raw())
                          ? (walk.notional / Quantity::fromRaw(walk.takenRaw)).raw()
                          : walk.worstPriceRaw;
@@ -2080,10 +2181,16 @@ bool SimulatedExecutor::tryFillOrder(Order& order, bool resting, int64_t trigger
   }
 
   // Apply slippage only to market-style fills (limit makers trade at posted price).
+  // A price the model moved off the tick is snapped back onto it against the
+  // order's owner, since a single level only trades on the tick. An average
+  // over several levels is not a traded price and stays as it is.
   if (fillsAsMarket(order.type))
   {
-    fillPriceRaw = applySlippage(fillPriceRaw, order.side, order.symbol,
-                                 remainingQty, levelQtyRaw);
+    const int64_t slippedRaw = applySlippage(fillPriceRaw, order.side, order.symbol,
+                                             remainingQty, levelQtyRaw);
+    fillPriceRaw = (slippedRaw != fillPriceRaw && !averaged)
+                       ? snapAgainstOwner(slippedRaw, orderTickRaw(order.symbol), order.side)
+                       : slippedRaw;
   }
   executeFill(order, Price::fromRaw(fillPriceRaw), remainingQty, isMaker);
   return true;
@@ -2940,7 +3047,8 @@ void SimulatedExecutor::updateTrailingStops(SymbolId symbol, Price currentPrice)
           offsetRaw = (priceRaw * order.trailingCallbackRate) / 10000;
         }
 
-        int64_t newCandidate = priceRaw - offsetRaw;
+        const int64_t newCandidate =
+            snapAgainstOwner(priceRaw - offsetRaw, orderTickRaw(symbol), Side::SELL);
         if (newCandidate > newTriggerRaw)
         {
           newTriggerRaw = newCandidate;
@@ -2959,7 +3067,8 @@ void SimulatedExecutor::updateTrailingStops(SymbolId symbol, Price currentPrice)
           offsetRaw = (priceRaw * order.trailingCallbackRate) / 10000;
         }
 
-        int64_t newCandidate = priceRaw + offsetRaw;
+        const int64_t newCandidate =
+            snapAgainstOwner(priceRaw + offsetRaw, orderTickRaw(symbol), Side::BUY);
         if (newCandidate < newTriggerRaw)
         {
           newTriggerRaw = newCandidate;

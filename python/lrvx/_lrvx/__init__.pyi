@@ -2900,6 +2900,10 @@ class SimulatedExecutor:
         ...
     def set_submit_ack_latency_distribution(self, dist: LatencyDistribution) -> None:
         ...
+    def set_symbol_registry(self, registry: typing.Any) -> None:
+        """
+        Read each symbol's tick from this registry. An order priced off a known tick is rejected (reason price_off_tick, trigger_off_tick or trailing_offset_off_tick), and slipped fills are snapped onto the tick against the order's owner. Pass None to stop checking.
+        """
     def set_symbol_slippage(self, symbol: typing.SupportsInt | typing.SupportsIndex, model: str, ticks: typing.SupportsInt | typing.SupportsIndex = 0, tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.0, bps: typing.SupportsFloat | typing.SupportsIndex = 0.0, impact_coeff: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:
         """
         Configure slippage for a specific symbol
@@ -3281,7 +3285,7 @@ class SymbolContext:
 class SymbolRegistry:
     def __init__(self) -> None:
         ...
-    def add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.01) -> Symbol:
+    def add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol:
         ...
     def symbol_count(self) -> int:
         ...

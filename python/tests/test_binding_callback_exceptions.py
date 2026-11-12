@@ -871,7 +871,8 @@ _VENUE_STACK_DRIVER = """
         def on_trade(self, ctx, trade):
             self.n += 1
             if self.n == 5:
-                self.limit_buy(trade.price * 0.999, 0.01)
+                # On the 0.01 tick: an off-tick price is rejected at submit.
+                self.limit_buy(round(trade.price * 0.999, 2), 0.01)
             if self.n == 50:
                 self.market_buy(0.01)
             if fired[0]:

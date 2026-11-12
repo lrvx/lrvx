@@ -80,10 +80,24 @@ void BacktestRunner::setSimulatedExecutor(SimulatedExecutor* executor, Simulated
     // result() forwards to BacktestResult, so each fill is billed at the
     // tier the account's 30-day notional resolves to.
     installOrderEventCallback(*executor);
+    if (_registry != nullptr)
+    {
+      executor->setSymbolRegistry(_registry);
+    }
     if (clock != nullptr)
     {
       clock->advanceTo(_clock.nowNs());
     }
+  }
+}
+
+void BacktestRunner::setSymbolRegistry(const SymbolRegistry* registry)
+{
+  _registry = registry;
+  _executor.setSymbolRegistry(registry);
+  if (_venueExecutor != nullptr)
+  {
+    _venueExecutor->setSymbolRegistry(registry);
   }
 }
 

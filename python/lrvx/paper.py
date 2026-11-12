@@ -116,6 +116,7 @@ class PaperBroker:
         import lrvx
 
         self._sim = lrvx.SimulatedExecutor()
+        self._sim.set_symbol_registry(self.registry)
         self._sim.set_default_slippage(
             **_slippage_kwargs(
                 self.default_slippage_model,

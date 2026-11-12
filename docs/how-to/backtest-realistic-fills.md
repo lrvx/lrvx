@@ -4,7 +4,7 @@ Configure a backtest with realistic execution: slippage on market orders, queue 
 
 ## What the fill model does before you configure anything
 
-Five rules hold in every backtest, with or without a slippage profile or a queue model:
+Six rules hold in every backtest, with or without a slippage profile or a queue model:
 
 | Rule | Meaning |
 |---|---|
@@ -12,7 +12,15 @@ Five rules hold in every backtest, with or without a slippage profile or a queue
 | A taker walks the book | A crossing order consumes the visible ladder and pays the volume-weighted price of the levels it took; what it ate is gone for the next order until the following snapshot. Size past the ladder pays the deepest visible level, for the whole order. |
 | A triggered stop or target cannot fill better than its trigger | It may fill worse — a sell stop armed at 95 on a bar that traded to 90 still books 90 — but a take-profit armed at 105 books 105, not the bar's high. |
 | A queue model fills on bars | A bar that trades strictly through a resting limit's price consumes that level's queue, per the configured model. A bar that only touches the price fills nothing. |
+| An order priced off the tick is rejected | A limit price, stop or take-profit trigger, or trailing distance that is not a whole number of the symbol's ticks is refused at submit with `REJECTED` and a reason (`price_off_tick`, `trigger_off_tick`, `trailing_offset_off_tick`), as a venue refuses it. A symbol registered without a tick is not checked. |
 | Each run starts clean | A second `run()` / `run_bars()` on the same runner reports that run, not the sum of every run so far. Configuration survives; state does not. |
+
+A strategy that prices an exit from its fill, such as a take-profit at `entry * 1.005`, rounds the
+result to the tick before sending it: `round(entry * 1.005 / tick) * tick`, with `tick` read from
+`Symbol.tick_size` in Python.
+
+Prices the simulator computes itself -- a fill moved by a slippage model, a percentage trailing
+trigger -- are snapped onto the tick against the strategy instead.
 
 Details and the exact bounds: [SimulatedExecutor](../reference/api/backtest/simulated_executor.md#execution-logic),
 [Queue simulation](../reference/api/backtest/queue_simulation.md#bar-data),

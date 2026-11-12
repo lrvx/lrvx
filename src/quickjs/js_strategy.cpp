@@ -1040,7 +1040,7 @@ void LrvxJsStrategy::resolveSymbols()
     LrvxRegistryHandle regHandle = static_cast<LrvxRegistryHandle>(&_registry);
     if (!lrvx_registry_get_symbol_id(regHandle, exchange.c_str(), symbol.c_str(), &symId))
     {
-      symId = lrvx_registry_add_symbol(regHandle, exchange.c_str(), symbol.c_str(), 0.01);
+      symId = lrvx_registry_add_symbol(regHandle, exchange.c_str(), symbol.c_str(), 0.0);
     }
 
     _symbolIds.push_back(symId);

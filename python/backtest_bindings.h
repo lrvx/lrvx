@@ -140,6 +140,8 @@ class PySimulatedExecutor
   // their own subsystem (e.g. LiquidationEngine::setExecutor).
   SimulatedExecutor& executor() { return _executor; }
 
+  void setSymbolRegistry(const SymbolRegistry* registry) { _executor.setSymbolRegistry(registry); }
+
   void submitOrder(uint64_t id, const std::string& sideStr, double price, double qty,
                    const std::string& typeStr, uint32_t symbol,
                    const std::string& tifStr = "gtc", bool reduceOnly = false,
@@ -715,6 +717,12 @@ inline void bindBacktest(py::module_& m)
 
   py::class_<PySimulatedExecutor>(m, "SimulatedExecutor")
       .def(py::init<>())
+      .def("set_symbol_registry", &PySimulatedExecutor::setSymbolRegistry, py::arg("registry"),
+           py::keep_alive<1, 2>(),
+           "Read each symbol's tick from this registry. An order priced off a "
+           "known tick is rejected (reason price_off_tick, trigger_off_tick or "
+           "trailing_offset_off_tick), and slipped fills are snapped onto the "
+           "tick against the order's owner. Pass None to stop checking.")
       .def("submit_order", &PySimulatedExecutor::submitOrder,
            "Submit an order to the simulated exchange. type: one of "
            "lrvx.ORDER_TYPE_NAMES (market|limit|stop_market|stop_limit|"

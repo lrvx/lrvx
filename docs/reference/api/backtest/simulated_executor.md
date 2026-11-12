@@ -16,6 +16,10 @@ public:
 
   void setOrderEventCallback(OrderEventCallback cb);
 
+  // Where each symbol's tick is read. Without a registry nothing is checked.
+  void setSymbolRegistry(const SymbolRegistry* registry);
+  int64_t orderTickRaw(SymbolId symbol) const;  // 0 when no tick is known
+
   // Apply slippage and queue-simulation settings from a BacktestConfig.
   void applyConfig(const BacktestConfig& config);
 
@@ -193,6 +197,42 @@ Submit, cancel and replace consult the rate-limit policy first; an overflow emit
 
 ## Execution logic
 
+### Order prices and the tick
+
+A venue refuses an order whose price is not a whole number of ticks, and so does the simulator. With
+a registry attached (`setSymbolRegistry`; `BacktestRunner` attaches the one its strategy uses in
+every binding), each order is checked against its symbol's tick when it reaches the simulator, and a
+replace is checked the same way. The rule lives in `include/lrvx/execution/order_price_rule.h` and is
+the only implementation.
+
+| Order type | Checked | Reject reason |
+|------------|---------|---------------|
+| `LIMIT`, `ICEBERG` | `price` | `price_off_tick` |
+| `STOP_MARKET`, `TAKE_PROFIT_MARKET` | `triggerPrice` | `trigger_off_tick` |
+| `STOP_LIMIT`, `TAKE_PROFIT_LIMIT` | `triggerPrice`, then `price` | `trigger_off_tick` / `price_off_tick` |
+| `TRAILING_STOP` | `trailingOffset` (a fixed distance) | `trailing_offset_off_tick` |
+| `MARKET` | nothing | |
+
+A refused order emits `REJECTED` with the reason in `OrderEvent::rejectReason`, before `SUBMITTED`,
+and never reaches the book. A refused replace emits `REPLACE_REJECTED` with the reason and leaves the
+original order as it was. An order held from a bar callback is checked when the next bar's open
+releases it.
+
+Which tick applies:
+
+| Symbol | Checked against |
+|--------|-----------------|
+| Registered with a tick (`tickSizeKnown`, or any `tickSize` other than the 0.01 default) | that tick |
+| Registered without a tick (the 0.01 default, `tickSizeKnown` false) | nothing |
+| Tick of zero | nothing |
+| No registry attached | nothing |
+
+Prices the simulator computes itself are snapped onto the tick on the side that is worse for the
+order's owner: a buy is moved up, a sell down. This covers a market-style fill moved by a slippage
+model (see [Slippage](./slippage.md#slippage-and-the-tick)) and the trigger of a percentage trailing
+stop (`trailingCallbackRate`). A volume-weighted fill over several book levels is an average, not a
+traded price, and is left as it is.
+
 ### Market orders
 
 A taker walks the visible ladder. `onBookUpdate` keeps every level it reports, not just the touch,
@@ -284,6 +324,7 @@ struct TrailingState
 ```
 
 SELL trailing: trigger follows price up (never down). BUY trailing: trigger follows price down (never up).
+A percentage trailing trigger is snapped onto the symbol's tick, down for a sell and up for a buy.
 
 ## Feeding market data
 
@@ -354,6 +395,8 @@ seeds, so a repeated run repeats. `BacktestRunner` calls it at the start of ever
 | `PARTIALLY_FILLED` | Partial execution (common with queue simulation) |
 | `CANCELED` | Order canceled |
 | `REPLACED` | Order modified |
+| `REJECTED` | Order refused; `rejectReason` says why (for example `price_off_tick`, `reduce_only`) |
+| `REPLACE_REJECTED` | Replace refused; the original order is unchanged |
 
 Trailing stop updates emit `TRAILING_UPDATED` events with the new trigger price.
 

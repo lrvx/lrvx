@@ -4577,7 +4577,7 @@ Configure a backtest with realistic execution: slippage on market orders, queue 
 
 ## What the fill model does before you configure anything
 
-Five rules hold in every backtest, with or without a slippage profile or a queue model:
+Six rules hold in every backtest, with or without a slippage profile or a queue model:
 
 | Rule | Meaning |
 |---|---|
@@ -4585,7 +4585,15 @@ Five rules hold in every backtest, with or without a slippage profile or a queue
 | A taker walks the book | A crossing order consumes the visible ladder and pays the volume-weighted price of the levels it took; what it ate is gone for the next order until the following snapshot. Size past the ladder pays the deepest visible level, for the whole order. |
 | A triggered stop or target cannot fill better than its trigger | It may fill worse — a sell stop armed at 95 on a bar that traded to 90 still books 90 — but a take-profit armed at 105 books 105, not the bar's high. |
 | A queue model fills on bars | A bar that trades strictly through a resting limit's price consumes that level's queue, per the configured model. A bar that only touches the price fills nothing. |
+| An order priced off the tick is rejected | A limit price, stop or take-profit trigger, or trailing distance that is not a whole number of the symbol's ticks is refused at submit with `REJECTED` and a reason (`price_off_tick`, `trigger_off_tick`, `trailing_offset_off_tick`), as a venue refuses it. A symbol registered without a tick is not checked. |
 | Each run starts clean | A second `run()` / `run_bars()` on the same runner reports that run, not the sum of every run so far. Configuration survives; state does not. |
+
+A strategy that prices an exit from its fill, such as a take-profit at `entry * 1.005`, rounds the
+result to the tick before sending it: `round(entry * 1.005 / tick) * tick`, with `tick` read from
+`Symbol.tick_size` in Python.
+
+Prices the simulator computes itself -- a fill moved by a slippage model, a percentage trailing
+trigger -- are snapped onto the tick against the strategy instead.
 
 Details and the exact bounds: [SimulatedExecutor](../reference/api/backtest/simulated_executor.md#execution-logic),
 [Queue simulation](../reference/api/backtest/queue_simulation.md#bar-data),
@@ -11354,6 +11362,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - `set_stp_mode(self, mode: str) -> None`
 - `set_submit_ack_latency(self, latency_ns: typing.SupportsInt | typing.SupportsIndex, jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `set_submit_ack_latency_distribution(self, dist: LatencyDistribution) -> None`
+- `set_symbol_registry(self, registry: typing.Any) -> None`
 - `set_symbol_slippage(self, symbol: typing.SupportsInt | typing.SupportsIndex, model: str, ticks: typing.SupportsInt | typing.SupportsIndex = 0, tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.0, bps: typing.SupportsFloat | typing.SupportsIndex = 0.0, impact_coeff: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None`
 - `set_top_priority_share(self, share: typing.SupportsFloat | typing.SupportsIndex) -> None`
 - `set_venue_availability(self, availability: typing.Any) -> None`
@@ -11562,7 +11571,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 
 **Members**
 
-- `add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.01) -> Symbol`
+- `add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol`
 - `symbol_count(self) -> int`
 
 ### `class TEMA`
@@ -12033,8 +12042,10 @@ btc = registry.add_symbol("binance", "BTCUSDT", tick_size=0.01)
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `add_symbol(exchange, symbol, tick_size=0.01)` | `Symbol` | Register a symbol and return its `Symbol` object |
+| `add_symbol(exchange, symbol, tick_size=None)` | `Symbol` | Register a symbol and return its `Symbol` object |
 | `symbol_count()` | `int` | Number of registered symbols |
+
+`tick_size` is the venue's price increment, and a backtest rejects orders priced off it. Left out, the symbol's book uses 0.01 and order prices are not checked; `Symbol.tick_size` then reads 0.01.
 
 ## Class: `lrvx.Strategy`
 
@@ -12132,6 +12143,8 @@ These methods use the first registered symbol when `symbol` is omitted. `symbol`
 | `modify_order(order_id, new_price, new_qty)` | Modify a resting order |
 
 `tif` accepts `"gtc"`, `"ioc"`, `"fok"`, `"gtd"`, `"post_only"`.
+
+In a backtest, `price`, `trigger`, `limit_price`, `offset` and `modify_order`'s `new_price` must be whole numbers of the symbol's tick when the symbol was registered with one. An order off the tick is rejected: `on_order_update` receives `status == "REJECTED"` and `reject_reason` `"price_off_tick"`, `"trigger_off_tick"` or `"trailing_offset_off_tick"` (a modify gets `"REPLACE_REJECTED"`). Round a computed price before sending it, for example `round(price / tick) * tick`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
 
 ### Order Emission — Explicit (emit_* variants)
 
@@ -14990,7 +15003,7 @@ const registry = new lrvx.SymbolRegistry();
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `addSymbol(exchange, name, tickSize)` | `Symbol` | Register a symbol |
+| `addSymbol(exchange, name, tickSize?)` | `Symbol` | Register a symbol. `tickSize` is the venue's price increment and a backtest rejects orders priced off it; left out, the book uses 0.01 and order prices are not checked |
 | `symbolCount()` | `number` | Number of registered symbols |
 
 ### Symbol
@@ -15107,6 +15120,8 @@ are the new touch.
 | `emit.withdrawLiquidity(liquidity)` | Withdraw AMM liquidity |
 | `emit.cancel(orderId)` | Cancel order |
 | `emit.closePosition()` | Close position (reduce-only) |
+
+In a backtest, a `limitBuy` / `limitSell` price that is not a whole number of the symbol's `tickSize` is rejected: `onOrderUpdate` receives `status` `"REJECTED"` with `rejectReason` `"price_off_tick"`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
 
 ---
 
@@ -16170,6 +16185,12 @@ level_empty, crossed). `ev.market_position` is the new state; `ev.distance_to_be
 ticks from best on our side. Backtest only.
 
 ### Signal Emission
+
+In a backtest, prices, triggers and trailing offsets must be whole numbers of the tick the symbol was
+registered with (`lrvx_registry_add_symbol(reg, exchange, name, tick)` with `tick > 0`). An order off
+the tick is rejected: `on_order_update` receives `REJECTED` with `ev.reject_reason` set to
+`price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`. A symbol registered with a tick of
+0 is not checked. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
 
 #### `emit_market_buy(symbol, qty) -> int`
 
@@ -17771,6 +17792,13 @@ this.trailingStop({ side: 'sell', offset: 100, qty: 0.1 })
 this.trailingStopPercent({ side: 'sell', callbackBps: 50, qty: 0.1 })
 ```
 
+### Prices and the tick
+
+A QuickJS strategy's symbols are registered without a tick, so its order prices are not checked
+against one. Other bindings register the venue's tick and a backtest rejects prices off it with
+`rejectReason` `price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`; see
+[SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
+
 ### Order management
 
 ```javascript
@@ -18668,6 +18696,8 @@ uint8_t  lrvx_registry_get_symbol_name(LrvxRegistryHandle registry,
                                        char* name_out, size_t name_len);
 uint32_t lrvx_registry_symbol_count(LrvxRegistryHandle registry);
 ```
+
+A positive `tick_size` is the venue's price increment: a backtest runner built on this registry rejects orders priced off it ([SimulatedExecutor](../backtest/simulated_executor.md#order-prices-and-the-tick)). Zero or less registers the symbol with the 0.01 default tick for its book and checks no order price.
 
 ---
 
