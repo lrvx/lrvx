@@ -16,6 +16,8 @@ All five trade importers append by default and dedup the same way: a row is skip
 
 Each import writes new segments named by the time of the import, so a tape filled out of order lists its segments out of time order. Readers and `run_tape` order segments by their first event, so the tape still replays forward in time.
 
+Within a file, the Bybit, OKX, Bitget and Deribit importers write trades in timestamp order (rows with the same timestamp keep their file order), whatever order the file lists them in; the Binance importer writes them in file order. Memory does not grow with the size of the day: a file is parsed in batches of 16,384 rows into a temporary file (about 33 bytes per row, 57 for Deribit, in the system temp directory, removed when the import ends), files not in time order are merged back from sorted runs, and the dedup read pulls the tape's ids for the file's time range in short time windows. Only the ids already on the tape for that range stay in memory for the whole import, 8 bytes per trade. A two-million-trade Bybit day imports in about 60 MB of resident memory, and re-importing it takes about 90 MB.
+
 The Binance bookTicker importer (`--book t1`) follows the same rule on the book record's update id, and encodes every file on its own, starting from a snapshot, so book days may be imported in any order too. See [Import Binance book archives](import-binance-book-archive.md#append-safe-and-idempotent).
 
 ## Bybit
