@@ -12,6 +12,7 @@
 #include "lrvx/error/lrvx_error.h"
 #include "lrvx/replay/aggregator.h"
 #include "lrvx/replay/readers/binary_log_reader.h"
+#include "segment_bounds.h"
 
 #include <algorithm>
 #include <memory>
@@ -443,22 +444,29 @@ class TapeWalker
   {
     while (_iter)
     {
-      if (_iter->next(out))
+      if (!_iter->next(out))
       {
-        if (out.timestamp_ns < _from_ns)
-        {
-          continue;
-        }
-        if (out.timestamp_ns > _to_ns)
-        {
-          _iter.reset();
-          _segment_idx = _segments.size();
-          return false;
-        }
-        return true;
+        ++_segment_idx;
+        advanceSegment();
+        continue;
       }
-      ++_segment_idx;
-      advanceSegment();
+      if (out.timestamp_ns < _from_ns)
+      {
+        continue;
+      }
+      if (out.timestamp_ns > _to_ns)
+      {
+        // Past `to`, a Sorted segment has nothing more in range; the next
+        // segment may still have. An unsorted one can hold earlier events
+        // further on.
+        if (_ordered)
+        {
+          ++_segment_idx;
+          advanceSegment();
+        }
+        continue;
+      }
+      return true;
     }
     return false;
   }
@@ -470,15 +478,13 @@ class TapeWalker
     while (_segment_idx < _segments.size())
     {
       const auto& seg = _segments[_segment_idx];
-      // Skip segments entirely outside the time window.
-      if (seg.last_event_ns < _from_ns)
+      // Skip segments whose proven bounds lie outside the time window. The
+      // header's first/last_event_ns are arrival order on a compressed or
+      // unsorted segment and prove nothing there.
+      if (detail::provenOutside(seg, _from_ns, _to_ns))
       {
         ++_segment_idx;
         continue;
-      }
-      if (seg.first_event_ns > _to_ns)
-      {
-        return;  // done
       }
       _iter = std::make_unique<BinaryLogIterator>(seg.path);
       if (!_iter->isValid())
@@ -487,14 +493,12 @@ class TapeWalker
         ++_segment_idx;
         continue;
       }
-      if (_from_ns > seg.first_event_ns && _iter->hasIndex())
+      _ordered = _iter->header().isSorted();
+      const auto min = detail::provenMin(seg);
+      if (_iter->hasIndex() && (!min || *min < _from_ns))
       {
-        _iter->seekToTimestamp(_from_ns);
-      }
-      else if (_from_ns > seg.first_event_ns)
-      {
-        // No index — try to load one; harmless if absent.
-        _iter->loadIndex();
+        // Moves only within a Sorted segment, to the last index entry below
+        // `from`; anything else is walked from its first event.
         _iter->seekToTimestamp(_from_ns);
       }
       return;
@@ -504,6 +508,7 @@ class TapeWalker
   std::vector<SegmentInfo> _segments;
   size_t _segment_idx{0};
   std::unique_ptr<BinaryLogIterator> _iter;
+  bool _ordered{false};
   int64_t _from_ns;
   int64_t _to_ns;
 };

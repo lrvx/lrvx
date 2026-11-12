@@ -42,6 +42,9 @@ class MmapSegmentReader
 
   bool next(ReplayEvent& out);
   void reset();
+  // As BinaryLogIterator::seekToTimestamp: the last index entry strictly below
+  // the target, in a Sorted segment only; otherwise false and back to the
+  // first event.
   bool seekToTimestamp(int64_t target_ts_ns);
   size_t position() const;
 

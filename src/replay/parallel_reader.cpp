@@ -37,14 +37,12 @@ ParallelReader::ParallelReader(ParallelReaderConfig config) : _config(std::move(
       .verify_crc = _config.verify_crc,
   };
 
+  // The order BinaryLogReader visits segments in: by proven first event where
+  // the segment proves one, by file name otherwise. The header's
+  // first_event_ns is arrival order on a compressed segment and proves
+  // nothing without the Sorted flag.
   BinaryLogReader scanner(reader_config);
-  // Force scanning by calling summary()
-  scanner.summary();
-  _segments = scanner.segments();
-
-  // Sort segments by first timestamp for proper merge ordering
-  std::sort(_segments.begin(), _segments.end(), [](const SegmentInfo& a, const SegmentInfo& b)
-            { return a.first_event_ns < b.first_event_ns; });
+  _segments = scanner.segmentsInReadOrder();
 }
 
 ParallelReader::~ParallelReader()
@@ -160,10 +158,16 @@ std::unique_ptr<SegmentBuffer> ParallelReader::readSegment(const SegmentInfo& se
 void ParallelReader::mergeBuffers(std::vector<std::unique_ptr<SegmentBuffer>>& buffers,
                                   const EventCallback& callback)
 {
-  // Min-heap comparator: smallest timestamp first
+  // Min-heap on (timestamp, file-name order), the order BinaryLogReader
+  // breaks ties in; each buffer is consumed front to back, which supplies the
+  // last tie-break, position in the segment.
   auto cmp = [](const SegmentBuffer* a, const SegmentBuffer* b)
   {
-    return a->front().timestamp_ns > b->front().timestamp_ns;
+    if (a->front().timestamp_ns != b->front().timestamp_ns)
+    {
+      return a->front().timestamp_ns > b->front().timestamp_ns;
+    }
+    return b->info.path < a->info.path;
   };
 
   std::priority_queue<SegmentBuffer*, std::vector<SegmentBuffer*>,
@@ -230,38 +234,35 @@ uint64_t ParallelReader::forEach(EventCallback callback)
 
   _stats.start_time_ns = time_utils::nowNanos();
 
-  // For small datasets, use single-threaded approach
+  // Small datasets and a single thread: BinaryLogReader::forEach, which
+  // delivers Sorted segments in timestamp order across segments (overlapping
+  // ones merged event by event) one segment at a time, and sorts each segment
+  // without the Sorted flag in its file-name position. Concatenating segment
+  // buffers instead left overlapping segments out of order.
   if (_segments.size() <= 2 || _num_threads == 1)
   {
+    ReaderConfig reader_config{
+        .data_dir = _config.data_dir,
+        .from_ns = _config.from_ns,
+        .to_ns = _config.to_ns,
+        .symbols = _config.symbols,
+        .verify_crc = _config.verify_crc,
+    };
+    BinaryLogReader reader(reader_config);
     uint64_t count = 0;
-    for (const auto& segment : _segments)
-    {
-      auto buffer = readSegment(segment);
-      if (buffer)
-      {
-        _stats.segments_processed++;
-        _stats.events_read += buffer->events.size();
-
-        for (const auto& event : buffer->events)
-        {
-          if (event.type == EventType::Trade)
-          {
-            _stats.trades_read++;
-          }
-          else
-          {
-            _stats.book_updates_read++;
-          }
-
-          if (!callback(event))
-          {
-            _stats.end_time_ns = time_utils::nowNanos();
-            return count;
-          }
-          ++count;
-        }
-      }
-    }
+    reader.forEach([&count, &callback](const ReplayEvent& event)
+                   {
+                     if (!callback(event))
+                     {
+                       return false;
+                     }
+                     ++count;
+                     return true; });
+    const ReaderStats rs = reader.stats();
+    _stats.segments_processed += rs.files_read;
+    _stats.events_read += rs.events_read;
+    _stats.trades_read += rs.trades_read;
+    _stats.book_updates_read += rs.book_updates_read;
     _stats.end_time_ns = time_utils::nowNanos();
     return count;
   }
@@ -287,6 +288,14 @@ uint64_t ParallelReader::forEach(EventCallback callback)
     for (auto& future : futures)
     {
       auto buffer = future.get();
+      if (buffer && !buffer->info.sorted)
+      {
+        // The merge needs every buffer in timestamp order, and only a Sorted
+        // segment arrives that way.
+        std::stable_sort(buffer->events.begin(), buffer->events.end(),
+                         [](const ReplayEvent& a, const ReplayEvent& b)
+                         { return a.timestamp_ns < b.timestamp_ns; });
+      }
       if (buffer)
       {
         _stats.segments_processed++;
