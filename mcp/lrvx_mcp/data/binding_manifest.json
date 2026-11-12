@@ -14816,6 +14816,11 @@
         },
         {
           "kind": "method",
+          "name": "attachSymbolRegistry",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "checkBreakpoints",
           "parent": "BacktestRunner"
         },
@@ -15017,6 +15022,11 @@
         {
           "kind": "method",
           "name": "stop",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "symbolRegistry",
           "parent": "BacktestRunner"
         },
         {
@@ -25762,6 +25772,11 @@
         {
           "kind": "method",
           "name": "symbol",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
+          "name": "symbolInfos",
           "parent": "Strategy"
         },
         {

@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 #include <cstring>
+#include <string>
 
 TEST(CapiRegistryTest, CreateAndDestroy)
 {
@@ -140,4 +141,81 @@ TEST(CapiRegistryTest, StrategyCreateRejectsNullRegistry)
   const uint32_t syms[] = {1u};
   LrvxStrategyCallbacks cb{};
   EXPECT_EQ(lrvx_strategy_create(1, syms, 1, nullptr, cb), nullptr);
+}
+
+// A tick passed to lrvx_registry_add_symbol is the venue's, 0.01 included: a
+// backtest on that registry refuses a limit price off it. A tick of 0 declares
+// none and nothing is refused.
+namespace
+{
+
+struct TickProbe
+{
+  LrvxStrategyHandle strategy{nullptr};
+  uint32_t symbol{0};
+  int bars{0};
+  std::string rejectReason;
+};
+
+void tickProbeOnBar(void* ud, const LrvxSymbolContext*, const LrvxBarData*)
+{
+  auto* st = static_cast<TickProbe*>(ud);
+  if (st->bars++ == 0)
+  {
+    // 100.005 is half a cent off the grid.
+    lrvx_emit_limit_buy(st->strategy, st->symbol, 10'000'500'000LL, 100'000'000LL);
+  }
+}
+
+void tickProbeOnOrderUpdate(void* ud, const LrvxSymbolContext*, const LrvxOrderEventData* ev)
+{
+  auto* st = static_cast<TickProbe*>(ud);
+  if (ev->reject_reason != nullptr && ev->reject_reason[0] != '\0')
+  {
+    st->rejectReason = ev->reject_reason;
+  }
+}
+
+std::string rejectReasonForTick(double tick)
+{
+  LrvxRegistryHandle reg = lrvx_registry_create();
+  TickProbe probe;
+  probe.symbol = lrvx_registry_add_symbol(reg, "test", "BTC", tick);
+  LrvxStrategyCallbacks cb{};
+  cb.on_bar = tickProbeOnBar;
+  cb.on_order_update = tickProbeOnOrderUpdate;
+  cb.user_data = &probe;
+  const uint32_t syms[] = {probe.symbol};
+  probe.strategy = lrvx_strategy_create(1, syms, 1, reg, cb);
+  auto* runner = lrvx_backtest_runner_create(reg, 0.0, 10000.0);
+  lrvx_backtest_runner_set_strategy(runner, probe.strategy);
+
+  constexpr int64_t kMin = 60'000'000'000LL;
+  const int64_t starts[2] = {0, kMin};
+  const int64_t ends[2] = {kMin, 2 * kMin};
+  const double opens[2] = {100.0, 100.0};
+  const double highs[2] = {100.5, 100.5};
+  const double lows[2] = {99.5, 99.5};
+  const double closes[2] = {100.0, 100.0};
+  const double volumes[2] = {10.0, 10.0};
+  LrvxBacktestStats stats{};
+  lrvx_backtest_runner_run_bars(runner, starts, ends, opens, highs, lows, closes, volumes, 2,
+                                "BTC", 0, 0, &stats);
+
+  lrvx_strategy_destroy(probe.strategy);
+  lrvx_backtest_runner_destroy(runner);
+  lrvx_registry_destroy(reg);
+  return probe.rejectReason;
+}
+
+}  // namespace
+
+TEST(CapiRegistryTest, ExplicitCentTickIsChecked)
+{
+  EXPECT_EQ(rejectReasonForTick(0.01), "price_off_tick");
+}
+
+TEST(CapiRegistryTest, ZeroTickChecksNothing)
+{
+  EXPECT_EQ(rejectReasonForTick(0.0), "");
 }

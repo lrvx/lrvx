@@ -461,6 +461,12 @@ bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
                  "\"tick_size\": %lld",
                  sym.id, sym.exchange.c_str(), sym.symbol.c_str(), static_cast<int>(sym.type),
                  static_cast<long long>(sym.tickSize.raw()));
+    // Written only when set, so an entry with no declared tick reads exactly as
+    // a file from before the flag was persisted.
+    if (sym.tickSizeKnown)
+    {
+      std::fprintf(f, ", \"tick_size_known\": true");
+    }
 
     if (sym.strike.has_value())
     {
@@ -591,6 +597,16 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
       // Optional fields - strike
       size_t strike_start = content.find("\"strike\":", pos);
       size_t entry_end = content.find('}', pos);
+
+      // A file written before the flag was persisted has no key: its ticks
+      // load as undeclared, and only a tick other than the 0.01 default is
+      // checked, the same as before the load.
+      size_t known_start = content.find("\"tick_size_known\":", pos);
+      if (known_start != std::string::npos && known_start < entry_end)
+      {
+        known_start = content.find_first_not_of(' ', known_start + 18);
+        info.tickSizeKnown = content.compare(known_start, 4, "true") == 0;
+      }
       if (strike_start != std::string::npos && strike_start < entry_end)
       {
         strike_start += 9;
@@ -675,7 +691,8 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
 //   [N bytes] symbol string
 //   [1 byte] instrument type
 //   [8 bytes] tick_size (v2+)
-//   [1 byte] flags (has_strike, has_expiry, has_option_type)
+//   [1 byte] flags (0x01 strike, 0x02 expiry, 0x04 option_type,
+//            0x08 settlement_ccy, 0x10 tick_size_known)
 //   [8 bytes] strike (if flag set)
 //   [8 bytes] expiry (if flag set)
 //   [1 byte] option_type (if flag set)
@@ -686,6 +703,9 @@ static constexpr uint32_t kSymbolRegistryMagic = 0x47455253;  // "SREG"
 // v4 adds per-symbol fixed-point scale (price_scale / qty_scale). Older files
 // load with the default 1e8 scale, so they are byte-identical in behavior.
 static constexpr uint32_t kSymbolRegistryVersion = 4;
+// A flag bit rather than a version: a reader that predates it ignores the bit
+// and loads the symbol as it always did.
+static constexpr uint8_t kFlagTickSizeKnown = 0x10;
 
 std::vector<std::byte> SymbolRegistry::serialize() const
 {
@@ -768,6 +788,10 @@ std::vector<std::byte> SymbolRegistry::serialize() const
     if (sym.settlementCcy.has_value())
     {
       flags |= 0x08;
+    }
+    if (sym.tickSizeKnown)
+    {
+      flags |= kFlagTickSizeKnown;
     }
     write_u8(flags);
 
@@ -919,6 +943,9 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
     }
 
     uint8_t flags = read_u8();
+    // Clear in data written before the bit existed, at any version: those
+    // ticks load as undeclared, as they were.
+    info.tickSizeKnown = (flags & kFlagTickSizeKnown) != 0;
 
     if (flags & 0x01)
     {

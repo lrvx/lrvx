@@ -200,10 +200,23 @@ Submit, cancel and replace consult the rate-limit policy first; an overflow emit
 ### Order prices and the tick
 
 A venue refuses an order whose price is not a whole number of ticks, and so does the simulator. With
-a registry attached (`setSymbolRegistry`; `BacktestRunner` attaches the one its strategy uses in
-every binding), each order is checked against its symbol's tick when it reaches the simulator, and a
-replace is checked the same way. The rule lives in `include/lrvx/execution/order_price_rule.h` and is
-the only implementation.
+a registry attached (`setSymbolRegistry`), each order is checked against its symbol's tick when it
+reaches the simulator, and a replace is checked the same way. The rule lives in
+`include/lrvx/execution/order_price_rule.h` and is the only implementation.
+
+Where a runner's registry comes from:
+
+| Runner | Ticks read from |
+|--------|-----------------|
+| C++ `BacktestRunner` | the registry passed to `setSymbolRegistry`; without one, the symbol entries the `lrvx::Strategy` was built with |
+| C++ `BacktestRunner` with an `IStrategy` that is not an `lrvx::Strategy` | only a registry passed to `setSymbolRegistry` |
+| `WalkForwardRunner` folds (C++ and every binding) | the strategy each fold's factory returns, as above |
+| Python `BacktestRunner`, `lrvx_backtest_runner_create` (Node, Codon) | the registry they are constructed with |
+| Python `SimulatedExecutor` | the registry passed to `set_symbol_registry`; none by default |
+| Node `SimulatedExecutor`, `lrvx_simulated_executor_create` | nothing: no registry can be attached |
+| Bundle replay | a registry holding the manifest's `tick_size` |
+| `PaperBroker` | the registry it is given |
+| Vectorized `Engine.run` (Python, Node) | nothing: its symbols are names with no tick |
 
 | Order type | Checked | Reject reason |
 |------------|---------|---------------|
@@ -226,6 +239,19 @@ Which tick applies:
 | Registered without a tick (the 0.01 default, `tickSizeKnown` false) | nothing |
 | Tick of zero | nothing |
 | No registry attached | nothing |
+
+The flag exists because the 0.01 default is also a common real tick: a `SymbolInfo` holding 0.01
+cannot say by itself whether someone declared it. Any other tick can only have been set on purpose,
+so it counts as declared without the flag, and C++ code that sets `tickSize` to a venue's tick is
+checked without knowing the flag exists. Every binding sets the flag whenever a tick is passed:
+Python `add_symbol(tick_size=0.01)`, Node `addSymbol(exchange, name, 0.01)` and
+`lrvx_registry_add_symbol` with `0.01` (which Codon calls) are all checked. In C++ an explicit 0.01
+is checked only with `tickSizeKnown = true`.
+
+The flag is part of the registry entry: `registerSymbol(SymbolInfo)`, `getSymbolInfo`,
+`getAllSymbols`, `saveToFile` / `loadFromFile` and `serialize` / `deserialize` all keep it. A
+registry written before the flag was persisted loads with it clear; see
+[SymbolRegistry](../engine/symbol_registry.md#persistence).
 
 Prices the simulator computes itself are snapped onto the tick on the side that is worse for the
 order's owner: a buy is moved up, a sell down. This covers a market-style fill moved by a slippage

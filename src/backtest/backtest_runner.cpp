@@ -80,10 +80,7 @@ void BacktestRunner::setSimulatedExecutor(SimulatedExecutor* executor, Simulated
     // result() forwards to BacktestResult, so each fill is billed at the
     // tier the account's 30-day notional resolves to.
     installOrderEventCallback(*executor);
-    if (_registry != nullptr)
-    {
-      executor->setSymbolRegistry(_registry);
-    }
+    executor->setSymbolRegistry(symbolRegistry());
     if (clock != nullptr)
     {
       clock->advanceTo(_clock.nowNs());
@@ -94,6 +91,12 @@ void BacktestRunner::setSimulatedExecutor(SimulatedExecutor* executor, Simulated
 void BacktestRunner::setSymbolRegistry(const SymbolRegistry* registry)
 {
   _registry = registry;
+  attachSymbolRegistry();
+}
+
+void BacktestRunner::attachSymbolRegistry()
+{
+  const SymbolRegistry* registry = symbolRegistry();
   _executor.setSymbolRegistry(registry);
   if (_venueExecutor != nullptr)
   {
@@ -122,6 +125,20 @@ void BacktestRunner::setStrategy(IStrategy* strategy)
   }
   _strategy = strategy;
   strategy->setSignalHandler(this);
+  // The symbols an lrvx::Strategy was built with, so its ticks are checked
+  // without a setSymbolRegistry call. The previous table stays alive until the
+  // executors have been pointed at the new one.
+  std::unique_ptr<SymbolRegistry> strategySymbols;
+  if (const auto* built = dynamic_cast<const Strategy*>(strategy))
+  {
+    strategySymbols = std::make_unique<SymbolRegistry>();
+    for (const SymbolInfo& info : built->symbolInfos())
+    {
+      strategySymbols->registerSymbol(info);
+    }
+  }
+  _strategySymbols.swap(strategySymbols);
+  attachSymbolRegistry();
   // Without this wire `ctx.position` / `ctx.is_long()` / `ctx.is_flat()`
   // never reflect fills the executor dispatches. Strategy::onTrade /
   // onBar / onBookUpdate refresh the per-symbol context from this
