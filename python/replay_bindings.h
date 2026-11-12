@@ -631,6 +631,7 @@ class PyDataReader
     d["unknown_frames_skipped"] = s.unknown_frames_skipped;
     d["segments_reordered"] = s.segments_reordered;
     d["segments_interleaved"] = s.segments_interleaved;
+    d["segments_truncated"] = s.segments_truncated;
     return d;
   }
 

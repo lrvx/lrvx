@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -168,13 +169,57 @@ TEST_F(CapiReaderSegmentsTest, CreateExKeepsTheOrderedReadersKnobs)
   lrvx_data_reader_destroy(r);
 }
 
-TEST(CapiReaderStatsLayout, ElevenCountersSinceAbiSix)
+TEST(CapiReaderStatsLayout, TwelveCountersSinceAbiSix)
 {
   EXPECT_EQ(LRVX_CAPI_ABI_VERSION, 6);
   EXPECT_EQ(lrvx_capi_abi_version(), 6u);
-  EXPECT_EQ(sizeof(LrvxReaderStats), 11 * sizeof(uint64_t));
+  EXPECT_EQ(sizeof(LrvxReaderStats), 12 * sizeof(uint64_t));
   EXPECT_EQ(offsetof(LrvxReaderStats, unknown_frames_skipped), 7 * sizeof(uint64_t));
   EXPECT_EQ(offsetof(LrvxReaderStats, segments_skipped), 8 * sizeof(uint64_t));
   EXPECT_EQ(offsetof(LrvxReaderStats, segments_reordered), 9 * sizeof(uint64_t));
   EXPECT_EQ(offsetof(LrvxReaderStats, segments_interleaved), 10 * sizeof(uint64_t));
+  EXPECT_EQ(offsetof(LrvxReaderStats, segments_truncated), 11 * sizeof(uint64_t));
+}
+
+// segments_truncated reaches the C struct: an uncompressed frame given a length
+// above the 10 MiB limit ends its segment.
+TEST(CapiReaderStats, CountsTruncatedSegments)
+{
+  const auto dir = std::filesystem::temp_directory_path() / "lrvx_capi_reader_truncated";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  for (int s = 0; s < 3; ++s)
+  {
+    WriterConfig cfg{.output_dir = dir, .output_filename = "seg" + std::to_string(s) + ".lrvx"};
+    BinaryLogWriter w(cfg);
+    for (int i = 0; i < 100; ++i)
+    {
+      TradeRecord t{};
+      t.exchange_ts_ns = 1'700'000'000'000'000'000LL + (s * 1000 + i) * 1'000'000LL;
+      t.symbol_id = 1;
+      ASSERT_TRUE(w.writeTrade(t));
+    }
+    w.close();
+  }
+  {
+    std::FILE* f = std::fopen((dir / "seg1.lrvx").string().c_str(), "r+b");
+    ASSERT_NE(f, nullptr);
+    const uint32_t size = 11u * 1024u * 1024u;
+    std::fseek(f, sizeof(SegmentHeader) + 40 * (sizeof(FrameHeader) + sizeof(TradeRecord)),
+               SEEK_SET);
+    ASSERT_EQ(std::fwrite(&size, sizeof(size), 1, f), 1u);
+    std::fclose(f);
+  }
+  LrvxDataReaderHandle r = lrvx_data_reader_create(dir.string().c_str());
+  ASSERT_NE(r, nullptr);
+  std::vector<LrvxTradeRecord> out(1000);
+  EXPECT_EQ(lrvx_data_reader_read_trades(r, out.data(), out.size()), 240u);
+  const LrvxReaderStats s = lrvx_data_reader_stats(r);
+  EXPECT_EQ(s.segments_truncated, 1u);
+  EXPECT_EQ(s.crc_errors, 0u);
+  LrvxReaderStats p{};
+  lrvx_data_reader_stats_p(r, &p);
+  EXPECT_EQ(p.segments_truncated, 1u);
+  lrvx_data_reader_destroy(r);
+  std::filesystem::remove_all(dir);
 }

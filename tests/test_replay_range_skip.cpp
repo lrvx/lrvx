@@ -517,14 +517,23 @@ TEST_F(ReplayRangeSkipTest, EqualTimestampsAcrossIndexEntriesAreAllReturned)
   }
 }
 
-// The writer compares a compressed block's minimum with the previous block's
-// maximum only once that maximum is positive, so with timestamps <= 0 a
-// segment can be flagged Sorted while its blocks go backwards. Its index is
-// not used as a bound.
+// Earlier writers compared a compressed block's minimum with the previous
+// block's maximum only once that maximum was positive, so with timestamps <= 0
+// a segment on disk can be flagged Sorted while its blocks go backwards. The
+// writer no longer does that (test_replay_compressed_sorted_flag); the flag is
+// forced on here to stand for such a tape. Its index is not used as a bound.
 TEST_F(ReplayRangeSkipTest, CompressedNonPositiveTimestampsAreNotTrusted)
 {
+  const auto forceSorted = [this](const std::string& name)
+  {
+    SegmentHeader h = headerOf(name);
+    ASSERT_FALSE(h.isSorted());
+    h.flags |= SegmentFlags::Sorted;
+    patchHeader(name, h);
+  };
   // Second block entirely below the first.
   writeSegment("a.lrvx", CompressionType::LZ4, {-10, -9, -8, -7, -40, -30, -20, -15}, 4, 0);
+  forceSorted("a.lrvx");
   ASSERT_TRUE(headerOf("a.lrvx").isSorted());
 
   auto stats = expectEquivalent({-40, -40});
@@ -537,6 +546,7 @@ TEST_F(ReplayRangeSkipTest, CompressedNonPositiveTimestampsAreNotTrusted)
   std::filesystem::remove_all(_dir);
   std::filesystem::create_directories(_dir);
   writeSegment("b.lrvx", CompressionType::LZ4, {-10, -9, -4, -3, -5, 100, 200, 300}, 4, 0);
+  forceSorted("b.lrvx");
   ASSERT_TRUE(headerOf("b.lrvx").isSorted());
 
   stats = expectEquivalent({-4, -4});

@@ -179,6 +179,7 @@ bool BinaryLogWriter::ensureOpen()
   _block_event_count = 0;
   _block_first_timestamp = 0;
   _last_block_max_ts = 0;
+  _have_last_block = false;
   _last_event_ts = 0;
   _have_last_event_ts = false;
   _segment_has_inversion = false;
@@ -354,16 +355,22 @@ bool BinaryLogWriter::flushBlock()
   // inversion that was not the first event of the block, and the segment then
   // shipped with the Sorted flag on. Readers trust that flag enough to switch
   // off the sort, the reorder buffer and the window check all at once.
+  //
+  // The comparison runs from the second block on, whatever the timestamps: a
+  // zero or negative exchange_ts_ns orders like any other value, as it does
+  // on the uncompressed path. Skipping it while the previous maximum was <= 0
+  // let a segment whose blocks were out of order there be flagged Sorted.
   BlockSpan span{_block_first_timestamp, _block_first_timestamp};
   if (_block_event_count > 1)
   {
     span = sortBlockBuffer();
   }
-  if (_last_block_max_ts > 0 && span.min_ts < _last_block_max_ts)
+  if (_have_last_block && span.min_ts < _last_block_max_ts)
   {
     _segment_has_inversion = true;
   }
   _last_block_max_ts = span.max_ts;
+  _have_last_block = true;
   const int64_t block_index_ts = span.min_ts;
 
   // Compress the block

@@ -2111,6 +2111,11 @@ export interface DataReaderStats {
   /** Segments whose events were merged with another segment's because
    *  their time ranges overlap. */
   segmentsInterleaved: number;
+  /** Segments whose read stopped early on data that cannot be decoded (a
+   *  compressed block that fails to decompress or has a bad header, an
+   *  uncompressed frame claiming more than 10 MiB). The rest of the segment
+   *  is not delivered; the read goes on with the next segment. */
+  segmentsTruncated: number;
 }
 
 export interface DataReaderOptions {

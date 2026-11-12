@@ -14113,6 +14113,7 @@ Reader statistics.
 | `unknown_frames_skipped` | `int` | Frames of a record type this build does not know, stepped over by their length |
 | `segments_reordered` | `int` | Segments read at a different position than their file name gives them |
 | `segments_interleaved` | `int` | Segments whose events were merged with another segment's because their time ranges overlap |
+| `segments_truncated` | `int` | Segments whose read stopped early on data that cannot be decoded: a compressed block that fails to decompress or has a bad header, an uncompressed frame claiming more than 10 MiB. The rest of such a segment is not delivered; the read goes on with the next segment |
 
 Counters accumulate over the reader's lifetime, on every read path and thread
 count.
@@ -19762,7 +19763,7 @@ uint64_t lrvx_data_reader_read_book_updates(LrvxDataReaderHandle reader,
 
 `LrvxLevel` fields (size: 24 B): `price_raw`, `qty_raw`, `side` (0=bid, 1=ask).
 
-`LrvxReaderStats` fields (size: 88 B, eleven `uint64_t`, counters accumulated over the reader's lifetime): `files_read`, `events_read`, `trades_read`, `book_updates_read`, `bytes_read`, `crc_errors` (frames skipped for a CRC mismatch; the read goes on), `late_dropped` (events past the reorder window), `unknown_frames_skipped` (frames of a record type this build does not know), and, since ABI version 6, `segments_skipped` (segments not decoded because their proven bounds lie outside the range), `segments_reordered` (segments read at a different position than their file name gives them) and `segments_interleaved` (segments merged event by event with another because their ranges overlap).
+`LrvxReaderStats` fields (size: 96 B, twelve `uint64_t`, counters accumulated over the reader's lifetime): `files_read`, `events_read`, `trades_read`, `book_updates_read`, `bytes_read`, `crc_errors` (frames skipped for a CRC mismatch; the read goes on), `late_dropped` (events past the reorder window), `unknown_frames_skipped` (frames of a record type this build does not know), and, since ABI version 6, `segments_skipped` (segments not decoded because their proven bounds lie outside the range), `segments_reordered` (segments read at a different position than their file name gives them), `segments_interleaved` (segments merged event by event with another because their ranges overlap) and `segments_truncated` (segments whose read stopped early on data that cannot be decoded: a compressed block that fails to decompress or has a bad header, an uncompressed frame claiming more than 10 MiB; the rest of the segment is not delivered and the read goes on with the next segment).
 
 `LrvxDatasetSummary.first_event_ns` / `last_event_ns` are the earliest and latest event of every `Sorted` segment, exactly; a segment without the `Sorted` flag contributes the first and last event it wrote. See [BinaryLogReader, Reported time range](../replay/binary_log_reader.md#reported-time-range).
 

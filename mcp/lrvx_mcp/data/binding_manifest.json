@@ -15472,6 +15472,11 @@
         },
         {
           "kind": "method",
+          "name": "liveTail",
+          "parent": "BinaryLogIterator"
+        },
+        {
+          "kind": "method",
           "name": "loadIndex",
           "parent": "BinaryLogIterator"
         },
@@ -15518,6 +15523,21 @@
         {
           "kind": "method",
           "name": "setStopAtBlockEnd",
+          "parent": "BinaryLogIterator"
+        },
+        {
+          "kind": "method",
+          "name": "setVerifyCrc",
+          "parent": "BinaryLogIterator"
+        },
+        {
+          "kind": "method",
+          "name": "truncate",
+          "parent": "BinaryLogIterator"
+        },
+        {
+          "kind": "method",
+          "name": "truncated",
           "parent": "BinaryLogIterator"
         },
         {
@@ -29554,6 +29574,11 @@
         {
           "kind": "method",
           "name": "segmentsSkipped",
+          "parent": "DataReaderStats"
+        },
+        {
+          "kind": "method",
+          "name": "segmentsTruncated",
           "parent": "DataReaderStats"
         },
         {

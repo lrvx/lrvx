@@ -5352,7 +5352,7 @@ LrvxReaderStats lrvx_data_reader_stats(LrvxDataReaderHandle h)
   return {s.files_read, s.events_read, s.trades_read,
           s.book_updates_read, s.bytes_read, s.crc_errors,
           s.late_dropped, s.unknown_frames_skipped, s.segments_skipped,
-          s.segments_reordered, s.segments_interleaved};
+          s.segments_reordered, s.segments_interleaved, s.segments_truncated};
   LRVX_CAPI_LEAVE;
 }
 
@@ -5386,8 +5386,8 @@ uint64_t lrvx_data_reader_read_trades(LrvxDataReaderHandle h, LrvxTradeRecord* t
 static_assert(sizeof(LrvxBBO) == 64, "LrvxBBO must be 64 bytes");
 static_assert(sizeof(LrvxBookUpdateHeader) == 48, "LrvxBookUpdateHeader must be 48 bytes");
 static_assert(sizeof(LrvxLevel) == 24, "LrvxLevel must be 24 bytes");
-static_assert(sizeof(LrvxReaderStats) == 11 * sizeof(uint64_t),
-              "LrvxReaderStats must be 11 x u64 (ABI version 6)");
+static_assert(sizeof(LrvxReaderStats) == 12 * sizeof(uint64_t),
+              "LrvxReaderStats must be 12 x u64 (ABI version 6)");
 
 uint64_t lrvx_data_reader_read_bbo(LrvxDataReaderHandle h, LrvxBBO* bbos_out,
                                    uint64_t max_events)

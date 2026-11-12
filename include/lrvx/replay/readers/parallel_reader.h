@@ -47,6 +47,7 @@ struct ParallelReaderStats
   uint64_t bytes_read{0};
   uint64_t crc_errors{0};
   uint64_t unknown_frames_skipped{0};
+  uint64_t segments_truncated{0};
 
   int64_t start_time_ns{0};
   int64_t end_time_ns{0};
@@ -82,6 +83,9 @@ struct SegmentBuffer
   // Frames the iterator skipped: payload CRC mismatch, unknown record type.
   uint64_t crc_errors{0};
   uint64_t unknown_frames_skipped{0};
+  // Whether the read stopped early on undecodable data
+  // (ReaderStats::segments_truncated).
+  bool truncated{false};
 
   bool empty() const { return current_index >= events.size(); }
   const ReplayEvent& front() const { return events[current_index]; }

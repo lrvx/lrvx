@@ -108,6 +108,7 @@ std::unique_ptr<SegmentBuffer> ParallelReader::readSegment(const SegmentInfo& se
   {
     return nullptr;
   }
+  iter.setVerifyCrc(_config.verify_crc);
 
   // Apply time range filter at seek level if possible
   if (_config.from_ns.has_value() && iter.hasIndex())
@@ -155,6 +156,7 @@ std::unique_ptr<SegmentBuffer> ParallelReader::readSegment(const SegmentInfo& se
   buffer->bytes_read = iter.bytesConsumed();
   buffer->crc_errors = iter.crcErrors();
   buffer->unknown_frames_skipped = iter.unknownFramesSkipped();
+  buffer->truncated = iter.truncated();
   return buffer;
 }
 
@@ -164,6 +166,7 @@ void ParallelReader::addSegmentStats(const SegmentBuffer& buffer)
   _stats.bytes_read += buffer.bytes_read;
   _stats.crc_errors += buffer.crc_errors;
   _stats.unknown_frames_skipped += buffer.unknown_frames_skipped;
+  _stats.segments_truncated += buffer.truncated ? 1 : 0;
   _stats.events_read += buffer.events.size();
   for (const auto& event : buffer.events)
   {
@@ -282,6 +285,7 @@ uint64_t ParallelReader::forEach(EventCallback callback)
     _stats.bytes_read += rs.bytes_read;
     _stats.crc_errors += rs.crc_errors;
     _stats.unknown_frames_skipped += rs.unknown_frames_skipped;
+    _stats.segments_truncated += rs.segments_truncated;
     _stats.end_time_ns = time_utils::nowNanos();
     return count;
   }

@@ -58,6 +58,7 @@ s = merged.reader_stats()
 # read_trades walks the tape twice (a count, then the copy), and the counters
 # accumulate over the reader's lifetime: two segments per walk.
 check("segments_interleaved == 2 per walk", s.segments_interleaved == 4)
+check("segments_truncated == 0 on a clean tape", s.segments_truncated == 0)
 check("segments_reordered == 4 per walk", s.segments_reordered == 8)
 check("segments_skipped == 0 without a range", s.segments_skipped == 0)
 

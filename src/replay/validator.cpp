@@ -22,6 +22,8 @@ namespace
 // Largest frame payload a sane segment carries; the readers use the same
 // ceiling. Anything above it is a corrupt length field.
 constexpr uint32_t kMaxValidatorFrameBytes = 10u * 1024u * 1024u;
+// Largest compressed or decompressed block the readers accept.
+constexpr uint32_t kMaxValidatorBlockBytes = 100u * 1024u * 1024u;
 }  // namespace
 
 SegmentValidator::SegmentValidator(ValidatorConfig config) : _config(std::move(config)) {}
@@ -403,6 +405,16 @@ bool SegmentValidator::validateEventsCompressed(std::FILE* file, SegmentValidati
       return false;
     }
 
+    // The readers' ceiling on either size: above it the header is damaged,
+    // and the reader stops the segment here.
+    if (block_header.compressed_size > kMaxValidatorBlockBytes ||
+        block_header.original_size > kMaxValidatorBlockBytes)
+    {
+      addIssue(result, IssueType::BlockSizeMismatch, IssueSeverity::Error,
+               "Block size out of range at offset " + std::to_string(current_pos), current_pos);
+      return false;
+    }
+
     // Bounds-check `compressed_size` against the bytes remaining in the
     // segment region. Without this, validating an actively-written tape
     // whose tail block has a header on disk but not its payload would
@@ -448,6 +460,7 @@ bool SegmentValidator::validateEventsCompressed(std::FILE* file, SegmentValidati
     // Parse events from decompressed block
     size_t offset = 0;
     uint16_t events_in_block = 0;
+    bool overran = false;
 
     while (offset + sizeof(FrameHeader) <= decompressed_buffer.size() &&
            events_in_block < block_header.event_count)
@@ -460,6 +473,7 @@ bool SegmentValidator::validateEventsCompressed(std::FILE* file, SegmentValidati
       {
         addIssue(result, IssueType::FrameTruncated, IssueSeverity::Error,
                  "Truncated frame in block at offset " + std::to_string(current_pos), current_pos);
+        overran = true;
         break;
       }
 
@@ -527,6 +541,16 @@ bool SegmentValidator::validateEventsCompressed(std::FILE* file, SegmentValidati
       offset += frame.size;
       ++result.actual_event_count;
       ++events_in_block;
+    }
+    // The block decompressed to fewer frames than its header counts: the
+    // reader stops the segment at the gap.
+    if (!overran && events_in_block < block_header.event_count)
+    {
+      addIssue(result, IssueType::BlockSizeMismatch, IssueSeverity::Error,
+               "Block at offset " + std::to_string(current_pos) + " holds " +
+                   std::to_string(events_in_block) + " of " +
+                   std::to_string(block_header.event_count) + " frames",
+               current_pos);
     }
 
     result.bytes_scanned = current_pos + sizeof(CompressedBlockHeader) +
