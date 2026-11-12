@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import lrvx  # noqa: E402
 
-import _archive_network as net  # noqa: E402
+from support import archive_network as net  # noqa: E402
 from lrvx.archives import ArchiveReader, bitget  # noqa: E402
 
 _HEADER = "trade_id,timestamp,price,side,volume(quote),size(base)"
