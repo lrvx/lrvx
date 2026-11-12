@@ -122,7 +122,11 @@ class BybitExchangeConnector : public IExchangeConnector
     return _specs.find(symbol);
   }
 
-  // Why some instrument info is missing; empty when everything loaded.
+  // Why some configured symbol does not carry the venue's tick: its info
+  // could not be read, or the registry entry declares a different tick,
+  // which it keeps (see registerVenueSymbol). Empty means that, by the time
+  // start() returns, every configured symbol -- including one registered
+  // before start() with no tick declared -- holds the venue's tick, known.
   std::string instrumentInfoError() const { return _specs.error(); }
 
   // The topics start() subscribes, in send order: each symbol's depth topic

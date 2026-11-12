@@ -55,7 +55,11 @@ class PolymarketExchangeConnector : public IExchangeConnector
     return _specs.find(tokenId);
   }
 
-  // Why some tick sizes are missing; empty when everything loaded.
+  // Why some configured symbol does not carry the venue's tick: its info
+  // could not be read, or the registry entry declares a different tick,
+  // which it keeps (see registerVenueSymbol). Empty means that, by the time
+  // start() returns, every configured symbol -- including one registered
+  // before start() with no tick declared -- holds the venue's tick, known.
   std::string instrumentInfoError() const { return _specs.error(); }
 
   // Public so protocol behaviour (snapshot vs incremental price_change) is
@@ -69,6 +73,8 @@ class PolymarketExchangeConnector : public IExchangeConnector
   void pollFeedHealth(MonoNanos now) override;
 
  private:
+  SymbolId registerToken(const std::string& tokenId);
+
   // exchangeTs is the venue-supplied timestamp for this message (read once,
   // outside these functions, via a fresh re-parse so field access here stays
   // forward-only regardless of where "timestamp" sits in the payload).

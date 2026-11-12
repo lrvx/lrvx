@@ -87,8 +87,10 @@ Price hyperliquidPerpTick(int szDecimals);
 
 }  // namespace instrument_info
 
-// Write the venue's tick into a registry entry and mark it known, so the
-// executor and the simulator both check order prices against it.
+// Write the venue's tick into a SymbolInfo about to be registered and mark it
+// known, so the executor and the simulator both check order prices against
+// it. An entry already registered is updated by
+// SymbolRegistry::applyVenueTick instead.
 inline void applyInstrumentSpec(SymbolInfo& info, const InstrumentSpec& spec)
 {
   if (spec.tickSize.raw() > 0)
@@ -144,7 +146,7 @@ class InstrumentSpecTable
     return it->second;
   }
 
-  // Empty when every requested instrument loaded.
+  // Empty when every requested instrument loaded and reached the registry.
   std::string error() const
   {
     std::lock_guard lock(_mutex);
@@ -158,12 +160,15 @@ class InstrumentSpecTable
 };
 
 // Registers a venue symbol, with the venue's tick when the table has one.
-// A symbol already in the registry is returned as it is: the registry keeps
-// the entry it was first given. When that entry's tick is not the venue's,
-// the mismatch is logged as an error, because orders on it are then checked
-// and formatted against a tick the venue does not use.
-SymbolId registerVenueSymbol(SymbolRegistry& registry, SymbolInfo info,
-                             const InstrumentSpecTable& specs, ILogger* logger);
+// A symbol already in the registry keeps its id and entry, and the venue's
+// tick goes into it through SymbolRegistry::applyVenueTick: an entry whose
+// tick was not declared takes the venue's, marked known. An entry that
+// declares a different tick keeps it -- the caller may know better (a
+// product the venue lists differently, a test of the refusal path) and a
+// declaration is not silently replaced -- and the disagreement is logged as
+// an error and added to the table's error(), naming both ticks.
+SymbolId registerVenueSymbol(SymbolRegistry& registry, SymbolInfo info, InstrumentSpecTable& specs,
+                             ILogger* logger);
 
 // Run once at start(), after the load: logs, as an error, every instrument
 // the venue's metadata did not cover. Such a symbol is registered with its

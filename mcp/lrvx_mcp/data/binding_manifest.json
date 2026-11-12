@@ -14141,6 +14141,16 @@
           "name": "VenueStack"
         },
         {
+          "header": "include/lrvx/engine/symbol_registry.h",
+          "kind": "type",
+          "name": "VenueTickLog"
+        },
+        {
+          "header": "include/lrvx/engine/symbol_registry.h",
+          "kind": "type",
+          "name": "VenueTickResult"
+        },
+        {
           "header": "include/lrvx/pricing/svi.h",
           "kind": "type",
           "name": "VolSliceFit"
@@ -25797,6 +25807,11 @@
         },
         {
           "kind": "method",
+          "name": "followVenueTick",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "getOrder",
           "parent": "Strategy"
         },
@@ -26097,6 +26112,11 @@
         },
         {
           "kind": "method",
+          "name": "applyVenueTick",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
           "name": "clear",
           "parent": "SymbolRegistry"
         },
@@ -26203,6 +26223,11 @@
         {
           "kind": "method",
           "name": "size",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
+          "name": "venueTickLog",
           "parent": "SymbolRegistry"
         },
         {
@@ -27069,6 +27094,26 @@
           "kind": "method",
           "name": "venueName",
           "parent": "VenueStack"
+        },
+        {
+          "kind": "method",
+          "name": "record",
+          "parent": "VenueTickLog"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "VenueTickLog"
+        },
+        {
+          "kind": "method",
+          "name": "revision",
+          "parent": "VenueTickLog"
+        },
+        {
+          "kind": "method",
+          "name": "tickFor",
+          "parent": "VenueTickLog"
         },
         {
           "kind": "method",

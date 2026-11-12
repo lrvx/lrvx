@@ -14,6 +14,10 @@
  * a format change on the venue's side shows up as a mismatch or a load error
  * here, where the offline tests only replay recorded bodies.
  *
+ * Each case runs twice: with the connector registering the symbol, and with
+ * the symbol registered (no tick) before the load, the order the documented
+ * setups use; the venue's tick must reach that existing entry under its id.
+ *
  * No socket is opened, no credential is used, and nothing is sent but GETs
  * and Hyperliquid's {"type":"meta"} info request.
  */
@@ -218,11 +222,41 @@ void expectTickUnknown(const Connector& connector, const SymbolRegistry& registr
   EXPECT_FALSE(connector.instrumentSpec(symbol));
 }
 
+// The ordinary order of operations: the symbol is registered with no tick
+// before the connector starts (strategies are built from its id). The id is
+// returned so the case can check the connector kept it.
+std::optional<SymbolId> preRegister(bool before, SymbolRegistry& registry,
+                                    const std::string& exchange, const std::string& symbol,
+                                    InstrumentType type)
+{
+  if (!before)
+  {
+    return std::nullopt;
+  }
+  SymbolInfo info;
+  info.exchange = exchange;
+  info.symbol = symbol;
+  info.type = type;
+  const SymbolId id = registry.registerSymbol(info);
+  std::cout << "[" << exchange << " " << symbol.substr(0, 24) << "] registered before start: tick "
+            << info.tickSize.toString() << " (known=" << info.tickSizeKnown << ")\n";
+  return id;
+}
+
+void expectSameId(const std::optional<SymbolId>& before, const SymbolRegistry& registry,
+                  const std::string& exchange, const std::string& symbol)
+{
+  if (before)
+  {
+    EXPECT_EQ(registry.getSymbolId(exchange, symbol), before) << "the connector re-registered";
+  }
+}
+
 }  // namespace
 
 // ------------------------------------------------------------------ Bybit
 
-static void bybitCase(InstrumentType type, const char* category)
+static void bybitCase(InstrumentType type, const char* category, bool registeredFirst)
 {
   const std::string body =
       httpRequest(std::string("https://api.bybit.com/v5/market/instruments-info?category=") +
@@ -239,17 +273,29 @@ static void bybitCase(InstrumentType type, const char* category)
 
   Buses buses;
   SymbolRegistry registry;
+  const auto early = preRegister(registeredFirst, registry, "bybit", "BTCUSDT", type);
   BybitConfig cfg;
   cfg.symbols = {{"BTCUSDT", type, BybitConfig::BookDepth::Top1}};
   BybitExchangeConnector connector(cfg, &buses.book, &buses.trade, nullptr, &registry,
                                    makeLogger("bybit_net.log"));
   connector.loadInstrumentSpecs();
   expectVenueTick(connector, registry, "bybit", "BTCUSDT", decimalRaw(*tick), decimalRaw(*lot));
+  expectSameId(early, registry, "bybit", "BTCUSDT");
 }
 
-TEST(InstrumentInfoNetwork, BybitLinear) { bybitCase(InstrumentType::Future, "linear"); }
+TEST(InstrumentInfoNetwork, BybitLinear) { bybitCase(InstrumentType::Future, "linear", false); }
 
-TEST(InstrumentInfoNetwork, BybitSpot) { bybitCase(InstrumentType::Spot, "spot"); }
+TEST(InstrumentInfoNetwork, BybitSpot) { bybitCase(InstrumentType::Spot, "spot", false); }
+
+TEST(InstrumentInfoNetwork, BybitLinearRegisteredBeforeStart)
+{
+  bybitCase(InstrumentType::Future, "linear", true);
+}
+
+TEST(InstrumentInfoNetwork, BybitSpotRegisteredBeforeStart)
+{
+  bybitCase(InstrumentType::Spot, "spot", true);
+}
 
 TEST(InstrumentInfoNetwork, BybitUnknownSymbolStaysTickUnknown)
 {
@@ -265,7 +311,7 @@ TEST(InstrumentInfoNetwork, BybitUnknownSymbolStaysTickUnknown)
 
 // ------------------------------------------------------------------ Bitget
 
-TEST(InstrumentInfoNetwork, BitgetFutures)
+static void bitgetFuturesCase(bool registeredFirst)
 {
   const std::string body = httpRequest(
       "https://api.bitget.com/api/v2/mix/market/contracts?productType=USDT-FUTURES&symbol=BTCUSDT");
@@ -278,15 +324,22 @@ TEST(InstrumentInfoNetwork, BitgetFutures)
 
   Buses buses;
   SymbolRegistry registry;
+  const auto early =
+      preRegister(registeredFirst, registry, "bitget", "BTCUSDT", InstrumentType::Future);
   BitgetConfig cfg;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BitgetConfig::BookDepth::Depth1}};
   BitgetExchangeConnector connector(cfg, &buses.book, &buses.trade, nullptr, &registry,
                                     makeLogger("bitget_net.log"));
   connector.loadInstrumentSpecs();
   expectVenueTick(connector, registry, "bitget", "BTCUSDT", tick, decimalRaw(*lot));
+  expectSameId(early, registry, "bitget", "BTCUSDT");
 }
 
-TEST(InstrumentInfoNetwork, BitgetSpot)
+TEST(InstrumentInfoNetwork, BitgetFutures) { bitgetFuturesCase(false); }
+
+TEST(InstrumentInfoNetwork, BitgetFuturesRegisteredBeforeStart) { bitgetFuturesCase(true); }
+
+static void bitgetSpotCase(bool registeredFirst)
 {
   const std::string body =
       httpRequest("https://api.bitget.com/api/v2/spot/public/symbols?symbol=BTCUSDT");
@@ -297,6 +350,8 @@ TEST(InstrumentInfoNetwork, BitgetSpot)
 
   Buses buses;
   SymbolRegistry registry;
+  const auto early =
+      preRegister(registeredFirst, registry, "bitget", "BTCUSDT", InstrumentType::Spot);
   BitgetConfig cfg;
   cfg.symbols = {{"BTCUSDT", InstrumentType::Spot, BitgetConfig::BookDepth::Depth1}};
   BitgetExchangeConnector connector(cfg, &buses.book, &buses.trade, nullptr, &registry,
@@ -305,7 +360,12 @@ TEST(InstrumentInfoNetwork, BitgetSpot)
   expectVenueTick(connector, registry, "bitget", "BTCUSDT",
                   tenToMinusRaw(std::stoll(*pricePrecision)),
                   tenToMinusRaw(std::stoll(*qtyPrecision)));
+  expectSameId(early, registry, "bitget", "BTCUSDT");
 }
+
+TEST(InstrumentInfoNetwork, BitgetSpot) { bitgetSpotCase(false); }
+
+TEST(InstrumentInfoNetwork, BitgetSpotRegisteredBeforeStart) { bitgetSpotCase(true); }
 
 TEST(InstrumentInfoNetwork, BitgetUnknownSymbolStaysTickUnknown)
 {
@@ -321,7 +381,7 @@ TEST(InstrumentInfoNetwork, BitgetUnknownSymbolStaysTickUnknown)
 
 // ------------------------------------------------------------------ Hyperliquid
 
-TEST(InstrumentInfoNetwork, HyperliquidBtc)
+static void hyperliquidCase(bool registeredFirst)
 {
   const std::string body = httpRequest("https://api.hyperliquid.xyz/info", R"({"type":"meta"})");
   // {"szDecimals":5,"name":"BTC",...}: the object that names BTC.
@@ -334,6 +394,8 @@ TEST(InstrumentInfoNetwork, HyperliquidBtc)
 
   Buses buses;
   SymbolRegistry registry;
+  const auto early =
+      preRegister(registeredFirst, registry, "hyperliquid", "BTC", InstrumentType::Future);
   HyperliquidConfig cfg;
   cfg.symbols = {"BTC"};
   HyperliquidExchangeConnector connector(cfg, &buses.book, &buses.trade, &registry,
@@ -341,7 +403,12 @@ TEST(InstrumentInfoNetwork, HyperliquidBtc)
   connector.loadInstrumentSpecs();
   expectVenueTick(connector, registry, "hyperliquid", "BTC", tenToMinusRaw(6 - szDecimals),
                   tenToMinusRaw(szDecimals));
+  expectSameId(early, registry, "hyperliquid", "BTC");
 }
+
+TEST(InstrumentInfoNetwork, HyperliquidBtc) { hyperliquidCase(false); }
+
+TEST(InstrumentInfoNetwork, HyperliquidBtcRegisteredBeforeStart) { hyperliquidCase(true); }
 
 TEST(InstrumentInfoNetwork, HyperliquidUnknownCoinStaysTickUnknown)
 {
@@ -387,7 +454,7 @@ static std::string activePolymarketToken()
   return {};
 }
 
-TEST(InstrumentInfoNetwork, PolymarketActiveToken)
+static void polymarketCase(bool registeredFirst)
 {
   const std::string token = activePolymarketToken();
   ASSERT_FALSE(token.empty()) << "no active market in /sampling-markets";
@@ -397,13 +464,20 @@ TEST(InstrumentInfoNetwork, PolymarketActiveToken)
 
   Buses buses;
   SymbolRegistry registry;
+  const auto early =
+      preRegister(registeredFirst, registry, "polymarket", token, InstrumentType::Spot);
   PolymarketConfig cfg;
   cfg.tokenIds = {token};
   PolymarketExchangeConnector connector(cfg, &buses.book, &buses.trade, &registry,
                                         makeLogger("pm_net.log"));
   connector.loadInstrumentSpecs();
   expectVenueTick(connector, registry, "polymarket", token, decimalRaw(*tick), std::nullopt);
+  expectSameId(early, registry, "polymarket", token);
 }
+
+TEST(InstrumentInfoNetwork, PolymarketActiveToken) { polymarketCase(false); }
+
+TEST(InstrumentInfoNetwork, PolymarketActiveTokenRegisteredBeforeStart) { polymarketCase(true); }
 
 TEST(InstrumentInfoNetwork, PolymarketUnknownTokenStaysTickUnknown)
 {

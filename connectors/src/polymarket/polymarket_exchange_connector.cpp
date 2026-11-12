@@ -192,10 +192,25 @@ void PolymarketExchangeConnector::loadInstrumentSpecs()
   }
   reportInstrumentLoad(_specs, "Polymarket", _logger.get());
 
+  // Past the token cache, which a previous start() already filled: every
+  // load brings the registry entry to the venue's tick.
+  if (!_registry)
+  {
+    return;
+  }
   for (const auto& tokenId : _config.tokenIds)
   {
-    resolveSymbolId(tokenId);
+    _tokenToSymbol[tokenId] = registerToken(tokenId);
   }
+}
+
+SymbolId PolymarketExchangeConnector::registerToken(const std::string& tokenId)
+{
+  SymbolInfo info;
+  info.exchange = "polymarket";
+  info.symbol = tokenId;
+  info.type = InstrumentType::Spot;  // TODO: Add PredictionMarket type
+  return registerVenueSymbol(*_registry, info, _specs, _logger.get());
 }
 
 SymbolId PolymarketExchangeConnector::resolveSymbolId(std::string_view tokenId)
@@ -210,14 +225,7 @@ SymbolId PolymarketExchangeConnector::resolveSymbolId(std::string_view tokenId)
 
   if (_registry)
   {
-    SymbolInfo info;
-    info.exchange = "polymarket";
-    info.symbol = key;
-    info.type = InstrumentType::Spot;  // TODO: Add PredictionMarket type
-
-    // An entry the caller registered first is kept as it is, and a tick that
-    // differs from the venue's is reported.
-    SymbolId id = registerVenueSymbol(*_registry, info, _specs, _logger.get());
+    SymbolId id = registerToken(key);
     _tokenToSymbol[key] = id;
     return id;
   }

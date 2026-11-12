@@ -65,6 +65,10 @@ public:
   std::optional<SymbolInfo> getSymbolInfo(SymbolId id) const;
   std::pair<std::string, std::string> getSymbolName(SymbolId id) const;
 
+  // A venue's tick for an entry registered before the venue was read
+  VenueTickResult applyVenueTick(SymbolId id, Price venueTick);
+  std::shared_ptr<const VenueTickLog> venueTickLog() const noexcept;
+
   // Symbol registration (ExchangeId-based API)
   SymbolId registerSymbol(ExchangeId exchange, std::string_view symbol);
   ExchangeId getExchangeForSymbol(SymbolId symbol) const;
@@ -115,6 +119,37 @@ public:
 | `getSymbolName`        | Reverse lookup from `SymbolId` to `(exchange, symbol)` string pair. |
 | `getSymbolInfo`        | Returns `std::optional<SymbolInfo>` for the given ID.               |
 | `getExchangeForSymbol` | Returns `ExchangeId` for a given symbol.                            |
+| `applyVenueTick`       | Writes a venue's tick into an existing entry whose tick is not declared (see below). |
+| `venueTickLog`         | The ticks `applyVenueTick` wrote, shared with copies taken earlier.  |
+
+## The venue's tick for an entry registered first
+
+`registerSymbol` never changes an existing entry: it returns its id. The usual live setup registers
+a symbol, builds strategies from its id, and only then starts the connector, which reads the
+venue's tick. The connector writes that tick into the existing entry with
+`applyVenueTick(id, tick)`, which changes `tickSize` and `tickSizeKnown` and nothing else (the id,
+names, type, exchange and scales stay, since consumers index by them), under the registry's
+exclusive lock:
+
+| Entry's tick before the call | Outcome | Entry after |
+| --- | --- | --- |
+| Not declared (`tickSizeKnown` false and the 0.01 default) | `Applied` | The venue's tick, known |
+| Declared, equal to the venue's | `Unchanged` | Unchanged |
+| Declared, different | `Conflict` | Unchanged: the declared tick is kept |
+| No entry with this id | `UnknownSymbol` | - |
+| Venue tick not positive | `InvalidTick` | Unchanged |
+
+A declared tick is never overwritten. The caller may know better than the venue's metadata (a
+product the venue lists under a different increment, or a test that wants the refusal path), and
+replacing a value someone set on purpose without saying so is worse than reporting the
+disagreement. The connectors report a `Conflict` as an error naming both ticks, in the log and in
+their `instrumentInfoError()`.
+
+Every reader of the registry (`getSymbolInfo` returns a copy) sees the new tick from the call on.
+A copy taken earlier does not: `Strategy` sizes each symbol's book on the tick it read in its
+constructor, so it keeps the shared `venueTickLog()` and rebuilds a symbol's book on the applied
+tick at that symbol's next event. The log is a `shared_ptr`, so a strategy may outlive the
+registry. `clear()`, `loadFromFile` and `deserialize` reset it.
 
 ## Symbol Equivalence
 

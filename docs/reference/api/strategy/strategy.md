@@ -152,6 +152,14 @@ public:
 ticks ([BacktestRunner](../backtest/backtest_runner.md#strategy-setup)). It is a copy, so the
 registry the strategy was built with need not outlive it.
 
+Each symbol's book (`ctx(sym).book`) is sized on the tick the registry held when the strategy was
+built. A strategy built before its connector starts usually sees the 0.01 placeholder; when the
+connector then applies the venue's tick to the registry entry
+([applyVenueTick](../engine/symbol_registry.md#the-venues-tick-for-an-entry-registered-first)),
+the strategy rebuilds that symbol's book on it at the symbol's next event, before any callback
+runs. The connector applies it in `start()` before its socket opens, so the book is still empty
+then. `symbolInfos()` keeps the values from construction.
+
 ## Signal Emission
 
 All order methods return an `OrderId` for tracking:

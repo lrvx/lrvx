@@ -26,6 +26,7 @@
  * injected fetch that answers with those bodies.
  */
 
+#include "loopback_ws_server.h"
 #include "lrvx-connectors/bitget/authenticated_rest_client.h"
 #include "lrvx-connectors/bitget/bitget_exchange_connector.h"
 #include "lrvx-connectors/bitget/bitget_order_executor.h"
@@ -45,13 +46,16 @@
 #include <lrvx/execution/order_price_rule.h>
 #include <lrvx/execution/order_tracker.h>
 #include <lrvx/log/atomic_logger.h>
+#include <lrvx/strategy/strategy.h>
 
 #include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <memory_resource>
 #include <mutex>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -481,42 +485,281 @@ TEST(InstrumentInfoLoad, ALoadedTickRefusesOffTickPricesLikeTheSimulator)
   EXPECT_EQ(rec.events[1].rejectReason, kRejectTriggerOffTick);
 }
 
-// The registry keeps the first entry it is given. A symbol registered before
-// the load stays as it was; the load reports the mismatch instead of claiming
-// a tick the registry does not hold.
-TEST(InstrumentInfoLoad, AnEarlierRegistrationIsKeptAndNotSilentlyClaimed)
-{
-  Buses buses;
-  SymbolRegistry registry;
-  SymbolInfo early;
-  early.exchange = "bybit";
-  early.symbol = "BTCUSDT";
-  early.type = InstrumentType::Future;
-  const SymbolId id = registry.registerSymbol(early);
+// ------------------------------------------------------------------ registered before start()
 
-  FixtureFetch fetch;
+namespace
+{
+
+SymbolId preRegister(SymbolRegistry& registry, const std::string& exchange,
+                     const std::string& symbol, std::optional<double> declaredTick = std::nullopt)
+{
+  SymbolInfo info;
+  info.exchange = exchange;
+  info.symbol = symbol;
+  info.type = InstrumentType::Future;
+  if (declaredTick)
+  {
+    info.tickSize = Price::fromDouble(*declaredTick);
+    info.tickSizeKnown = true;
+  }
+  return registry.registerSymbol(info);
+}
+
+BybitConfig bybitBtcConfig(FixtureFetch& fetch)
+{
   fetch.answers.push_back({"symbol=BTCUSDT", fixture("bybit_linear_btc.json")});
   BybitConfig cfg;
   cfg.publicEndpoint = "wss://unused.invalid";
   cfg.instrumentInfoUrl = "https://fixture.invalid";
   cfg.instrumentFetch = fetch.fn();
   cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
-  BybitExchangeConnector connector(cfg, &buses.book, &buses.trade, nullptr, &registry,
-                                   makeLogger("bybit_early.log"));
+  return cfg;
+}
+
+// A strategy that records the book it is handed, the one place an
+// lrvx::Strategy reads a symbol's tick.
+class BookReader final : public Strategy
+{
+ public:
+  BookReader(SymbolId sym, const SymbolRegistry& registry) : Strategy(7, sym, registry) {}
+  Price bookTick() const { return ctx().book.tickSize(); }
+  std::optional<Price> seenTick;
+  std::optional<Price> seenBestBid;
+
+ protected:
+  void onSymbolBook(SymbolContext& c, const BookUpdateEvent&) override
+  {
+    seenTick = c.book.tickSize();
+    seenBestBid = c.book.bestBid();
+  }
+};
+
+void feedSnapshot(BookReader& strategy, SymbolId sym, std::vector<double> bids, double ask)
+{
+  BookUpdateEvent ev(std::pmr::get_default_resource());
+  ev.update.symbol = sym;
+  ev.update.type = BookUpdateType::SNAPSHOT;
+  for (double b : bids)
+  {
+    ev.update.bids.emplace_back(Price::fromDouble(b), Quantity::fromDouble(10));
+  }
+  ev.update.asks.emplace_back(Price::fromDouble(ask), Quantity::fromDouble(10));
+  strategy.onBookUpdate(ev);
+}
+
+}  // namespace
+
+// The ordinary order of operations: the symbol is registered (with no tick),
+// a strategy and the executor are built from its id, then the connector
+// starts. The venue's tick reaches the registry entry they all share: the
+// executor refuses an off-tick price with the simulator's reason and sends an
+// on-tick one as its exact decimal.
+TEST(InstrumentInfoPreRegistered, AnUndeclaredTickTakesTheVenues)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  const SymbolId id = preRegister(registry, "bybit", "BTCUSDT");
+
+  BodyTransport transport;
+  auto client =
+      std::make_unique<AuthenticatedRestClient>("k", "s", "https://unused.invalid", &transport);
+  OrderTracker tracker;
+  OrderExecutionBus bus;
+  Rejections rec;
+  bus.subscribe(&rec);
+  bus.start();
+  BybitOrderExecutorT<NoPolicies> ex(std::move(client), &registry, &tracker);
+  ex.setOrderBus(&bus);
+
+  FixtureFetch fetch;
+  BybitExchangeConnector connector(bybitBtcConfig(fetch), &buses.book, &buses.trade, nullptr,
+                                   &registry, makeLogger("bybit_prereg.log"));
   connector.loadInstrumentSpecs();
 
+  EXPECT_TRUE(connector.instrumentInfoError().empty()) << connector.instrumentInfoError();
   EXPECT_EQ(*registry.getSymbolId("bybit", "BTCUSDT"), id);
-  EXPECT_FALSE(registry.getSymbolInfo(id)->tickSizeKnown);
-  // What the venue enforces is still known to the connector.
-  ASSERT_TRUE(connector.instrumentSpec("BTCUSDT"));
-  EXPECT_EQ(connector.instrumentSpec("BTCUSDT")->tickSize.raw(), Price::fromDouble(0.1).raw());
+  const auto info = registry.getSymbolInfo(id);
+  EXPECT_TRUE(info->tickSizeKnown);
+  EXPECT_EQ(info->tickSize.raw(), Price::fromDouble(0.1).raw());
+  EXPECT_EQ(info->type, InstrumentType::Future);
 
-  // applyInstrumentSpec() is how a caller registering first gets it right.
-  SymbolRegistry fresh;
-  SymbolInfo right = early;
-  applyInstrumentSpec(right, *connector.instrumentSpec("BTCUSDT"));
-  const auto rid = fresh.registerSymbol(right);
-  EXPECT_TRUE(fresh.getSymbolInfo(rid)->tickSizeKnown);
+  ex.submitOrder(limitBuy(1, id, 60000.123));
+  ex.submitOrder(limitBuy(2, id, 60000.1));
+  bus.flush();
+  bus.stop();
+
+  ASSERT_EQ(rec.events.size(), 1u);
+  EXPECT_EQ(rec.events[0].order.id, 1u);
+  EXPECT_EQ(rec.events[0].status, OrderEventStatus::REJECTED);
+  EXPECT_EQ(rec.events[0].rejectReason, kRejectPriceOffTick);
+  ASSERT_EQ(transport.bodies.size(), 1u);
+  EXPECT_NE(transport.bodies[0].find(R"("orderLinkId":"2")"), std::string::npos);
+  EXPECT_NE(transport.bodies[0].find(R"("price":"60000.100000")"), std::string::npos)
+      << transport.bodies[0];
+}
+
+// Every connector applies it, each through its own load path.
+TEST(InstrumentInfoPreRegistered, EveryVenueAppliesItsTick)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  const SymbolId bitgetDoge = preRegister(registry, "bitget", "DOGEUSDT");
+  const SymbolId hlBtc = preRegister(registry, "hyperliquid", "BTC");
+  const SymbolId pmFine = preRegister(registry, "polymarket", "FINE");
+
+  FixtureFetch fetch;
+  fetch.answers.push_back({"/api/v2/mix/market/contracts", fixture("bitget_doge.json")});
+  fetch.answers.push_back({"/info", fixture("hyperliquid_meta.json")});
+  fetch.answers.push_back({"token_id=FINE", fixture("polymarket_tick_0001.json")});
+
+  BitgetConfig bg;
+  bg.publicEndpoint = "wss://unused.invalid";
+  bg.instrumentInfoUrl = "https://fixture.invalid";
+  bg.instrumentFetch = fetch.fn();
+  bg.symbols = {{"DOGEUSDT", InstrumentType::Future, BitgetConfig::BookDepth::Depth15}};
+  BitgetExchangeConnector bitget(bg, &buses.book, &buses.trade, nullptr, &registry,
+                                 makeLogger("bitget_prereg.log"));
+  bitget.loadInstrumentSpecs();
+
+  HyperliquidConfig hl;
+  hl.wsEndpoint = "wss://unused.invalid";
+  hl.instrumentInfoUrl = "https://fixture.invalid/info";
+  hl.instrumentFetch = fetch.fn();
+  hl.symbols = {"BTC"};
+  HyperliquidExchangeConnector hyperliquid(hl, &buses.book, &buses.trade, &registry,
+                                           makeLogger("hl_prereg.log"));
+  hyperliquid.loadInstrumentSpecs();
+
+  PolymarketConfig pm;
+  pm.instrumentInfoUrl = "https://fixture.invalid";
+  pm.instrumentFetch = fetch.fn();
+  pm.tokenIds = {"FINE"};
+  PolymarketExchangeConnector polymarket(pm, &buses.book, &buses.trade, &registry,
+                                         makeLogger("pm_prereg.log"));
+  polymarket.loadInstrumentSpecs();
+
+  EXPECT_TRUE(bitget.instrumentInfoError().empty()) << bitget.instrumentInfoError();
+  EXPECT_TRUE(hyperliquid.instrumentInfoError().empty()) << hyperliquid.instrumentInfoError();
+  EXPECT_TRUE(polymarket.instrumentInfoError().empty()) << polymarket.instrumentInfoError();
+  EXPECT_EQ(orderTickRaw(*registry.getSymbolInfo(bitgetDoge)), 1000);
+  EXPECT_EQ(orderTickRaw(*registry.getSymbolInfo(hlBtc)), Price::fromDouble(0.1).raw());
+  EXPECT_EQ(orderTickRaw(*registry.getSymbolInfo(pmFine)), 100000);
+  EXPECT_EQ(*registry.getSymbolId("polymarket", "FINE"), pmFine);
+}
+
+// A declared tick equal to the venue's: nothing to do, nothing to report.
+TEST(InstrumentInfoPreRegistered, ADeclaredTickEqualToTheVenuesIsLeftAlone)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  const SymbolId id = preRegister(registry, "bybit", "BTCUSDT", 0.1);
+  FixtureFetch fetch;
+  BybitExchangeConnector connector(bybitBtcConfig(fetch), &buses.book, &buses.trade, nullptr,
+                                   &registry, makeLogger("bybit_prereg_same.log"));
+  connector.loadInstrumentSpecs();
+
+  EXPECT_TRUE(connector.instrumentInfoError().empty()) << connector.instrumentInfoError();
+  EXPECT_TRUE(registry.getSymbolInfo(id)->tickSizeKnown);
+  EXPECT_EQ(registry.getSymbolInfo(id)->tickSize.raw(), Price::fromDouble(0.1).raw());
+}
+
+// A declared tick that differs from the venue's is the user's call: it is
+// kept, and the disagreement is an error naming both values.
+TEST(InstrumentInfoPreRegistered, ADeclaredTickThatDiffersIsKeptAndReported)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  const SymbolId id = preRegister(registry, "bybit", "BTCUSDT", 0.5);
+  FixtureFetch fetch;
+  BybitExchangeConnector connector(bybitBtcConfig(fetch), &buses.book, &buses.trade, nullptr,
+                                   &registry, makeLogger("bybit_prereg_diff.log"));
+  connector.loadInstrumentSpecs();
+
+  EXPECT_EQ(registry.getSymbolInfo(id)->tickSize.raw(), Price::fromDouble(0.5).raw());
+  EXPECT_TRUE(registry.getSymbolInfo(id)->tickSizeKnown);
+  const std::string err = connector.instrumentInfoError();
+  EXPECT_NE(err.find("BTCUSDT"), std::string::npos) << err;
+  EXPECT_NE(err.find("0.500000"), std::string::npos) << err;
+  EXPECT_NE(err.find("0.100000"), std::string::npos) << err;
+  // The venue's value stays available to the caller.
+  EXPECT_EQ(connector.instrumentSpec("BTCUSDT")->tickSize.raw(), Price::fromDouble(0.1).raw());
+}
+
+// A symbol first seen after the load is registered with the venue's tick, as
+// before; one the connector does not serve keeps its entry untouched.
+TEST(InstrumentInfoPreRegistered, SymbolsTheConnectorDoesNotOwnAreUntouched)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  const SymbolId eth = preRegister(registry, "bybit", "ETHUSDT");
+  const SymbolId otherVenue = preRegister(registry, "bitget", "BTCUSDT");
+  FixtureFetch fetch;
+  BybitExchangeConnector connector(bybitBtcConfig(fetch), &buses.book, &buses.trade, nullptr,
+                                   &registry, makeLogger("bybit_prereg_other.log"));
+  connector.loadInstrumentSpecs();
+
+  const SymbolId btc = connector.resolveSymbolId("BTCUSDT");
+  EXPECT_EQ(orderTickRaw(*registry.getSymbolInfo(btc)), Price::fromDouble(0.1).raw());
+  EXPECT_FALSE(registry.getSymbolInfo(eth)->tickSizeKnown);
+  EXPECT_FALSE(registry.getSymbolInfo(otherVenue)->tickSizeKnown);
+  EXPECT_EQ(registry.getSymbolInfo(otherVenue)->tickSize.raw(), kDefaultTickSize.raw());
+}
+
+// A strategy built before the connector starts sizes its book on the venue's
+// tick by the first frame. DOGE's 0.00001 is finer than the 0.01 placeholder:
+// on the placeholder's grid two neighbouring venue levels fall into one
+// bucket and the best bid is quantised away.
+TEST(InstrumentInfoPreRegistered, AStrategyBuiltBeforeStartBooksOnTheVenueTick)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  const SymbolId doge = preRegister(registry, "bitget", "DOGEUSDT");
+  BookReader strategy(doge, registry);
+
+  FixtureFetch fetch;
+  fetch.answers.push_back({"/api/v2/mix/market/contracts", fixture("bitget_doge.json")});
+  BitgetConfig bg;
+  bg.publicEndpoint = "wss://unused.invalid";
+  bg.instrumentInfoUrl = "https://fixture.invalid";
+  bg.instrumentFetch = fetch.fn();
+  bg.symbols = {{"DOGEUSDT", InstrumentType::Future, BitgetConfig::BookDepth::Depth15}};
+  BitgetExchangeConnector connector(bg, &buses.book, &buses.trade, nullptr, &registry,
+                                    makeLogger("bitget_prereg_strategy.log"));
+  connector.loadInstrumentSpecs();
+
+  feedSnapshot(strategy, doge, {0.10002, 0.10001}, 0.10004);
+  ASSERT_TRUE(strategy.seenTick);
+  EXPECT_EQ(strategy.seenTick->raw(), 1000);
+  EXPECT_EQ(strategy.bookTick().raw(), 1000);
+  ASSERT_TRUE(strategy.seenBestBid);
+  EXPECT_EQ(strategy.seenBestBid->raw(), Price::fromDouble(0.10002).raw());
+}
+
+// The guarantee start() gives: when it returns, every configured symbol --
+// registered before it or not -- carries the venue's tick, or
+// instrumentInfoError() says why not. Orders can only follow.
+TEST(InstrumentInfoPreRegistered, ByTheTimeStartReturnsTheTickIsApplied)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  const SymbolId btc = preRegister(registry, "bybit", "BTCUSDT");
+  FixtureFetch fetch;
+  fetch.answers.push_back({"symbol=ETHUSDT", fixture("bybit_symbol_invalid.json")});
+  BybitConfig cfg = bybitBtcConfig(fetch);
+  cfg.symbols.push_back({"ETHUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50});
+  cfg.publicEndpoint = test::refusingUrl();
+  cfg.reconnectDelayMs = 5000;
+  BybitExchangeConnector connector(cfg, &buses.book, &buses.trade, nullptr, &registry,
+                                   makeLogger("bybit_prereg_start.log"));
+  connector.start();
+  const auto btcInfo = registry.getSymbolInfo(btc);
+  const std::string err = connector.instrumentInfoError();
+  connector.stop();
+
+  EXPECT_TRUE(btcInfo->tickSizeKnown);
+  EXPECT_EQ(btcInfo->tickSize.raw(), Price::fromDouble(0.1).raw());
+  EXPECT_NE(err.find("ETHUSDT"), std::string::npos) << err;
+  EXPECT_EQ(err.find("BTCUSDT"), std::string::npos) << err;
 }
 
 // An unreachable venue is asked once: each further symbol would wait out the

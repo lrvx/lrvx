@@ -1093,9 +1093,9 @@ void BitgetExchangeConnector::loadInstrumentSpecs()
   }
   reportInstrumentLoad(_specs, "Bitget", _logger.get());
 
-  // A symbol the caller registered before start() keeps that entry; the
-  // registry has no update, so a tick that differs from the venue's is
-  // reported instead.
+  // A symbol the caller registered before start() keeps its id and entry,
+  // and the venue's tick goes into it unless the caller declared one (see
+  // registerVenueSymbol).
   for (const auto& entry : _config.symbols)
   {
     if (_registry->getSymbolId("bitget", entry.name))

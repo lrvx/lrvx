@@ -94,9 +94,12 @@ class Strategy : public IStrategy
   };
 
   Strategy(SubscriberId id, std::vector<SymbolId> symbols, const SymbolRegistry& registry)
-      : _id(id), _symbols(std::move(symbols))
+      : _id(id), _symbols(std::move(symbols)), _venueTicks(registry.venueTickLog())
   {
     _symbolSet.insert(_symbols.begin(), _symbols.end());
+    // Read before the entries: a tick applied in between moves the revision
+    // past this one and is picked up on the symbol's first event.
+    const uint64_t revision = _venueTicks->revision();
     for (SymbolId sym : _symbols)
     {
       auto info = registry.getSymbolInfo(sym);
@@ -106,6 +109,7 @@ class Strategy : public IStrategy
       }
       _contexts[sym] = SymbolContext(info->tickSize);
       _contexts[sym].symbolId = sym;
+      _venueTickSeen[sym] = revision;
       _symbolInfos.push_back(*info);
     }
   }
@@ -120,7 +124,9 @@ class Strategy : public IStrategy
   // Each symbol's entry as the registry held it when the strategy was built, in
   // symbols() order. A copy, so the registry need not outlive the strategy.
   // BacktestRunner reads the declared ticks from here when it is not given a
-  // registry of its own.
+  // registry of its own. A venue tick a connector applies later
+  // (SymbolRegistry::applyVenueTick) does not change this copy; it reaches the
+  // symbol's book (ctx().book.tickSize()) on the symbol's next event.
   const std::vector<SymbolInfo>& symbolInfos() const noexcept { return _symbolInfos; }
 
   void setSignalHandler(ISignalHandler* handler) override { _signalHandler = handler; }
@@ -137,6 +143,7 @@ class Strategy : public IStrategy
 
     std::lock_guard<SymbolLock> owned(lockFor(sym));
     auto& c = _contexts[sym];
+    followVenueTick(c, sym);
     c.lastTradePrice = ev.trade.price;
     c.lastUpdateNs = ev.trade.exchangeTsNs.raw();
     refreshPosition(c, sym);
@@ -160,6 +167,7 @@ class Strategy : public IStrategy
     {
       std::lock_guard<SymbolLock> owned(lockFor(sym));
       auto& c = _contexts[sym];
+      followVenueTick(c, sym);
       const auto bid = ev.update.bids.empty() ? std::nullopt
                                               : std::optional<BookLevel>(ev.update.bids.front());
       const auto ask = ev.update.asks.empty() ? std::nullopt
@@ -178,6 +186,7 @@ class Strategy : public IStrategy
 
     std::lock_guard<SymbolLock> owned(lockFor(sym));
     auto& c = _contexts[sym];
+    followVenueTick(c, sym);
     const auto prevBid = c.touchBid;
     const auto prevAsk = c.touchAsk;
     c.book.applyBookUpdate(ev);
@@ -203,6 +212,7 @@ class Strategy : public IStrategy
 
     std::lock_guard<SymbolLock> owned(lockFor(sym));
     auto& c = _contexts[sym];
+    followVenueTick(c, sym);
     c.lastTradePrice = ev.bar.close;
     c.lastUpdateNs = ev.bar.endTime.time_since_epoch().count();
     refreshPosition(c, sym);
@@ -236,6 +246,7 @@ class Strategy : public IStrategy
     }
     std::lock_guard<SymbolLock> owned(lockFor(sym));
     auto& c = _contexts[sym];
+    followVenueTick(c, sym);
     if (ev.status == OrderEventStatus::FILLED ||
         ev.status == OrderEventStatus::PARTIALLY_FILLED)
     {
@@ -559,6 +570,29 @@ class Strategy : public IStrategy
     return (static_cast<OrderId>(_id) << kOrderIdStrategyShift) + (_nextOrderId++);
   }
 
+  // Caller holds the symbol lock. The book was sized on the tick the registry
+  // held at construction, usually the 0.01 placeholder of a symbol registered
+  // before its connector started. When a connector has since applied the
+  // venue's tick (SymbolRegistry::applyVenueTick), the book is rebuilt on it.
+  // The connector applies it in start() before its socket opens, so the book
+  // is still empty here; a book with levels in it would lose them, and the
+  // venue's next snapshot refills it. One acquire load per event otherwise.
+  void followVenueTick(SymbolContext& c, SymbolId sym)
+  {
+    const uint64_t revision = _venueTicks->revision();
+    uint64_t& seen = _venueTickSeen[sym];
+    if (revision == seen)
+    {
+      return;
+    }
+    seen = revision;
+    const auto tick = _venueTicks->tickFor(sym);
+    if (tick && tick->raw() > 0 && tick->raw() != c.book.tickSize().raw())
+    {
+      c.book = NLevelOrderBook<SymbolContext::kDefaultBookLevels>(*tick);
+    }
+  }
+
   // Pull the latest position and cost basis from the attached
   // IPositionManager into the per-symbol context so `ctx.position` /
   // `ctx.is_long()` / `ctx.is_flat()` / `ctx.unrealizedPnl()` reflect fills
@@ -720,6 +754,11 @@ class Strategy : public IStrategy
   IPositionManager* _positionManager{nullptr};
   std::vector<SymbolId> _symbols;
   std::vector<SymbolInfo> _symbolInfos;
+  // Venue ticks applied after construction, and the log revision each
+  // symbol's book last followed (followVenueTick). The seen table is written
+  // under the symbol's lock only.
+  std::shared_ptr<const VenueTickLog> _venueTicks;
+  mutable SymbolStateMap<uint64_t> _venueTickSeen;
   std::set<SymbolId> _symbolSet;
   // 256 SymbolContext slots, each carrying a full 512-level book. The table
   // lives in one heap block owned by the map (see symbol_state_map.h), so a

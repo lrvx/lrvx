@@ -395,24 +395,25 @@ std::expected<InstrumentSpec, std::string> parsePolymarketTickSize(std::string_v
 
 }  // namespace instrument_info
 
-SymbolId registerVenueSymbol(SymbolRegistry& registry, SymbolInfo info,
-                             const InstrumentSpecTable& specs, ILogger* logger)
+SymbolId registerVenueSymbol(SymbolRegistry& registry, SymbolInfo info, InstrumentSpecTable& specs,
+                             ILogger* logger)
 {
   const auto spec = specs.find(info.symbol);
   if (auto existing = registry.getSymbolId(info.exchange, info.symbol))
   {
     if (spec)
     {
-      const auto held = registry.getSymbolInfo(*existing);
-      if (held && (!held->tickSizeKnown || held->tickSize.raw() != spec->tickSize.raw()))
+      const auto r = registry.applyVenueTick(*existing, spec->tickSize);
+      if (r.outcome == VenueTickOutcome::Conflict)
       {
+        specs.addError(info.symbol + ": the registry declares tick " + r.heldTick.toString() +
+                       ", the venue uses " + spec->tickSize.toString() +
+                       "; the declared tick is kept");
         const std::string msg =
-            "[" + info.exchange + "] " + info.symbol +
-            " was registered before the venue's instrument info was applied: the registry " +
-            "holds tick " + held->tickSize.toString() +
-            (held->tickSizeKnown ? "" : " (not known)") + ", the venue uses " +
-            spec->tickSize.toString() +
-            ". Register it with applyInstrumentSpec() or let the connector register it.";
+            "[" + info.exchange + "] " + info.symbol + " was registered with tick " +
+            r.heldTick.toString() + " and the venue uses " + spec->tickSize.toString() +
+            ". The declared tick is kept: orders on it are checked against " +
+            r.heldTick.toString() + " and the venue may refuse prices that pass.";
         if (logger)
         {
           logger->error(msg);
