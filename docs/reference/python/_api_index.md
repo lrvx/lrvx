@@ -280,7 +280,7 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 
 **Constructor**
 
-- `BacktestRunner(registry: SymbolRegistry, fee_rate: typing.SupportsFloat | typing.SupportsIndex = 0.0004, initial_capital: typing.SupportsFloat | typing.SupportsIndex = 100000.0) -> None`
+- `BacktestRunner(registry: SymbolRegistry, fee_rate: typing.SupportsFloat | typing.SupportsIndex = 0.0004, initial_capital: typing.SupportsFloat | typing.SupportsIndex = 100000.0, *, slippage_model: str = 'none', slippage_ticks: typing.SupportsInt | typing.SupportsIndex = 0, slippage_tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.0, slippage_bps: typing.SupportsFloat | typing.SupportsIndex = 0.0, slippage_impact_coeff: typing.SupportsFloat | typing.SupportsIndex = 0.0, submit_ack_latency_ns: typing.SupportsInt | typing.SupportsIndex = 0, submit_ack_jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0, cancel_ack_latency_ns: typing.SupportsInt | typing.SupportsIndex = 0, cancel_ack_jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0, cancel_ack_seed: typing.SupportsInt | typing.SupportsIndex = 42, replace_ack_latency_ns: typing.SupportsInt | typing.SupportsIndex = 0, replace_ack_jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0, latency: typing.Any = None) -> None`
 
 **Members**
 
@@ -290,6 +290,7 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 - `run_csv(self, path: str, symbol: str = '') -> typing.Any`
 - `run_ohlcv(self, ts: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol: str = '') -> typing.Any`
 - `run_tape(self, path: str) -> typing.Any`
+- `run_tape_bars(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any`
 - `run_tapes(self, paths: collections.abc.Sequence[str]) -> typing.Any`
 - `set_executor(self, executor: Executor) -> None`
 - `set_executor(self, executor: VenueExecutor) -> None`

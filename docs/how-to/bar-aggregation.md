@@ -89,8 +89,13 @@ Same tool for every binding — it's a standalone CLI binary.
 ## 3. Load bars for backtesting
 
 `MmapBarStorage` / `MmapBarReplaySource` are C++-only — neither is exposed in
-the Python or Node.js bindings. From the bindings, aggregate the trade arrays
-in-process with the batch aggregators and feed the result to `run_bars`.
+the Python or Node.js bindings. From the bindings, a single run over a `.lrvx`
+tape is `run_tape_bars(path, interval_seconds=..., symbol=...)` (Node
+`runTapeBars`), which aggregates time bars while the tape streams -- see
+[Bars from a tape in one call](backtest.md#bars-from-a-tape-in-one-call). The
+explicit form, for bars reused across runs or for other bar types, aggregates
+the trade arrays in-process with the batch aggregators and feeds the result to
+`run_bars`.
 
 === "Python"
 

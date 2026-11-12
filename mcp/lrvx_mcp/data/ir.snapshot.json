@@ -1635,6 +1635,77 @@
     },
     {
       "group": "backtestrunner_replay",
+      "name": "lrvx_backtest_runner_create_with_fill_settings",
+      "params": [
+        {
+          "name": "registry",
+          "type": "LrvxRegistryHandle"
+        },
+        {
+          "name": "fee_rate",
+          "type": "double"
+        },
+        {
+          "name": "initial_capital",
+          "type": "double"
+        },
+        {
+          "name": "slippage_model",
+          "type": "int32_t"
+        },
+        {
+          "name": "slippage_ticks",
+          "type": "int32_t"
+        },
+        {
+          "name": "slippage_tick_size",
+          "type": "double"
+        },
+        {
+          "name": "slippage_bps",
+          "type": "double"
+        },
+        {
+          "name": "slippage_impact_coeff",
+          "type": "double"
+        },
+        {
+          "name": "submit_ack_latency_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "submit_ack_jitter_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "cancel_ack_latency_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "cancel_ack_jitter_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "cancel_ack_seed",
+          "type": "uint64_t"
+        },
+        {
+          "name": "replace_ack_latency_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "replace_ack_jitter_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "latency",
+          "type": "LrvxLatencyModelHandle"
+        }
+      ],
+      "return_type": "LrvxBacktestRunnerHandle"
+    },
+    {
+      "group": "backtestrunner_replay",
       "name": "lrvx_backtest_runner_destroy",
       "params": [
         {
@@ -1786,6 +1857,33 @@
         },
         {
           "name": "tape_dir",
+          "type": "const char *"
+        },
+        {
+          "name": "stats_out",
+          "type": "LrvxBacktestStats *"
+        }
+      ],
+      "return_type": "int"
+    },
+    {
+      "group": "backtestrunner_replay",
+      "name": "lrvx_backtest_runner_run_tape_bars",
+      "params": [
+        {
+          "name": "runner",
+          "type": "LrvxBacktestRunnerHandle"
+        },
+        {
+          "name": "tape_dir",
+          "type": "const char *"
+        },
+        {
+          "name": "interval_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "symbol",
           "type": "const char *"
         },
         {

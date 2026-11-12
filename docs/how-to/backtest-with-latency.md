@@ -4,7 +4,7 @@ A backtest runs in instant mode by default: no order latency. On tick and book r
 
 Latency models live in the C++ engine and are exposed through every binding (Python, Node, Codon, QuickJS) with the same surface. Each draw covers `feed` (event arrival to engine), `order` (engine submit to exchange), and `fill` (exchange match to engine notification).
 
-In C++, `BacktestConfig::latency` takes one of these models and the simulator applies its `order_delay()` itself: an order submitted at `T` is not marketable until `T + order_delay()`, and its fill is stamped at the time it actually matched. `feed_delay()` and `fill_delay()` are still a sampling primitive the user app applies to its own timestamps -- see [What is wired, what is not](#what-is-wired-what-is-not). For ack latency the simulator has always applied, see the `SimulatedExecutor` setters at the bottom of this page.
+`BacktestConfig::latency` takes one of these models and the simulator applies its `order_delay()` itself: an order submitted at `T` is not marketable until `T + order_delay()`, and its fill is stamped at the time it actually matched. From Python, Node and Codon the same field is the `latency` argument of `BacktestRunner`, next to the venue ack latencies. `feed_delay()` and `fill_delay()` are a sampling primitive the user app applies to its own timestamps -- see [What is wired, what is not](#what-is-wired-what-is-not). On bar replay a deferred order moves by whole bars -- see [Latency on bar replay](#latency-on-bar-replay).
 
 ## The four models
 
@@ -80,8 +80,53 @@ Pass `seed` for reproducible runs. `reset(seed)` replays the same sequence.
 
 ## Order latency the engine applies for you
 
-Attach a model to the run configuration and the executor holds each order out
-of matching for the delay it draws:
+Attach a model to the runner and the executor holds each order out of matching
+for the delay it draws:
+
+=== "Python"
+
+    ```python
+    import lrvx
+
+    bt = lrvx.BacktestRunner(
+        reg, fee_rate=0.0004, initial_capital=10_000.0,
+        latency=lrvx.ConstantLatency(0, 5_000_000, 0),   # 5 ms order delay
+        submit_ack_latency_ns=2_000_000,                  # plus 2 ms venue ack
+    )
+    ```
+
+=== "Node.js"
+
+    ```javascript
+    const bt = new lrvx.BacktestRunner(reg, 0.0004, 10_000, {
+      latency: new lrvx.ConstantLatency({feedNs: 0, orderNs: 5_000_000, fillNs: 0}),
+      submitAckLatencyNs: 2_000_000,
+    });
+    ```
+
+=== "Codon"
+
+    ```python
+    from lrvx.runner import BacktestRunner
+    from lrvx.latency import ConstantLatency
+
+    model = ConstantLatency(0, 5_000_000, 0)   # must outlive the runner
+    bt = BacktestRunner(reg, 0.0004, 10_000.0, latency=model,
+                        submit_ack_latency_ns=2_000_000)
+    ```
+
+=== "C++"
+
+    ```cpp
+    BacktestConfig cfg;
+    cfg.latency = std::make_shared<ConstantLatency>(/*feed_ns=*/0,
+                                                    /*order_ns=*/5'000'000,
+                                                    /*fill_ns=*/0);
+    cfg.submitAckLatencyNs = 2'000'000;
+    BacktestRunner runner(cfg);
+    ```
+
+Driving a `SimulatedExecutor` by hand in C++, the same config applies to it:
 
 ```cpp
 BacktestConfig cfg;
@@ -108,6 +153,35 @@ fills against whatever book is standing when it arrives, not the one the
 strategy saw. A stochastic model keeps drawing from where it left off across
 a re-run; call `model.reset(seed)` before the second run to replay the same
 sequence.
+
+## Latency on bar replay
+
+A bar has no clock inside it. On bar replay (`run_bars`, `run_tape_bars`,
+`runBars`, `runTapeBars`) the simulated clock reads a bar's end time from the
+moment the bar is walked until the next bar arrives, and an order sent from the
+bar callback is submitted at the next bar's open with that next bar's end on
+the clock. An order whose total deferral (`order_delay()` plus the drawn submit
+ack latency) is `L > 0` is accepted at the first step whose clock has reached
+`end(n+1) + L` -- the open of a later bar -- and fills there:
+
+| Deferral `L`, bars of length `T` | Callback on bar `n` fills at |
+|---|---|
+| `0` (default) | open of bar `n+1` |
+| `0 < L <= T` | open of bar `n+2` |
+| `T < L <= 2T` | open of bar `n+3` |
+| in general | open of bar `n+1+ceil(L/T)`, for contiguous bars |
+
+So any positive submit latency costs at least one whole bar: 5 ms on 5-minute
+bars moves the fill five minutes. That is the honest reading of bar data --
+a fill inside bar `n+1` would need a price at `start(n+1) + L`, and the bar
+reports only its open (earlier than the order's arrival) and a high, low and
+close with no times. If a sub-bar delay matters to the strategy, the run needs
+tick or book data (`run_tape`), where the clock moves with every event.
+
+Cancel and replace acks follow the same clock. A cancel sent from a bar
+callback with an ack latency shorter than one bar has landed by the next bar's
+first step and changes nothing; a longer one leaves the order live, and able to
+fill, for the bars in between.
 
 ## Applying feed and fill samples in your backtest loop
 
@@ -185,7 +259,7 @@ Sampling is uniform with replacement. The resulting distribution shape matches t
 
 ## When to skip latency entirely
 
-For bar-driven strategies on minute-or-larger timeframes, latency rarely changes backtest results. Instant mode is the right default. Reach for this module when:
+For bar-driven strategies on minute-or-larger timeframes, instant mode is the right default: the next-open rule already keeps a bar callback from trading at a price it reacted to, and a sub-bar latency on bar replay only shifts every fill by a whole bar (see [Latency on bar replay](#latency-on-bar-replay)). Reach for this module when:
 
 - You are market-making and round-trip determines whether you get a fill at all.
 - You are testing a latency-arbitrage strategy where round-trip is the whole point.
@@ -195,19 +269,21 @@ For bar-driven strategies on minute-or-larger timeframes, latency rarely changes
 
 | Component | Applied by | Effect |
 |---|---|---|
-| `order_delay()` | The engine, from `BacktestConfig::latency` | The order is not marketable until the delay has elapsed; the fill is stamped when it matched |
+| `order_delay()` | The engine, from `BacktestConfig::latency` (the runners' `latency` argument) | The order is not marketable until the delay has elapsed; the fill is stamped when it matched |
 | `feed_delay()` | Your app | Add it to the event timestamp before handing the event to the simulator |
 | `fill_delay()` | Your app | The simulator dispatches the fill callback as soon as the order matches |
 
-Still open:
+Not covered:
 
-- `BacktestConfig::latency` is a C++ field. The Python, Node and QuickJS
-  runners take a fee rate and an initial capital rather than a
-  `BacktestConfig`, and there is no C API call to attach a model to a
-  simulated executor, so from a binding the order delay is not reachable yet.
 - Per-symbol calibration. The models are global per component.
+- QuickJS has no `BacktestRunner`, so there the models stay a sampling primitive.
 
-`SimulatedExecutor` does have its own ack-latency knobs, independent of the models above, and they *are* wired into the fill path:
+The venue ack latencies are independent of the models above and wired into the
+fill path too. On `BacktestRunner` they are constructor arguments
+(`submit_ack_latency_ns`, `submit_ack_jitter_ns`, `cancel_ack_latency_ns`,
+`cancel_ack_jitter_ns`, `cancel_ack_seed`, `replace_ack_latency_ns`,
+`replace_ack_jitter_ns`; camelCase in Node); on a `SimulatedExecutor` you drive
+yourself they are setters:
 
 | Setter | Effect |
 |---|---|

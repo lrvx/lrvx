@@ -29,6 +29,9 @@ public:
   BacktestResult runBars(const std::vector<BarEvent>& bars);
   BacktestResult runTape(const std::filesystem::path& data_dir);
   BacktestResult runTapes(const std::vector<std::filesystem::path>& data_dirs);
+  BacktestResult runTapeBars(const std::filesystem::path& data_dir,
+                             std::chrono::nanoseconds interval,
+                             std::optional<SymbolId> symbol = std::nullopt);
 
   // Interactive mode
   void start(replay::IMultiSegmentReader& reader);
@@ -73,6 +76,7 @@ public:
 | `run(reader)` | An `IMultiSegmentReader` | The general path |
 | `runBars(bars)` | A `std::vector<BarEvent>` | Each bar updates the `SimulatedExecutor` — open first, then low, high and close, so resting orders and SL/TP match against the intrabar extremes — and is then dispatched to `Strategy::onBar` and any registered subscriber. An order the callback emits is held for the next bar's open (see below). Bars must be in non-decreasing `endTime` order |
 | `runTape(dir)` | One `.lrvx` directory | Opens the tape via `replay::createMultiSegmentReader`. Throws if `dir` is not a `.lrvx` directory or holds no segments |
+| `runTapeBars(dir, interval, symbol)` | One `.lrvx` directory, replayed as time bars | The tape's trades are aggregated into wall-clock-aligned bars of `interval` while it streams (`TimeBarPolicy`, the policy `aggregate_time_bars` uses: late trades dropped, the last still-open bar not delivered), and each closed bar goes through the same step as `runBars` -- so the next-open rule below applies. Each `BarEvent` carries `BarType::Time`, `barTypeParam` = interval in ns, buy volume and trade count; bar times are Unix nanoseconds, as `runBars` takes them. One symbol per run: with `symbol` only its trades are read, and a tape with none throws `std::invalid_argument`; without it a second symbol's trade stops the run with `std::invalid_argument`. A non-positive interval throws `std::invalid_argument`. Book records are not used |
 | `runTapes(dirs)` | N `.lrvx` directories, merged on read | Symbols are rekeyed into the engine registry via `(metadata.exchange, name)`, so strategies that pre-resolved venue-tagged symbols see the merger's ids. Throws if any input is not `.lrvx`, or if two inputs declare overlapping book streams for the same symbol (`OverlappingBookStreamError`). `runTapes({t})` equals `runTape(t)` modulo the rekey |
 
 ## Bar callbacks fill at the next open
@@ -93,11 +97,17 @@ extremes either.
   signals directly and owns its own matching, so it is on its own here.
 
 Tick and book replay (`run`, `runTape`, `runTapes`) is not affected: there the next event is the
-next price, and the strategy callback runs after the event has been matched.
+next price, and the strategy callback runs after the event has been matched. `runTapeBars` is bar
+replay and follows the rule above.
+
+On bar replay the clock reads each bar's end time. A held order released at the next open with a
+positive submit deferral (`BacktestConfig::latency` order delay plus the submit ack latency) is
+therefore accepted at a later bar's open, never inside the bar it was released in: see
+[Latency on bar replay](../../../how-to/backtest-with-latency.md#latency-on-bar-replay).
 
 ## Reruns
 
-Every entry point — `run`, `runBars`, `runTape`, `runTapes` and interactive `start` — clears the
+Every entry point — `run`, `runBars`, `runTape`, `runTapes`, `runTapeBars` and interactive `start` — clears the
 previous run first: the executor's fills, live, held and conditional orders, market state and
 ladder, the built-in position tracker, the clock, and the event counters. A second run therefore
 reports that run, not the sum of every run so far, and repeats bit for bit.

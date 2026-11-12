@@ -88,14 +88,28 @@ bt.set_strategy(my_strategy)
 
 stats = bt.run_csv("data/btcusdt.csv", "BTCUSDT")
 stats = bt.run_ohlcv(timestamps, closes, "BTCUSDT")
+stats = bt.run_tape_bars("data/tape", 300.0, "BTCUSDT")
 print(stats.return_pct, stats.sharpe_ratio)
 ```
 
 ### Constructor
 
 ```codon
-BacktestRunner(registry: cobj, fee_rate: float = 0.0004, initial_capital: float = 10_000.0)
+BacktestRunner(registry: cobj, fee_rate: float = 0.0004, initial_capital: float = 10_000.0,
+               slippage_model: str = "none", slippage_ticks: int = 0,
+               slippage_tick_size: float = 0.0, slippage_bps: float = 0.0,
+               slippage_impact_coeff: float = 0.0,
+               submit_ack_latency_ns: int = 0, submit_ack_jitter_ns: int = 0,
+               cancel_ack_latency_ns: int = 0, cancel_ack_jitter_ns: int = 0,
+               cancel_ack_seed: int = 42,
+               replace_ack_latency_ns: int = 0, replace_ack_jitter_ns: int = 0,
+               latency = None)
 ```
+
+The arguments after `initial_capital` set the built-in executor's slippage and latency with the
+names and meaning of the Python runner (see
+[BacktestRunner constructor](../python/strategy.md#constructor)); `latency` is a model from
+`lrvx.latency` and must outlive the runner. An invalid setting raises `ValueError`.
 
 ### Methods
 
@@ -106,6 +120,7 @@ BacktestRunner(registry: cobj, fee_rate: float = 0.0004, initial_capital: float 
 | `run_ohlcv(timestamps, closes, symbol)` | `BacktestStats` | Replay raw arrays (`List[int]` timestamps in ns, `List[float]` closes) |
 | `run_bars(start_ns, end_ns, opens, highs, lows, closes, volumes, symbol, bar_type=0, bar_type_param=0)` | `BacktestStats` | Replay full OHLCV bars. `Strategy.on_bar` fires; `on_trade` does **not** |
 | `run_tape(path)` | `BacktestStats` | Replay one `.lrvx` tape directory |
+| `run_tape_bars(path, interval_seconds, symbol="")` | `BacktestStats` | Replay a `.lrvx` tape as time bars, aggregated while it streams; each closed bar goes to `on_bar` with `run_bars`' fill rules. Same result as `aggregate_time_bars` -> `run_bars` on the tape's trades. `symbol` is required when the tape holds more than one |
 | `run_tapes(paths)` | `BacktestStats` | Replay N `.lrvx` tapes merged on read |
 | `equity_curve()` | `Tuple[List[int], List[float], List[float]]` | `(timestamps_ns, equity, drawdown_pct)` from the most recent run, all the same length. Raises if no run has completed |
 | `trades()` | 9 parallel lists | `(symbol, side, entry_price, exit_price, quantity, pnl, fee, entry_time_ns, exit_time_ns)` for the closed trades of the most recent run. `side` is 0 for long, 1 for short |

@@ -2,6 +2,13 @@
 
 Run one bar strategy over many parameter combinations fast enough to iterate on the grid, not wait for it.
 
+A single run over a recorded tape does not need the arrays at all:
+`run_tape_bars(path, interval_seconds=..., symbol=...)` aggregates the tape
+while it streams and gives the same result as the explicit route (see
+[Bars from a tape in one call](backtest.md#bars-from-a-tape-in-one-call)).
+A sweep repeats the run many times over the same bars, so it pays to build the
+bars once and reuse them, which is what this page does.
+
 ## Load the bars once
 
 `run_bars` takes the bar arrays and nothing else: no file, no parsing, no conversion. Load them once and hand the same arrays to every run. Timestamps are nanoseconds and the call does no unit guessing, so a file with millisecond timestamps is multiplied by 1 000 000 at load time, once.

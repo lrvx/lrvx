@@ -69,6 +69,11 @@ from C import lrvx_live_engine_publish_bar(cobj, u32, u8, u64,
 from C import lrvx_live_engine_set_market_data_recorder(cobj, cobj)
 
 from C import lrvx_backtest_runner_create(cobj, float, float) -> cobj
+from C import lrvx_backtest_runner_create_with_fill_settings(
+    cobj, float, float, i32, i32, float, float, float,
+    i64, i64, i64, i64, u64, i64, i64, cobj) -> cobj
+from C import lrvx_backtest_runner_run_tape_bars(cobj, cobj, i64, cobj, Ptr[i64]) -> i32
+from C import lrvx_last_error_message() -> cobj
 from C import lrvx_backtest_runner_destroy(cobj)
 from C import lrvx_backtest_runner_set_strategy(cobj, cobj)
 from C import lrvx_backtest_runner_run_csv(cobj, cobj, cobj, Ptr[i64]) -> i32
@@ -401,9 +406,54 @@ class BacktestRunner:
     _registry: cobj
 
     def __init__(self, registry: cobj, fee_rate: float = 0.0004,
-                 initial_capital: float = 10_000.0):
+                 initial_capital: float = 10_000.0,
+                 slippage_model: str = "none", slippage_ticks: int = 0,
+                 slippage_tick_size: float = 0.0, slippage_bps: float = 0.0,
+                 slippage_impact_coeff: float = 0.0,
+                 submit_ack_latency_ns: int = 0, submit_ack_jitter_ns: int = 0,
+                 cancel_ack_latency_ns: int = 0, cancel_ack_jitter_ns: int = 0,
+                 cancel_ack_seed: int = 42,
+                 replace_ack_latency_ns: int = 0, replace_ack_jitter_ns: int = 0,
+                 latency = None):
+        """The keywords after initial_capital are the built-in executor's
+        slippage and latency, the same BacktestConfig fields the Python
+        BacktestRunner takes under the same names. slippage_model: none |
+        fixed_ticks | fixed_bps | volume_impact. latency: a ConstantLatency,
+        GaussianLatency, ExponentialLatency or EmpiricalLatency from
+        lrvx.latency, which must outlive the runner. A setting the chosen
+        model does not read, or a negative latency, raises ValueError.
+        All defaults give the plain runner."""
         self._registry = registry
-        self._handle = lrvx_backtest_runner_create(registry, fee_rate, initial_capital)
+        models = ["none", "fixed_ticks", "fixed_bps", "volume_impact"]
+        model = -1
+        for k in range(len(models)):
+            if models[k] == slippage_model:
+                model = k
+        if model < 0:
+            raise ValueError("BacktestRunner: slippage_model must be one of 'none', "
+                             "'fixed_ticks', 'fixed_bps', 'volume_impact'; got '"
+                             + slippage_model + "'")
+        latency_h = cobj()
+        if latency is not None:
+            latency_h = latency._h
+        plain = (model == 0 and slippage_ticks == 0 and slippage_tick_size == 0.0
+                 and slippage_bps == 0.0 and slippage_impact_coeff == 0.0
+                 and submit_ack_latency_ns == 0 and submit_ack_jitter_ns == 0
+                 and cancel_ack_latency_ns == 0 and cancel_ack_jitter_ns == 0
+                 and replace_ack_latency_ns == 0 and replace_ack_jitter_ns == 0
+                 and latency_h == cobj())
+        if plain:
+            self._handle = lrvx_backtest_runner_create(registry, fee_rate, initial_capital)
+        else:
+            self._handle = lrvx_backtest_runner_create_with_fill_settings(
+                registry, fee_rate, initial_capital, i32(model), i32(slippage_ticks),
+                slippage_tick_size, slippage_bps, slippage_impact_coeff,
+                i64(submit_ack_latency_ns), i64(submit_ack_jitter_ns),
+                i64(cancel_ack_latency_ns), i64(cancel_ack_jitter_ns),
+                u64(cancel_ack_seed),
+                i64(replace_ack_latency_ns), i64(replace_ack_jitter_ns), latency_h)
+            if self._handle == cobj():
+                raise ValueError("BacktestRunner: " + str.from_ptr(lrvx_last_error_message()))
 
     def close(self):
         if self._handle != cobj():
@@ -478,6 +528,34 @@ class BacktestRunner:
             self._handle, path.c_str(), buf.arr.ptr)
         if ok == i32(0):
             raise ValueError(f"BacktestRunner.run_tape failed: {path}")
+        return self._parse_stats(buf)
+
+    def run_tape_bars(self, path: str, interval_seconds: float,
+                      symbol: str = "") -> BacktestStats:
+        """Replay a `.lrvx` tape as time bars of interval_seconds. The
+        trades are aggregated while the tape streams (wall-clock aligned,
+        the last still-open bar dropped, as aggregate_time_bars does) and
+        each closed bar goes to Strategy.on_bar with run_bars' fill rules:
+        an order sent from on_bar fills at the next bar's open. on_trade
+        does not fire. symbol is required when the tape holds more than one;
+        its registry id must be the tape's symbol id. Raises ValueError with
+        the reason on a bad interval, an unknown symbol, an unreadable tape
+        or a symbol with no trades."""
+        # NaN and infinity fail the range test; the cast truncates like
+        # aggregate_time_bars' conversion.
+        finite = interval_seconds > 0.0 and interval_seconds < 1e9
+        interval_ns = int(interval_seconds * 1e9) if finite else 0
+        if interval_ns <= 0:
+            raise ValueError("BacktestRunner.run_tape_bars: interval_seconds must be a "
+                             "finite number of seconds of at least one nanosecond")
+        buf = [i64(0)] * 29
+        sym = cobj()
+        if symbol != "":
+            sym = symbol.c_str()
+        ok = lrvx_backtest_runner_run_tape_bars(
+            self._handle, path.c_str(), i64(interval_ns), sym, buf.arr.ptr)
+        if ok == i32(0):
+            raise ValueError(str.from_ptr(lrvx_last_error_message()))
         return self._parse_stats(buf)
 
     def run_tapes(self, paths: List[str]) -> BacktestStats:

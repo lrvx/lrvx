@@ -289,6 +289,13 @@
     },
     {
       "language": "python",
+      "path": "docs/examples/python_run_tape_bars.py",
+      "sha256": "9f3f278335875a4e80be3c2d9ac962a92e217cd24cadd3f074cbec6728d36936",
+      "size_bytes": 3268,
+      "topic": "strategy"
+    },
+    {
+      "language": "python",
       "path": "docs/examples/python_stp_modes.py",
       "sha256": "cc816a51ea04e354dbffb29695939cd42294ceb847a1e4f2f8dcb0f8cf89b9b6",
       "size_bytes": 782,

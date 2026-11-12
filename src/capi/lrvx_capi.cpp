@@ -23,6 +23,7 @@
 #include "lrvx/backtest/backtest_runner.h"
 #include "lrvx/backtest/grid_search.h"
 #include "lrvx/backtest/latency_model.h"
+#include "lrvx/backtest/runner_fill_settings.h"
 #include "lrvx/backtest/simulated_clock.h"
 #include "lrvx/backtest/simulated_executor.h"
 #include "lrvx/backtest/walk_forward.h"
@@ -7856,14 +7857,63 @@ struct LrvxBacktestRunnerImpl
   // backtest. Replaced on every run.
   std::optional<BacktestResult> lastResult;
 
-  explicit LrvxBacktestRunnerImpl(SymbolRegistry* reg, double feeRate, double initialCapital)
-      : registry(reg)
+  // Slippage and latency given at creation (create_with_fill_settings).
+  // Kept so the runner can refuse what would silently bypass them.
+  RunnerFillSettings fill;
+
+  explicit LrvxBacktestRunnerImpl(SymbolRegistry* reg, double feeRate, double initialCapital,
+                                  RunnerFillSettings fillSettings = {})
+      : registry(reg), fill(std::move(fillSettings))
   {
     BacktestConfig cfg{};
     cfg.feeRate = feeRate;
     cfg.initialCapital = initialCapital;
     cfg.usePercentageFee = true;
+    fill.applyTo(cfg);
     runner = std::make_unique<BacktestRunner>(cfg);
+  }
+
+  // VOLUME_IMPACT reads the visible level size; bar and trade-only replays
+  // report none, so the model would add nothing.
+  void refuseWithoutDepth(const char* fn) const
+  {
+    if (fill.slippageModel == SlippageModel::VOLUME_IMPACT)
+    {
+      throw std::invalid_argument(
+          std::string(fn) +
+          ": slippage model volume_impact needs book depth, and this replay has none "
+          "(bars and trade-only data report no level sizes); use fixed_ticks or fixed_bps, "
+          "or volume_impact with run_tape on a tape that records the book");
+    }
+  }
+
+  int runTapeBars(const char* tapeDir, int64_t intervalNs, const char* symbol,
+                  LrvxBacktestStats* out)
+  {
+    if (intervalNs <= 0)
+    {
+      throw std::invalid_argument("interval_ns must be positive, got " +
+                                  std::to_string(intervalNs));
+    }
+    refuseWithoutDepth("run_tape_bars");
+    std::optional<SymbolId> sid;
+    if (symbol != nullptr && symbol[0] != '\0')
+    {
+      const uint32_t id = resolveSymbol(symbol);
+      if (id == 0)
+      {
+        throw std::invalid_argument(std::string("symbol '") + symbol + "' is not registered");
+      }
+      sid = id;
+    }
+    BacktestResult result =
+        runner->runTapeBars(std::filesystem::path(tapeDir), std::chrono::nanoseconds{intervalNs}, sid);
+    if (out)
+    {
+      fillStats(result.computeStats(), out);
+    }
+    lastResult = std::move(result);
+    return 1;
   }
 
   void addExecutionListener(LrvxExecutionListenerImpl* impl)
@@ -7885,6 +7935,12 @@ struct LrvxBacktestRunnerImpl
       runner->setExecutor(nullptr);
       executorAdapter.reset();
       return;
+    }
+    if (fill.customized())
+    {
+      throw std::invalid_argument(
+          "the runner was created with slippage or latency settings, which apply to the "
+          "built-in executor only; the attached executor would not use them");
     }
     executorAdapter = std::make_unique<CapiExecutor>(impl);
     runner->setExecutor(executorAdapter.get());
@@ -8085,6 +8141,7 @@ struct LrvxBacktestRunnerImpl
 
   int runCsv(const char* path, const char* symbol, LrvxBacktestStats* out)
   {
+    refuseWithoutDepth("run_csv");
     uint32_t id = resolveSymbol(symbol);
     std::ifstream f(path);
     if (!f.is_open())
@@ -8118,6 +8175,7 @@ struct LrvxBacktestRunnerImpl
   int runOhlcv(const int64_t* ts, const double* close, uint32_t n,
                const char* symbol, LrvxBacktestStats* out)
   {
+    refuseWithoutDepth("run_ohlcv");
     uint32_t id = resolveSymbol(symbol);
     std::vector<OhlcvBacktestReader::Bar> bars;
     bars.reserve(n);
@@ -8137,6 +8195,7 @@ struct LrvxBacktestRunnerImpl
                   const char* symbol, uint8_t bar_type, uint64_t bar_type_param,
                   LrvxBacktestStats* out)
   {
+    refuseWithoutDepth("run_bars");
     uint32_t id = resolveSymbol(symbol);
     std::vector<BarEvent> events;
     events.reserve(n);
@@ -9106,6 +9165,68 @@ int lrvx_backtest_runner_run_tape(LrvxBacktestRunnerHandle h,
 {
   LRVX_CAPI_ENTER(h);
   return toBacktestRunner(h)->runTape(tape_dir, out);
+  LRVX_CAPI_LEAVE;
+}
+
+int lrvx_backtest_runner_run_tape_bars(LrvxBacktestRunnerHandle h,
+                                       const char* tape_dir,
+                                       int64_t interval_ns,
+                                       const char* symbol,
+                                       LrvxBacktestStats* out)
+{
+  LRVX_CAPI_ENTER(h);
+  LRVX_CAPI_REQUIRE(tape_dir);
+  return toBacktestRunner(h)->runTapeBars(tape_dir, interval_ns, symbol, out);
+  LRVX_CAPI_LEAVE;
+}
+
+LrvxBacktestRunnerHandle lrvx_backtest_runner_create_with_fill_settings(
+    LrvxRegistryHandle registry,
+    double fee_rate,
+    double initial_capital,
+    int32_t slippage_model,
+    int32_t slippage_ticks,
+    double slippage_tick_size,
+    double slippage_bps,
+    double slippage_impact_coeff,
+    int64_t submit_ack_latency_ns,
+    int64_t submit_ack_jitter_ns,
+    int64_t cancel_ack_latency_ns,
+    int64_t cancel_ack_jitter_ns,
+    uint64_t cancel_ack_seed,
+    int64_t replace_ack_latency_ns,
+    int64_t replace_ack_jitter_ns,
+    LrvxLatencyModelHandle latency)
+{
+  LRVX_CAPI_ENTER(registry);
+  if (slippage_model < 0 || slippage_model > static_cast<int32_t>(SlippageModel::VOLUME_IMPACT))
+  {
+    throw std::invalid_argument(
+        "slippage_model must be 0 (none), 1 (fixed_ticks), 2 (fixed_bps) or 3 (volume_impact), "
+        "got " +
+        std::to_string(slippage_model));
+  }
+  RunnerFillSettings fill;
+  fill.slippageModel = static_cast<SlippageModel>(slippage_model);
+  fill.slippageTicks = slippage_ticks;
+  fill.slippageTickSize = slippage_tick_size;
+  fill.slippageBps = slippage_bps;
+  fill.slippageImpactCoeff = slippage_impact_coeff;
+  fill.submitAckLatencyNs = submit_ack_latency_ns;
+  fill.submitAckJitterNs = submit_ack_jitter_ns;
+  fill.cancelAckLatencyNs = cancel_ack_latency_ns;
+  fill.cancelAckJitterNs = cancel_ack_jitter_ns;
+  fill.cancelAckSeed = cancel_ack_seed;
+  fill.replaceAckLatencyNs = replace_ack_latency_ns;
+  fill.replaceAckJitterNs = replace_ack_jitter_ns;
+  if (latency != nullptr)
+  {
+    // Borrowed: the caller owns the model and keeps it alive (documented).
+    fill.latency = std::shared_ptr<lrvx::LatencyModel>(
+        static_cast<lrvx::LatencyModel*>(latency), [](lrvx::LatencyModel*) {});
+  }
+  return static_cast<LrvxBacktestRunnerHandle>(new LrvxBacktestRunnerImpl(
+      toRegistry(registry), fee_rate, initial_capital, std::move(fill)));
   LRVX_CAPI_LEAVE;
 }
 
