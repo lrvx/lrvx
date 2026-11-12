@@ -6,6 +6,7 @@
 #include <vector>
 #include "bindings_common.h"
 #include "lrvx/capi/lrvx_capi.h"
+#include "lrvx/replay/readers/binary_log_reader.h"
 #include "tape_aggregators.h"
 
 namespace node_lrvx
@@ -276,47 +277,119 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
   }
 
  private:
+  // One walk of the tape per call. The C API's read functions fill a caller
+  // buffer, which leaves a caller that does not know the size counting in one
+  // walk and filling in a second: two reads, and every ReaderStats counter
+  // doubled. The addon links the core, so it walks the reader itself and
+  // grows its rows instead. `visit` returns false to stop the walk.
+  //
+  // A walk that throws (strictOrdering on a late event) returns false and
+  // the caller returns no rows, as the C API read did: see
+  // DataReaderOptions.strictOrdering.
+  template <typename Visit>
+  bool walk(int64_t startTsNs, bool useFrom, Visit&& visit)
+  {
+    if (!_h)
+    {
+      return false;
+    }
+    auto* reader = static_cast<lrvx::replay::BinaryLogReader*>(_h);
+    try
+    {
+      if (useFrom)
+      {
+        reader->forEachFrom(startTsNs, visit);
+      }
+      else
+      {
+        reader->forEach(visit);
+      }
+    }
+    catch (const std::exception&)
+    {
+      return false;
+    }
+    return true;
+  }
+
+  static bool isBook(const lrvx::replay::ReplayEvent& ev)
+  {
+    using lrvx::replay::EventType;
+    return ev.type == EventType::BookSnapshot || ev.type == EventType::BookDelta ||
+           ev.type == EventType::BookTop;
+  }
+
+  // maxTrades == 0: no limit.
   Napi::Value readTradesImpl(Napi::Env env, int64_t startTsNs, bool useFrom, uint64_t maxTrades)
   {
-    if (maxTrades == 0)
+    std::vector<lrvx::replay::TradeRecord> trades;
+    const bool ok = walk(startTsNs, useFrom,
+                         [&](const lrvx::replay::ReplayEvent& ev) -> bool
+                         {
+                           if (ev.type == lrvx::replay::EventType::Trade)
+                           {
+                             trades.push_back(ev.trade);
+                           }
+                           return maxTrades == 0 || trades.size() < maxTrades;
+                         });
+    if (!ok)
     {
-      maxTrades = useFrom ? lrvx_data_reader_read_trades_from(_h, startTsNs, nullptr, 0)
-                          : lrvx_data_reader_read_trades(_h, nullptr, 0);
+      trades.clear();
     }
-    std::vector<LrvxTradeRecord> trades(maxTrades);
-    uint64_t n = useFrom
-                     ? lrvx_data_reader_read_trades_from(_h, startTsNs, trades.data(), maxTrades)
-                     : lrvx_data_reader_read_trades(_h, trades.data(), maxTrades);
-    auto arr = Napi::Array::New(env, n);
-    for (uint64_t i = 0; i < n; i++)
+    auto arr = Napi::Array::New(env, trades.size());
+    for (size_t i = 0; i < trades.size(); i++)
     {
+      const auto& t = trades[i];
       auto o = Napi::Object::New(env);
-      o.Set("exchangeTsNs", (double)trades[i].exchange_ts_ns);
-      o.Set("recvTsNs", (double)trades[i].recv_ts_ns);
-      o.Set("price", (double)trades[i].price_raw / 1e8);
-      o.Set("qty", (double)trades[i].qty_raw / 1e8);
-      o.Set("tradeId", (double)trades[i].trade_id);
-      o.Set("symbolId", trades[i].symbol_id);
+      o.Set("exchangeTsNs", (double)t.exchange_ts_ns);
+      o.Set("recvTsNs", (double)t.recv_ts_ns);
+      o.Set("price", (double)t.price_raw / 1e8);
+      o.Set("qty", (double)t.qty_raw / 1e8);
+      o.Set("tradeId", (double)t.trade_id);
+      o.Set("symbolId", t.symbol_id);
       // TradeRecord.side is declared "buy" | "sell", not a number.
-      o.Set("side", Napi::String::New(env, trades[i].side == 0 ? "buy" : "sell"));
+      o.Set("side", Napi::String::New(env, t.side == 0 ? "buy" : "sell"));
       arr.Set((uint32_t)i, o);
     }
     return arr;
   }
 
+  // maxEvents == 0: no limit.
   Napi::Value readBboImpl(Napi::Env env, int64_t startTsNs, bool useFrom, uint64_t maxEvents)
   {
-    if (maxEvents == 0)
+    std::vector<LrvxBBO> bbos;
+    const bool ok = walk(startTsNs, useFrom,
+                         [&](const lrvx::replay::ReplayEvent& ev) -> bool
+                         {
+                           if (!isBook(ev))
+                           {
+                             return true;
+                           }
+                           LrvxBBO b{};
+                           b.exchange_ts_ns = ev.book_header.exchange_ts_ns;
+                           b.recv_ts_ns = ev.book_header.recv_ts_ns;
+                           b.seq = ev.book_header.seq;
+                           b.symbol_id = ev.book_header.symbol_id;
+                           b.event_type = ev.book_header.type;
+                           if (!ev.bids.empty())
+                           {
+                             b.bid_price_raw = ev.bids[0].price_raw;
+                             b.bid_qty_raw = ev.bids[0].qty_raw;
+                           }
+                           if (!ev.asks.empty())
+                           {
+                             b.ask_price_raw = ev.asks[0].price_raw;
+                             b.ask_qty_raw = ev.asks[0].qty_raw;
+                           }
+                           bbos.push_back(b);
+                           return maxEvents == 0 || bbos.size() < maxEvents;
+                         });
+    if (!ok)
     {
-      maxEvents = useFrom ? lrvx_data_reader_read_bbo_from(_h, startTsNs, nullptr, 0)
-                          : lrvx_data_reader_read_bbo(_h, nullptr, 0);
+      bbos.clear();
     }
-    std::vector<LrvxBBO> bbos(maxEvents);
-    uint64_t n = useFrom
-                     ? lrvx_data_reader_read_bbo_from(_h, startTsNs, bbos.data(), maxEvents)
-                     : lrvx_data_reader_read_bbo(_h, bbos.data(), maxEvents);
-    auto arr = Napi::Array::New(env, n);
-    for (uint64_t i = 0; i < n; i++)
+    auto arr = Napi::Array::New(env, bbos.size());
+    for (size_t i = 0; i < bbos.size(); i++)
     {
       auto o = Napi::Object::New(env);
       o.Set("exchangeTsNs", (double)bbos[i].exchange_ts_ns);
@@ -350,22 +423,36 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
  private:
   Napi::Value readBookUpdatesImpl(Napi::Env env, int64_t startTsNs, bool useFrom)
   {
-    uint64_t totalLevels = 0;
-    uint64_t maxEvents = useFrom
-                             ? lrvx_data_reader_count_book_updates_from(_h, startTsNs, &totalLevels)
-                             : lrvx_data_reader_count_book_updates(_h, &totalLevels);
+    std::vector<LrvxBookUpdateHeader> headers;
+    std::vector<lrvx::replay::BookLevel> levels;
+    const bool ok = walk(startTsNs, useFrom,
+                         [&](const lrvx::replay::ReplayEvent& ev) -> bool
+                         {
+                           if (!isBook(ev))
+                           {
+                             return true;
+                           }
+                           LrvxBookUpdateHeader hdr{};
+                           hdr.exchange_ts_ns = ev.book_header.exchange_ts_ns;
+                           hdr.recv_ts_ns = ev.book_header.recv_ts_ns;
+                           hdr.seq = ev.book_header.seq;
+                           hdr.level_offset = levels.size();
+                           hdr.symbol_id = ev.book_header.symbol_id;
+                           hdr.bid_count = static_cast<uint16_t>(ev.bids.size());
+                           hdr.ask_count = static_cast<uint16_t>(ev.asks.size());
+                           hdr.event_type = ev.book_header.type;
+                           headers.push_back(hdr);
+                           levels.insert(levels.end(), ev.bids.begin(), ev.bids.end());
+                           levels.insert(levels.end(), ev.asks.begin(), ev.asks.end());
+                           return true;
+                         });
+    if (!ok)
+    {
+      headers.clear();
+    }
 
-    std::vector<LrvxBookUpdateHeader> headers(maxEvents);
-    std::vector<LrvxLevel> levels(totalLevels);
-    uint64_t n = useFrom
-                     ? lrvx_data_reader_read_book_updates_from(_h, startTsNs, headers.data(),
-                                                               maxEvents, levels.data(),
-                                                               totalLevels)
-                     : lrvx_data_reader_read_book_updates(_h, headers.data(), maxEvents,
-                                                          levels.data(), totalLevels);
-
-    auto arr = Napi::Array::New(env, n);
-    for (uint64_t i = 0; i < n; i++)
+    auto arr = Napi::Array::New(env, headers.size());
+    for (size_t i = 0; i < headers.size(); i++)
     {
       const auto& h = headers[i];
       auto o = Napi::Object::New(env);

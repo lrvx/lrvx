@@ -303,6 +303,8 @@ Emitted by strategies, received by the order backend.
 | `returnPct` | `double` | Net return (%) |
 | `startTimeNs` | `int64_t` | Backtest start timestamp (ns) |
 | `endTimeNs` | `int64_t` | Backtest end timestamp (ns) |
+| `optionQuoteCount` | `uint64_t` | Option-quote records the run read and delivered to nobody: filled by `run_tape`, `run_tapes` and `run_tape_bars_on_ticks`, 0 otherwise |
+| `poolStateCount` | `uint64_t` | Pool-state records the run read and delivered to nobody, as `optionQuoteCount` |
 
 ### `LrvxEquityPoint`
 
@@ -573,6 +575,18 @@ int lrvx_backtest_runner_run_tape_bars(LrvxBacktestRunnerHandle runner,
                                        const char* tape_dir, int64_t interval_ns,
                                        const char* symbol,
                                        LrvxBacktestStats* stats_out);
+
+// The same bars to on_bar, every trade and book record to the executor as
+// run_tape feeds them. Bar n is delivered when the first trade stamped at or
+// after its end arrives, before that trade reaches the executor; an order sent
+// from on_bar can first match against that trade (with a submit latency L,
+// the first record at or after the bar's end + L). symbol as for
+// run_tape_bars. Returns 1 on success, 0 on error with the reason in
+// lrvx_last_error_message().
+int lrvx_backtest_runner_run_tape_bars_on_ticks(LrvxBacktestRunnerHandle runner,
+                                                const char* tape_dir, int64_t interval_ns,
+                                                const char* symbol,
+                                                LrvxBacktestStats* stats_out);
 
 // lrvx_backtest_runner_create with the built-in executor's slippage and
 // latency (BacktestConfig fields of the same names). slippage_model: 0 none,

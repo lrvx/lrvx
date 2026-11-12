@@ -48,9 +48,22 @@ from C import lrvx_indicator_correlation(Ptr[f64], Ptr[f64], int, int, Ptr[f64])
 from C import lrvx_indicator_adf(Ptr[f64], int, int, cobj,
                                   Ptr[f64], Ptr[f64], Ptr[int])
 from C import lrvx_indicator_autocorrelation(Ptr[f64], int, int, int, Ptr[f64])
+from C import lrvx_clear_last_error()
+from C import lrvx_last_error_code() -> i32
+from C import lrvx_last_error_message() -> cobj
 
 
 # ── Internal helpers ─────────────────────────────────────────────────
+
+def _refused():
+    """A registry batch call whose integer arguments are below their floor
+    (lrvx/indicator/params.h) writes nothing and records E_IND_001: raise it,
+    as the streaming constructor raises the same refusal. Call
+    lrvx_clear_last_error() before the C call; a successful call does not
+    clear it."""
+    if int(lrvx_last_error_code()) != 0:
+        raise ValueError(str.from_ptr(lrvx_last_error_message()))
+
 
 def _last1(data: List[float], period: int, fn) -> float:
     """Last element of `fn(data, period)`."""
@@ -66,42 +79,58 @@ def _last1(data: List[float], period: int, fn) -> float:
 
 def sma(data: List[float], period: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_sma(data.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def ema(data: List[float], period: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_ema(data.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def rma(data: List[float], period: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_rma(data.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def dema(data: List[float], period: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_dema(data.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def tema(data: List[float], period: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_tema(data.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def kama(data: List[float], period: int, fast: int = 2, slow: int = 30) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_kama(data.arr.ptr, n, period, fast, slow, out.arr.ptr)
+    _refused()
     return out
 
 def rsi(data: List[float], period: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_rsi(data.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def slope(data: List[float], length: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_slope(data.arr.ptr, n, length, out.arr.ptr)
+    _refused()
     return out
 
 def atr(high: List[float], low: List[float], close: List[float], period: int) -> List[float]:
@@ -109,7 +138,9 @@ def atr(high: List[float], low: List[float], close: List[float], period: int) ->
     if len(low) != n or len(close) != n:
         raise ValueError("atr: high, low, close must have the same length")
     out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_atr(high.arr.ptr, low.arr.ptr, close.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def cci(high: List[float], low: List[float], close: List[float], period: int) -> List[float]:
@@ -117,7 +148,9 @@ def cci(high: List[float], low: List[float], close: List[float], period: int) ->
     if len(low) != n or len(close) != n:
         raise ValueError("cci: high, low, close must have the same length")
     out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_cci(high.arr.ptr, low.arr.ptr, close.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def chop(high: List[float], low: List[float], close: List[float], period: int) -> List[float]:
@@ -125,7 +158,9 @@ def chop(high: List[float], low: List[float], close: List[float], period: int) -
     if len(low) != n or len(close) != n:
         raise ValueError("chop: high, low, close must have the same length")
     out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_chop(high.arr.ptr, low.arr.ptr, close.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def obv(close: List[float], volume: List[float]) -> List[float]:
@@ -156,22 +191,30 @@ def cvd(open_: List[float], high: List[float], low: List[float],
 
 def skewness(data: List[float], period: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_skewness(data.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def kurtosis(data: List[float], period: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_kurtosis(data.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def rolling_zscore(data: List[float], period: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_rolling_zscore(data.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def shannon_entropy(data: List[float], period: int, bins: int = 10) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_shannon_entropy(data.arr.ptr, n, period, bins, out.arr.ptr)
+    _refused()
     return out
 
 def parkinson_vol(high: List[float], low: List[float], period: int) -> List[float]:
@@ -179,7 +222,9 @@ def parkinson_vol(high: List[float], low: List[float], period: int) -> List[floa
     if len(low) != n:
         raise ValueError("parkinson_vol: high, low must have the same length")
     out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_parkinson_vol(high.arr.ptr, low.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def rogers_satchell_vol(open_: List[float], high: List[float], low: List[float],
@@ -188,8 +233,10 @@ def rogers_satchell_vol(open_: List[float], high: List[float], low: List[float],
     if len(high) != n or len(low) != n or len(close) != n:
         raise ValueError("rogers_satchell_vol: open, high, low, close must have the same length")
     out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_rogers_satchell_vol(open_.arr.ptr, high.arr.ptr, low.arr.ptr,
                                         close.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 # Named rolling_correlation (not correlation) to avoid colliding with the
@@ -202,12 +249,16 @@ def rolling_correlation(x: List[float], y: List[float], period: int) -> List[flo
     if len(y) != n:
         raise ValueError("rolling_correlation: x, y must have the same length")
     out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_correlation(x.arr.ptr, y.arr.ptr, n, period, out.arr.ptr)
+    _refused()
     return out
 
 def autocorrelation(data: List[float], window: int, lag: int) -> List[float]:
     n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_autocorrelation(data.arr.ptr, n, window, lag, out.arr.ptr)
+    _refused()
     return out
 
 
@@ -225,8 +276,10 @@ class MacdResult:
 def macd(data: List[float], fast: int = 12, slow: int = 26, signal: int = 9) -> MacdResult:
     n = len(data)
     line = [0.0] * n; sig = [0.0] * n; hist = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_macd(data.arr.ptr, n, fast, slow, signal,
                         line.arr.ptr, sig.arr.ptr, hist.arr.ptr)
+    _refused()
     return MacdResult(line, sig, hist)
 
 class BollingerResult:
@@ -241,8 +294,10 @@ class BollingerResult:
 def bollinger(data: List[float], period: int = 20, multiplier: float = 2.0) -> BollingerResult:
     n = len(data)
     upper = [0.0] * n; middle = [0.0] * n; lower = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_bollinger(data.arr.ptr, n, period, multiplier,
                              upper.arr.ptr, middle.arr.ptr, lower.arr.ptr)
+    _refused()
     return BollingerResult(upper, middle, lower)
 
 class StochasticResult:
@@ -258,8 +313,10 @@ def stochastic(high: List[float], low: List[float], close: List[float],
     if len(low) != n or len(close) != n:
         raise ValueError("stochastic: high, low, close must have the same length")
     k = [0.0] * n; d = [0.0] * n
+    lrvx_clear_last_error()
     lrvx_indicator_stochastic(high.arr.ptr, low.arr.ptr, close.arr.ptr, n,
                                k_period, d_period, k.arr.ptr, d.arr.ptr)
+    _refused()
     return StochasticResult(k, d)
 
 class AdxResult:
@@ -325,7 +382,6 @@ from C import lrvx_streaming_indicator_output(cobj, u32) -> float
 from C import lrvx_streaming_indicator_ready(cobj) -> u8
 from C import lrvx_streaming_indicator_count(cobj) -> u64
 from C import lrvx_streaming_indicator_reset(cobj)
-from C import lrvx_last_error_message() -> cobj
 
 
 class _Stream:

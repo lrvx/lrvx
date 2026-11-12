@@ -293,6 +293,7 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 - `run_ohlcv(self, ts: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol: str = '') -> typing.Any`
 - `run_tape(self, path: str) -> typing.Any`
 - `run_tape_bars(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any`
+- `run_tape_bars_on_ticks(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any`
 - `run_tapes(self, paths: collections.abc.Sequence[str]) -> typing.Any`
 - `session_book_snapshot(self, symbol: typing.Any, bid_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ask_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `session_fills(self) -> numpy.ndarray[typing.Any, numpy.dtype[numpy.void]]`

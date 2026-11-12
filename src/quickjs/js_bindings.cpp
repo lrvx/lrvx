@@ -809,12 +809,28 @@ static std::vector<double> jsArrayToDoubles(JSContext* ctx, JSValueConst arr)
   return result;
 }
 
+// A registry batch call whose integer arguments are below their floor
+// (lrvx/indicator/params.h) writes nothing and records E_IND_001; it is
+// thrown here, as the streaming constructor throws the same refusal, instead
+// of handing back an array nobody wrote. The error is cleared first because
+// a successful call does not clear it.
+#define LRVX_JS_INDICATOR_CALL(ctx, ...)                                \
+  do                                                                    \
+  {                                                                     \
+    lrvx_clear_last_error();                                            \
+    __VA_ARGS__;                                                        \
+    if (lrvx_last_error_code() != 0)                                    \
+    {                                                                   \
+      return JS_ThrowTypeError((ctx), "%s", lrvx_last_error_message()); \
+    }                                                                   \
+  } while (0)
+
 static JSValue js_indicator_sma(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
   auto data = jsArrayToDoubles(ctx, argv[0]);
   uint32_t period = toUint32(ctx, argv[1]);
   std::vector<double> output(data.size());
-  lrvx_indicator_sma(data.data(), data.size(), period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_sma(data.data(), data.size(), period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -823,7 +839,7 @@ static JSValue js_indicator_ema(JSContext* ctx, JSValueConst, int, JSValueConst*
   auto data = jsArrayToDoubles(ctx, argv[0]);
   uint32_t period = toUint32(ctx, argv[1]);
   std::vector<double> output(data.size());
-  lrvx_indicator_ema(data.data(), data.size(), period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_ema(data.data(), data.size(), period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -832,7 +848,7 @@ static JSValue js_indicator_rsi(JSContext* ctx, JSValueConst, int, JSValueConst*
   auto data = jsArrayToDoubles(ctx, argv[0]);
   uint32_t period = toUint32(ctx, argv[1]);
   std::vector<double> output(data.size());
-  lrvx_indicator_rsi(data.data(), data.size(), period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_rsi(data.data(), data.size(), period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -865,7 +881,7 @@ static JSValue js_indicator_atr(JSContext* ctx, JSValueConst, int, JSValueConst*
   uint32_t period = toUint32(ctx, argv[3]);
   size_t len = high.size();
   std::vector<double> output(len);
-  lrvx_indicator_atr(high.data(), low.data(), close.data(), len, period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_atr(high.data(), low.data(), close.data(), len, period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -877,8 +893,8 @@ static JSValue js_indicator_macd(JSContext* ctx, JSValueConst, int argc, JSValue
   uint32_t signal = (argc > 3) ? toUint32(ctx, argv[3]) : 9;
   size_t len = data.size();
   std::vector<double> macdOut(len), signalOut(len), histOut(len);
-  lrvx_indicator_macd(data.data(), len, fast, slow, signal, macdOut.data(), signalOut.data(),
-                      histOut.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_macd(data.data(), len, fast, slow, signal, macdOut.data(), signalOut.data(),
+                                                  histOut.data()));
   JSValue result = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, result, "line", jsArrayFromDoubles(ctx, macdOut));
   JS_SetPropertyStr(ctx, result, "signal", jsArrayFromDoubles(ctx, signalOut));
@@ -893,8 +909,8 @@ static JSValue js_indicator_bollinger(JSContext* ctx, JSValueConst, int argc, JS
   double multiplier = (argc > 2) ? toDouble(ctx, argv[2]) : 2.0;
   size_t len = data.size();
   std::vector<double> upper(len), middle(len), lower(len);
-  lrvx_indicator_bollinger(data.data(), len, period, multiplier, upper.data(), middle.data(),
-                           lower.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_bollinger(data.data(), len, period, multiplier, upper.data(), middle.data(),
+                                                       lower.data()));
   JSValue result = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, result, "upper", jsArrayFromDoubles(ctx, upper));
   JS_SetPropertyStr(ctx, result, "middle", jsArrayFromDoubles(ctx, middle));
@@ -907,7 +923,7 @@ static JSValue js_indicator_rma(JSContext* ctx, JSValueConst, int, JSValueConst*
   auto data = jsArrayToDoubles(ctx, argv[0]);
   uint32_t period = toUint32(ctx, argv[1]);
   std::vector<double> output(data.size());
-  lrvx_indicator_rma(data.data(), data.size(), period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_rma(data.data(), data.size(), period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -916,7 +932,7 @@ static JSValue js_indicator_dema(JSContext* ctx, JSValueConst, int, JSValueConst
   auto data = jsArrayToDoubles(ctx, argv[0]);
   uint32_t period = toUint32(ctx, argv[1]);
   std::vector<double> output(data.size());
-  lrvx_indicator_dema(data.data(), data.size(), period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_dema(data.data(), data.size(), period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -925,7 +941,7 @@ static JSValue js_indicator_tema(JSContext* ctx, JSValueConst, int, JSValueConst
   auto data = jsArrayToDoubles(ctx, argv[0]);
   uint32_t period = toUint32(ctx, argv[1]);
   std::vector<double> output(data.size());
-  lrvx_indicator_tema(data.data(), data.size(), period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_tema(data.data(), data.size(), period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -936,7 +952,7 @@ static JSValue js_indicator_kama(JSContext* ctx, JSValueConst, int argc, JSValue
   uint32_t fast = (argc > 2) ? toUint32(ctx, argv[2]) : 2;
   uint32_t slow = (argc > 3) ? toUint32(ctx, argv[3]) : 30;
   std::vector<double> output(data.size());
-  lrvx_indicator_kama(data.data(), data.size(), period, fast, slow, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_kama(data.data(), data.size(), period, fast, slow, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -945,7 +961,7 @@ static JSValue js_indicator_slope(JSContext* ctx, JSValueConst, int, JSValueCons
   auto data = jsArrayToDoubles(ctx, argv[0]);
   uint32_t length = toUint32(ctx, argv[1]);
   std::vector<double> output(data.size());
-  lrvx_indicator_slope(data.data(), data.size(), length, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_slope(data.data(), data.size(), length, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -982,7 +998,7 @@ static JSValue js_indicator_cci(JSContext* ctx, JSValueConst, int, JSValueConst*
   uint32_t period = toUint32(ctx, argv[3]);
   size_t len = high.size();
   std::vector<double> output(len);
-  lrvx_indicator_cci(high.data(), low.data(), close.data(), len, period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_cci(high.data(), low.data(), close.data(), len, period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -999,8 +1015,8 @@ static JSValue js_indicator_stochastic(JSContext* ctx, JSValueConst, int argc, J
   uint32_t dPeriod = (argc > 4) ? toUint32(ctx, argv[4]) : 3;
   size_t len = high.size();
   std::vector<double> kOut(len), dOut(len);
-  lrvx_indicator_stochastic(high.data(), low.data(), close.data(), len, kPeriod, dPeriod,
-                            kOut.data(), dOut.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_stochastic(high.data(), low.data(), close.data(), len, kPeriod, dPeriod,
+                                                        kOut.data(), dOut.data()));
   JSValue result = JS_NewObject(ctx);
   JS_SetPropertyStr(ctx, result, "k", jsArrayFromDoubles(ctx, kOut));
   JS_SetPropertyStr(ctx, result, "d", jsArrayFromDoubles(ctx, dOut));
@@ -1015,7 +1031,7 @@ static JSValue js_indicator_chop(JSContext* ctx, JSValueConst, int, JSValueConst
   uint32_t period = toUint32(ctx, argv[3]);
   size_t len = high.size();
   std::vector<double> output(len);
-  lrvx_indicator_chop(high.data(), low.data(), close.data(), len, period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_chop(high.data(), low.data(), close.data(), len, period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -1059,7 +1075,7 @@ static JSValue js_indicator_skewness(JSContext* ctx, JSValueConst, int, JSValueC
   auto data = jsArrayToDoubles(ctx, argv[0]);
   uint32_t period = toUint32(ctx, argv[1]);
   std::vector<double> output(data.size());
-  lrvx_indicator_skewness(data.data(), data.size(), period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_skewness(data.data(), data.size(), period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -1068,7 +1084,7 @@ static JSValue js_indicator_kurtosis(JSContext* ctx, JSValueConst, int, JSValueC
   auto data = jsArrayToDoubles(ctx, argv[0]);
   uint32_t period = toUint32(ctx, argv[1]);
   std::vector<double> output(data.size());
-  lrvx_indicator_kurtosis(data.data(), data.size(), period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_kurtosis(data.data(), data.size(), period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -1077,7 +1093,7 @@ static JSValue js_indicator_rolling_zscore(JSContext* ctx, JSValueConst, int, JS
   auto data = jsArrayToDoubles(ctx, argv[0]);
   uint32_t period = toUint32(ctx, argv[1]);
   std::vector<double> output(data.size());
-  lrvx_indicator_rolling_zscore(data.data(), data.size(), period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_rolling_zscore(data.data(), data.size(), period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -1087,7 +1103,7 @@ static JSValue js_indicator_shannon_entropy(JSContext* ctx, JSValueConst, int, J
   uint32_t period = toUint32(ctx, argv[1]);
   uint32_t bins = toUint32(ctx, argv[2]);
   std::vector<double> output(data.size());
-  lrvx_indicator_shannon_entropy(data.data(), data.size(), period, bins, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_shannon_entropy(data.data(), data.size(), period, bins, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -1098,7 +1114,7 @@ static JSValue js_indicator_parkinson_vol(JSContext* ctx, JSValueConst, int, JSV
   uint32_t period = toUint32(ctx, argv[2]);
   size_t len = high.size();
   std::vector<double> output(len);
-  lrvx_indicator_parkinson_vol(high.data(), low.data(), len, period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_parkinson_vol(high.data(), low.data(), len, period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -1112,8 +1128,8 @@ static JSValue js_indicator_rogers_satchell_vol(JSContext* ctx, JSValueConst, in
   uint32_t period = toUint32(ctx, argv[4]);
   size_t len = open.size();
   std::vector<double> output(len);
-  lrvx_indicator_rogers_satchell_vol(open.data(), high.data(), low.data(), close.data(), len,
-                                     period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_rogers_satchell_vol(open.data(), high.data(), low.data(), close.data(), len,
+                                                                 period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -1124,7 +1140,7 @@ static JSValue js_indicator_correlation(JSContext* ctx, JSValueConst, int, JSVal
   uint32_t period = toUint32(ctx, argv[2]);
   size_t len = x.size();
   std::vector<double> output(len);
-  lrvx_indicator_correlation(x.data(), y.data(), len, period, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_correlation(x.data(), y.data(), len, period, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -1157,7 +1173,7 @@ static JSValue js_indicator_autocorrelation(JSContext* ctx, JSValueConst, int,
   uint32_t lag = toUint32(ctx, argv[2]);
   size_t len = in.size();
   std::vector<double> output(len);
-  lrvx_indicator_autocorrelation(in.data(), len, window, lag, output.data());
+  LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_autocorrelation(in.data(), len, window, lag, output.data()));
   return jsArrayFromDoubles(ctx, output);
 }
 
@@ -2136,9 +2152,14 @@ static JSValue js_executor_set_symbol_slippage(JSContext* ctx, JSValueConst, int
 static JSValue js_executor_set_queue_model(JSContext* ctx, JSValueConst, int,
                                            JSValueConst* argv)
 {
+  lrvx_clear_last_error();
   lrvx_simulated_executor_set_queue_model(static_cast<LrvxSimulatedExecutorHandle>(getHandle(ctx, argv[0])),
                                           static_cast<int32_t>(toInt64(ctx, argv[1])),
                                           toUint32(ctx, argv[2]));
+  if (lrvx_last_error_code() != 0)
+  {
+    return JS_ThrowTypeError(ctx, "setQueueModel: %s", lrvx_last_error_message());
+  }
   return JS_UNDEFINED;
 }
 static JSValue js_executor_set_queue_fifo_top_n(JSContext* ctx, JSValueConst, int,

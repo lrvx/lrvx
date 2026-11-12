@@ -255,6 +255,11 @@
         {
           "group": "backtestrunner_replay",
           "kind": "function",
+          "name": "lrvx_backtest_runner_run_tape_bars_on_ticks"
+        },
+        {
+          "group": "backtestrunner_replay",
+          "kind": "function",
           "name": "lrvx_backtest_runner_run_tapes"
         },
         {
@@ -5419,6 +5424,11 @@
         },
         {
           "kind": "method",
+          "name": "run_tape_bars_on_ticks",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "run_tapes",
           "parent": "BacktestRunner"
         },
@@ -8941,6 +8951,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_backtest_runner_run_tape_bars"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_backtest_runner_run_tape_bars_on_ticks"
         },
         {
           "kind": "c_import",
@@ -13346,6 +13360,11 @@
           "name": "ParallelReaderStats"
         },
         {
+          "header": "include/lrvx/indicator/params.h",
+          "kind": "type",
+          "name": "ParamFloor"
+        },
+        {
           "header": "include/lrvx/indicator/parkinson_vol.h",
           "kind": "type",
           "name": "ParkinsonVol"
@@ -13664,6 +13683,11 @@
           "header": "include/lrvx/indicator/rolling_zscore.h",
           "kind": "type",
           "name": "RollingZScoreKernel"
+        },
+        {
+          "header": "include/lrvx/indicator/params.h",
+          "kind": "type",
+          "name": "RowParamFloors"
         },
         {
           "header": "include/lrvx/indicator/rsi.h",
@@ -15033,6 +15057,11 @@
         {
           "kind": "method",
           "name": "runTapeBars",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "runTapeBarsOnTicks",
           "parent": "BacktestRunner"
         },
         {
@@ -17137,6 +17166,16 @@
         },
         {
           "kind": "method",
+          "name": "computeSoftware",
+          "parent": "Crc32"
+        },
+        {
+          "kind": "method",
+          "name": "hardwareAccelerated",
+          "parent": "Crc32"
+        },
+        {
+          "kind": "method",
           "name": "absDiff",
           "parent": "CryptoswapCurve"
         },
@@ -18468,6 +18507,11 @@
         {
           "kind": "method",
           "name": "isValid",
+          "parent": "FrameHeader"
+        },
+        {
+          "kind": "method",
+          "name": "memcpy",
           "parent": "FrameHeader"
         },
         {
@@ -21237,6 +21281,11 @@
         },
         {
           "kind": "method",
+          "name": "crcErrors",
+          "parent": "MmapSegmentReader"
+        },
+        {
+          "kind": "method",
           "name": "currentFrame",
           "parent": "MmapSegmentReader"
         },
@@ -21287,6 +21336,11 @@
         },
         {
           "kind": "method",
+          "name": "nextCheckedFrame",
+          "parent": "MmapSegmentReader"
+        },
+        {
+          "kind": "method",
           "name": "position",
           "parent": "MmapSegmentReader"
         },
@@ -21302,7 +21356,17 @@
         },
         {
           "kind": "method",
+          "name": "setVerifyCrc",
+          "parent": "MmapSegmentReader"
+        },
+        {
+          "kind": "method",
           "name": "totalSize",
+          "parent": "MmapSegmentReader"
+        },
+        {
+          "kind": "method",
+          "name": "truncated",
           "parent": "MmapSegmentReader"
         },
         {
@@ -24827,6 +24891,11 @@
         },
         {
           "kind": "method",
+          "name": "beginNextEventWindow",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "bestAskPrice",
           "parent": "SimulatedExecutor"
         },
@@ -24953,6 +25022,11 @@
         {
           "kind": "method",
           "name": "endBarCallbackWindow",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "endNextEventWindow",
           "parent": "SimulatedExecutor"
         },
         {
@@ -25113,6 +25187,11 @@
         {
           "kind": "method",
           "name": "netPositionRaw",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "nextEventWindowOpen",
           "parent": "SimulatedExecutor"
         },
         {
@@ -28508,6 +28587,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "ATR"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "ATR"
         },
@@ -28668,6 +28752,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "AutoCorrelation"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "AutoCorrelation"
         },
@@ -28734,6 +28823,11 @@
         {
           "kind": "method",
           "name": "runTapeBars",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "runTapeBarsOnTicks",
           "parent": "BacktestRunner"
         },
         {
@@ -29168,6 +29262,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "Bollinger"
+        },
+        {
+          "kind": "method",
           "name": "lower",
           "parent": "Bollinger"
         },
@@ -29194,6 +29293,11 @@
         {
           "kind": "method",
           "name": "upper",
+          "parent": "Bollinger"
+        },
+        {
+          "kind": "method",
+          "name": "value",
           "parent": "Bollinger"
         },
         {
@@ -29293,6 +29397,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "CCI"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "CCI"
         },
@@ -29314,6 +29423,11 @@
         {
           "kind": "method",
           "name": "compute",
+          "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "CHOP"
         },
         {
@@ -29449,6 +29563,11 @@
         {
           "kind": "method",
           "name": "compute",
+          "parent": "Correlation"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "Correlation"
         },
         {
@@ -31198,6 +31317,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "MACD"
+        },
+        {
+          "kind": "method",
           "name": "histogram",
           "parent": "MACD"
         },
@@ -31224,6 +31348,11 @@
         {
           "kind": "method",
           "name": "update",
+          "parent": "MACD"
+        },
+        {
+          "kind": "method",
+          "name": "value",
           "parent": "MACD"
         },
         {
@@ -32118,6 +32247,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "ParkinsonVol"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "ParkinsonVol"
         },
@@ -32563,6 +32697,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "RogersSatchellVol"
+        },
+        {
+          "kind": "method",
           "name": "ready",
           "parent": "RogersSatchellVol"
         },
@@ -32768,6 +32907,16 @@
         },
         {
           "kind": "method",
+          "name": "skippedOptionQuotes",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
+          "name": "skippedPoolStates",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
           "name": "sortinoRatio",
           "parent": "RunnerStats"
         },
@@ -32869,6 +33018,11 @@
         {
           "kind": "method",
           "name": "compute",
+          "parent": "ShannonEntropy"
+        },
+        {
+          "kind": "method",
+          "name": "count",
           "parent": "ShannonEntropy"
         },
         {
@@ -33253,6 +33407,11 @@
         },
         {
           "kind": "method",
+          "name": "count",
+          "parent": "Stochastic"
+        },
+        {
+          "kind": "method",
           "name": "d",
           "parent": "Stochastic"
         },
@@ -33274,6 +33433,11 @@
         {
           "kind": "method",
           "name": "update",
+          "parent": "Stochastic"
+        },
+        {
+          "kind": "method",
+          "name": "value",
           "parent": "Stochastic"
         },
         {
@@ -35666,6 +35830,11 @@
         {
           "kind": "method",
           "name": "run_tape_bars",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "run_tape_bars_on_ticks",
           "parent": "BacktestRunner"
         },
         {
@@ -42629,6 +42798,7 @@
         "lrvx_backtest_runner_run_replay_source",
         "lrvx_backtest_runner_run_tape",
         "lrvx_backtest_runner_run_tape_bars",
+        "lrvx_backtest_runner_run_tape_bars_on_ticks",
         "lrvx_backtest_runner_run_tapes",
         "lrvx_backtest_runner_set_kill_switch",
         "lrvx_backtest_runner_set_order_validator",

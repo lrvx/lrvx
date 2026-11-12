@@ -129,6 +129,9 @@ add_codon_executable(codon_backtest_run_tapes_smoke
 add_codon_executable(codon_backtest_run_tape_bars_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/backtest_run_tape_bars_smoke.codon)
 
+add_codon_executable(codon_backtest_run_tape_bars_on_ticks_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/backtest_run_tape_bars_on_ticks_smoke.codon)
+
 add_codon_executable(codon_order_type_codes_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/order_type_codes_smoke.codon)
 
@@ -137,6 +140,9 @@ add_codon_executable(codon_indicator_bounds_smoke
 
 add_codon_executable(codon_indicator_streaming_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/indicator_streaming_smoke.codon)
+
+add_codon_executable(codon_indicator_params_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/indicator_params_smoke.codon)
 
 add_codon_executable(codon_signal_fields_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/signal_fields_smoke.codon)

@@ -490,8 +490,9 @@ void MatchingEngine<Book>::onNew(NewOrder o, bool clOrdIdChecked)
     // Conditional orders branch off before validate(), which is written for
     // an order carrying a live limit price. They still have a price (the
     // trigger) and a quantity, and both must obey the instrument -- an
-    // off-tick or out-of-band trigger, or a sub-lot size, used to be parked
-    // happily and only surfaced when the stop fired.
+    // off-tick or out-of-band trigger, or a size below the minimum or off
+    // the lot, used to be parked happily and only surfaced when the stop
+    // fired.
     if (const RejectReason r = credit_.validateConditional(o, cfg_); r != RejectReason::None)
     {
       sink_(OrderRejected{o.id, o.symbol, r, o.accountId, o.clientOrderId});

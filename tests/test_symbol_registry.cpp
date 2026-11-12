@@ -1019,3 +1019,137 @@ TEST(SymbolRegistryVenueTick, AStrategyMayOutliveTheRegistry)
   trade(*strategy, a);
   EXPECT_EQ(strategy->bookTick(a).raw(), Price::fromDouble(0.5).raw());
 }
+
+// Names are written as JSON strings: quotes, backslashes and control
+// characters are escaped, and they read back as the same bytes. A brace, a
+// comma or a key-like fragment inside a name does not end the entry early.
+TEST(SymbolRegistryTest, JsonEscapesNamesAndReadsThemBack)
+{
+  SymbolInfo odd;
+  odd.exchange = "ex\"q\\b";
+  odd.symbol = std::string("A\"B\\C\n}{, \"id\": 9, \"tick_size\": 1\t") + '\x01' + "\xc3\xa9";
+  odd.tickSize = Price::fromRaw(5);
+  odd.tickSizeKnown = true;
+  odd.settlementCcy = "U\"SD\\";
+  odd.qtyScale = 1'000;
+  SymbolInfo next;
+  next.exchange = "binance";
+  next.symbol = "ETHUSDT";
+
+  SymbolRegistry registry;
+  odd.id = registry.registerSymbol(odd);
+  next.id = registry.registerSymbol(next);
+  ASSERT_NE(odd.id, 0u);
+
+  const auto path = std::filesystem::temp_directory_path() / "test_registry_escapes.json";
+  std::filesystem::remove(path);
+  ASSERT_TRUE(registry.saveToFile(path));
+  std::string text;
+  {
+    std::FILE* f = std::fopen(path.string().c_str(), "rb");
+    ASSERT_NE(f, nullptr);
+    char buf[4096];
+    for (size_t n; (n = std::fread(buf, 1, sizeof buf, f)) > 0;)
+    {
+      text.append(buf, n);
+    }
+    std::fclose(f);
+  }
+  for (unsigned char c : text)
+  {
+    EXPECT_TRUE(c >= 0x20 || c == '\n') << "raw control byte " << int(c) << " in the file";
+  }
+  EXPECT_NE(text.find(R"("exchange": "ex\"q\\b")"), std::string::npos) << text;
+  EXPECT_NE(text.find(R"(A\"B\\C\n}{, \"id\": 9, \"tick_size\": 1\t\u0001)"), std::string::npos)
+      << text;
+  EXPECT_NE(text.find(R"("settlement_ccy": "U\"SD\\")"), std::string::npos) << text;
+
+  SymbolRegistry loaded;
+  ASSERT_TRUE(loaded.loadFromFile(path));
+  std::filesystem::remove(path);
+  EXPECT_EQ(loaded.size(), 2u);
+  for (const SymbolInfo* want : {&odd, &next})
+  {
+    SCOPED_TRACE(want->symbol);
+    auto got = loaded.getSymbolInfo(want->id);
+    ASSERT_TRUE(got.has_value());
+    expectSameSymbol(*got, *want);
+    EXPECT_EQ(loaded.getSymbolId(want->exchange, want->symbol), want->id);
+  }
+}
+
+// A file from before names were escaped, plain names and a raw backslash the
+// old writer left as it was, loads as it did.
+TEST(SymbolRegistryTest, JsonFromBeforeEscapingLoadsAsBefore)
+{
+  const auto path = std::filesystem::temp_directory_path() / "test_registry_unescaped.json";
+  {
+    std::FILE* f = std::fopen(path.string().c_str(), "wb");
+    ASSERT_NE(f, nullptr);
+    std::fputs(
+        "{\n  \"version\": 1,\n  \"symbols\": [\n"
+        "    {\"id\": 3, \"exchange\": \"binance\", \"symbol\": \"BTC\\USDT\", \"type\": 0, "
+        "\"tick_size\": 1000000, \"contract_multiplier\": 1, \"settlement_type\": 0, "
+        "\"exercise_style\": 0},\n"
+        "    {\"id\": 4, \"exchange\": \"bybit\", \"symbol\": \"ETHUSDT\", \"type\": 2, "
+        "\"tick_size\": 1000000, \"tick_size_known\": true}\n"
+        "  ]\n}\n",
+        f);
+    std::fclose(f);
+  }
+  SymbolRegistry loaded;
+  ASSERT_TRUE(loaded.loadFromFile(path));
+  std::filesystem::remove(path);
+  ASSERT_EQ(loaded.size(), 2u);
+  EXPECT_EQ(loaded.getSymbolInfo(3)->symbol, "BTC\\USDT");
+  EXPECT_EQ(loaded.getSymbolInfo(4)->exchange, "bybit");
+  EXPECT_EQ(loaded.getSymbolInfo(4)->type, InstrumentType::Inverse);
+  EXPECT_TRUE(loaded.getSymbolInfo(4)->tickSizeKnown);
+  EXPECT_EQ(loaded.getSymbolId("bybit", "ETHUSDT"), SymbolId{4});
+}
+
+// A load rebuilds what registration builds: the symbol -> exchange mapping
+// (when the loading registry knows the exchange), the info's exchange id and
+// the id -> name table.
+TEST(SymbolRegistryTest, LoadRebuildsTheSymbolToExchangeMapping)
+{
+  SymbolRegistry src;
+  src.registerExchange("uniswap", VenueType::AmmDex);
+  SymbolInfo pool;
+  pool.exchange = "uniswap";
+  pool.symbol = "WETHUSDC";
+  SymbolInfo cex;
+  cex.exchange = "binance";
+  cex.symbol = "BTCUSDT";
+  SymbolInfo stray;
+  stray.exchange = "nowhere";
+  stray.symbol = "XYZ";
+  stray.id = 9;
+  const SymbolId poolId = src.registerSymbol(pool);
+  const SymbolId cexId = src.registerSymbol(cex);
+  const SymbolId strayId = src.registerSymbol(stray);
+
+  const auto path = std::filesystem::temp_directory_path() / "test_registry_exchanges.json";
+  ASSERT_TRUE(src.saveToFile(path));
+  const auto bytes = src.serialize();
+
+  for (int viaJson = 0; viaJson < 2; ++viaJson)
+  {
+    SCOPED_TRACE(viaJson ? "json" : "binary");
+    SymbolRegistry dst;
+    // Registered in another order, so the ids differ from the source's.
+    const ExchangeId binance = dst.registerExchange("binance", VenueType::CentralizedExchange);
+    const ExchangeId uniswap = dst.registerExchange("uniswap", VenueType::AmmDex);
+    ASSERT_TRUE(viaJson ? dst.loadFromFile(path) : dst.deserialize(bytes));
+
+    EXPECT_EQ(dst.getExchangeForSymbol(poolId), uniswap);
+    EXPECT_EQ(dst.venueTypeForSymbol(poolId), VenueType::AmmDex);
+    EXPECT_EQ(dst.getSymbolInfo(poolId)->exchangeId, uniswap);
+    EXPECT_EQ(dst.getExchangeForSymbol(cexId), binance);
+    EXPECT_EQ(dst.getExchangeForSymbol(strayId), InvalidExchangeId);
+    EXPECT_EQ(dst.venueTypeForSymbol(strayId), VenueType::CentralizedExchange);
+    EXPECT_EQ(dst.getSymbolName(poolId), (std::pair<std::string, std::string>{"uniswap", "WETHUSDC"}));
+    EXPECT_EQ(dst.getSymbolName(strayId), (std::pair<std::string, std::string>{"nowhere", "XYZ"}));
+  }
+  std::filesystem::remove(path);
+}

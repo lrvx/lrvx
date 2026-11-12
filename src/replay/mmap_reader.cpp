@@ -119,13 +119,18 @@ MmapSegmentReader::MmapSegmentReader(const std::filesystem::path& segment_path)
 
   _data_start = reinterpret_cast<const std::byte*>(_mapped_data) + sizeof(SegmentHeader);
 
+  _data_end = reinterpret_cast<const std::byte*>(_mapped_data) + _mapped_size;
   if (_header->hasIndex())
   {
-    _data_end = reinterpret_cast<const std::byte*>(_mapped_data) + _header->index_offset;
-  }
-  else
-  {
-    _data_end = reinterpret_cast<const std::byte*>(_mapped_data) + _mapped_size;
+    if (_header->index_offset > _mapped_size)
+    {
+      _data_short = true;
+    }
+    else
+    {
+      _data_end = reinterpret_cast<const std::byte*>(_mapped_data) +
+                  std::max<uint64_t>(_header->index_offset, sizeof(SegmentHeader));
+    }
   }
 
   _current = _data_start;
@@ -187,7 +192,11 @@ MmapSegmentReader::MmapSegmentReader(MmapSegmentReader&& other) noexcept
       _data_end(other._data_end),
       _current(other._current),
       _index_entries(std::move(other._index_entries)),
-      _index_loaded(other._index_loaded)
+      _index_loaded(other._index_loaded),
+      _data_short(other._data_short),
+      _verify_crc(other._verify_crc),
+      _crc_errors(other._crc_errors),
+      _truncated(other._truncated)
 {
   other._mapped_data = nullptr;
 #ifdef _WIN32
@@ -218,6 +227,10 @@ MmapSegmentReader& MmapSegmentReader::operator=(MmapSegmentReader&& other) noexc
     _current = other._current;
     _index_entries = std::move(other._index_entries);
     _index_loaded = other._index_loaded;
+    _data_short = other._data_short;
+    _verify_crc = other._verify_crc;
+    _crc_errors = other._crc_errors;
+    _truncated = other._truncated;
 
     other._mapped_data = nullptr;
 #ifdef _WIN32
@@ -269,6 +282,8 @@ size_t MmapSegmentReader::totalSize() const
 void MmapSegmentReader::reset()
 {
   _current = _data_start;
+  _crc_errors = 0;
+  _truncated = false;
 }
 
 size_t MmapSegmentReader::position() const
@@ -303,6 +318,53 @@ bool MmapSegmentReader::advanceFrame()
   return true;
 }
 
+const FrameHeader* MmapSegmentReader::nextCheckedFrame()
+{
+  // The readers' ceiling: a frame above 10 MiB is a damaged length field.
+  constexpr uint32_t kMaxFrameBytes = 10u * 1024u * 1024u;
+  // Without an index the data runs to the end of the file, whose tail may
+  // still be being written; with one, data that stops short has lost bytes.
+  const bool live_tail = !hasIndex();
+
+  while (!_truncated && _current < _data_end)
+  {
+    const size_t left = static_cast<size_t>(_data_end - _current);
+    if (left < sizeof(FrameHeader))
+    {
+      _truncated = !live_tail;
+      return nullptr;
+    }
+    FrameHeader frame;
+    std::memcpy(&frame, _current, sizeof(frame));
+    if (frame.size > kMaxFrameBytes)
+    {
+      _truncated = true;
+      return nullptr;
+    }
+    if (left - sizeof(FrameHeader) < frame.size)
+    {
+      _truncated = !live_tail;
+      return nullptr;
+    }
+
+    const auto* at = reinterpret_cast<const FrameHeader*>(_current);
+    const std::byte* payload = _current + sizeof(FrameHeader);
+    _current += sizeof(FrameHeader) + frame.size;
+
+    if (_verify_crc && Crc32::compute(payload, frame.size) != frame.crc32)
+    {
+      ++_crc_errors;
+      continue;
+    }
+    return at;
+  }
+  if (_data_short)
+  {
+    _truncated = true;
+  }
+  return nullptr;
+}
+
 bool MmapSegmentReader::next(ReplayEvent& out)
 {
   if (isCompressed())
@@ -310,91 +372,80 @@ bool MmapSegmentReader::next(ReplayEvent& out)
     return false;
   }
 
-  const auto* frame = currentFrame();
-  if (!frame)
+  // As BinaryLogIterator::nextUncompressed: a frame of a type this build does
+  // not know is walked past, and one too short for its record is counted and
+  // walked past, rather than ending the segment.
+  while (const FrameHeader* at = nextCheckedFrame())
   {
-    return false;
-  }
+    FrameHeader frame;
+    std::memcpy(&frame, at, sizeof(frame));
+    const std::byte* payload = reinterpret_cast<const std::byte*>(at) + sizeof(FrameHeader);
 
-  size_t frame_size = sizeof(FrameHeader) + frame->size;
-  if (_current + frame_size > _data_end)
-  {
-    return false;
-  }
+    if (frameRecordSize(frame.type) == 0)
+    {
+      continue;
+    }
+    // Checks the payload against its type's fixed record as well.
+    if (!frameTimestamp(frame.type, payload, frame.size, out.timestamp_ns))
+    {
+      ++_crc_errors;
+      continue;
+    }
+    out.type = static_cast<EventType>(frame.type);
 
-  const std::byte* payload = _current + sizeof(FrameHeader);
-  out.type = static_cast<EventType>(frame->type);
+    if (frame.type == static_cast<uint8_t>(EventType::Trade))
+    {
+      std::memcpy(&out.trade, payload, sizeof(TradeRecord));
+      out.bids.clear();
+      out.asks.clear();
+      return true;
+    }
+    if (frame.type == static_cast<uint8_t>(EventType::OptionQuote))
+    {
+      std::memcpy(&out.option_quote, payload, sizeof(OptionQuoteRecord));
+      out.bids.clear();
+      out.asks.clear();
+      return true;
+    }
+    if (frame.type == static_cast<uint8_t>(EventType::PoolState))
+    {
+      std::memcpy(&out.pool_state_header, payload, sizeof(PoolStateRecordHeader));
+      const size_t payload_len = out.pool_state_header.payload_len;
+      if (frame.size < sizeof(PoolStateRecordHeader) + payload_len)
+      {
+        ++_crc_errors;
+        continue;
+      }
+      const std::byte* pool_payload = payload + sizeof(PoolStateRecordHeader);
+      out.pool_state_payload.assign(pool_payload, pool_payload + payload_len);
+      out.bids.clear();
+      out.asks.clear();
+      return true;
+    }
 
-  if (frame->type == static_cast<uint8_t>(EventType::Trade))
-  {
-    if (frame->size < sizeof(TradeRecord))
-    {
-      return false;
-    }
-    std::memcpy(&out.trade, payload, sizeof(TradeRecord));
-    out.timestamp_ns = out.trade.exchange_ts_ns;
-  }
-  else if (frame->type == static_cast<uint8_t>(EventType::OptionQuote))
-  {
-    if (frame->size < sizeof(OptionQuoteRecord))
-    {
-      return false;
-    }
-    std::memcpy(&out.option_quote, payload, sizeof(OptionQuoteRecord));
-    out.timestamp_ns = out.option_quote.exchange_ts_ns;
-  }
-  else if (frame->type == static_cast<uint8_t>(EventType::PoolState))
-  {
-    if (frame->size < sizeof(PoolStateRecordHeader))
-    {
-      return false;
-    }
-    std::memcpy(&out.pool_state_header, payload, sizeof(PoolStateRecordHeader));
-    out.timestamp_ns = out.pool_state_header.exchange_ts_ns;
-    const size_t payload_len = out.pool_state_header.payload_len;
-    if (frame->size < sizeof(PoolStateRecordHeader) + payload_len)
-    {
-      return false;
-    }
-    const std::byte* pool_payload = payload + sizeof(PoolStateRecordHeader);
-    out.pool_state_payload.assign(pool_payload, pool_payload + payload_len);
-  }
-  else if (frame->type == static_cast<uint8_t>(EventType::BookSnapshot) ||
-           frame->type == static_cast<uint8_t>(EventType::BookDelta) ||
-           frame->type == static_cast<uint8_t>(EventType::BookTop))
-  {
-    if (frame->size < sizeof(BookRecordHeader))
-    {
-      return false;
-    }
+    // BookSnapshot, BookDelta, BookTop.
     std::memcpy(&out.book_header, payload, sizeof(BookRecordHeader));
-    out.timestamp_ns = out.book_header.exchange_ts_ns;
-
-    const auto* levels =
-        reinterpret_cast<const BookLevel*>(payload + sizeof(BookRecordHeader));
-
-    out.bids.clear();
-    out.asks.clear();
-    out.bids.reserve(out.book_header.bid_count);
-    out.asks.reserve(out.book_header.ask_count);
-
-    for (uint16_t i = 0; i < out.book_header.bid_count; ++i)
+    const size_t bid_n = out.book_header.bid_count;
+    const size_t ask_n = out.book_header.ask_count;
+    if (frame.size < sizeof(BookRecordHeader) + (bid_n + ask_n) * sizeof(BookLevel))
     {
-      out.bids.push_back(levels[i]);
+      ++_crc_errors;
+      continue;
     }
-    for (uint16_t i = 0; i < out.book_header.ask_count; ++i)
+    out.bids.resize(bid_n);
+    out.asks.resize(ask_n);
+    const std::byte* levels = payload + sizeof(BookRecordHeader);
+    if (bid_n > 0)
     {
-      out.asks.push_back(levels[out.book_header.bid_count + i]);
+      std::memcpy(out.bids.data(), levels, bid_n * sizeof(BookLevel));
     }
+    if (ask_n > 0)
+    {
+      std::memcpy(out.asks.data(), levels + bid_n * sizeof(BookLevel), ask_n * sizeof(BookLevel));
+    }
+    return true;
   }
-  else
-  {
-    _current += frame_size;
-    return next(out);
-  }
-
-  _current += frame_size;
-  return true;
+  return false;
 }
 
 bool MmapSegmentReader::seekToTimestamp(int64_t target_ts_ns)
@@ -493,6 +544,7 @@ MmapReader::MmapReader(const Config& config) : _config(config)
   for (const auto& seg : _segments)
   {
     auto reader = std::make_unique<MmapSegmentReader>(seg.path);
+    reader->setVerifyCrc(_config.verify_crc);
     if (reader->isValid())
     {
       _stats.segments_mapped++;
@@ -520,6 +572,28 @@ MmapReader::MmapReader(const Config& config) : _config(config)
 }
 
 MmapReader::~MmapReader() = default;
+
+namespace
+{
+// Adds a segment read's CRC and truncation counters to the reader's stats on
+// every way out of the read, a callback that stops the walk included.
+class SegmentTally
+{
+ public:
+  SegmentTally(const MmapSegmentReader& seg, MmapReaderStats& stats) : _seg(seg), _stats(stats) {}
+  ~SegmentTally()
+  {
+    _stats.crc_errors += _seg.crcErrors();
+    _stats.segments_truncated += _seg.truncated() ? 1 : 0;
+  }
+  SegmentTally(const SegmentTally&) = delete;
+  SegmentTally& operator=(const SegmentTally&) = delete;
+
+ private:
+  const MmapSegmentReader& _seg;
+  MmapReaderStats& _stats;
+};
+}  // namespace
 
 bool MmapReader::passesFilter(int64_t timestamp, uint32_t symbol_id) const
 {
@@ -550,6 +624,7 @@ uint64_t MmapReader::forEach(EventCallback callback)
     }
 
     reader->reset();
+    SegmentTally tally(*reader, _stats);
     ReplayEvent event;
 
     while (reader->next(event))
@@ -594,7 +669,9 @@ uint64_t MmapReader::forEachFrom(int64_t start_ts_ns, EventCallback callback)
 
     // Leaves the reader at the first event when the index cannot position
     // the start (no index, or no Sorted flag).
+    reader->reset();
     reader->seekToTimestamp(start_ts_ns);
+    SegmentTally tally(*reader, _stats);
 
     ReplayEvent event;
     while (reader->next(event))
@@ -634,32 +711,34 @@ uint64_t MmapReader::forEachRawTrade(RawTradeCallback callback)
       continue;
     }
 
+    // The frame walk next() takes, so a trade that fails its CRC is skipped
+    // and counted here too; only trade frames are decoded.
     reader->reset();
-
-    while (const auto* frame = reader->currentFrame())
+    SegmentTally tally(*reader, _stats);
+    while (const FrameHeader* at = reader->nextCheckedFrame())
     {
-      if (frame->type == static_cast<uint8_t>(EventType::Trade))
+      FrameHeader frame;
+      std::memcpy(&frame, at, sizeof(frame));
+      if (frame.type != static_cast<uint8_t>(EventType::Trade))
       {
-        // Copy to aligned temporary to avoid UB from misaligned access
-        // (FrameHeader is 12 bytes, TradeRecord requires 8-byte alignment)
-        TradeRecord trade;
-        std::memcpy(&trade,
-                    reinterpret_cast<const std::byte*>(frame) + sizeof(FrameHeader),
-                    sizeof(TradeRecord));
-
-        if (passesFilter(trade.exchange_ts_ns, trade.symbol_id))
-        {
-          if (!callback(&trade))
-          {
-            return count;
-          }
-          ++count;
-        }
+        continue;
       }
-
-      if (!reader->advanceFrame())
+      if (frame.size < sizeof(TradeRecord))
       {
-        break;
+        ++reader->_crc_errors;
+        continue;
+      }
+      // Copy to an aligned record: the payload follows a 12-byte FrameHeader.
+      TradeRecord trade;
+      std::memcpy(&trade, reinterpret_cast<const std::byte*>(at) + sizeof(FrameHeader),
+                  sizeof(TradeRecord));
+      if (passesFilter(trade.exchange_ts_ns, trade.symbol_id))
+      {
+        if (!callback(&trade))
+        {
+          return count;
+        }
+        ++count;
       }
     }
   }

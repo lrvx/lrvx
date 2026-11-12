@@ -512,6 +512,11 @@ export interface RunnerStats {
   avgWin: number;
   avgLoss: number;
   profitFactor: number;
+  /** Option-quote records a tape run read and delivered to no callback or
+   *  the executor; 0 for a run that read no tape. */
+  skippedOptionQuotes: number;
+  /** Pool-state records a tape run read and delivered to nobody. */
+  skippedPoolStates: number;
 }
 
 /** Stats attached to a `WalkForwardFold` and to a `GridSearchResult`.
@@ -910,6 +915,17 @@ export class BacktestRunner {
    *  tape's symbol id. Throws LrvxError on a bad interval, an unknown symbol,
    *  an unreadable tape or a symbol with no trades. */
   runTapeBars(path: string, intervalSeconds: number, symbol?: string): RunnerStats;
+  /** Decide on bars, fill on ticks. onBar receives the bars runTapeBars
+   *  builds from the tape, while the simulated executor is fed every trade
+   *  and book record as runTape feeds it; onTrade and onBookUpdate do not
+   *  fire. Bar n reaches onBar when the first trade stamped at or after its
+   *  end arrives, before that trade reaches the executor: an order sent from
+   *  onBar is submitted at the bar's end and can first match against that
+   *  trade (with a submit latency L, the first record at or after end + L).
+   *  Working stops and limits fill on the prints inside the next bars, a
+   *  stop never better than its trigger. `symbol` and the errors as for
+   *  runTapeBars. */
+  runTapeBarsOnTicks(path: string, intervalSeconds: number, symbol?: string): RunnerStats;
   /** Replace the built-in SimulatedExecutor with a binding-supplied one. */
   setExecutor(executor: Executor | null): void;
   /** Attach a listener for order lifecycle events. Multiple listeners
@@ -1424,6 +1440,8 @@ interface StreamingSingleInput {
   readonly value: number;
   /** True once `update` has been called enough times to produce a value. */
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   /** Reset state but keep configuration. */
   reset(): void;
   /** Batch convenience: apply `update` over an array, returning the values. */
@@ -1523,6 +1541,8 @@ export class ShannonEntropy {
   update(value: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(input: Float64Array): Float64Array;
 }
@@ -1531,6 +1551,8 @@ export class AutoCorrelation {
   update(value: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(input: Float64Array): Float64Array;
 }
@@ -1541,6 +1563,8 @@ export class ATR {
   update(high: number, low: number, close: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(high: Float64Array, low: Float64Array, close: Float64Array): Float64Array;
 }
@@ -1549,6 +1573,8 @@ export class CCI {
   update(high: number, low: number, close: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(high: Float64Array, low: Float64Array, close: Float64Array): Float64Array;
 }
@@ -1557,6 +1583,8 @@ export class CHOP {
   update(high: number, low: number, close: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(high: Float64Array, low: Float64Array, close: Float64Array): Float64Array;
 }
@@ -1566,6 +1594,10 @@ export class Stochastic {
   readonly k: number;
   readonly d: number;
   readonly ready: boolean;
+  /** Same as `k`. */
+  readonly value: number;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(
     high: Float64Array,
@@ -1578,6 +1610,8 @@ export class ParkinsonVol {
   update(high: number, low: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(high: Float64Array, low: Float64Array): Float64Array;
 }
@@ -1586,6 +1620,8 @@ export class RogersSatchellVol {
   update(open: number, high: number, low: number, close: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(
     open: Float64Array,
@@ -1599,6 +1635,8 @@ export class Correlation {
   update(x: number, y: number): number | null;
   readonly value: number;
   readonly ready: boolean;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(x: Float64Array, y: Float64Array): Float64Array;
 }
@@ -1611,6 +1649,10 @@ export class MACD {
   readonly signal: number;
   readonly histogram: number;
   readonly ready: boolean;
+  /** Same as `line`. */
+  readonly value: number;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(input: Float64Array): { line: Float64Array; signal: Float64Array; histogram: Float64Array };
 }
@@ -1622,6 +1664,10 @@ export class Bollinger {
   readonly middle: number;
   readonly lower: number;
   readonly ready: boolean;
+  /** Same as `middle`. */
+  readonly value: number;
+  /** Updates since construction or the last `reset`. */
+  readonly count: number;
   reset(): void;
   compute(input: Float64Array): { upper: Float64Array; middle: Float64Array; lower: Float64Array };
 }

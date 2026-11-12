@@ -149,7 +149,8 @@ Per-symbol slippage override. Same parameters as `set_default_slippage`.
 
 #### `set_queue_model(model, depth=1)`
 
-Configure limit order queue simulation. `model` is a string.
+Configure limit order queue simulation. `model` is one of the names below; any other string
+raises `LrvxError` (`E_VAL_002`) listing them, and the model installed before stays.
 
 ```python
 executor.set_queue_model("tob", depth=1)

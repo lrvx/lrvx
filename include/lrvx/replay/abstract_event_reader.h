@@ -110,6 +110,11 @@ struct ReaderFilter
   }
 };
 
+// Both factories build readers that check every frame's CRC32 and skip one
+// that fails, whichever reader they pick (ReaderConfig::verify_crc and
+// MmapReader::Config::verify_crc both default to true). The mapped readers
+// read uncompressed segments only: createSegmentReader falls back to the
+// stream iterator for a compressed one.
 std::unique_ptr<ISegmentReader> createSegmentReader(
     const std::filesystem::path& segment_path,
     bool prefer_mmap = true);

@@ -334,6 +334,105 @@ BacktestResult BacktestRunner::endBarRun()
   return result();
 }
 
+namespace
+{
+
+TradeEvent tradeFromRecord(const replay::ReplayEvent& event)
+{
+  TradeEvent trade;
+  trade.trade.symbol = event.trade.symbol_id;
+  trade.trade.price = Price::fromRaw(event.trade.price_raw);
+  trade.trade.quantity = Quantity::fromRaw(event.trade.qty_raw);
+  trade.trade.isBuy = (event.trade.side == 0);
+  trade.trade.exchangeTsNs = UnixNanos::fromRaw(event.trade.exchange_ts_ns);
+  trade.trade.instrument = static_cast<InstrumentType>(event.trade.instrument);
+  return trade;
+}
+
+// The time bars of one symbol's trades, closed the way the batch aggregators
+// close them (doAggregate in python/aggregator_bindings.h, doAggregateC in the
+// C ABI): same policy, same late-trade drop, and the bar still open at the end
+// is never emitted. runTapeBars and runTapeBarsOnTicks both build their bars
+// here, so the one-call routes and the explicit read_trades ->
+// aggregate_time_bars -> run_bars route all see the same bars.
+class TapeTimeBars
+{
+ public:
+  explicit TapeTimeBars(std::chrono::nanoseconds interval) : _policy(interval) {}
+
+  bool anyTrade() const noexcept { return _open; }
+
+  // Folds `trade` in. When it belongs to a later interval than the live bar,
+  // the live bar is complete: it is written to `closed` (bar times as Unix
+  // nanoseconds, as runBars() takes them) before the trade opens the next one,
+  // and the call returns true.
+  bool add(const TradeEvent& trade, SymbolId symbol, BarEvent& closed)
+  {
+    if (!_open)
+    {
+      open(trade);
+      return false;
+    }
+    if (_policy.isLate(trade, _bar))
+    {
+      return false;
+    }
+    if (_policy.shouldClose(trade, _bar))
+    {
+      closed = BarEvent{};
+      closed.symbol = symbol;
+      closed.instrument = _instrument;
+      closed.barType = BarType::Time;
+      closed.barTypeParam = _policy.param();
+      closed.bar = _bar;
+      // The aggregator keeps bar times on the engine clock.
+      closed.bar.startTime = unixPoint(_bar.startTime);
+      closed.bar.endTime = unixPoint(_bar.endTime);
+      open(trade);
+      return true;
+    }
+    _policy.update(trade, _bar);
+    return false;
+  }
+
+ private:
+  void open(const TradeEvent& trade)
+  {
+    _policy.initBar(trade, _bar);
+    _instrument = trade.trade.instrument;
+    _open = true;
+  }
+
+  static TimePoint unixPoint(TimePoint tp)
+  {
+    const int64_t lrvxNs =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
+    return TimePoint{std::chrono::nanoseconds{
+        lrvxNs - unix_to_lrvx_offset_ns().load(std::memory_order_relaxed)}};
+  }
+
+  TimeBarPolicy _policy;
+  Bar _bar{};
+  bool _open{false};
+  InstrumentType _instrument{InstrumentType::Spot};
+};
+
+bool isMarketRecord(const replay::ReplayEvent& event)
+{
+  return event.type == replay::EventType::Trade ||
+         event.type == replay::EventType::BookSnapshot ||
+         event.type == replay::EventType::BookDelta ||
+         event.type == replay::EventType::BookTop;
+}
+
+SymbolId marketRecordSymbol(const replay::ReplayEvent& event)
+{
+  return event.type == replay::EventType::Trade ? event.trade.symbol_id
+                                                : event.book_header.symbol_id;
+}
+
+}  // namespace
+
 BacktestResult BacktestRunner::runTapeBars(const std::filesystem::path& data_dir,
                                            std::chrono::nanoseconds interval,
                                            std::optional<SymbolId> symbol)
@@ -350,39 +449,10 @@ BacktestResult BacktestRunner::runTapeBars(const std::filesystem::path& data_dir
   }
   auto reader = openTapeDir(data_dir, filter, "runTapeBars");
 
-  // The close path below is the one the batch aggregators run (doAggregate in
-  // python/aggregator_bindings.h, doAggregateC in the C ABI) for a single
-  // symbol: same policy, same late-trade drop, same rule that the bar still
-  // open at the end is never emitted. The one-call route and the explicit
-  // read_trades -> aggregate_time_bars -> run_bars route see the same bars.
-  TimeBarPolicy policy(interval);
-  Bar bar{};
-  bool barOpen = false;
-  InstrumentType instrument = InstrumentType::Spot;
+  TapeTimeBars bars(interval);
   std::optional<SymbolId> barSymbol = symbol;
   std::optional<SymbolId> otherSymbol;
-
-  const auto unixPoint = [](TimePoint tp)
-  {
-    const int64_t lrvxNs =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
-    return TimePoint{std::chrono::nanoseconds{
-        lrvxNs - unix_to_lrvx_offset_ns().load(std::memory_order_relaxed)}};
-  };
-  const auto emit = [&]()
-  {
-    BarEvent ev{};
-    ev.symbol = *barSymbol;
-    ev.instrument = instrument;
-    ev.barType = BarType::Time;
-    ev.barTypeParam = policy.param();
-    ev.bar = bar;
-    // runBars() takes bar times as Unix nanoseconds; the aggregator keeps
-    // them on the engine clock.
-    ev.bar.startTime = unixPoint(bar.startTime);
-    ev.bar.endTime = unixPoint(bar.endTime);
-    stepBar(ev);
-  };
+  BarEvent closed{};
 
   beginBarRun();
   reader->forEach(
@@ -402,34 +472,10 @@ BacktestResult BacktestRunner::runTapeBars(const std::filesystem::path& data_dir
           otherSymbol = sid;
           return false;
         }
-
-        TradeEvent trade;
-        trade.trade.symbol = sid;
-        trade.trade.price = Price::fromRaw(event.trade.price_raw);
-        trade.trade.quantity = Quantity::fromRaw(event.trade.qty_raw);
-        trade.trade.isBuy = (event.trade.side == 0);
-        trade.trade.exchangeTsNs = UnixNanos::fromRaw(event.trade.exchange_ts_ns);
-        trade.trade.instrument = static_cast<InstrumentType>(event.trade.instrument);
-
-        if (!barOpen)
+        if (bars.add(tradeFromRecord(event), sid, closed))
         {
-          policy.initBar(trade, bar);
-          instrument = trade.trade.instrument;
-          barOpen = true;
-          return true;
+          stepBar(closed);
         }
-        if (policy.isLate(trade, bar))
-        {
-          return true;
-        }
-        if (policy.shouldClose(trade, bar))
-        {
-          emit();
-          policy.initBar(trade, bar);
-          instrument = trade.trade.instrument;
-          return true;
-        }
-        policy.update(trade, bar);
         return true;
       });
   BacktestResult res = endBarRun();
@@ -441,10 +487,109 @@ BacktestResult BacktestRunner::runTapeBars(const std::filesystem::path& data_dir
         std::to_string(*barSymbol) + " and " + std::to_string(*otherSymbol) +
         "); pass the symbol to replay");
   }
-  if (symbol && !barOpen)
+  if (symbol && !bars.anyTrade())
   {
     throw std::invalid_argument("BacktestRunner.runTapeBars: the tape has no trade for symbol id " +
                                 std::to_string(*symbol));
+  }
+  return res;
+}
+
+BacktestResult BacktestRunner::runTapeBarsOnTicks(const std::filesystem::path& data_dir,
+                                                  std::chrono::nanoseconds interval,
+                                                  std::optional<SymbolId> symbol)
+{
+  if (interval.count() <= 0)
+  {
+    throw std::invalid_argument(
+        "BacktestRunner.runTapeBarsOnTicks: interval must be positive, got " +
+        std::to_string(interval.count()) + " ns");
+  }
+  replay::ReaderFilter filter{};
+  if (symbol)
+  {
+    filter.symbols.insert(*symbol);
+  }
+  auto reader = openTapeDir(data_dir, filter, "runTapeBarsOnTicks");
+
+  TapeTimeBars bars(interval);
+  std::optional<SymbolId> runSymbol = symbol;
+  std::optional<SymbolId> otherSymbol;
+  BarEvent closed{};
+
+  // The executor is fed record by record, exactly as run() feeds it; only the
+  // strategy's view is bars.
+  resetRunState();
+  _interactiveMode = false;
+  _running.store(true, std::memory_order_release);
+  _paused.store(false, std::memory_order_release);
+  _finished.store(false, std::memory_order_release);
+  if (_strategy)
+  {
+    _strategy->start();
+  }
+
+  reader->forEach(
+      [&](const replay::ReplayEvent& event) -> bool
+      {
+        if (isMarketRecord(event))
+        {
+          const SymbolId sid = marketRecordSymbol(event);
+          if (!runSymbol)
+          {
+            runSymbol = sid;
+          }
+          else if (sid != *runSymbol)
+          {
+            otherSymbol = sid;
+            return false;
+          }
+        }
+        if (event.type == replay::EventType::Trade &&
+            bars.add(tradeFromRecord(event), event.trade.symbol_id, closed))
+        {
+          // This trade is the first one at or after the bar's end: the bar is
+          // over, and the trade has not reached the executor yet. The strategy
+          // decides at the bar's end (later, when book records past the end
+          // came first), and what it sends waits for the next market event,
+          // which is this trade. Nothing it sends can meet a print from inside
+          // the bar it is reacting to.
+          advanceClocks(UnixNanos::fromRaw(closed.bar.endTime.time_since_epoch().count()));
+          SimulatedExecutor::NextEventScope window(sim());
+          if (_strategy)
+          {
+            _strategy->onBar(closed);
+          }
+          for (auto* sub : _marketDataSubscribers)
+          {
+            sub->onBar(closed);
+          }
+        }
+        processEvent(event, /*dispatchMarketData=*/false);
+        return true;
+      });
+
+  if (_strategy)
+  {
+    _strategy->stop();
+  }
+  _finished.store(true, std::memory_order_release);
+  _running.store(false, std::memory_order_release);
+  BacktestResult res = result();
+
+  if (otherSymbol)
+  {
+    throw std::invalid_argument(
+        "BacktestRunner.runTapeBarsOnTicks: the tape holds records of more than one symbol "
+        "(ids " +
+        std::to_string(*runSymbol) + " and " + std::to_string(*otherSymbol) +
+        "); pass the symbol to replay");
+  }
+  if (symbol && !bars.anyTrade())
+  {
+    throw std::invalid_argument(
+        "BacktestRunner.runTapeBarsOnTicks: the tape has no trade for symbol id " +
+        std::to_string(*symbol));
   }
   return res;
 }
@@ -533,7 +678,7 @@ void BacktestRunner::start(replay::IMultiSegmentReader& reader)
   notifyPaused();
 }
 
-void BacktestRunner::processEvent(const replay::ReplayEvent& event)
+void BacktestRunner::processEvent(const replay::ReplayEvent& event, bool dispatchMarketData)
 {
   advanceClocks(UnixNanos::fromRaw(event.timestamp_ns));
   ++_eventCount;
@@ -555,14 +700,16 @@ void BacktestRunner::processEvent(const replay::ReplayEvent& event)
     sim().onTrade(trade_ev.trade.symbol, trade_ev.trade.price, trade_ev.trade.quantity,
                   trade_ev.trade.isBuy);
 
-    if (_strategy)
+    if (dispatchMarketData)
     {
-      _strategy->onTrade(trade_ev);
-    }
-
-    for (auto* subscriber : _marketDataSubscribers)
-    {
-      subscriber->onTrade(trade_ev);
+      if (_strategy)
+      {
+        _strategy->onTrade(trade_ev);
+      }
+      for (auto* subscriber : _marketDataSubscribers)
+      {
+        subscriber->onTrade(trade_ev);
+      }
     }
   }
   else if (event.type == replay::EventType::BookSnapshot ||
@@ -604,14 +751,16 @@ void BacktestRunner::processEvent(const replay::ReplayEvent& event)
       sim().onBookUpdate(book_ev.update.symbol, book_ev.update.bids, book_ev.update.asks);
     }
 
-    if (_strategy)
+    if (dispatchMarketData)
     {
-      _strategy->onBookUpdate(book_ev);
-    }
-
-    for (auto* subscriber : _marketDataSubscribers)
-    {
-      subscriber->onBookUpdate(book_ev);
+      if (_strategy)
+      {
+        _strategy->onBookUpdate(book_ev);
+      }
+      for (auto* subscriber : _marketDataSubscribers)
+      {
+        subscriber->onBookUpdate(book_ev);
+      }
     }
 
     _pool->release();

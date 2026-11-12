@@ -370,6 +370,14 @@ extern "C"
 
   // ============================================================
   // Indicator functions (stateless, array-in/array-out)
+  //
+  // The integer parameters of the indicators in
+  // include/lrvx/indicator/registry.def have a floor (a period of at least 1,
+  // at least 2 for a rolling standard deviation or correlation, 3 for
+  // skewness, 4 for kurtosis; the table is lrvx/indicator/params.h). A
+  // parameter below it writes nothing to the outputs and records code 2
+  // with an E_IND_001 message in lrvx_last_error_message, which is how a
+  // caller tells the failure apart: clear the error before the call.
   // ============================================================
 
   LRVX_EXPORT(group = "indicator_functions")
@@ -476,9 +484,10 @@ extern "C"
   // Every row of include/lrvx/indicator/registry.def can be created here by
   // its snake_case name ("sma", "macd", "rogers_satchell_vol", ...), with
   // the constructor arguments of that row in order, passed as doubles. An
-  // integer (size_t) argument must be a non-negative whole number. An
-  // unknown name, a wrong argument count or an argument that does not fit
-  // returns NULL, with code 2 and the reason in lrvx_last_error_message.
+  // integer (size_t) argument must be a non-negative whole number, at least
+  // the row's floor (see the indicator functions above). An unknown name, a
+  // wrong argument count or an argument that does not fit returns NULL, with
+  // code 2 and the reason in lrvx_last_error_message.
   //
   //   double args[] = {12, 26, 9};
   //   LrvxStreamingIndicatorHandle h = lrvx_streaming_indicator_create("macd", args, 3);
@@ -1946,6 +1955,13 @@ extern "C"
 
     int64_t startTimeNs;
     int64_t endTimeNs;
+
+    // Option-quote and pool-state records a tape run read and delivered to
+    // nobody (no strategy callback or the simulated executor takes either).
+    // Filled by run_tape, run_tapes and run_tape_bars_on_ticks; 0 for every
+    // other run.
+    uint64_t optionQuoteCount;
+    uint64_t poolStateCount;
   } LrvxBacktestStats;
 
   LRVX_EXPORT(group = "backtest_slippage")
@@ -3433,6 +3449,29 @@ extern "C"
                                          int64_t interval_ns,
                                          const char* symbol,
                                          LrvxBacktestStats* stats_out);
+
+  // Decide on bars, fill on ticks. Strategy.on_bar receives the bars
+  // lrvx_backtest_runner_run_tape_bars builds from the tape, and the
+  // simulated executor is fed every trade and book record as
+  // lrvx_backtest_runner_run_tape feeds it (on_trade and on_book_update do
+  // not fire). Bar n reaches on_bar when the first trade stamped at or after
+  // its end arrives, before that trade reaches the executor; an order sent
+  // from on_bar is submitted at the bar's end and can first match against
+  // that trade, or with a submit latency L against the first record at or
+  // after end + L. Working stops and limits fill on the prints inside the
+  // next bars; a stop never fills better than its trigger. `symbol` as for
+  // run_tape_bars. The stats carry the skipped option-quote and pool-state
+  // counts like run_tape.
+  // Returns 1 on success, 0 on error, with the reason in
+  // lrvx_last_error_message: interval_ns <= 0, an unregistered symbol, an
+  // unreadable tape, a tape with more than one symbol and no symbol given,
+  // or no trade for the symbol.
+  LRVX_EXPORT(group = "backtestrunner_replay")
+  int lrvx_backtest_runner_run_tape_bars_on_ticks(LrvxBacktestRunnerHandle runner,
+                                                  const char* tape_dir,
+                                                  int64_t interval_ns,
+                                                  const char* symbol,
+                                                  LrvxBacktestStats* stats_out);
 
   // Replay raw OHLCV arrays (timestamps in nanoseconds, close prices as double).
   // Each row produces one synthetic trade (price=close, qty=1). Strategy.on_trade fires.

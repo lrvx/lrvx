@@ -1039,6 +1039,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
             InstanceMethod("runTape", &BacktestRunnerNode::runTape),
             InstanceMethod("runTapes", &BacktestRunnerNode::runTapes),
             InstanceMethod("runTapeBars", &BacktestRunnerNode::runTapeBars),
+            InstanceMethod("runTapeBarsOnTicks", &BacktestRunnerNode::runTapeBarsOnTicks),
             InstanceMethod("setExecutor", &BacktestRunnerNode::setExecutor),
             InstanceMethod("addExecutionListener", &BacktestRunnerNode::addExecutionListener),
             InstanceMethod("equityCurve", &BacktestRunnerNode::equityCurve),
@@ -1185,6 +1186,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
         {"replace_ack_jitter_ns", "replaceAckJitterNs"},
         {"interval_ns", "intervalSeconds"},
         {"lrvx_backtest_runner_create_with_fill_settings: ", ""},
+        {"lrvx_backtest_runner_run_tape_bars_on_ticks: ", ""},
         {"lrvx_backtest_runner_run_tape_bars: ", ""},
     };
     for (const auto& [from, to] : kNames)
@@ -1202,12 +1204,30 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
   // replayed as time bars with runBars' fill rules; throws on error.
   Napi::Value runTapeBars(const Napi::CallbackInfo& info)
   {
+    return runTapeAsBars(info, "runTapeBars", lrvx_backtest_runner_run_tape_bars);
+  }
+
+  // runner.runTapeBarsOnTicks(path, intervalSeconds, symbol?) -> stats. The
+  // same bars reach onBar, and the executor matches on the tape's records
+  // with runTape's rules; throws on error.
+  Napi::Value runTapeBarsOnTicks(const Napi::CallbackInfo& info)
+  {
+    return runTapeAsBars(info, "runTapeBarsOnTicks",
+                         lrvx_backtest_runner_run_tape_bars_on_ticks);
+  }
+
+  using TapeBarsRun = int (*)(LrvxBacktestRunnerHandle, const char*, int64_t, const char*,
+                              LrvxBacktestStats*);
+
+  Napi::Value runTapeAsBars(const Napi::CallbackInfo& info, const std::string& method,
+                            TapeBarsRun runFn)
+  {
     auto env = info.Env();
     if (info.Length() < 2 || !info[0].IsString() || !info[1].IsNumber())
     {
-      Napi::TypeError::New(env,
-                           "BacktestRunner.runTapeBars(path, intervalSeconds, symbol?): expected "
-                           "a string and a number")
+      Napi::TypeError::New(env, "BacktestRunner." + method +
+                                    "(path, intervalSeconds, symbol?): expected "
+                                    "a string and a number")
           .ThrowAsJavaScriptException();
       return env.Undefined();
     }
@@ -1222,8 +1242,9 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     if (ns <= 0)
     {
       lrvxError(env,
-                "BacktestRunner.runTapeBars: intervalSeconds must be a finite number of "
-                "seconds of at least one nanosecond, got " +
+                "BacktestRunner." + method +
+                    ": intervalSeconds must be a finite number of "
+                    "seconds of at least one nanosecond, got " +
                     std::to_string(seconds))
           .ThrowAsJavaScriptException();
       return env.Undefined();
@@ -1234,8 +1255,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
       symbol = info[2].As<Napi::String>().Utf8Value();
     }
     LrvxBacktestStats s{};
-    if (!lrvx_backtest_runner_run_tape_bars(_handle, path.c_str(), ns,
-                                            symbol.empty() ? nullptr : symbol.c_str(), &s))
+    if (!runFn(_handle, path.c_str(), ns, symbol.empty() ? nullptr : symbol.c_str(), &s))
     {
       lrvxError(env, camelCaseNames(lrvx_last_error_message())).ThrowAsJavaScriptException();
       return env.Undefined();
@@ -1528,6 +1548,11 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     obj.Set("avgWin", Napi::Number::New(env, s.avgWin));
     obj.Set("avgLoss", Napi::Number::New(env, s.avgLoss));
     obj.Set("profitFactor", Napi::Number::New(env, s.profitFactor));
+    // Option-quote and pool-state records a tape run read and delivered to
+    // nobody; 0 for a run that read no tape.
+    obj.Set("skippedOptionQuotes",
+            Napi::Number::New(env, static_cast<double>(s.optionQuoteCount)));
+    obj.Set("skippedPoolStates", Napi::Number::New(env, static_cast<double>(s.poolStateCount)));
     return obj;
   }
 

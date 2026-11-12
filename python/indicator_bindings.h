@@ -29,6 +29,7 @@
 #include "lrvx/indicator/kurtosis.h"
 #include "lrvx/indicator/macd.h"
 #include "lrvx/indicator/obv.h"
+#include "lrvx/indicator/params.h"
 #include "lrvx/indicator/parkinson_vol.h"
 #include "lrvx/indicator/rma.h"
 #include "lrvx/indicator/rogers_satchell_vol.h"
@@ -50,20 +51,38 @@ namespace
 // book_bindings.h, and composite_book_bindings.h need the same length
 // check this file already had.
 
-// The rolling-sum indicator family (SMA/RMA/Bollinger/VWAP/CCI) computes
-// `output[period - 1]` internally; with period == 0 that underflows to a huge
-// index and writes out of bounds (confirmed under AddressSanitizer). The C++
-// engine now guards this defensively -- period=0 behaves like "not enough
-// data" rather than corrupting memory -- but a caller who passes 0 almost
-// always did so by mistake (a config value or an optimizer search bound that
-// slipped to zero), so Python raises loudly here rather than silently
-// returning an all-NaN array.
+// VWAP is not a registry row, so its window has no entry in
+// lrvx/indicator/params.h; a zero window is refused here the same way.
 inline void checkPeriodPositive(size_t period, const char* name)
 {
   if (period == 0)
   {
     throw lrvx::LrvxError("E_IND_001", std::string(name) + ": period must be > 0, got 0.");
   }
+}
+
+// A registry indicator built from a binding's arguments. The C++ classes
+// accept any period and answer NaN for a window they cannot fill; a binding
+// refuses the arguments instead (E_IND_001), with the floors of
+// lrvx/indicator/params.h, so a call with period 0 fails rather than
+// returning an all-NaN array.
+template <typename T, typename... A>
+T checkedIndicator(const char* row, A... args)
+{
+  lrvx::indicator::requireArgs(row, args...);
+  return T(args...);
+}
+
+// py::init for a registry class, with the same check.
+template <typename T, typename... A>
+auto checkedInit(const char* row)
+{
+  return py::init(
+      [row](A... args)
+      {
+        lrvx::indicator::requireArgs(row, args...);
+        return new T(args...);
+      });
 }
 
 using contiguous_double = py::array_t<double, py::array::c_style | py::array::forcecast>;
@@ -274,19 +293,17 @@ inline void bindIndicators(py::module_& m)
 {
   m.def(
       "ema", [](contiguous_double input, size_t period)
-      { return computeSingle(lrvx::indicator::EMA(period), input); },
+      { return computeSingle(checkedIndicator<lrvx::indicator::EMA>("ema", period), input); },
       py::arg("input"), py::arg("period"));
 
   m.def(
       "sma", [](contiguous_double input, size_t period)
-      {
-        checkPeriodPositive(period, "sma");
-        return computeSingle(lrvx::indicator::SMA(period), input); },
+      { return computeSingle(checkedIndicator<lrvx::indicator::SMA>("sma", period), input); },
       py::arg("input"), py::arg("period"));
 
   m.def(
       "rsi", [](contiguous_double input, size_t period)
-      { return computeSingle(lrvx::indicator::RSI(period), input); },
+      { return computeSingle(checkedIndicator<lrvx::indicator::RSI>("rsi", period), input); },
       py::arg("input"), py::arg("period"));
 
   m.def(
@@ -304,9 +321,7 @@ inline void bindIndicators(py::module_& m)
         auto* o = result.mutable_data();
         {
           py::gil_scoped_release release;
-          lrvx::indicator::ATR(period).compute(
-              std::span<const double>(h, n), std::span<const double>(l, n),
-              std::span<const double>(c, n), std::span<double>(o, n));
+          checkedIndicator<lrvx::indicator::ATR>("atr", period).compute(std::span<const double>(h, n), std::span<const double>(l, n), std::span<const double>(c, n), std::span<double>(o, n));
         }
         return result;
       },
@@ -324,7 +339,7 @@ inline void bindIndicators(py::module_& m)
         auto* hp = hist.mutable_data();
         {
           py::gil_scoped_release release;
-          lrvx::indicator::MACD(fast, slow, signal)
+          checkedIndicator<lrvx::indicator::MACD>("macd", fast, slow, signal)
               .compute(std::span<const double>(inp, n),
                        std::span<double>(lp, n), std::span<double>(sp, n), std::span<double>(hp, n));
         }
@@ -338,12 +353,12 @@ inline void bindIndicators(py::module_& m)
 
   m.def(
       "slope", [](contiguous_double input, size_t length)
-      { return computeSingle(lrvx::indicator::Slope(length), input); },
+      { return computeSingle(checkedIndicator<lrvx::indicator::Slope>("slope", length), input); },
       py::arg("input"), py::arg("length") = 1);
 
   m.def(
       "kama", [](contiguous_double input, size_t period)
-      { return computeSingle(lrvx::indicator::KAMA(period), input); },
+      { return computeSingle(checkedIndicator<lrvx::indicator::KAMA>("kama", period, size_t{2}, size_t{30}), input); },
       py::arg("input"), py::arg("period") = 10);
 
   m.def(
@@ -409,9 +424,7 @@ inline void bindIndicators(py::module_& m)
         std::vector<double> result;
         {
           py::gil_scoped_release release;
-          result = lrvx::indicator::CHOP(period).compute(
-              std::span<const double>(h, n), std::span<const double>(l, n),
-              std::span<const double>(c, n));
+          result = checkedIndicator<lrvx::indicator::CHOP>("chop", period).compute(std::span<const double>(h, n), std::span<const double>(l, n), std::span<const double>(c, n));
         }
         py::array_t<double> out(n);
         fillArray(out.mutable_data(), result.data(), n);
@@ -423,13 +436,12 @@ inline void bindIndicators(py::module_& m)
       "bollinger",
       [](contiguous_double input, size_t period, double stddev) -> py::dict
       {
-        checkPeriodPositive(period, "bollinger");
         size_t n = input.request().shape[0];
         auto* inp = input.data();
         lrvx::indicator::BollingerResult result;
         {
           py::gil_scoped_release release;
-          result = lrvx::indicator::Bollinger(period, stddev)
+          result = checkedIndicator<lrvx::indicator::Bollinger>("bollinger", period, stddev)
                        .compute(std::span<const double>(inp, n));
         }
         py::array_t<double> upper(n), middle(n), lower(n);
@@ -560,9 +572,7 @@ inline void bindIndicators(py::module_& m)
 
   m.def(
       "rma", [](contiguous_double input, size_t period)
-      {
-        checkPeriodPositive(period, "rma");
-        return computeSingle(lrvx::indicator::RMA(period), input); },
+      { return computeSingle(checkedIndicator<lrvx::indicator::RMA>("rma", period), input); },
       py::arg("input"), py::arg("period"));
 
   m.def(
@@ -572,7 +582,7 @@ inline void bindIndicators(py::module_& m)
         size_t n = buf.shape[0];
         auto* ptr = static_cast<const double*>(buf.ptr);
         std::vector<double> result;
-        { py::gil_scoped_release r; result = lrvx::indicator::DEMA(period).compute(std::span<const double>(ptr, n)); }
+        { py::gil_scoped_release r; result = checkedIndicator<lrvx::indicator::DEMA>("dema", period).compute(std::span<const double>(ptr, n)); }
         py::array_t<double> out(n);
         fillArray(out.mutable_data(), result.data(), n);
         return out; },
@@ -585,7 +595,7 @@ inline void bindIndicators(py::module_& m)
         size_t n = buf.shape[0];
         auto* ptr = static_cast<const double*>(buf.ptr);
         std::vector<double> result;
-        { py::gil_scoped_release r; result = lrvx::indicator::TEMA(period).compute(std::span<const double>(ptr, n)); }
+        { py::gil_scoped_release r; result = checkedIndicator<lrvx::indicator::TEMA>("tema", period).compute(std::span<const double>(ptr, n)); }
         py::array_t<double> out(n);
         fillArray(out.mutable_data(), result.data(), n);
         return out; },
@@ -605,7 +615,7 @@ inline void bindIndicators(py::module_& m)
         lrvx::indicator::StochasticResult result;
         {
           py::gil_scoped_release r;
-          result = lrvx::indicator::Stochastic(k_period, d_period).compute(std::span<const double>(h, n), std::span<const double>(l, n), std::span<const double>(c, n));
+          result = checkedIndicator<lrvx::indicator::Stochastic>("stochastic", k_period, d_period).compute(std::span<const double>(h, n), std::span<const double>(l, n), std::span<const double>(c, n));
         }
         py::array_t<double> ko(n), dout(n);
         fillArray(ko.mutable_data(), result.k.data(), n);
@@ -622,7 +632,6 @@ inline void bindIndicators(py::module_& m)
       "cci",
       [](contiguous_double high, contiguous_double low, contiguous_double close, size_t period)
       {
-        checkPeriodPositive(period, "cci");
         size_t n = high.request().shape[0];
         checkSameSize(n, low.request().shape[0], "arrays must have same size");
         checkSameSize(n, close.request().shape[0], "arrays must have same size");
@@ -632,8 +641,7 @@ inline void bindIndicators(py::module_& m)
         std::vector<double> result;
         {
           py::gil_scoped_release r;
-          result = lrvx::indicator::CCI(period).compute(
-              std::span<const double>(h, n), std::span<const double>(l, n), std::span<const double>(c, n));
+          result = checkedIndicator<lrvx::indicator::CCI>("cci", period).compute(std::span<const double>(h, n), std::span<const double>(l, n), std::span<const double>(c, n));
         }
         py::array_t<double> out(n);
         fillArray(out.mutable_data(), result.data(), n);
@@ -693,22 +701,22 @@ inline void bindIndicators(py::module_& m)
 
   m.def(
       "skewness", [](contiguous_double input, size_t period)
-      { return computeSingle(lrvx::indicator::Skewness(period), input); },
+      { return computeSingle(checkedIndicator<lrvx::indicator::Skewness>("skewness", period), input); },
       py::arg("input"), py::arg("period"));
 
   m.def(
       "kurtosis", [](contiguous_double input, size_t period)
-      { return computeSingle(lrvx::indicator::Kurtosis(period), input); },
+      { return computeSingle(checkedIndicator<lrvx::indicator::Kurtosis>("kurtosis", period), input); },
       py::arg("input"), py::arg("period"));
 
   m.def(
       "rolling_zscore", [](contiguous_double input, size_t period)
-      { return computeSingle(lrvx::indicator::RollingZScore(period), input); },
+      { return computeSingle(checkedIndicator<lrvx::indicator::RollingZScore>("rolling_zscore", period), input); },
       py::arg("input"), py::arg("period"));
 
   m.def(
       "shannon_entropy", [](contiguous_double input, size_t period, size_t bins)
-      { return computeSingle(lrvx::indicator::ShannonEntropy(period, bins), input); },
+      { return computeSingle(checkedIndicator<lrvx::indicator::ShannonEntropy>("shannon_entropy", period, bins), input); },
       py::arg("input"), py::arg("period"), py::arg("bins") = 10);
 
   m.def(
@@ -723,8 +731,7 @@ inline void bindIndicators(py::module_& m)
         auto* o = result.mutable_data();
         {
           py::gil_scoped_release release;
-          lrvx::indicator::ParkinsonVol(period).compute(
-              std::span<const double>(h, n), std::span<const double>(l, n), std::span<double>(o, n));
+          checkedIndicator<lrvx::indicator::ParkinsonVol>("parkinson_vol", period).compute(std::span<const double>(h, n), std::span<const double>(l, n), std::span<double>(o, n));
         }
         return result;
       },
@@ -747,10 +754,7 @@ inline void bindIndicators(py::module_& m)
         auto* out = result.mutable_data();
         {
           py::gil_scoped_release release;
-          lrvx::indicator::RogersSatchellVol(period).compute(
-              std::span<const double>(o, n), std::span<const double>(h, n),
-              std::span<const double>(l, n), std::span<const double>(c, n),
-              std::span<double>(out, n));
+          checkedIndicator<lrvx::indicator::RogersSatchellVol>("rogers_satchell_vol", period).compute(std::span<const double>(o, n), std::span<const double>(h, n), std::span<const double>(l, n), std::span<const double>(c, n), std::span<double>(out, n));
         }
         return result;
       },
@@ -845,7 +849,7 @@ inline void bindIndicators(py::module_& m)
         auto* o = result.mutable_data();
         {
           py::gil_scoped_release release;
-          lrvx::indicator::AutoCorrelation(window, lag)
+          checkedIndicator<lrvx::indicator::AutoCorrelation>("autocorrelation", window, lag)
               .compute(std::span<const double>(p, n), std::span<double>(o, n));
         }
         return result;
@@ -867,55 +871,44 @@ inline void bindIndicators(py::module_& m)
         auto* o = result.mutable_data();
         {
           py::gil_scoped_release release;
-          lrvx::indicator::Correlation(period).compute(
-              std::span<const double>(xp, n), std::span<const double>(yp, n), std::span<double>(o, n));
+          checkedIndicator<lrvx::indicator::Correlation>("correlation", period).compute(std::span<const double>(xp, n), std::span<const double>(yp, n), std::span<double>(o, n));
         }
         return result;
       },
       py::arg("x"), py::arg("y"), py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::SMA>(m, "SMA")
-      .def(py::init(
-               [](size_t period)
-               {
-                 checkPeriodPositive(period, "SMA");
-                 return new lrvx::indicator::SMA(period);
-               }),
+      .def(checkedInit<lrvx::indicator::SMA, size_t>("sma"),
            py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::EMA>(m, "EMA")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::EMA, size_t>("ema"), py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::RMA>(m, "RMA")
-      .def(py::init(
-               [](size_t period)
-               {
-                 checkPeriodPositive(period, "RMA");
-                 return new lrvx::indicator::RMA(period);
-               }),
+      .def(checkedInit<lrvx::indicator::RMA, size_t>("rma"),
            py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::RSI>(m, "RSI")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::RSI, size_t>("rsi"), py::arg("period"));
 
   bindBarIndicator<lrvx::indicator::ATR>(m, "ATR")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::ATR, size_t>("atr"), py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::DEMA>(m, "DEMA")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::DEMA, size_t>("dema"), py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::TEMA>(m, "TEMA")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::TEMA, size_t>("tema"), py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::KAMA>(m, "KAMA")
-      .def(py::init<size_t, size_t, size_t>(), py::arg("period"), py::arg("fast") = 2,
+      .def(checkedInit<lrvx::indicator::KAMA, size_t, size_t, size_t>("kama"), py::arg("period"), py::arg("fast") = 2,
            py::arg("slow") = 30);
 
   bindSingleIndicator<lrvx::indicator::Slope>(m, "Slope")
-      .def(py::init<size_t>(), py::arg("length"));
+      .def(checkedInit<lrvx::indicator::Slope, size_t>("slope"), py::arg("length"));
 
   py::class_<lrvx::indicator::MACD>(m, "MACD")
-      .def(py::init<size_t, size_t, size_t>(), py::arg("fast") = 12, py::arg("slow") = 26,
+      .def(checkedInit<lrvx::indicator::MACD, size_t, size_t, size_t>("macd"), py::arg("fast") = 12, py::arg("slow") = 26,
            py::arg("signal") = 9)
       .def("compute",
            [](const lrvx::indicator::MACD& self, contiguous_double input)
@@ -953,12 +946,7 @@ inline void bindIndicators(py::module_& m)
       .def_property_readonly("count", &lrvx::indicator::MACD::count);
 
   py::class_<lrvx::indicator::Bollinger>(m, "Bollinger")
-      .def(py::init(
-               [](size_t period, double multiplier)
-               {
-                 checkPeriodPositive(period, "Bollinger");
-                 return new lrvx::indicator::Bollinger(period, multiplier);
-               }),
+      .def(checkedInit<lrvx::indicator::Bollinger, size_t, double>("bollinger"),
            py::arg("period") = 20, py::arg("multiplier") = 2.0)
       .def("compute",
            [](const lrvx::indicator::Bollinger& self, contiguous_double input)
@@ -996,7 +984,7 @@ inline void bindIndicators(py::module_& m)
       .def_property_readonly("count", &lrvx::indicator::Bollinger::count);
 
   py::class_<lrvx::indicator::Stochastic>(m, "Stochastic")
-      .def(py::init<size_t, size_t>(), py::arg("k_period") = 14, py::arg("d_period") = 3)
+      .def(checkedInit<lrvx::indicator::Stochastic, size_t, size_t>("stochastic"), py::arg("k_period") = 14, py::arg("d_period") = 3)
       .def("compute",
            [](const lrvx::indicator::Stochastic& self, contiguous_double high,
               contiguous_double low, contiguous_double close)
@@ -1032,43 +1020,38 @@ inline void bindIndicators(py::module_& m)
       .def_property_readonly("count", &lrvx::indicator::Stochastic::count);
 
   bindBarIndicator<lrvx::indicator::CCI>(m, "CCI")
-      .def(py::init(
-               [](size_t period)
-               {
-                 checkPeriodPositive(period, "CCI");
-                 return new lrvx::indicator::CCI(period);
-               }),
+      .def(checkedInit<lrvx::indicator::CCI, size_t>("cci"),
            py::arg("period") = 20);
 
   bindBarIndicator<lrvx::indicator::CHOP>(m, "CHOP")
-      .def(py::init<size_t>(), py::arg("period") = 14);
+      .def(checkedInit<lrvx::indicator::CHOP, size_t>("chop"), py::arg("period") = 14);
 
   // OBV/VWAP/CVD: batch-only (top-level functions registered above);
   // streaming wrappers can be added in a follow-up if needed.
 
   bindSingleIndicator<lrvx::indicator::Skewness>(m, "Skewness")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::Skewness, size_t>("skewness"), py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::Kurtosis>(m, "Kurtosis")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::Kurtosis, size_t>("kurtosis"), py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::RollingZScore>(m, "RollingZScore")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::RollingZScore, size_t>("rolling_zscore"), py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::ShannonEntropy>(m, "ShannonEntropy")
-      .def(py::init<size_t, size_t>(), py::arg("period"), py::arg("bins") = 10);
+      .def(checkedInit<lrvx::indicator::ShannonEntropy, size_t, size_t>("shannon_entropy"), py::arg("period"), py::arg("bins") = 10);
 
   bindHighLowIndicator<lrvx::indicator::ParkinsonVol>(m, "ParkinsonVol")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::ParkinsonVol, size_t>("parkinson_vol"), py::arg("period"));
 
   bindOhlcIndicator<lrvx::indicator::RogersSatchellVol>(m, "RogersSatchellVol")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::RogersSatchellVol, size_t>("rogers_satchell_vol"), py::arg("period"));
 
   bindPairIndicator<lrvx::indicator::Correlation>(m, "Correlation")
-      .def(py::init<size_t>(), py::arg("period"));
+      .def(checkedInit<lrvx::indicator::Correlation, size_t>("correlation"), py::arg("period"));
 
   bindSingleIndicator<lrvx::indicator::AutoCorrelation>(m, "AutoCorrelation")
-      .def(py::init<size_t, size_t>(), py::arg("window"), py::arg("lag"));
+      .def(checkedInit<lrvx::indicator::AutoCorrelation, size_t, size_t>("autocorrelation"), py::arg("window"), py::arg("lag"));
 
   // ── Discovery API ────────────────────────────────────────────────
   // Generated from include/lrvx/indicator/registry.def. Adding an indicator

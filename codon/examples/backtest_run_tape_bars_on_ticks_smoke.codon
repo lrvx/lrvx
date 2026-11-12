@@ -1,0 +1,148 @@
+# Smoke test: BacktestRunner.run_tape_bars_on_ticks. Mirrors
+# python/tests/test_run_tape_bars_on_ticks.py:
+#   * on_bar sees the bars run_tape_bars delivers
+#   * an order sent from bar n's on_bar fills at the first print of the symbol
+#     stamped at or after the end of bar n; a 5 ms submit latency moves it by
+#     milliseconds, not by a bar
+#   * the stats carry skipped_option_quotes / skipped_pool_states
+#   * a two-symbol tape without a symbol and a bad interval raise ValueError
+
+import os
+
+from C import lrvx_registry_create() -> cobj
+from C import lrvx_registry_destroy(cobj)
+from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+
+from lrvx.runner import BacktestRunner
+from lrvx.strategy import Strategy, SymbolContext
+from lrvx.types import BarData
+from lrvx.tools import DataWriter
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+class Swing(Strategy):
+    opens: List[float]
+    starts: List[int]
+    ends: List[int]
+
+    def __init__(self, symbols: List[int]):
+        super().__init__(symbols)
+        self.opens = list[float]()
+        self.starts = list[int]()
+        self.ends = list[int]()
+
+    def on_bar(self, ctx: SymbolContext, bar: BarData):
+        self.opens.append(bar.open)
+        self.starts.append(bar.start_time_ns)
+        self.ends.append(bar.end_time_ns)
+        i = len(self.opens)
+        if i % 6 == 1:
+            self.market_buy(0.5)
+        elif i % 6 == 4:
+            self.market_sell(0.5)
+
+
+SEC = 1_000_000_000
+T0 = 1_767_225_600 * SEC
+
+ts_a = list[int]()
+px_a = list[float]()
+
+root = "/tmp/codon_backtest_run_tape_bars_on_ticks_smoke"
+os.system("rm -rf " + root)
+os.system("mkdir -p " + root)
+w = DataWriter(root)
+seed = 11
+tid = 0
+t = T0
+pa = 10_000
+pb = 5_000
+for i in range(3000):
+    seed = (seed * 1103515245 + 12345) % 2147483648
+    t += 1 + (seed % 2_500) * 1_000_000
+    s = 0 if seed % 3 != 0 else 1
+    step = (seed // 7) % 41 - 20
+    if s == 0:
+        pa += step
+        px = float(pa) / 100.0
+        ts_a.append(t)
+        px_a.append(px)
+    else:
+        pb += step
+        px = float(pb) / 100.0
+    q = float(1 + (seed // 13) % 2000) / 1000.0
+    tid += 1
+    w.write_trade(t, t, px, q, tid, s + 1, (seed // 17) % 2)
+w.close()
+
+
+def registry() -> cobj:
+    reg = lrvx_registry_create()
+    lrvx_registry_add_symbol(reg, "test".c_str(), "AAA".c_str(), 0.01)
+    lrvx_registry_add_symbol(reg, "test".c_str(), "BBB".c_str(), 0.01)
+    return reg
+
+
+def first_at_or_after(ns: int) -> int:
+    for k in range(len(ts_a)):
+        if ts_a[k] >= ns:
+            return k
+    return -1
+
+
+reg = registry()
+a = Swing([1])
+bars = BacktestRunner(reg, 0.0004, 10_000.0)
+bars.set_strategy(a)
+bars.run_tape_bars(root, 60.0, "AAA")
+
+b = Swing([1])
+ticks = BacktestRunner(reg, 0.0004, 10_000.0)
+ticks.set_strategy(b)
+st = ticks.run_tape_bars_on_ticks(root, 60.0, "AAA")
+tt = ticks.trades()
+check(len(a.opens) > 20 and a.opens == b.opens and a.starts == b.starts and a.ends == b.ends,
+      "on_bar sees the run_tape_bars bars")
+k = first_at_or_after(b.ends[0])
+check(len(tt[2]) > 2 and k >= 0 and tt[2][0] == px_a[k] and tt[7][0] == ts_a[k],
+      "the first entry fills at the first print at or after the end of its bar")
+check(st.skipped_option_quotes == 0 and st.skipped_pool_states == 0,
+      "the stats carry the skipped record counts")
+
+late = BacktestRunner(reg, 0.0004, 10_000.0, submit_ack_latency_ns=5_000_000)
+c = Swing([1])
+late.set_strategy(c)
+late.run_tape_bars_on_ticks(root, 60.0, "AAA")
+lt = late.trades()
+kl = first_at_or_after(c.ends[0] + 5_000_000)
+check(kl >= 0 and lt[2][0] == px_a[kl] and lt[7][0] == ts_a[kl] and lt[7][0] < c.ends[1],
+      "5 ms submit latency moves the fill by milliseconds, inside the next bar")
+
+threw = False
+try:
+    ticks.run_tape_bars_on_ticks(root, 60.0)
+except ValueError as e:
+    threw = "more than one symbol" in e.message
+check(threw, "two-symbol tape without a symbol raises")
+
+threw = False
+try:
+    ticks.run_tape_bars_on_ticks(root, 0.0, "AAA")
+except ValueError:
+    threw = True
+check(threw, "interval 0 raises")
+
+os.system("rm -rf " + root)
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")

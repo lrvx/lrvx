@@ -1322,6 +1322,9 @@ allowlist_reasons:
     no addGlobalFunc registration in src/quickjs/js_bindings.cpp reaches it
   quickjs_helper_only: &quickjs_helper_only
     called only inside other wrappers; no global of its own to map to
+  napi_single_pass: &napi_single_pass
+    the Node DataReader walks the C++ reader once per read (DataReaderWrap::walk
+    in node/src/data_ops.h); this count-then-fill pair would read the tape twice
 
 allowlist_functions:
   pybind11:
@@ -1379,6 +1382,7 @@ allowlist_functions:
     lrvx_backtest_runner_run_replay_source: *cpp_direct
     lrvx_backtest_runner_run_tape: *cpp_direct
     lrvx_backtest_runner_run_tape_bars: *cpp_direct
+    lrvx_backtest_runner_run_tape_bars_on_ticks: *cpp_direct
     lrvx_backtest_runner_run_tapes: *cpp_direct
     lrvx_backtest_runner_set_executor: *cpp_direct
     lrvx_backtest_runner_set_kill_switch: *cpp_direct
@@ -2048,8 +2052,16 @@ allowlist_functions:
     lrvx_book_bid_at_price: *no_napi_wrapper
     lrvx_capi_abi_version: *no_napi_wrapper
     lrvx_clear_last_error: *no_napi_wrapper
+    lrvx_data_reader_count_book_updates: *napi_single_pass
+    lrvx_data_reader_count_book_updates_from: *napi_single_pass
     lrvx_data_reader_create_filtered: *no_napi_wrapper
     lrvx_data_reader_create_ordered: *no_napi_wrapper
+    lrvx_data_reader_read_bbo: *napi_single_pass
+    lrvx_data_reader_read_bbo_from: *napi_single_pass
+    lrvx_data_reader_read_book_updates: *napi_single_pass
+    lrvx_data_reader_read_book_updates_from: *napi_single_pass
+    lrvx_data_reader_read_trades: *napi_single_pass
+    lrvx_data_reader_read_trades_from: *napi_single_pass
     lrvx_data_reader_stats_p: *no_napi_wrapper
     lrvx_data_reader_summary_p: *no_napi_wrapper
     lrvx_data_writer_stats_p: *no_napi_wrapper
@@ -2394,6 +2406,7 @@ allowlist_functions:
     lrvx_backtest_runner_run_replay_source: *no_quickjs_global
     lrvx_backtest_runner_run_tape: *no_quickjs_global
     lrvx_backtest_runner_run_tape_bars: *no_quickjs_global
+    lrvx_backtest_runner_run_tape_bars_on_ticks: *no_quickjs_global
     lrvx_backtest_runner_run_tapes: *no_quickjs_global
     lrvx_backtest_runner_set_executor: *no_quickjs_global
     lrvx_backtest_runner_set_kill_switch: *no_quickjs_global

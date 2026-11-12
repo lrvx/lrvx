@@ -185,7 +185,7 @@ All bindings expose the same core model: strategy callbacks, order emission, pos
 | Capability | Python | Node | Codon | JavaScript (QuickJS) |
 |---|---|---|---|---|
 | `Strategy` callbacks — trade, book, bar | yes | yes | yes | yes |
-| `BacktestRunner` — event-driven replay (`run_csv`, `run_tape`, `run_ohlcv`, `run_bars`, `run_tape_bars`), slippage and latency arguments | yes | yes | yes | no |
+| `BacktestRunner` — event-driven replay (`run_csv`, `run_tape`, `run_ohlcv`, `run_bars`, `run_tape_bars`, `run_tape_bars_on_ticks`), slippage and latency arguments | yes | yes | yes | no |
 | `Engine` + `SignalBuilder` — backtest a pre-built signal list | yes | yes | yes | yes |
 | `SimulatedExecutor`, `BacktestResult` | yes | yes | yes | yes |
 | `DataReader`, `DataWriter` | yes | yes | yes | yes |
@@ -333,7 +333,7 @@ print(stats["return_pct"], stats["sharpe_ratio"], stats["max_drawdown_pct"])
 
 The constructor takes `(registry, fee_rate=0.0004, initial_capital=100000.0)` — nothing else. Flat fee rate, no funding, no liquidation, no rate limits, no queue position. Useful for an indicator sanity check; not enough for a decision about real capital.
 
-`run_csv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used; each bar is replayed as one trade, so `on_trade` fires and `on_bar` does not. Timestamps below `1e12` are treated as seconds and scaled to nanoseconds, because a raw CSV column's unit is genuinely unknown. `run_ohlcv(ts, close, symbol)` and `run_bars(...)` (full OHLC, fires `on_bar`) are both different: `ts` and `start_time_ns` / `end_time_ns` are nanoseconds by contract — the same contract the C ABI, Node, and Codon bindings use for the same calls — so they are used exactly as given, with no unit guessing at all. Other entry points: `run_tape(path)` and `run_tapes(paths)` replay `.lrvx` tapes tick by tick (`on_trade`), and `run_tape_bars(path, interval_seconds=..., symbol=...)` replays a tape as time bars (`on_bar`, `run_bars`' fill rules).
+`run_csv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used; each bar is replayed as one trade, so `on_trade` fires and `on_bar` does not. Timestamps below `1e12` are treated as seconds and scaled to nanoseconds, because a raw CSV column's unit is genuinely unknown. `run_ohlcv(ts, close, symbol)` and `run_bars(...)` (full OHLC, fires `on_bar`) are both different: `ts` and `start_time_ns` / `end_time_ns` are nanoseconds by contract — the same contract the C ABI, Node, and Codon bindings use for the same calls — so they are used exactly as given, with no unit guessing at all. Other entry points: `run_tape(path)` and `run_tapes(paths)` replay `.lrvx` tapes tick by tick (`on_trade`), `run_tape_bars(path, interval_seconds=..., symbol=...)` replays a tape as time bars (`on_bar`, `run_bars`' fill rules), and `run_tape_bars_on_ticks(path, interval_seconds=..., symbol=...)` shows the strategy the same bars while the executor fills on the tape's prints.
 
 Returns a plain dict. Keys: `total_trades`, `winning_trades`, `losing_trades`, `initial_capital`, `final_capital`, `total_pnl`, `total_fees`, `net_pnl`, `gross_profit`, `gross_loss`, `max_drawdown`, `max_drawdown_pct`, `win_rate`, `profit_factor`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `return_pct`.
 
@@ -639,7 +639,7 @@ const stats = bt.runCsv('/path/to/btcusdt_1m.csv', 'BTCUSDT');
 
 The constructor takes `(registry, feeRate, initialCapital)` — nothing else. Flat fee rate, no funding, no liquidation, no rate limits, no queue position. Good for an indicator sanity check; not enough before live.
 
-`runCsv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used, and each bar is replayed as one trade. Other entry points: `runOhlcv(timestamps, closes, symbol)`, `runTape(path)`, `runTapes(paths)`, and `runTapeBars(path, intervalSeconds, symbol)`, which replays a tape as time bars.
+`runCsv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used, and each bar is replayed as one trade. Other entry points: `runOhlcv(timestamps, closes, symbol)`, `runTape(path)`, `runTapes(paths)`, `runTapeBars(path, intervalSeconds, symbol)`, which replays a tape as time bars, and `runTapeBarsOnTicks(path, intervalSeconds, symbol)`, which shows the strategy the same bars while the executor fills on the tape's prints.
 
 Hooks attach after construction: `setExecutor(executor)` (an object implementing the `Executor` interface, or `null`), `addExecutionListener(listener)`. Run artifacts: `equityCurve()`, `trades()`.
 
@@ -4515,6 +4515,84 @@ Slippage and latency arguments are covered in
 submit latency moves a fill to a later bar's open:
 [Latency on bar replay](backtest-with-latency.md#latency-on-bar-replay).
 
+## Decide on bars, fill on ticks
+
+A tape holds every print, and a bar hides them: on bar replay a stop that
+triggers inside a bar fills at the bar's low, while the tape says it filled a
+tick or two past its trigger. `run_tape_bars_on_ticks` keeps both: the
+strategy is shown the bars `run_tape_bars` builds, and the simulated executor
+is fed the tape's own trades and book records, as `run_tape` feeds it.
+
+=== "Python"
+
+    ```python
+    stats = bt.run_tape_bars_on_ticks("data/tape", interval_seconds=300, symbol="BTCUSDT")
+    ```
+
+=== "Node.js"
+
+    ```javascript
+    const stats = bt.runTapeBarsOnTicks("data/tape", 300, "BTCUSDT");
+    ```
+
+=== "Codon"
+
+    ```python
+    stats = bt.run_tape_bars_on_ticks("data/tape", 300.0, "BTCUSDT")
+    ```
+
+=== "C++"
+
+    ```cpp
+    auto result = runner.runTapeBarsOnTicks("data/tape", std::chrono::minutes(5), btcId);
+    ```
+
+The three ways to run a strategy over a tape, side by side:
+
+| | `run_tape` | `run_tape_bars` | `run_tape_bars_on_ticks` |
+|---|---|---|---|
+| The strategy sees | every trade (`on_trade`) and book record | closed time bars (`on_bar`) | closed time bars (`on_bar`) |
+| The executor matches against | every trade and book record | each bar's open, low, high, close | every trade and book record |
+| An order sent from the callback first trades at | the current market (the record just shown) | the next bar's open | the first trade stamped at or after the bar's end |
+| A stop triggered inside a bar fills at | the print that crossed it | the bar's low (high for a buy stop) | the print that crossed it |
+| Submit latency of L | moves the fill to the first record at or after now + L | moves the fill to a later bar's open | moves the fill to the first record at or after the bar's end + L |
+| Use it for | strategies that react to prints or the book | fast sweeps of a bar strategy, and parity with bar data | a bar strategy whose fills should be the tape's |
+
+The rules of `run_tape_bars_on_ticks`, exactly:
+
+- Bar n reaches `on_bar` when the first trade stamped at or after its end
+  arrives, and before that trade reaches the executor. The bar is over by
+  then, and nothing it contains is new to the strategy. The callback runs on
+  a clock set to the bar's end, or later when book records stamped past the
+  end came first.
+- An order sent from that callback is submitted then, through the full submit
+  path (rate limits, reduce-only, the sampled latency), and is not matched
+  inside the call. With no latency it can first match against that trade: the
+  first trade stamped at or after the end of bar n, a trade stamped exactly at
+  the end included. With a submit latency L it waits for the first record at
+  or after the bar's end + L: 5 ms of latency moves a fill by milliseconds,
+  not by a bar.
+- Stops, take-profits, trailing stops and limits already working are matched
+  by the trades inside the following bars, by `run_tape`'s rules. A
+  conditional order never fills better than its trigger.
+- The bars are the bars `run_tape_bars` delivers for the same interval, bit
+  for bit, and the last bar, still open when the tape ends, is not delivered.
+  A trade later than its bar's bucket is left out of the bar and still reaches
+  the executor.
+- `on_trade` and `on_book_update` do not fire.
+- One symbol per run, as for `run_tape_bars`: `symbol` names it, and without
+  it a trade or book record of a second symbol raises.
+- The result has the same shape as the other runners' (stats, `trades()`,
+  `equity_curve()`); the stats also carry `skipped_option_quotes` and
+  `skipped_pool_states`, as `run_tape`'s do. The tape is streamed: memory does
+  not grow with the number of trades.
+
+A strategy that sends only market orders from `on_bar` gets exactly the fills
+`run_tape` gives the same orders sent from `on_trade` of the first trade at or
+after each bar's end. Choose `run_tape_bars` when bars are all the data there
+is, or to sweep many parameters fast; choose `run_tape_bars_on_ticks` for the
+fills of a bar strategy that the tape can actually support.
+
 ## Output
 
 ```
@@ -4533,7 +4611,7 @@ What still differs between producers is the *field set*, not the names:
 
 | Producer | Field set |
 |---|---|
-| `BacktestRunner.run_csv` / `run_ohlcv` / `run_bars` / `run_tape` / `run_tapes` | Headline metrics plus all three risk ratios |
+| `BacktestRunner.run_csv` / `run_ohlcv` / `run_bars` / `run_tape` / `run_tapes` / `run_tape_bars` / `run_tape_bars_on_ticks` | Headline metrics plus all three risk ratios; the tape runs `run_tape`, `run_tapes` and `run_tape_bars_on_ticks` add `skipped_option_quotes` and `skipped_pool_states` (Node: `skippedOptionQuotes` / `skippedPoolStates` on every run) |
 | `BacktestResult.stats()` | The full set |
 | `GridSearch.run()[i]["stats"]` | Python: whatever the factory returned (normally the `run_*` shape). Node: the fold shape |
 | `WalkForwardRunner` fold stats | The fold shape: the `run_*` set minus `avg_win` / `avg_loss` |
@@ -5402,6 +5480,14 @@ while it streams and gives the same result as the explicit route (see
 [Bars from a tape in one call](backtest.md#bars-from-a-tape-in-one-call)).
 A sweep repeats the run many times over the same bars, so it pays to build the
 bars once and reuse them, which is what this page does.
+
+A bar sweep fills on bars: an order from `on_bar` at the next bar's open, a
+stop at the bar's low. Once the grid has narrowed to a few candidates, run
+those on the tape itself with `run_tape_bars_on_ticks`, which shows the
+strategy the same bars but fills its orders on the tape's prints; the table in
+[Decide on bars, fill on ticks](backtest.md#decide-on-bars-fill-on-ticks) sets
+the three modes side by side. That run reads the whole tape each time, so it
+is the check on a shortlist, not the sweep itself.
 
 ## Load the bars once
 
@@ -7596,7 +7682,7 @@ reader.run(panel)                # default n_threads=0 → auto
 - `1`: explicit single-thread. Useful for benchmarking the base path, or for environments where threading is undesirable.
 - `>1`: explicit worker count, capped to the effective block count per segment. `n_threads=100` on a 4-block segment allocates 4 panel clones.
 
-Partitioning is intra-segment at the compressed-block level. Each worker holds its own panel, cloned from the caller's via `IAggregator::cloneEmpty()`, and walks its assigned block range; results merge into the caller's originals via `IAggregator::merge()` before `finalize()`. Captures with one large active segment (md_collector style) benefit from this layout; segment-level partitioning would leave workers idle when one segment dominates.
+Partitioning is intra-segment at the compressed-block level. Each worker holds its own panel, cloned from the caller's via `IAggregator::cloneEmpty()`, and walks its assigned block range; results merge into the caller's originals via `IAggregator::merge()` before `finalize()`. Captures with one large active segment (a long-running recorder that appends to a single file) benefit from this layout; segment-level partitioning would leave workers idle when one segment dominates.
 
 Every thread count delivers events in the order `n_threads=1` does. `Sorted` segments whose time ranges overlap (two captures of one window, an archive import that overlaps a recording) are merged event by event on the calling thread and fed to the caller's aggregators directly; only the remaining segments are partitioned. A tape recorded in order has no such segments and is partitioned in full. See [BinaryLogReader, Ordering guarantee](../reference/api/replay/binary_log_reader.md#ordering-guarantee).
 
@@ -7612,7 +7698,7 @@ The failure is layout-dependent: the reader only partitions when a segment has e
 
 ## Out-of-order tapes and the reorder buffer
 
-For segments without the `Sorted` flag (tapes produced by external writers such as `md_collector` or third-party recorders), the reader applies two ordering stages:
+For segments without the `Sorted` flag (tapes produced by external writers or third-party recorders), the reader applies two ordering stages:
 
 1. Intra-block sort runs on decompress, removing the ~1–2 ms exchange-WS jitter that accounts for most exchange-feed reordering. Cost: one linear scan of the block buffer per Sorted=false block.
 2. Cross-block reorder buffer is a bounded min-heap of in-flight events keyed by `exchange_ts_ns`. As events arrive (each block already intra-sorted), the heap drains anything whose timestamp falls outside `watermark - reorder_window_ns`. Memory: `O(reorder_window_ns × peak_event_rate)`.
@@ -7626,7 +7712,7 @@ reader = lrvx.DataReader(
 )
 ```
 
-The 10s default covers ~99% of cross-block inversions observed on real `md_collector` captures (1–25s tail, p99 around 5s).
+The 10s default covers about 99% of cross-block inversions seen on live exchange captures written without sorting (1–25s tail, p99 around 5s).
 
 ### Events that arrive too late
 
@@ -9898,6 +9984,7 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 - `run_ohlcv(self, ts: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol: str = '') -> typing.Any`
 - `run_tape(self, path: str) -> typing.Any`
 - `run_tape_bars(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any`
+- `run_tape_bars_on_ticks(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any`
 - `run_tapes(self, paths: collections.abc.Sequence[str]) -> typing.Any`
 - `session_book_snapshot(self, symbol: typing.Any, bid_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ask_levels: collections.abc.Sequence[tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex]], ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `session_fills(self) -> numpy.ndarray[typing.Any, numpy.dtype[numpy.void]]`
@@ -12530,9 +12617,10 @@ moves a fill to a later bar's open: see
 | `run_bars(start_time_ns, end_time_ns, open, high, low, close, volume, symbol='', bar_type=0, bar_type_param=0)` | Replay full OHLCV bars (`Strategy.on_bar` fires) |
 | `run_tape(path)` | Run against a `.lrvx` tape directory — the canonical recorded artifact `lrvx tape record` writes. Same stats shape as `run_csv`, plus `skipped_option_quotes` and `skipped_pool_states`: option-quote and pool-state records on the tape reach no strategy callback and do not move the simulated executor, so they are skipped and counted here |
 | `run_tape_bars(path, *, interval_seconds, symbol='')` | Replay a `.lrvx` tape as time bars of `interval_seconds` (`Strategy.on_bar` fires, `on_trade` does not). The trades are aggregated while the tape streams, never materialised in Python. Same bars, fills, `trades()` and `equity_curve()` as `read_trades` -> `aggregate_time_bars` -> `run_bars` for the same interval. `symbol` is required when the tape holds more than one. See [Bars from a tape in one call](../../how-to/backtest.md#bars-from-a-tape-in-one-call) |
+| `run_tape_bars_on_ticks(path, *, interval_seconds, symbol='')` | Decide on bars, fill on ticks: `on_bar` receives the bars `run_tape_bars` builds for the same interval, while the simulated executor is fed every trade and book record as `run_tape` feeds it (`on_trade` and `on_book_update` do not fire). Bar n reaches `on_bar` when the first trade stamped at or after its end arrives, before that trade reaches the executor; an order sent from `on_bar` can first match against that trade, or with a submit latency L against the first record at or after the bar's end + L. Working stops and limits fill on the prints inside the next bars, a stop never better than its trigger. `symbol` as for `run_tape_bars`. Stats shape as `run_tape`, including `skipped_option_quotes` and `skipped_pool_states`. See [Decide on bars, fill on ticks](../../how-to/backtest.md#decide-on-bars-fill-on-ticks) |
 | `run_tapes(paths)` | Run against N `.lrvx` tapes merged on read. Symbols are rekeyed by `(metadata.exchange, name)`, so two captures of the same venue/symbol collapse and two venues stay distinct. `run_tapes([t])` equals `run_tape(t)`, skipped-record counts included |
 | `equity_curve()` | Equity curve from the most recent run, as a dict of numpy arrays (`timestamp_ns`, `equity`, `drawdown_pct`). One point per closed trade; a position still open at the end adds none (see [A position open at the end](#a-position-open-at-the-end)) |
-| `trades()` | Closed trades from the most recent run, as a dict of numpy arrays (`symbol`, `side`, `entry_price`, `exit_price`, `quantity`, `pnl`, `fee`, `entry_time_ns`, `exit_time_ns`). A position still open at the end is not a trade and is not listed. On bar replay (`run_bars`, `run_tape_bars`) `entry_time_ns` / `exit_time_ns` are the end of the bar in which the fill happened, wherever in the bar it matched: a fill inside a daily bar carries the next day's 00:00. On tick replay they are the timestamp of the filling event |
+| `trades()` | Closed trades from the most recent run, as a dict of numpy arrays (`symbol`, `side`, `entry_price`, `exit_price`, `quantity`, `pnl`, `fee`, `entry_time_ns`, `exit_time_ns`). A position still open at the end is not a trade and is not listed. On bar replay (`run_bars`, `run_tape_bars`) `entry_time_ns` / `exit_time_ns` are the end of the bar in which the fill happened, wherever in the bar it matched: a fill inside a daily bar carries the next day's 00:00. On tick replay, and with `run_tape_bars_on_ticks`, they are the timestamp of the filling event |
 
 An empty `symbol` resolves to `"default"`.
 
@@ -14838,7 +14926,8 @@ Per-symbol slippage override. Same parameters as `set_default_slippage`.
 
 #### `set_queue_model(model, depth=1)`
 
-Configure limit order queue simulation. `model` is a string.
+Configure limit order queue simulation. `model` is one of the names below; any other string
+raises `LrvxError` (`E_VAL_002`) listing them, and the model installed before stays.
 
 ```python
 executor.set_queue_model("tob", depth=1)
@@ -15539,6 +15628,7 @@ built with options refuses `setExecutor`.
 | `runOhlcv(timestamps, closes, symbol)` | stats object | Replay raw arrays (timestamps as Float64Array, closes as Float64Array) |
 | `runTape(path)` | stats object | Replay a `.lrvx` tape directory — the canonical recording written by `lrvx tape record` or `scripts/backfill_to_tape.py` |
 | `runTapeBars(path, intervalSeconds, symbol?)` | stats object | Replay a `.lrvx` tape as time bars: trades aggregated while the tape streams, each closed bar to `onBar` with `runBars`' fill rules. Same result as `readTrades` -> `aggregateTimeBars` -> `runBars` for the same interval. `symbol` is required when the tape holds more than one; throws `LrvxError` on a bad interval, unknown symbol, unreadable tape or a symbol with no trades |
+| `runTapeBarsOnTicks(path, intervalSeconds, symbol?)` | stats object | Decide on bars, fill on ticks: `onBar` receives the `runTapeBars` bars, the executor is fed every trade and book record as `runTape` feeds it (`onTrade` and `onBookUpdate` do not fire). An order sent from bar n's `onBar` can first match against the first trade stamped at or after the end of bar n (with a submit latency L, the first record at or after the end + L). `symbol` and the errors as for `runTapeBars`. See [Decide on bars, fill on ticks](../../how-to/backtest.md#decide-on-bars-fill-on-ticks) |
 | `runTapes(paths)` | stats object | Merge N `.lrvx` tape directories on read and replay the merged stream. Symbols are rekeyed by `(metadata.exchange, name)` so two venues stay distinct. `runTapes([t])` equals `runTape(t)`; throws on bad paths or overlapping book streams |
 | `setExecutor(executor)` | `void` | Replace the built-in `SimulatedExecutor`. `null` detaches |
 | `addExecutionListener(listener)` | `void` | Attach an order-lifecycle listener. Multiple listeners may be attached; each fires for every order event |
@@ -15546,6 +15636,10 @@ built with options refuses `setExecutor`.
 | `trades()` | `BacktestTrades` | Closed trades from the most recent run |
 
 `equityCurve()` and `trades()` throw `LrvxError(E_RUN_002)` if no run has completed.
+
+Every run's stats object carries `skippedOptionQuotes` and `skippedPoolStates`: the option-quote
+and pool-state records a tape run (`runTape`, `runTapes`, `runTapeBarsOnTicks`) read and delivered
+to no callback or the executor, 0 for a run that read no tape.
 
 ### Stats object
 
@@ -15597,7 +15691,7 @@ exec.setQueueModel('tob', 1);
 | `onTopOfBook(symbol, bid, ask)` | Feed a touch-only frame. `bid` / `ask` are `{ price, qty }`; `null` means that side of the book is empty |
 | `advanceClock(timestampNs)` | Advance simulated time |
 | `setDefaultSlippage(model, ticks, tickSize, bps, impactCoeff)` | Configure slippage. `model` is one of `"none"`, `"fixed_ticks"`, `"fixed_bps"`, `"volume_impact"` |
-| `setQueueModel(model, depth)` | Configure limit order queue. `model` is one of `"none"`, `"tob"`, `"full"`, `"pro_rata"`, `"pro_rata_with_fifo"`, `"top_pro_lmm"`, `"pro_rata_with_priority"` |
+| `setQueueModel(model, depth)` | Configure limit order queue. `model` is one of `"none"`, `"tob"`, `"full"`, `"pro_rata"`, `"pro_rata_with_fifo"`, `"top_pro_lmm"`, `"pro_rata_with_priority"`, or its `QUEUE_*` code; anything else throws with the valid names and leaves the model installed before |
 | `fillCount` | Number of fills (property) |
 
 No symbol registry can be attached to this executor, so order prices are not checked against a
@@ -17303,6 +17397,7 @@ names and meaning of the Python runner (see
 | `run_bars(start_ns, end_ns, opens, highs, lows, closes, volumes, symbol, bar_type=0, bar_type_param=0)` | `BacktestStats` | Replay full OHLCV bars. `Strategy.on_bar` fires; `on_trade` does **not** |
 | `run_tape(path)` | `BacktestStats` | Replay one `.lrvx` tape directory |
 | `run_tape_bars(path, interval_seconds, symbol="")` | `BacktestStats` | Replay a `.lrvx` tape as time bars, aggregated while it streams; each closed bar goes to `on_bar` with `run_bars`' fill rules. Same result as `aggregate_time_bars` -> `run_bars` on the tape's trades. `symbol` is required when the tape holds more than one |
+| `run_tape_bars_on_ticks(path, interval_seconds, symbol="")` | `BacktestStats` | Decide on bars, fill on ticks: `on_bar` receives the `run_tape_bars` bars, the executor is fed every trade and book record as `run_tape` feeds it. An order sent from bar n's `on_bar` can first match against the first trade stamped at or after the end of bar n (with a submit latency L, the first record at or after the end + L). `symbol` as for `run_tape_bars`. See [Decide on bars, fill on ticks](../../how-to/backtest.md#decide-on-bars-fill-on-ticks) |
 | `run_tapes(paths)` | `BacktestStats` | Replay N `.lrvx` tapes merged on read |
 | `equity_curve()` | `Tuple[List[int], List[float], List[float]]` | `(timestamps_ns, equity, drawdown_pct)` from the most recent run, all the same length. Raises if no run has completed |
 | `trades()` | 9 parallel lists | `(symbol, side, entry_price, exit_price, quantity, pnl, fee, entry_time_ns, exit_time_ns)` for the closed trades of the most recent run. `side` is 0 for long, 1 for short |
@@ -17361,6 +17456,8 @@ Returned by `BacktestRunner.run_csv()` / `run_ohlcv()` and `BacktestResult.stats
 | `return_pct` | `float` | Net return (%) |
 | `start_time_ns` | `int` | Backtest start timestamp (ns) |
 | `end_time_ns` | `int` | Backtest end timestamp (ns) |
+| `skipped_option_quotes` | `int` | Option-quote records a tape run read and delivered to nobody (`run_tape`, `run_tapes`, `run_tape_bars_on_ticks`); 0 otherwise |
+| `skipped_pool_states` | `int` | Pool-state records a tape run read and delivered to nobody, as `skipped_option_quotes` |
 
 ---
 
@@ -17404,7 +17501,7 @@ SimulatedExecutor()
 | `advance_clock(timestamp_ns)` | Advance simulated time |
 | `set_default_slippage(model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)` | Configure slippage for all symbols |
 | `set_symbol_slippage(symbol, model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)` | Per-symbol slippage override |
-| `set_queue_model(model, depth=1)` | Configure limit order queue simulation |
+| `set_queue_model(model, depth=1)` | Configure limit order queue simulation. `model` is a `QUEUE_*` code from 0 (none) to 6 (pro_rata_with_priority); any other raises `ValueError` and the model installed before stays |
 | `close()` | Free resources |
 
 ### Properties
@@ -18871,6 +18968,8 @@ Emitted by strategies, received by the order backend.
 | `returnPct` | `double` | Net return (%) |
 | `startTimeNs` | `int64_t` | Backtest start timestamp (ns) |
 | `endTimeNs` | `int64_t` | Backtest end timestamp (ns) |
+| `optionQuoteCount` | `uint64_t` | Option-quote records the run read and delivered to nobody: filled by `run_tape`, `run_tapes` and `run_tape_bars_on_ticks`, 0 otherwise |
+| `poolStateCount` | `uint64_t` | Pool-state records the run read and delivered to nobody, as `optionQuoteCount` |
 
 ### `LrvxEquityPoint`
 
@@ -19141,6 +19240,18 @@ int lrvx_backtest_runner_run_tape_bars(LrvxBacktestRunnerHandle runner,
                                        const char* tape_dir, int64_t interval_ns,
                                        const char* symbol,
                                        LrvxBacktestStats* stats_out);
+
+// The same bars to on_bar, every trade and book record to the executor as
+// run_tape feeds them. Bar n is delivered when the first trade stamped at or
+// after its end arrives, before that trade reaches the executor; an order sent
+// from on_bar can first match against that trade (with a submit latency L,
+// the first record at or after the bar's end + L). symbol as for
+// run_tape_bars. Returns 1 on success, 0 on error with the reason in
+// lrvx_last_error_message().
+int lrvx_backtest_runner_run_tape_bars_on_ticks(LrvxBacktestRunnerHandle runner,
+                                                const char* tape_dir, int64_t interval_ns,
+                                                const char* symbol,
+                                                LrvxBacktestStats* stats_out);
 
 // lrvx_backtest_runner_create with the built-in executor's slippage and
 // latency (BacktestConfig fields of the same names). slippage_model: 0 none,

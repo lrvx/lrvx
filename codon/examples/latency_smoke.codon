@@ -109,6 +109,19 @@ else:
     print("FAIL: set_symbol_slippage accepted model 9")
 ex.set_default_slippage(2, 0, 0.0, 5.0)
 print("ok  set_default_slippage accepts fixed_bps")
+for bad in [7, -1]:
+    raised = False
+    try:
+        ex.set_queue_model(bad)
+    except ValueError as err:
+        raised = "pro_rata_with_priority" in err.message
+    if raised:
+        print("ok  set_queue_model refuses model", bad)
+    else:
+        print("FAIL: set_queue_model accepted model", bad)
+for good in range(7):
+    ex.set_queue_model(good)
+print("ok  set_queue_model accepts codes 0..6")
 ex.close()
 
 

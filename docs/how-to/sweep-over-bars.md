@@ -9,6 +9,14 @@ while it streams and gives the same result as the explicit route (see
 A sweep repeats the run many times over the same bars, so it pays to build the
 bars once and reuse them, which is what this page does.
 
+A bar sweep fills on bars: an order from `on_bar` at the next bar's open, a
+stop at the bar's low. Once the grid has narrowed to a few candidates, run
+those on the tape itself with `run_tape_bars_on_ticks`, which shows the
+strategy the same bars but fills its orders on the tape's prints; the table in
+[Decide on bars, fill on ticks](backtest.md#decide-on-bars-fill-on-ticks) sets
+the three modes side by side. That run reads the whole tape each time, so it
+is the check on a shortlist, not the sweep itself.
+
 ## Load the bars once
 
 `run_bars` takes the bar arrays and nothing else: no file, no parsing, no conversion. Load them once and hand the same arrays to every run. Timestamps are nanoseconds and the call does no unit guessing, so a file with millisecond timestamps is multiplied by 1 000 000 at load time, once.

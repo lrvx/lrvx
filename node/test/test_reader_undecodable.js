@@ -70,9 +70,9 @@ function main()
       const trades = r.readTrades();
       check(trades.length === 240, `damaged tape returns 240 trades (got ${trades.length})`);
       const s = r.stats();
-      // readTrades walks the tape twice (a count, then the copy) and the
-      // counters accumulate over the reader's lifetime: once per walk.
-      check(s.segmentsTruncated === 2, `segmentsTruncated === 2 (got ${s.segmentsTruncated})`);
+      // readTrades walks the tape once; the counters accumulate over the
+      // reader's lifetime, once per walk.
+      check(s.segmentsTruncated === 1, `segmentsTruncated === 1 (got ${s.segmentsTruncated})`);
       check(s.crcErrors === 0, `crcErrors === 0 (got ${s.crcErrors})`);
     }
   } finally {
