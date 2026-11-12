@@ -139,10 +139,8 @@ class AccountWrap : public Napi::ObjectWrap<AccountWrap>
   }
   Napi::Value MarkTsFor(const Napi::CallbackInfo& info)
   {
-    return Napi::Number::New(
-        info.Env(),
-        static_cast<double>(lrvx_account_mark_ts(
-            _h, info[0].As<Napi::Number>().Uint32Value())));
+    return Napi::BigInt::New(
+        info.Env(), lrvx_account_mark_ts(_h, info[0].As<Napi::Number>().Uint32Value()));
   }
   Napi::Value HasStaleMarks(const Napi::CallbackInfo& info)
   {

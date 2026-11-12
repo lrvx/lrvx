@@ -333,6 +333,20 @@ class FundingSchedule
   }
   int64_t lastTickNs() const noexcept { return _lastTickNs; }
 
+  // Where tick() has got to. A caller that must size a buffer before it can
+  // take the payments ticks, counts, and puts the cursor back.
+  struct Cursor
+  {
+    int64_t lastTickNs{0};
+    bool seeded{false};
+  };
+  Cursor cursor() const noexcept { return {_lastTickNs, _seeded}; }
+  void restoreCursor(Cursor c) noexcept
+  {
+    _lastTickNs = c.lastTickNs;
+    _seeded = c.seeded;
+  }
+
  private:
   int64_t _intervalNs{0};
   double _constantRate{0.0};

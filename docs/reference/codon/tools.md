@@ -389,3 +389,10 @@ merge_segments("input_dir", "output.bin")  # bool
 | `recompress_segment(input_path, output_path, compression=1)` | `bool` | Recompress |
 | `extract_symbols(input_path, output_path, symbols)` | `int` | Extract specific symbols |
 | `extract_time_range(input_path, output_path, from_ns, to_ns)` | `int` | Extract time slice |
+
+`recompress_segment` returns `False`, and `extract_symbols` and `extract_time_range` return `0`,
+when the input cannot be read or the output cannot be written. `last_error()` (from `lrvx.abi`,
+also importable from `lrvx.tools`) then returns the reason: a string that opens with the C
+function's name and names the file. Each of the three clears it on entry, so `""` means the call
+did not fail; an extract that matched nothing returns `0` with `""`.
+`FundingSchedule.load_tape(path)` reports a file it could not open the same way.

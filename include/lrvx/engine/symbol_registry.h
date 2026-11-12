@@ -259,6 +259,8 @@ class SymbolRegistry : public ISubsystem
   bool deserialize(std::span<const std::byte> data);
 
   void clear();
+  // In registration order (ascending id): front() is the first symbol
+  // registered.
   std::vector<SymbolInfo> getAllSymbols() const;
   size_t size() const;
 

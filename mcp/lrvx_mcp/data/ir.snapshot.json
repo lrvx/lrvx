@@ -5445,6 +5445,49 @@
       "return_type": "uint32_t"
     },
     {
+      "group": "funding_schedule",
+      "name": "lrvx_funding_schedule_tick_exact",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxFundingScheduleHandle"
+        },
+        {
+          "name": "now_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "symbols",
+          "type": "const uint32_t *"
+        },
+        {
+          "name": "positions",
+          "type": "const double *"
+        },
+        {
+          "name": "mark_prices",
+          "type": "const double *"
+        },
+        {
+          "name": "n_symbols",
+          "type": "uint32_t"
+        },
+        {
+          "name": "out_timestamps_ns",
+          "type": "int64_t *"
+        },
+        {
+          "name": "out_buf",
+          "type": "double *"
+        },
+        {
+          "name": "max_events",
+          "type": "uint32_t"
+        }
+      ],
+      "return_type": "uint32_t"
+    },
+    {
       "group": "context_queries",
       "name": "lrvx_get_order_status",
       "params": [
@@ -13884,6 +13927,17 @@
       "return_type": "uint32_t"
     },
     {
+      "group": "strategy_lifecycle",
+      "name": "lrvx_strategy_id",
+      "params": [
+        {
+          "name": "strategy",
+          "type": "LrvxStrategyHandle"
+        }
+      ],
+      "return_type": "uint32_t"
+    },
+    {
       "group": "multi_tf_helpers",
       "name": "lrvx_strategy_last_closed_bar",
       "params": [
@@ -13981,6 +14035,21 @@
         },
         {
           "name": "capacity",
+          "type": "uint32_t"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "strategy_lifecycle",
+      "name": "lrvx_strategy_set_id",
+      "params": [
+        {
+          "name": "strategy",
+          "type": "LrvxStrategyHandle"
+        },
+        {
+          "name": "id",
           "type": "uint32_t"
         }
       ],

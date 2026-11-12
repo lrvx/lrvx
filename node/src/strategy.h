@@ -1774,14 +1774,22 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
         // Nothing reads this host yet, so the write is unshared.
         host->openChannel();
       }
+      lrvx_clear_last_error();
       lrvx_live_engine_add_strategy(_engine,
                                     static_cast<LrvxStrategyHandle>(host->bridge.get()),
                                     &RunnerNode::signalCbThreaded, this);
     }
     else
     {
+      lrvx_clear_last_error();
       lrvx_runner_add_strategy(_runner,
                                static_cast<LrvxStrategyHandle>(host->bridge.get()));
+    }
+    if (lrvx_last_error_code() != 0)
+    {
+      // Not attached: the host is dropped with this scope.
+      Napi::Error::New(env, "Runner.addStrategy: " + capiReason()).ThrowAsJavaScriptException();
+      return env.Undefined();
     }
     _hosts.push_back(std::move(host));
     return env.Undefined();

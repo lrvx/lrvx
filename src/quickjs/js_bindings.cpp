@@ -3434,8 +3434,14 @@ static JSValue js_funding_schedule_load_tape(JSContext* ctx, JSValueConst, int,
 {
   auto h = static_cast<LrvxFundingScheduleHandle>(getHandle(ctx, argv[0]));
   LRVX_JS_CSTRING_OR_THROW(path, ctx, argv[1]);
+  lrvx_clear_last_error();
   const uint8_t ok = lrvx_funding_schedule_load_tape(h, path);
   return JS_NewBool(ctx, ok != 0);
+}
+// Why the last call that reports failure through its return value failed.
+static JSValue js_last_error(JSContext* ctx, JSValueConst, int, JSValueConst*)
+{
+  return JS_NewString(ctx, lrvx_last_error_message());
 }
 static JSValue js_funding_schedule_set_tape_by_symbol(JSContext* ctx, JSValueConst,
                                                       int, JSValueConst* argv)
@@ -3511,17 +3517,26 @@ static JSValue js_funding_schedule_tick(JSContext* ctx, JSValueConst, int,
     mp[i] = d;
     JS_FreeValue(ctx, v);
   }
-  uint32_t count =
-      lrvx_funding_schedule_tick(h, nowNs, sy.data(), ps.data(), mp.data(), n, nullptr, 0);
-  std::vector<double> buf(count * 6, 0.0);
-  lrvx_funding_schedule_tick(h, nowNs, sy.data(), ps.data(), mp.data(), n, buf.data(),
-                             count);
+  // One call settles and hands over; a second is made only when more events
+  // were due than the first had room for, and that first one settled nothing.
+  uint32_t room = 16;
+  std::vector<int64_t> ts(room);
+  std::vector<double> buf(room * 6, 0.0);
+  uint32_t count = lrvx_funding_schedule_tick_exact(h, nowNs, sy.data(), ps.data(), mp.data(), n,
+                                                    ts.data(), buf.data(), room);
+  if (count > room)
+  {
+    room = count;
+    ts.assign(room, 0);
+    buf.assign(room * 6, 0.0);
+    count = lrvx_funding_schedule_tick_exact(h, nowNs, sy.data(), ps.data(), mp.data(), n,
+                                             ts.data(), buf.data(), room);
+  }
   JSValue arr = JS_NewArray(ctx);
   for (uint32_t i = 0; i < count; ++i)
   {
     JSValue obj = JS_NewObject(ctx);
-    JS_SetPropertyStr(ctx, obj, "timestampNs",
-                      JS_NewInt64(ctx, static_cast<int64_t>(buf[i * 6 + 0])));
+    JS_SetPropertyStr(ctx, obj, "timestampNs", JS_NewBigInt64(ctx, ts[i]));
     JS_SetPropertyStr(ctx, obj, "symbol", JS_NewFloat64(ctx, buf[i * 6 + 1]));
     JS_SetPropertyStr(ctx, obj, "rate", JS_NewFloat64(ctx, buf[i * 6 + 2]));
     JS_SetPropertyStr(ctx, obj, "markPrice", JS_NewFloat64(ctx, buf[i * 6 + 3]));
@@ -7132,6 +7147,7 @@ static JSValue js_seg_recompress(JSContext* c, JSValueConst, int argc, JSValueCo
   LRVX_JS_CSTRING_OR_THROW(in, c, a[0]);
   LRVX_JS_CSTRING_OR_THROW(out, c, a[1]);
   uint8_t comp = argc > 2 ? static_cast<uint8_t>(toUint32(c, a[2])) : 1;
+  lrvx_clear_last_error();
   JSValue ret = JS_NewBool(c, lrvx_segment_recompress(in, out, comp));
   return ret;
 }
@@ -7154,6 +7170,7 @@ static JSValue js_seg_extract_symbols(JSContext* c, JSValueConst, int, JSValueCo
       JS_FreeValue(c, e);
     }
   }
+  lrvx_clear_last_error();
   uint64_t written = lrvx_segment_extract_symbols(in, out, syms.data(), static_cast<uint32_t>(syms.size()));
   return JS_NewInt64(c, static_cast<int64_t>(written));
 }
@@ -7162,6 +7179,7 @@ static JSValue js_seg_extract_time(JSContext* c, JSValueConst, int, JSValueConst
 {
   LRVX_JS_CSTRING_OR_THROW(in, c, a[0]);
   LRVX_JS_CSTRING_OR_THROW(out, c, a[1]);
+  lrvx_clear_last_error();
   uint64_t written = lrvx_segment_extract_time_range(in, out, toInt64(c, a[2]), toInt64(c, a[3]));
   return JS_NewInt64(c, static_cast<int64_t>(written));
 }
@@ -7710,6 +7728,7 @@ bool registerLrvxBindings(JSContext* ctx)
                 js_funding_schedule_set_constant_rate, 2);
   addGlobalFunc(ctx, "__lrvx_funding_schedule_reset", js_funding_schedule_reset, 1);
   addGlobalFunc(ctx, "__lrvx_funding_schedule_tick", js_funding_schedule_tick, 5);
+  addGlobalFunc(ctx, "__lrvx_last_error", js_last_error, 0);
   addGlobalFunc(ctx, "__lrvx_simulated_executor_on_trade_qty", js_executor_on_trade_qty, 5);
   addGlobalFunc(ctx, "__lrvx_simulated_executor_on_best_levels", js_executor_on_best_levels, 6);
   addGlobalFunc(ctx, "__lrvx_simulated_executor_on_top_of_book", js_executor_on_top_of_book, 8);

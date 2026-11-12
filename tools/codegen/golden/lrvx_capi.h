@@ -1470,6 +1470,11 @@ extern "C"
                                       const uint32_t* symbols, const double* positions,
                                       const double* mark_prices, uint32_t n_symbols,
                                       double* out_buf, uint32_t max_events);
+  uint32_t lrvx_funding_schedule_tick_exact(LrvxFundingScheduleHandle h, int64_t now_ns,
+                                            const uint32_t* symbols, const double* positions,
+                                            const double* mark_prices, uint32_t n_symbols,
+                                            int64_t* out_timestamps_ns, double* out_buf,
+                                            uint32_t max_events);
 
   // ============================================================
   // Grid Search
@@ -2327,6 +2332,8 @@ extern "C"
                                           LrvxStrategyCallbacks callbacks);
   void lrvx_strategy_destroy(LrvxStrategyHandle strategy);
   void lrvx_strategy_replace_callbacks(LrvxStrategyHandle strategy, LrvxStrategyCallbacks callbacks);
+  uint32_t lrvx_strategy_id(LrvxStrategyHandle strategy);
+  void lrvx_strategy_set_id(LrvxStrategyHandle strategy, uint32_t id);
   LrvxStrategyHandle lrvx_strategy_create_p(uint32_t id, const uint32_t* symbols,
                                             uint32_t num_symbols, LrvxRegistryHandle registry,
                                             const LrvxStrategyCallbacks* callbacks);

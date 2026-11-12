@@ -156,22 +156,29 @@ class SegmentOps
   static ExportResult exportData(const std::filesystem::path& input_path,
                                  const ExportConfig& config, ProgressCallback progress);
 
+  // The four below take an optional `error`: left empty when the operation
+  // ran, set to the reason when the input could not be read or the output
+  // could not be written. A count of 0 with no error is a filter that
+  // matched nothing.
   static bool recompress(const std::filesystem::path& input_path,
-                         const std::filesystem::path& output_path, CompressionType new_compression);
+                         const std::filesystem::path& output_path, CompressionType new_compression,
+                         std::string* error = nullptr);
 
   static uint64_t filter(const std::filesystem::path& input_path,
                          const std::filesystem::path& output_path,
                          const std::function<bool(const ReplayEvent&)>& predicate,
-                         const WriterConfig& output_config);
+                         const WriterConfig& output_config, std::string* error = nullptr);
 
   static uint64_t extractSymbols(const std::filesystem::path& input_path,
                                  const std::filesystem::path& output_path,
-                                 const std::set<uint32_t>& symbols, const WriterConfig& config);
+                                 const std::set<uint32_t>& symbols, const WriterConfig& config,
+                                 std::string* error = nullptr);
 
   static uint64_t extractTimeRange(const std::filesystem::path& input_path,
                                    const std::filesystem::path& output_path, int64_t from_ns,
                                    int64_t to_ns, const WriterConfig& config,
-                                   RangeExtractStats* stats = nullptr);
+                                   RangeExtractStats* stats = nullptr,
+                                   std::string* error = nullptr);
 
  private:
   static std::string formatCSVEvent(const ReplayEvent& event, char delimiter);

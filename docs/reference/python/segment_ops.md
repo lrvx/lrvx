@@ -111,7 +111,8 @@ result = lrvx.export_data(
 
 ### `recompress(input_path, output_path, compression="lz4") -> bool`
 
-Re-compress a segment file. Returns `True` on success.
+Re-compress a segment file. Returns `True` on success, `False` when the input cannot be read or
+the output cannot be written.
 
 ```python
 ok = lrvx.recompress("uncompressed.lrvx", "compressed.lrvx", "lz4")
@@ -132,6 +133,19 @@ Extract a time range to a new file. Returns event count.
 ```python
 count = lrvx.extract_time_range("data.lrvx", "morning.lrvx",
                                  from_ns=start, to_ns=end)
+```
+
+### `last_error() -> str`
+
+Why the last `recompress` returned `False` or the last `extract_symbols` / `extract_time_range`
+returned `0`: a string that opens with the C function's name and names the file that could not
+be read or written. Each of the three clears it on entry, so `''` means the call did not fail; an
+extract that matched nothing returns `0` with `''`. `FundingSchedule.load_tape(path)` reports a
+file it could not open the same way. The record is per thread.
+
+```python
+if not lrvx.recompress("in.lrvx", "out.lrvx", "lz4"):
+    print(lrvx.last_error())
 ```
 
 ---

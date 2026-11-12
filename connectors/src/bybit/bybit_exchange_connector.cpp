@@ -1168,26 +1168,26 @@ void BybitExchangeConnector::loadInstrumentSpecs()
     // the same timeout inside start().
     if (!unreachable.empty())
     {
-      _specs.addError(entry.name + ": not requested, " + unreachable);
+      _specs.addError(entry.name, "not requested, " + unreachable);
       continue;
     }
     auto body = fetch(url, "");
     if (!body)
     {
-      _specs.addError(entry.name + ": " + body.error());
+      _specs.addError(entry.name, body.error());
       unreachable = "the previous request failed";
       continue;
     }
     auto specs = instrument_info::parseBybit(*body);
     if (!specs)
     {
-      _specs.addError(entry.name + ": " + specs.error());
+      _specs.addError(entry.name, specs.error());
       continue;
     }
     auto it = specs->find(entry.name);
     if (it == specs->end())
     {
-      _specs.addError(entry.name + ": not listed in the instruments-info response");
+      _specs.addError(entry.name, "not listed in the instruments-info response");
       continue;
     }
     _specs.add(entry.name, it->second);

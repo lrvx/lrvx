@@ -4365,6 +4365,124 @@ TEST(JsIntegrationTest, ContextPositionInOnFillCountsTheFill)
   EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "afterClose"), 0.0);
 }
 
+// What a script is handed in each callback, field by field: the shapes
+// docs/reference/quickjs/strategy.md lists. Clock readings are BigInt, order
+// ids and prices are Number.
+TEST(JsIntegrationTest, CallbackArgumentsHaveTheDocumentedTypes)
+{
+  TempJsFile script(R"(
+    var bars = 0;
+    var tradeShape = "", barShape = "", fillShape = "", updateShape = "", ctxShape = "";
+    var fillStatus = "", updateStatuses = "", fillPosition = -1, fillOrderIdMatches = 0;
+    var sentId = 0;
+    function shape(o) {
+      return Object.keys(o).sort().map(function(k) {
+        return k + ":" + (o[k] === null ? "null" : typeof o[k]);
+      }).join(",");
+    }
+    class TestStrat extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+      onTrade(ctx, trade) { tradeShape = shape(trade); }
+      onBar(ctx, bar) {
+        bars += 1;
+        barShape = shape(bar);
+        if (bars === 1) { sentId = this.marketBuy({ symbol: "BTCUSDT", qty: 1.0 }); }
+      }
+      onFill(ctx, ev) {
+        fillShape = shape(ev);
+        ctxShape = shape(ctx);
+        fillStatus = ev.status;
+        fillPosition = ctx.position;
+        fillOrderIdMatches = ev.orderId === sentId ? 1 : 0;
+      }
+      onOrderUpdate(ctx, ev) {
+        updateShape = shape(ev);
+        updateStatuses += ev.status + " ";
+      }
+    }
+    lrvx.register(new TestStrat());
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+  ASSERT_FALSE(symIds.empty());
+  auto bridge = std::make_unique<BridgeStrategy>(
+      1, std::vector<SymbolId>(symIds.begin(), symIds.end()), registry, callbacks);
+  jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+
+  TradeEvent trade{};
+  trade.trade.symbol = symIds[0];
+  trade.trade.price = Price::fromDouble(100.0);
+  trade.trade.quantity = Quantity::fromDouble(1.0);
+  trade.trade.isBuy = true;
+  trade.trade.exchangeTsNs = UnixNanos(1'700'000'000'123'456'789LL);
+  bridge->onTrade(trade);
+
+  constexpr int64_t kMinuteNs = 60'000'000'000LL;
+  std::vector<BarEvent> bars;
+  for (int i = 0; i < 4; ++i)
+  {
+    BarEvent ev{};
+    ev.symbol = symIds[0];
+    ev.barType = BarType::Time;
+    ev.barTypeParam = static_cast<uint64_t>(kMinuteNs);
+    ev.bar.open = Price::fromDouble(100.0);
+    ev.bar.high = Price::fromDouble(100.5);
+    ev.bar.low = Price::fromDouble(99.5);
+    ev.bar.close = Price::fromDouble(100.0);
+    ev.bar.startTime = TimePoint{std::chrono::nanoseconds{kMinuteNs * i}};
+    ev.bar.endTime = TimePoint{std::chrono::nanoseconds{kMinuteNs * (i + 1)}};
+    bars.push_back(ev);
+  }
+  BacktestRunner runner;
+  runner.setSymbolRegistry(&registry);
+  runner.setStrategy(bridge.get());
+  runner.runBars(bars);
+
+  const auto str = [&](const char* name)
+  {
+    JSValue v = jsStrat.engine().getGlobalProperty(name);
+    const char* s = JS_ToCString(jsStrat.engine().context(), v);
+    std::string out = s != nullptr ? s : "";
+    JS_FreeCString(jsStrat.engine().context(), s);
+    JS_FreeValue(jsStrat.engine().context(), v);
+    return out;
+  };
+
+  EXPECT_EQ(str("tradeShape"),
+            "isBuy:boolean,price:number,qty:number,side:string,symbol:string,symbolId:number,"
+            "timestampNs:bigint");
+  EXPECT_EQ(str("barShape"),
+            "barType:number,barTypeParam:number,buyVolume:number,close:number,closeReason:number,"
+            "endTimeNs:bigint,high:number,low:number,open:number,startTimeNs:bigint,"
+            "symbol:string,symbolId:number,volume:number");
+  const std::string orderEvent =
+      "acceptedAtNs:bigint,canceledAtNs:bigint,distanceToBestTicks:number,"
+      "exchangeTsNs:bigint,expiredAtNs:bigint,fillPrice:number,fillQty:number,"
+      "fillRole:string,firstFillAtNs:bigint,isMaker:boolean,lastFillAtNs:bigint,"
+      "marketPosition:null,orderId:number,orderType:string,queueAhead:number,"
+      "queueTotal:number,rejectReason:null,rejectedAtNs:bigint,side:string,status:string,"
+      "submittedAtNs:bigint,symbolId:number,triggeredAtNs:bigint";
+  EXPECT_EQ(str("fillShape"), orderEvent);
+  // The same object outside a fill: fillRole is null.
+  std::string update = orderEvent;
+  update.replace(update.find("fillRole:string"), 15, "fillRole:null");
+  EXPECT_EQ(str("updateShape"), update);
+  EXPECT_EQ(str("ctxShape"),
+            "avgEntryPrice:number,book:object,lastTouchNs:bigint,lastTradePrice:number,"
+            "lastUpdateNs:bigint,position:number,symbol:string,symbolId:number");
+
+  EXPECT_EQ(str("fillStatus"), "FILLED");
+  EXPECT_EQ(readGlobalInt32(jsStrat, "fillOrderIdMatches"), 1);
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "fillPosition"), 1.0);
+  // A fill is delivered to onFill only; onOrderUpdate hears the rest.
+  const std::string statuses = str("updateStatuses");
+  EXPECT_NE(statuses.find("ACCEPTED"), std::string::npos) << statuses;
+  EXPECT_EQ(statuses.find("FILLED"), std::string::npos) << statuses;
+}
+
 // A script's modify() goes out as a Modify signal, which names only the order
 // id. Hosted on a BacktestRunner the replacement has to stay the order the
 // script placed: on its symbol and side, under the id the script holds, and

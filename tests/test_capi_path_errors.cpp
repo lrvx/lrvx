@@ -212,6 +212,86 @@ TEST_F(CapiPathErrors, SegmentOpsSayWhyTheyFailed)
   EXPECT_FALSE(lastError().empty());
 }
 
+// recompress and the two extracts returned a bare 0 for an input they could
+// not open, the same value an extract that matches nothing returns.
+TEST_F(CapiPathErrors, RecompressAndExtractSayWhatTheyCouldNotOpen)
+{
+  const std::string out = (_root / "out.lrvx").string();
+
+  EXPECT_EQ(lrvx_segment_recompress(_missing.c_str(), out.c_str(), 1), 0);
+  expectReason(_missing);
+  expectReason("lrvx_segment_recompress");
+
+  lrvx_clear_last_error();
+  const uint32_t symbols[1] = {1};
+  EXPECT_EQ(lrvx_segment_extract_symbols(_missing.c_str(), out.c_str(), symbols, 1), 0u);
+  expectReason(_missing);
+  expectReason("lrvx_segment_extract_symbols");
+
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_segment_extract_time_range(_missing.c_str(), out.c_str(), 0, kSec), 0u);
+  expectReason(_missing);
+  expectReason("lrvx_segment_extract_time_range");
+}
+
+TEST_F(CapiPathErrors, AnExtractThatMatchesNothingIsNotAnError)
+{
+  const auto dir = _root / "tape";
+  LrvxDataWriterHandle w = lrvx_data_writer_create(dir.string().c_str(), 16, 1);
+  ASSERT_NE(w, nullptr);
+  for (int i = 0; i < 5; ++i)
+  {
+    ASSERT_EQ(lrvx_data_writer_write_trade(w, (10 + i) * kSec, (10 + i) * kSec, 100.0 + i, 1.0,
+                                           static_cast<uint64_t>(i + 1), 1, 0),
+              1);
+  }
+  lrvx_data_writer_close(w);
+  lrvx_data_writer_destroy(w);
+  std::string segment;
+  for (const auto& entry : std::filesystem::directory_iterator(dir))
+  {
+    if (entry.path().extension() != ".idx")
+    {
+      segment = entry.path().string();
+    }
+  }
+  ASSERT_FALSE(segment.empty());
+  lrvx_clear_last_error();
+
+  const uint32_t absent[1] = {99};
+  EXPECT_EQ(lrvx_segment_extract_symbols(segment.c_str(), (_root / "none.lrvx").string().c_str(),
+                                         absent, 1),
+            0u);
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+  EXPECT_EQ(lrvx_segment_extract_time_range(segment.c_str(),
+                                            (_root / "none2.lrvx").string().c_str(), 500 * kSec,
+                                            600 * kSec),
+            0u);
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+
+  const uint32_t present[1] = {1};
+  EXPECT_EQ(lrvx_segment_extract_symbols(segment.c_str(), (_root / "all.lrvx").string().c_str(),
+                                         present, 1),
+            5u);
+  EXPECT_EQ(lrvx_segment_recompress(segment.c_str(), (_root / "lz4.lrvx").string().c_str(), 1), 1);
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+
+  // An output that cannot be written: the path is a directory.
+  const auto taken = _root / "taken.lrvx";
+  std::filesystem::create_directories(taken);
+  EXPECT_EQ(lrvx_segment_recompress(segment.c_str(), taken.string().c_str(), 0), 0);
+  expectReason("Cannot write output file");
+  expectReason("taken.lrvx");
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_segment_extract_symbols(segment.c_str(), taken.string().c_str(), present, 1), 0u);
+  expectReason("taken.lrvx");
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_segment_extract_time_range(segment.c_str(), taken.string().c_str(), 0,
+                                            100 * kSec),
+            0u);
+  expectReason("taken.lrvx");
+}
+
 TEST_F(CapiPathErrors, PartitionerNeedsADirectoryArgument)
 {
   EXPECT_EQ(lrvx_partitioner_create(nullptr), nullptr);
@@ -273,6 +353,51 @@ class CapiRunnerUnknownSymbol : public CapiPathErrors
   LrvxStrategyHandle _strategy{nullptr};
   LrvxBacktestRunnerHandle _runner{nullptr};
 };
+
+// No name means the first symbol registered, whatever order the registry's
+// map walks its entries in.
+TEST(CapiRunnerDefaultSymbol, IsTheFirstRegistered)
+{
+  LrvxRegistryHandle registry = lrvx_registry_create();
+  std::vector<uint32_t> ids;
+  for (const char* name : {"AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG"})
+  {
+    ids.push_back(lrvx_registry_add_symbol(registry, "test", name, 0.01));
+  }
+  struct Seen
+  {
+    std::vector<uint32_t> symbols;
+  } seen;
+  LrvxStrategyCallbacks scb{};
+  scb.user_data = &seen;
+  scb.on_trade = +[](void* ud, const LrvxSymbolContext*, const LrvxTradeData* t)
+  {
+    static_cast<Seen*>(ud)->symbols.push_back(t->symbol);
+  };
+  LrvxStrategyHandle strategy = lrvx_strategy_create(
+      1, ids.data(), static_cast<uint32_t>(ids.size()), registry, scb);
+  LrvxBacktestRunnerHandle runner = lrvx_backtest_runner_create(registry, 0.0, 10000.0);
+  lrvx_backtest_runner_set_strategy(runner, strategy);
+
+  const int64_t ts[3] = {kSec, 2 * kSec, 3 * kSec};
+  const double close[3] = {100.0, 101.0, 102.0};
+  LrvxBacktestStats stats{};
+  for (const char* symbol : {static_cast<const char*>(nullptr), ""})
+  {
+    seen.symbols.clear();
+    ASSERT_EQ(lrvx_backtest_runner_run_ohlcv(runner, ts, close, 3, symbol, &stats), 1)
+        << lrvx_last_error_message();
+    ASSERT_EQ(seen.symbols.size(), 3u);
+    for (uint32_t s : seen.symbols)
+    {
+      EXPECT_EQ(s, ids.front());
+    }
+  }
+
+  lrvx_backtest_runner_destroy(runner);
+  lrvx_strategy_destroy(strategy);
+  lrvx_registry_destroy(registry);
+}
 
 TEST_F(CapiRunnerUnknownSymbol, RunCsv)
 {

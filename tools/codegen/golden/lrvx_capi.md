@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 767 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
+**Surface:** 770 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
 
 ## Opaque handles
 
@@ -1245,6 +1245,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `void lrvx_funding_schedule_set_constant_rate(LrvxFundingScheduleHandle h, double rate)`
 - `void lrvx_funding_schedule_reset(LrvxFundingScheduleHandle h)`
 - `uint32_t lrvx_funding_schedule_tick(LrvxFundingScheduleHandle h, int64_t now_ns, const uint32_t * symbols, const double * positions, const double * mark_prices, uint32_t n_symbols, double * out_buf, uint32_t max_events)`
+- `uint32_t lrvx_funding_schedule_tick_exact(LrvxFundingScheduleHandle h, int64_t now_ns, const uint32_t * symbols, const double * positions, const double * mark_prices, uint32_t n_symbols, int64_t * out_timestamps_ns, double * out_buf, uint32_t max_events)`
 
 ### grid_search
 
@@ -1766,6 +1767,8 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `LrvxStrategyHandle lrvx_strategy_create(uint32_t id, const uint32_t * symbols, uint32_t num_symbols, LrvxRegistryHandle registry, LrvxStrategyCallbacks callbacks)`
 - `void lrvx_strategy_destroy(LrvxStrategyHandle strategy)`
 - `void lrvx_strategy_replace_callbacks(LrvxStrategyHandle strategy, LrvxStrategyCallbacks callbacks)`
+- `uint32_t lrvx_strategy_id(LrvxStrategyHandle strategy)`
+- `void lrvx_strategy_set_id(LrvxStrategyHandle strategy, uint32_t id)`
 - `LrvxStrategyHandle lrvx_strategy_create_p(uint32_t id, const uint32_t * symbols, uint32_t num_symbols, LrvxRegistryHandle registry, const LrvxStrategyCallbacks * callbacks)`
 - `void lrvx_strategy_replace_callbacks_p(LrvxStrategyHandle strategy, const LrvxStrategyCallbacks * callbacks)`
 

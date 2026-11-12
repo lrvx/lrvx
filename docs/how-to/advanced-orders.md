@@ -13,7 +13,7 @@ Stop orders, take-profit, trailing stops, and execution flags. Every order type 
 | `TRAILING_STOP` | Dynamic stop that follows price |
 | `ICEBERG` | Large order shown in slices — see [Iceberg orders](iceberg-orders.md) |
 
-OCO is not an `OrderType` and has no emit method. It is an executor-side call — `Executor.submit_oco(order1, order2)` in Python, `submitOco(order1, order2)` in Node — backed by the separate `supportsOCO` capability flag. An OCO signal reaches an attached executor as two limit orders with different ids, live and in a backtest alike: the first keeps the signal's order id, the second gets one the runner assigns, and either id names its leg in a later cancel or replace. From a strategy, use the manual TP/SL bracket below or [bracket orders](bracket-orders.md).
+OCO is not an `OrderType` and has no emit method. It is an executor-side call — `Executor.submit_oco(order1, order2)` in Python, `submitOco(order1, order2)` in Node — backed by the separate `supportsOCO` capability flag. An OCO signal reaches an attached executor as two limit orders with different ids, live and in a backtest alike: the first keeps the signal's order id, the second gets one the runner assigns, and either id names its leg in a later cancel or replace. The runner's ids count up from `0x1FFFFF00000001`: the block of subscriber id 2097151, which no strategy can hold, so a second leg never equals an id a strategy issued (those are `(subscriber id << 32) + n`). Every id in the block is exact as a JavaScript `Number`. From a strategy, use the manual TP/SL bracket below or [bracket orders](bracket-orders.md).
 
 ## Stop orders
 

@@ -736,6 +736,15 @@ PYBIND11_MODULE(_lrvx, m)
         "C ABI version the loaded lrvx library reports. Equal to\n"
         "CAPI_ABI_VERSION, which the extension was compiled against --\n"
         "the import fails outright when they disagree.");
+  m.def(
+      "last_error", []()
+      { return std::string(lrvx_last_error_message()); },
+      "Why the last call that reports failure through its return value\n"
+      "failed: FundingSchedule.load_tape returning False, recompress\n"
+      "returning False, extract_symbols / extract_time_range returning 0.\n"
+      "Each clears it on entry, so '' after one means it did not fail (an\n"
+      "extract that matched nothing returns 0 with ''). The text opens with\n"
+      "the name of the C function. Per thread.");
 
   lrvx::bindOrderTypes(m);
 

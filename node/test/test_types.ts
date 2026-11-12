@@ -644,6 +644,20 @@ void targets.future_linear_slope(arr, 5);
   checkAcceptsBigint(() => fs.setTapeBySymbol([T], [1], [0.001]), "FundingSchedule.setTapeBySymbol accepts bigint timestamps");
   checkAcceptsBigint(() => void fs.tick(T, [1], [1], [100]), "FundingSchedule.tick accepts bigint nowNs");
 
+  // Clock readings handed back are declared `bigint` and must be one.
+  const markTs: bigint = acct.markTsFor(1);
+  check(typeof markTs === "bigint" && markTs === T, "Account.markTsFor is the bigint it was given");
+  const fs2 = new lrvx.FundingSchedule();
+  fs2.setTapeBySymbol([T], [1], [0.001]);
+  const payments: lrvx.FundingPaymentEvent[] = fs2.tick(T, [1], [2], [100]);
+  const paidAt: bigint | undefined = payments[0]?.timestampNs;
+  check(payments.length === 1 && typeof paidAt === "bigint" && paidAt === T,
+        "FundingPaymentEvent.timestampNs is the settlement's bigint");
+  check(payments[0]?.amount === -2 * 100 * 0.001, "FundingPaymentEvent.amount is the settled amount");
+  const noFile: boolean = fs2.loadTape("/nonexistent/lrvx-types-funding.csv");
+  const why: string = lrvx.lastError();
+  check(noFile === false && why.includes("lrvx-types-funding.csv"), "lastError() names the tape loadTape could not open");
+
   const group = new lrvx.OrderGroup();
   checkAcceptsBigint(() => void group.pairLatencyDecision({ leaderSubmitTsNs: T, leaderAckTsNs: T + 5n, ackReceived: true }),
                      "OrderGroup.pairLatencyDecision accepts bigint timestamps");

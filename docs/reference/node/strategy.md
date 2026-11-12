@@ -172,7 +172,7 @@ In threaded mode, events are published to a lock-free ring buffer and callbacks 
 
 | Method | Description |
 |--------|-------------|
-| `addStrategy(strategy)` | Register a strategy object |
+| `addStrategy(strategy)` | Register a strategy object. The runner gives each strategy its own subscriber id, 1, 2, ... in the order added, and order ids are `(id << 32) + n`, so two strategies on one runner never issue the same order id. Throws when the engine refuses the strategy |
 | `replaceStrategy(index, strategy)` | Atomically swap the strategy at `index`. The old strategy's `onStop` fires before the swap, the new one's `onStart` after; bus subscriptions, in-flight orders and connections are untouched. Must be invoked on the V8 thread |
 | `start()` | Start the runner |
 | `stop()` | Stop and clean up |

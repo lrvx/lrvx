@@ -1,0 +1,54 @@
+# Smoke test: last_error() says why a call that returns False or 0 failed.
+#
+# FundingSchedule.load_tape, recompress_segment, extract_symbols and
+# extract_time_range report failure through their return value, and 0 is
+# also what an extract that matches nothing returns.
+#   * each failure leaves its reason, naming the path
+#   * a call that did not fail leaves ""
+
+from lrvx.abi import last_error
+from lrvx.funding_schedule import FundingSchedule
+from lrvx.tools import recompress_segment, extract_symbols, extract_time_range
+
+from C import getpid() -> i32
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+root = "/tmp/lrvx-codon-last-error-smoke-" + str(int(getpid()))
+missing = root + "-no-such-file"
+
+fs = FundingSchedule()
+check(not fs.load_tape(missing), "load_tape returns False for a file that is not there")
+check(missing in last_error(), "and last_error() names it: " + last_error())
+
+check(not recompress_segment(missing, root + "-out.lrvx"), "recompress_segment returns False")
+check(missing in last_error(), "and last_error() names the input: " + last_error())
+check("lrvx_segment_recompress" in last_error(), "and the C function that failed")
+
+check(extract_symbols(missing, root + "-out.lrvx", [1]) == 0, "extract_symbols returns 0")
+check(missing in last_error(), "and last_error() names the input")
+
+check(extract_time_range(missing, root + "-out.lrvx", 0, 1_000_000_000) == 0,
+      "extract_time_range returns 0")
+check(missing in last_error(), "and last_error() names the input")
+
+tape = root + "-funding.csv"
+with open(tape, "w") as f:
+    f.write("timestamp_ns,symbol,funding_rate\n1000,1,0.0001\n")
+check(fs.load_tape(tape), "load_tape reads a file that is there")
+check(last_error() == "", "and leaves no error behind: '" + last_error() + "'")
+fs.close()
+
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")

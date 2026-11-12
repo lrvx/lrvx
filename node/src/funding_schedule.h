@@ -88,6 +88,7 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
   Napi::Value LoadTape(const Napi::CallbackInfo& info)
   {
     std::string path = info[0].As<Napi::String>().Utf8Value();
+    lrvx_clear_last_error();
     const uint8_t ok = lrvx_funding_schedule_load_tape(_h, path.c_str());
     return Napi::Boolean::New(info.Env(), ok != 0);
   }
@@ -126,16 +127,27 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
       ps[i] = positions.Get(i).As<Napi::Number>().DoubleValue();
       mk[i] = marks.Get(i).As<Napi::Number>().DoubleValue();
     }
-    uint32_t count = lrvx_funding_schedule_tick(_h, nowNs, sy.data(), ps.data(),
-                                                mk.data(), n, nullptr, 0);
-    std::vector<double> buf(count * 6, 0.0);
-    lrvx_funding_schedule_tick(_h, nowNs, sy.data(), ps.data(), mk.data(), n, buf.data(),
-                               count);
+    // One call settles and hands over; a second is made only when more
+    // events were due than the first had room for, and that first one settled
+    // nothing.
+    uint32_t room = 16;
+    std::vector<int64_t> ts(room);
+    std::vector<double> buf(room * 6, 0.0);
+    uint32_t count = lrvx_funding_schedule_tick_exact(_h, nowNs, sy.data(), ps.data(), mk.data(),
+                                                      n, ts.data(), buf.data(), room);
+    if (count > room)
+    {
+      room = count;
+      ts.assign(room, 0);
+      buf.assign(room * 6, 0.0);
+      count = lrvx_funding_schedule_tick_exact(_h, nowNs, sy.data(), ps.data(), mk.data(), n,
+                                               ts.data(), buf.data(), room);
+    }
     Napi::Array out = Napi::Array::New(info.Env(), count);
     for (uint32_t i = 0; i < count; ++i)
     {
       Napi::Object o = Napi::Object::New(info.Env());
-      o.Set("timestampNs", Napi::Number::New(info.Env(), buf[i * 6 + 0]));
+      o.Set("timestampNs", Napi::BigInt::New(info.Env(), ts[i]));
       o.Set("symbol", Napi::Number::New(info.Env(), buf[i * 6 + 1]));
       o.Set("rate", Napi::Number::New(info.Env(), buf[i * 6 + 2]));
       o.Set("markPrice", Napi::Number::New(info.Env(), buf[i * 6 + 3]));

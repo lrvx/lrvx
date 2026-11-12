@@ -245,6 +245,7 @@ lrvx_funding_schedule_set_constant_rate|void|LrvxFundingScheduleHandle|double
 lrvx_funding_schedule_set_tape|void|LrvxFundingScheduleHandle|const int64_t *|const double *|uint32_t
 lrvx_funding_schedule_set_tape_by_symbol|void|LrvxFundingScheduleHandle|const int64_t *|const uint32_t *|const double *|uint32_t
 lrvx_funding_schedule_tick|uint32_t|LrvxFundingScheduleHandle|int64_t|const uint32_t *|const double *|const double *|uint32_t|double *|uint32_t
+lrvx_funding_schedule_tick_exact|uint32_t|LrvxFundingScheduleHandle|int64_t|const uint32_t *|const double *|const double *|uint32_t|int64_t *|double *|uint32_t
 lrvx_get_order_status|int32_t|LrvxStrategyHandle|uint64_t
 lrvx_get_symbol_context|void|LrvxStrategyHandle|uint32_t|LrvxSymbolContext *
 lrvx_grid_search_add_axis|void|LrvxGridSearchHandle|const double *|uint32_t
@@ -688,11 +689,13 @@ lrvx_strategy_create|LrvxStrategyHandle|uint32_t|const uint32_t *|uint32_t|LrvxR
 lrvx_strategy_create_p|LrvxStrategyHandle|uint32_t|const uint32_t *|uint32_t|LrvxRegistryHandle|const LrvxStrategyCallbacks *
 lrvx_strategy_destroy|void|LrvxStrategyHandle
 lrvx_strategy_get_bar_ring_capacity|uint32_t|LrvxStrategyHandle
+lrvx_strategy_id|uint32_t|LrvxStrategyHandle
 lrvx_strategy_last_closed_bar|uint8_t|LrvxStrategyHandle|uint32_t|uint8_t|uint64_t|LrvxBar *
 lrvx_strategy_last_n_closed_bars|uint32_t|LrvxStrategyHandle|uint32_t|uint8_t|uint64_t|LrvxBar *|uint32_t
 lrvx_strategy_replace_callbacks|void|LrvxStrategyHandle|LrvxStrategyCallbacks
 lrvx_strategy_replace_callbacks_p|void|LrvxStrategyHandle|const LrvxStrategyCallbacks *
 lrvx_strategy_set_bar_ring_capacity|void|LrvxStrategyHandle|uint32_t
+lrvx_strategy_set_id|void|LrvxStrategyHandle|uint32_t
 lrvx_streaming_graph_add_node|void|LrvxStreamingGraphHandle|const char *|const char *const *|size_t|LrvxGraphNodeFn|void *
 lrvx_streaming_graph_bar_count|uint32_t|LrvxStreamingGraphHandle|uint32_t
 lrvx_streaming_graph_close|const double *|LrvxStreamingGraphHandle|uint32_t|size_t *

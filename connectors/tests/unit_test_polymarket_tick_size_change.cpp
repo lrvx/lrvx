@@ -284,3 +284,116 @@ TEST(PolymarketTickSizeChange, AMessageWithNoUsableTickChangesNothing)
   EXPECT_FALSE(s.registry.getSymbolId("polymarket", "NOT_OURS"))
       << "a market the connector was not configured with is not registered by a tick message";
 }
+
+namespace
+{
+std::string tickChange(const std::string& token, const std::string& tick)
+{
+  return R"({"event_type":"tick_size_change","asset_id":")" + token + R"(","new_tick_size":")" +
+         tick + R"("})";
+}
+
+size_t occurrences(const std::string& text, const std::string& needle)
+{
+  size_t n = 0;
+  for (size_t at = text.find(needle); at != std::string::npos; at = text.find(needle, at + 1))
+  {
+    ++n;
+  }
+  return n;
+}
+}  // namespace
+
+// The report was a string that only grew: a token whose tick the venue could
+// not be asked for at start() stayed in it after the venue supplied the tick.
+TEST(PolymarketTickSizeChange, ATickTheVenueSuppliesLaterClearsTheLoadFailure)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  PolymarketConfig cfg;
+  cfg.instrumentInfoUrl = "https://fixture.invalid";
+  cfg.instrumentFetch = [](const std::string&,
+                           const std::string&) -> std::expected<std::string, std::string>
+  {
+    return std::string(R"({"error":"market not found"})");
+  };
+  cfg.tokenIds = {kToken, kOtherToken};
+  PolymarketExchangeConnector connector(cfg, &buses.book, &buses.trade, &registry,
+                                        makeLogger("late.log"));
+  connector.loadInstrumentSpecs();
+
+  const std::string atStart = connector.instrumentInfoError();
+  ASSERT_NE(atStart.find(kToken), std::string::npos) << atStart;
+  ASSERT_NE(atStart.find(kOtherToken), std::string::npos) << atStart;
+  ASSERT_FALSE(registry.getSymbolInfo(*registry.getSymbolId("polymarket", kToken))->tickSizeKnown);
+
+  connector.handleMessage(tickChange(kToken, "0.001"));
+
+  const auto info = *registry.getSymbolInfo(*registry.getSymbolId("polymarket", kToken));
+  EXPECT_TRUE(info.tickSizeKnown);
+  EXPECT_EQ(info.tickSize.raw(), kMill);
+  const std::string after = connector.instrumentInfoError();
+  EXPECT_EQ(after.find(kToken), std::string::npos)
+      << "the token's tick is known now, the report still says: " << after;
+  EXPECT_NE(after.find(kOtherToken), std::string::npos)
+      << "the other token is still unread: " << after;
+  EXPECT_NE(after.find("market not found"), std::string::npos) << after;
+
+  connector.handleMessage(tickChange(kOtherToken, "0.01"));
+  EXPECT_TRUE(connector.instrumentInfoError().empty()) << connector.instrumentInfoError();
+}
+
+// A conflict with a declared tick stays for as long as the two differ, as one
+// entry that names the venue's current tick.
+TEST(PolymarketTickSizeChange, AConflictIsOneEntryThatFollowsTheVenue)
+{
+  Loaded s("conflict.log");
+  preRegister(s.registry, kToken, 0.01);
+  s.load();
+  ASSERT_TRUE(s.connector->instrumentInfoError().empty()) << s.connector->instrumentInfoError();
+
+  s.connector->handleMessage(tickChange(kToken, "0.001"));
+  const std::string first = s.connector->instrumentInfoError();
+  EXPECT_NE(first.find("the venue uses 0.001000;"), std::string::npos) << first;
+
+  s.connector->handleMessage(tickChange(kToken, "0.0001"));
+  const std::string second = s.connector->instrumentInfoError();
+  EXPECT_NE(second.find("the venue uses 0.000100;"), std::string::npos) << second;
+  EXPECT_EQ(second.find("the venue uses 0.001000;"), std::string::npos)
+      << "the earlier venue tick is no longer true: " << second;
+  EXPECT_EQ(occurrences(second, kToken), 1u) << second;
+  EXPECT_EQ(s.info(kToken).tickSize.raw(), kCent) << "the declared tick is still the caller's";
+
+  // The venue comes back to the declared tick: nothing is in conflict.
+  s.connector->handleMessage(tickChange(kToken, "0.01"));
+  EXPECT_TRUE(s.connector->instrumentInfoError().empty()) << s.connector->instrumentInfoError();
+}
+
+TEST(InstrumentSpecTableReport, KeepsOneEntryPerSymbolInFirstSeenOrder)
+{
+  InstrumentSpecTable table;
+  table.addError("meta: unreachable");
+  table.addError("AAA", "HTTP 503");
+  table.setConflict("BBB", "the registry declares tick 0.01, the venue uses 0.1");
+  table.addError("CCC", "not listed");
+  EXPECT_EQ(table.error(),
+            "meta: unreachable; AAA: HTTP 503; BBB: the registry declares tick 0.01, the venue "
+            "uses 0.1; CCC: not listed");
+
+  table.addError("AAA", "not requested");
+  EXPECT_EQ(occurrences(table.error(), "AAA"), 1u);
+  EXPECT_NE(table.error().find("AAA: not requested"), std::string::npos);
+
+  InstrumentSpec spec;
+  spec.tickSize = Price::fromRaw(kCent);
+  table.add("AAA", spec);
+  table.add("BBB", spec);
+  EXPECT_EQ(table.error(),
+            "meta: unreachable; BBB: the registry declares tick 0.01, the venue uses 0.1; CCC: "
+            "not listed")
+      << "a spec clears the load failure; a conflict is the registry's to clear";
+
+  table.clearConflict("BBB");
+  table.clear();
+  EXPECT_TRUE(table.error().empty());
+}

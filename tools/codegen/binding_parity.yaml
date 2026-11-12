@@ -235,7 +235,7 @@ groups:
         lrvx_funding_schedule_set_constant: __lrvx_funding_schedule_set_constant
         lrvx_funding_schedule_set_constant_rate: __lrvx_funding_schedule_set_constant_rate
         lrvx_funding_schedule_set_tape_by_symbol: __lrvx_funding_schedule_set_tape_by_symbol
-        lrvx_funding_schedule_tick: __lrvx_funding_schedule_tick
+        lrvx_funding_schedule_tick_exact: __lrvx_funding_schedule_tick
 
   fee_schedule:
     pybind11: { status: required, classes: [FeeSchedule] }
@@ -1328,6 +1328,7 @@ allowlist_reasons:
 
 allowlist_functions:
   pybind11:
+    lrvx_funding_schedule_tick_exact: *cpp_direct
     lrvx_simulated_executor_begin_bar_callback_window: *cpp_direct
     lrvx_simulated_executor_end_bar_callback_window: *cpp_direct
     lrvx_simulated_executor_on_bar_ohlc: *cpp_direct
@@ -1955,11 +1956,13 @@ allowlist_functions:
     lrvx_strategy_create_p: *cpp_direct
     lrvx_strategy_destroy: *cpp_direct
     lrvx_strategy_get_bar_ring_capacity: *cpp_direct
+    lrvx_strategy_id: *cpp_direct
     lrvx_strategy_last_closed_bar: *cpp_direct
     lrvx_strategy_last_n_closed_bars: *cpp_direct
     lrvx_strategy_replace_callbacks: *cpp_direct
     lrvx_strategy_replace_callbacks_p: *cpp_direct
     lrvx_strategy_set_bar_ring_capacity: *cpp_direct
+    lrvx_strategy_set_id: *cpp_direct
     lrvx_streaming_graph_add_node: *cpp_direct
     lrvx_streaming_graph_bar_count: *cpp_direct
     lrvx_streaming_graph_close: *cpp_direct
@@ -2086,6 +2089,7 @@ allowlist_functions:
     lrvx_executor_create_p: *no_napi_wrapper
     lrvx_executor_get_capabilities: *no_napi_wrapper
     lrvx_feed_clock_last_fired: *no_napi_wrapper
+    lrvx_funding_schedule_tick: *no_napi_wrapper
     lrvx_get_order_status: *no_napi_wrapper
     lrvx_get_symbol_context: *no_napi_wrapper
     lrvx_indicator_adf: *no_napi_wrapper
@@ -2170,11 +2174,13 @@ allowlist_functions:
     lrvx_strategy_create_p: *no_napi_wrapper
     lrvx_strategy_destroy: *no_napi_wrapper
     lrvx_strategy_get_bar_ring_capacity: *no_napi_wrapper
+    lrvx_strategy_id: *no_napi_wrapper
     lrvx_strategy_last_closed_bar: *no_napi_wrapper
     lrvx_strategy_last_n_closed_bars: *no_napi_wrapper
     lrvx_strategy_replace_callbacks: *no_napi_wrapper
     lrvx_strategy_replace_callbacks_p: *no_napi_wrapper
     lrvx_strategy_set_bar_ring_capacity: *no_napi_wrapper
+    lrvx_strategy_set_id: *no_napi_wrapper
     lrvx_streaming_graph_add_node: *no_napi_wrapper
     lrvx_streaming_graph_bar_count: *no_napi_wrapper
     lrvx_streaming_graph_close: *no_napi_wrapper
@@ -2214,6 +2220,7 @@ allowlist_functions:
     lrvx_aggregator_destroy: *no_codon_import
     lrvx_best_ask_raw: "the Codon context reads the _opt variants, which tell no quote from a price of zero"
     lrvx_best_bid_raw: "the Codon context reads the _opt variants, which tell no quote from a price of zero"
+    lrvx_funding_schedule_tick: *no_codon_import
     lrvx_mid_price_raw: "the Codon context reads the _opt variants, which tell no quote from a price of zero"
     lrvx_backtest_runner_add_execution_listener: *no_codon_import
     lrvx_backtest_runner_add_journey_tracer: *no_codon_import
@@ -2377,6 +2384,7 @@ allowlist_functions:
     lrvx_storage_sink_create: *no_codon_import
     lrvx_storage_sink_create_p: *no_codon_import
     lrvx_storage_sink_destroy: *no_codon_import
+    lrvx_strategy_id: *no_codon_import
     lrvx_strategy_replace_callbacks: *no_codon_import
     lrvx_tape_diff_copy_mismatches: *no_codon_import
     lrvx_u256_from_hex: *no_codon_import
@@ -2461,6 +2469,7 @@ allowlist_functions:
     lrvx_fee_schedule_tier_transitions: *no_quickjs_global
     lrvx_footprint_num_levels: *no_quickjs_global
     lrvx_funding_schedule_set_tape: *no_quickjs_global
+    lrvx_funding_schedule_tick: *no_quickjs_global
     lrvx_get_symbol_context: *no_quickjs_global
     lrvx_grid_search_add_axis: *no_quickjs_global
     lrvx_grid_search_create: *no_quickjs_global
@@ -2595,8 +2604,10 @@ allowlist_functions:
     lrvx_strategy_create: *no_quickjs_global
     lrvx_strategy_create_p: *no_quickjs_global
     lrvx_strategy_destroy: *no_quickjs_global
+    lrvx_strategy_id: *no_quickjs_global
     lrvx_strategy_replace_callbacks: *no_quickjs_global
     lrvx_strategy_replace_callbacks_p: *no_quickjs_global
+    lrvx_strategy_set_id: *no_quickjs_global
     lrvx_streaming_graph_close: *no_quickjs_global
     lrvx_streaming_graph_destroy: *no_quickjs_global
     lrvx_streaming_graph_high: *no_quickjs_global

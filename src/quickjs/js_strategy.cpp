@@ -757,6 +757,11 @@ void LrvxJsStrategy::loadStdlib()
         return __lrvx_seg_extract_time(inputPath, outputPath, fromNs || 0, toNs || 0);
       },
 
+      // Why the last recompressSegment / extractSymbols / extractTimeRange /
+      // __lrvx_funding_schedule_load_tape that returned false or 0 did so;
+      // '' when it did not fail.
+      lastError: function() { return __lrvx_last_error(); },
+
       loadCsv: function(path) { return __lrvx_load_csv(path); },
 
       // Forward-looking labels (research-only). See lrvx/targets.js.

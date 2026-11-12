@@ -574,6 +574,8 @@ jobs:
                    codon_trace_attach_smoke codon_modify_order_smoke \
                    codon_base_strategy_callbacks_smoke \
                    codon_backtest_runner_stats_smoke \
+                   codon_funding_schedule_smoke \
+                   codon_runner_strategy_ids_smoke codon_last_error_smoke \
                    codon_sma_crossover codon_pairs_strategy; do
           echo "── $bin"
           out=$(LD_LIBRARY_PATH=build/src/capi:$HOME/.codon/lib/codon \
@@ -608,6 +610,8 @@ jobs:
         ./build/src/quickjs/lrvx_js_runner quickjs/examples/pairs_strategy_smoke.js
         ./build/src/quickjs/lrvx_js_runner quickjs/examples/merged_tape_smoke.js
         ./build/src/quickjs/lrvx_js_runner quickjs/examples/run_trace_smoke.js
+        ./build/src/quickjs/lrvx_js_runner quickjs/examples/funding_schedule_smoke.js
+        ./build/src/quickjs/lrvx_js_runner quickjs/examples/last_error_smoke.js
 
     # Every test_*.js, not a hand-listed subset (9 of 21 files were unrun).
     # byte_identical_fixture.js is a fixture helper, not a test, and is

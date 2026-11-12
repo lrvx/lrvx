@@ -13,6 +13,7 @@
 #include <pybind11/stl.h>
 
 #include "lrvx/backtest/funding_schedule.h"
+#include "lrvx/capi/lrvx_capi.h"
 
 namespace py = pybind11;
 
@@ -52,9 +53,19 @@ inline void bindFundingSchedule(py::module_& m)
       .def_static("bybit_linear", &lrvx::FundingSchedule::bybit_linear)
       .def_static("okx_swap", &lrvx::FundingSchedule::okx_swap)
       .def_static("bitget_hourly", &lrvx::FundingSchedule::bitget_hourly)
-      .def("load_tape", &lrvx::FundingSchedule::loadTape, py::arg("path"),
-           "Read CSV with columns timestamp_ns, symbol, funding_rate. "
-           "Returns True on success.")
+      // Through the C API so that the reason for a False is on record for
+      // lrvx.last_error(); a LrvxFundingScheduleHandle is a FundingSchedule*.
+      .def(
+          "load_tape",
+          [](lrvx::FundingSchedule& self, const std::string& path)
+          {
+            lrvx_clear_last_error();
+            return lrvx_funding_schedule_load_tape(&self, path.c_str()) != 0;
+          },
+          py::arg("path"),
+          "Read CSV with columns timestamp_ns, symbol, funding_rate. "
+          "Returns True on success; after a False, lrvx.last_error() names "
+          "the file that could not be opened.")
       .def("set_constant_rate", &lrvx::FundingSchedule::setConstantRate,
            py::arg("rate"))
       .def("reset", &lrvx::FundingSchedule::reset)

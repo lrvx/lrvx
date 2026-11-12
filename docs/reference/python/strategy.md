@@ -253,7 +253,7 @@ runner.stop()
 
 | Method | Description |
 |--------|-------------|
-| `add_strategy(strategy)` | Register a strategy instance |
+| `add_strategy(strategy)` | Register a strategy instance. The runner gives each strategy its own subscriber id, 1, 2, ... in the order added, and order ids are `(id << 32) + n`, so two strategies on one runner never issue the same order id. Raises `LrvxError` when the engine refuses the strategy |
 | `replace_strategy(index, strategy)` | Atomically swap the strategy at `index`. The old strategy's `on_stop` fires, the bridge's internal state survives, the new strategy's `on_start` fires afterwards. WebSocket / gRPC connections are unaffected |
 | `start()` | Start the runner |
 | `stop()` | Stop the runner |
@@ -354,6 +354,10 @@ A setting the chosen slippage model does not read, an unknown model, or a negati
 `set_venue_stack`, whose executors would not use them. On bar replay any positive submit deferral
 moves a fill to a later bar's open: see
 [Latency on bar replay](../../how-to/backtest-with-latency.md#latency-on-bar-replay).
+
+`run_ohlcv` and `run_bars` take a registered symbol's name. With `symbol` omitted or `''` they
+replay for the first symbol registered. `run_csv` without a symbol takes the name from the file
+name.
 
 | Method | Description |
 |--------|-------------|

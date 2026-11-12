@@ -417,7 +417,7 @@ class BacktestRunner : public ISignalHandler
   MultiModePositionTracker _positionTracker{0xFEFEFEFEu};
   std::vector<IMarketDataSubscriber*> _marketDataSubscribers;
   std::vector<IOrderExecutionListener*> _executionListeners;
-  OrderId _nextOrderId{1};
+  OrderId _nextOrderId{kRunnerOrderIdBase + 1};
 
   // Interactive state
   std::atomic<bool> _running{false};

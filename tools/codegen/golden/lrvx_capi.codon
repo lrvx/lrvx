@@ -336,6 +336,7 @@ from C import lrvx_funding_schedule_load_profile(cobj, cobj) -> int
 from C import lrvx_funding_schedule_set_constant_rate(cobj, float)
 from C import lrvx_funding_schedule_reset(cobj)
 from C import lrvx_funding_schedule_tick(cobj, i64, Ptr[u32], Ptr[float], Ptr[float], u32, Ptr[float], u32) -> u32
+from C import lrvx_funding_schedule_tick_exact(cobj, i64, Ptr[u32], Ptr[float], Ptr[float], u32, Ptr[i64], Ptr[float], u32) -> u32
 
 # ── grid_search ──
 from C import lrvx_grid_search_create() -> cobj
@@ -821,6 +822,8 @@ from C import lrvx_runner_set_storage_sink(cobj, cobj)
 from C import lrvx_strategy_create(u32, Ptr[u32], u32, cobj, cobj) -> cobj
 from C import lrvx_strategy_destroy(cobj)
 from C import lrvx_strategy_replace_callbacks(cobj, cobj)
+from C import lrvx_strategy_id(cobj) -> u32
+from C import lrvx_strategy_set_id(cobj, u32)
 from C import lrvx_strategy_create_p(u32, Ptr[u32], u32, cobj, cobj) -> cobj
 from C import lrvx_strategy_replace_callbacks_p(cobj, cobj)
 

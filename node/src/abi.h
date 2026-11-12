@@ -41,6 +41,15 @@ inline bool registerAbi(Napi::Env env, Napi::Object exports)
                                         info.Env(),
                                         static_cast<double>(lrvx_capi_abi_version()));
                                   }));
+  // Why the last call that reports failure by its return value failed:
+  // FundingSchedule.loadTape, recompress, extractSymbols, extractTimeRange.
+  // Each clears it on entry, so "" after one of them means it did not fail.
+  exports.Set("lastError", Napi::Function::New(env,
+                                               [](const Napi::CallbackInfo& info)
+                                               {
+                                                 return Napi::String::New(
+                                                     info.Env(), lrvx_last_error_message());
+                                               }));
   return true;
 }
 

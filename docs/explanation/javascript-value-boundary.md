@@ -79,8 +79,11 @@ records listed above, these read as `BigInt`:
   on every signal, order-event and fill record
 - `tapeDiff` mismatches: `exchangeTsNs`
 
-`FundingSchedule.tick()` payments still report `timestampNs` as a
-`Number`: the C API hands that value over as a double.
+- `FundingSchedule.tick()` payments: `timestampNs`
+- `Account.markTsFor()`
+
+In QuickJS the payments `__lrvx_funding_schedule_tick` returns carry
+`timestampNs` as a `BigInt` too.
 
 On the write side the addon takes a `BigInt` or a `Number` wherever the
 argument is a clock reading, and uses a `BigInt` to the nanosecond:
