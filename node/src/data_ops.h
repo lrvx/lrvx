@@ -175,6 +175,8 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
     // TODO: symbol filter array
     int64_t reorderWindowNs = 0;
     int32_t strictOrdering = 0;
+    int32_t orderSegmentsByTime = 1;
+    int32_t skipSegmentsByTime = 1;
     if (info.Length() > 3 && info[3].IsObject())
     {
       Napi::Object opts = info[3].As<Napi::Object>();
@@ -190,9 +192,17 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
       {
         strictOrdering = opts.Get("strictOrdering").ToBoolean().Value() ? 1 : 0;
       }
+      if (opts.Has("orderSegmentsByTime") && !opts.Get("orderSegmentsByTime").IsUndefined())
+      {
+        orderSegmentsByTime = opts.Get("orderSegmentsByTime").ToBoolean().Value() ? 1 : 0;
+      }
+      if (opts.Has("skipSegmentsByTime") && !opts.Get("skipSegmentsByTime").IsUndefined())
+      {
+        skipSegmentsByTime = opts.Get("skipSegmentsByTime").ToBoolean().Value() ? 1 : 0;
+      }
     }
-    _h = lrvx_data_reader_create_ordered(dir.c_str(), from, to, nullptr, 0, reorderWindowNs,
-                                         strictOrdering);
+    _h = lrvx_data_reader_create_ex(dir.c_str(), from, to, nullptr, 0, reorderWindowNs,
+                                    strictOrdering, orderSegmentsByTime, skipSegmentsByTime);
   }
   ~DataReaderWrap()
   {
@@ -228,6 +238,9 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
     o.Set("crcErrors", (double)s.crc_errors);
     o.Set("lateDropped", (double)s.late_dropped);
     o.Set("unknownFramesSkipped", (double)s.unknown_frames_skipped);
+    o.Set("segmentsSkipped", (double)s.segments_skipped);
+    o.Set("segmentsReordered", (double)s.segments_reordered);
+    o.Set("segmentsInterleaved", (double)s.segments_interleaved);
     return o;
   }
   Napi::Value ReadTrades(const Napi::CallbackInfo& info)

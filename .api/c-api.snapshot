@@ -124,6 +124,7 @@ lrvx_data_reader_count|uint64_t|LrvxDataReaderHandle
 lrvx_data_reader_count_book_updates|uint64_t|LrvxDataReaderHandle|uint64_t *
 lrvx_data_reader_count_book_updates_from|uint64_t|LrvxDataReaderHandle|int64_t|uint64_t *
 lrvx_data_reader_create|LrvxDataReaderHandle|const char *
+lrvx_data_reader_create_ex|LrvxDataReaderHandle|const char *|int64_t|int64_t|const uint32_t *|uint32_t|int64_t|int32_t|int32_t|int32_t
 lrvx_data_reader_create_filtered|LrvxDataReaderHandle|const char *|int64_t|int64_t|const uint32_t *|uint32_t
 lrvx_data_reader_create_ordered|LrvxDataReaderHandle|const char *|int64_t|int64_t|const uint32_t *|uint32_t|int64_t|int32_t
 lrvx_data_reader_destroy|void|LrvxDataReaderHandle

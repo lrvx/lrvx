@@ -26,9 +26,10 @@
 // range_lower / range_upper / liquidity. 3: LrvxBar grew close_reason.
 // 4: LrvxBookSnapshot grew has_bid / has_ask. 5: LrvxSymbolContext grew
 // last_touch_ns, LrvxEventTypeStatsRow grew book_tops and
-// LrvxStrategyCallbacks grew on_touch.
+// LrvxStrategyCallbacks grew on_touch. 6: LrvxReaderStats grew
+// segments_skipped, segments_reordered and segments_interleaved.
 // lrvx::export_macro(group="abi_version")
-#define LRVX_CAPI_ABI_VERSION 5
+#define LRVX_CAPI_ABI_VERSION 6
 
 #ifdef __cplusplus
 extern "C"
@@ -2119,6 +2120,21 @@ extern "C"
                                                        int64_t reorder_window_ns,
                                                        int32_t strict_ordering);
 
+  // The ordered reader plus the two segment switches. order_segments_by_time
+  // != 0 (the default of every other create function) reads segments in time
+  // order of their first event and merges Sorted segments whose ranges
+  // overlap; 0 reads them in file-name order. skip_segments_by_time != 0 (the
+  // default) leaves out, with from_ns or to_ns set, the segments whose proven
+  // time bounds lie outside the range; 0 decodes every segment. Neither
+  // changes which events a read delivers on a tape recorded in order.
+  LRVX_EXPORT(group = "datareader")
+  LrvxDataReaderHandle lrvx_data_reader_create_ex(const char* data_dir, int64_t from_ns,
+                                                  int64_t to_ns, const uint32_t* symbols,
+                                                  uint32_t num_symbols, int64_t reorder_window_ns,
+                                                  int32_t strict_ordering,
+                                                  int32_t order_segments_by_time,
+                                                  int32_t skip_segments_by_time);
+
   LRVX_EXPORT(group = "datareader")
   LrvxDatasetSummary lrvx_data_reader_summary(LrvxDataReaderHandle reader);
 
@@ -2136,6 +2152,15 @@ extern "C"
     // Frames whose record type this build does not know. The tape format is
     // additive, so they are stepped over rather than ending the read.
     uint64_t unknown_frames_skipped;
+    // Segments not decoded at all because their proven time bounds lie
+    // outside the reader's [from_ns, to_ns] (skip_segments_by_time).
+    uint64_t segments_skipped;
+    // Segments visited at a different position than their file name gives
+    // them (order_segments_by_time).
+    uint64_t segments_reordered;
+    // Segments whose events were merged with another segment's because their
+    // time ranges overlap.
+    uint64_t segments_interleaved;
   } LrvxReaderStats;
 
   LRVX_EXPORT(group = "datareader")

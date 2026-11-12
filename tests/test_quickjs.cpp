@@ -4059,3 +4059,84 @@ TEST(JsStreamingIndicators, UpdateCostDoesNotGrowWithHistory)
     EXPECT_LT(t10, kMaxRatio * t1) << cls << ": ratio " << t10 / t1;
   }
 }
+
+// The prelude's DataReader reaches the two segment switches and reports the
+// segment counters (LrvxReaderStats, ABI version 6). The tape, in the order
+// written: the even milliseconds from 2; the odd ones from 1 (it starts first
+// and overlaps the first); a segment after both; one between them that
+// overlaps nothing. Four segments are read out of file order, two merged.
+TEST(JsIntegrationTest, DataReaderSegmentSwitchesAndCounters)
+{
+  const auto dir = std::filesystem::temp_directory_path() / "lrvx_test_qjs_reader_segments";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  const std::string script = "var tapeDir = '" + dir.string() + "';" + R"(
+    var BASE = 1700000000000000000n;
+    var MS = 1000000n;
+    function seg(first, n, step) {
+      var w = new DataWriter(tapeDir, 4, 0);
+      for (var i = 0; i < n; i++) {
+        var ts = first + BigInt(i) * step;
+        w.writeTrade(ts, ts, 100.0 + i, 1.0, i, 1, true);
+      }
+      w.close();
+      w.destroy();
+    }
+    function sorted(ts) {
+      for (var i = 1; i < ts.length; i++) { if (ts[i] < ts[i - 1]) return 0; }
+      return 1;
+    }
+    function stamps(trades) { return trades.map(function (t) { return t.exchangeTsNs; }); }
+    seg(BASE + 2n * MS, 100, 2n * MS);
+    seg(BASE + MS, 50, 2n * MS);
+    seg(BASE + 1000n * MS, 50, MS);
+    seg(BASE + 500n * MS, 50, MS);
+
+    var merged = new DataReader({ dir: tapeDir });
+    var m = stamps(merged.readTrades());
+    var mergedCount = m.length;
+    var mergedSorted = sorted(m);
+    var ms = merged.stats();
+    var mergedInterleaved = Number(ms.segmentsInterleaved);
+    var mergedReordered = Number(ms.segmentsReordered);
+    var hasLateDropped = ("lateDropped" in ms) ? 1 : 0;
+    var hasUnknown = ("unknownFramesSkipped" in ms) ? 1 : 0;
+    merged.destroy();
+
+    var byName = new DataReader({ dir: tapeDir, orderSegmentsByTime: false });
+    var n = stamps(byName.readTrades());
+    var byNameSorted = sorted(n);
+    var byNameInterleaved = Number(byName.stats().segmentsInterleaved);
+    byName.destroy();
+
+    var skip = new DataReader({ dir: tapeDir, fromNs: BASE + 500n * MS });
+    var walk = new DataReader({ dir: tapeDir, fromNs: BASE + 500n * MS, skipSegmentsByTime: false });
+    var sk = skip.readTrades().length;
+    var wk = walk.readTrades().length;
+    var skipCount = (sk === 100 && wk === 100) ? 1 : 0;
+    var skipped = Number(skip.stats().segmentsSkipped);
+    var walkedSkipped = Number(walk.stats().segmentsSkipped);
+    skip.destroy();
+    walk.destroy();
+
+    class S extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+    }
+    lrvx.register(new S());
+  )";
+  TempJsFile file(script);
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(file.path(), registry);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "mergedCount"), 250);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "mergedSorted"), 1);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "mergedInterleaved"), 2);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "mergedReordered"), 4);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "hasLateDropped"), 1);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "hasUnknown"), 1);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "byNameSorted"), 0);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "byNameInterleaved"), 0);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "skipCount"), 1);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "skipped"), 2);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "walkedSkipped"), 0);
+  std::filesystem::remove_all(dir);
+}

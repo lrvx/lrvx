@@ -331,6 +331,7 @@ from C import lrvx_segment_merge(cobj, cobj) -> u8
 
 # Extended DataReader
 from C import lrvx_data_reader_create_filtered(cobj, i64, i64, Ptr[u32], u32) -> cobj
+from C import lrvx_data_reader_create_ex(cobj, i64, i64, Ptr[u32], u32, i64, i32, i32, i32) -> cobj
 from C import lrvx_data_reader_read_trades(cobj, cobj, u64) -> u64
 from C import lrvx_data_reader_read_bbo(cobj, cobj, u64) -> u64
 from C import lrvx_data_reader_count_book_updates(cobj, Ptr[u64]) -> u64
@@ -945,6 +946,15 @@ class ReaderStats:
     # Frames of a record type this build does not know, stepped over via the
     # frame length rather than ending the read.
     unknown_frames_skipped: int
+    # Segments not decoded at all because their proven time bounds lie
+    # outside the reader's range (skip_segments_by_time).
+    segments_skipped: int
+    # Segments visited at a different position than their file name gives
+    # them (order_segments_by_time).
+    segments_reordered: int
+    # Segments whose events were merged with another segment's because their
+    # time ranges overlap.
+    segments_interleaved: int
 
 
 @dataclass
@@ -1093,7 +1103,7 @@ class DataReader:
     def create_filtered(data_dir: str, from_ns: int, to_ns: int,
                         symbols: List[int] = list[int]()) -> DataReader:
         """Create a DataReader limited to a time range and set of symbols."""
-        r = DataReader.__new__(DataReader)
+        r = DataReader.__new__()
         if len(symbols) > 0:
             sym_buf = [u32(s) for s in symbols]
             r._h = lrvx_data_reader_create_filtered(
@@ -1101,7 +1111,31 @@ class DataReader:
                 sym_buf.arr.ptr, u32(len(sym_buf)))
         else:
             r._h = lrvx_data_reader_create_filtered(
-                data_dir.c_str(), i64(from_ns), i64(to_ns), cobj(), u32(0))
+                data_dir.c_str(), i64(from_ns), i64(to_ns), Ptr[u32](), u32(0))
+        return r
+
+    @staticmethod
+    def create_ex(data_dir: str, from_ns: int = 0, to_ns: int = 0,
+                  symbols: List[int] = list[int](), reorder_window_ns: int = 0,
+                  strict_ordering: bool = False,
+                  order_segments_by_time: bool = True,
+                  skip_segments_by_time: bool = True) -> DataReader:
+        """Create a DataReader with every reader option.
+
+        order_segments_by_time=False reads segments in file-name order
+        instead of merging them by time; skip_segments_by_time=False decodes
+        every segment even when its proven bounds lie outside
+        [from_ns, to_ns]. reorder_window_ns <= 0 keeps the 10 s default.
+        """
+        r = DataReader.__new__()
+        sym_buf = [u32(s) for s in symbols]
+        r._h = lrvx_data_reader_create_ex(
+            data_dir.c_str(), i64(from_ns), i64(to_ns),
+            sym_buf.arr.ptr if len(sym_buf) > 0 else Ptr[u32](),
+            u32(len(sym_buf)), i64(reorder_window_ns),
+            i32(1 if strict_ordering else 0),
+            i32(1 if order_segments_by_time else 0),
+            i32(1 if skip_segments_by_time else 0))
         return r
 
     def summary(self) -> DatasetSummary:
@@ -1130,8 +1164,8 @@ class DataReader:
 
     def reader_stats(self) -> ReaderStats:
         """Return reader I/O statistics."""
-        # LrvxReaderStats: 8 x u64 = 64 bytes
-        buf = [i64(0)] * 8
+        # LrvxReaderStats: 11 x u64 = 88 bytes (ABI version 6)
+        buf = [i64(0)] * 11
         lrvx_data_reader_stats_p(self._h, Ptr[byte](buf.arr.ptr))
         return ReaderStats(
             files_read=int(buf[0]),
@@ -1141,7 +1175,10 @@ class DataReader:
             bytes_read=int(buf[4]),
             crc_errors=int(buf[5]),
             late_dropped=int(buf[6]),
-            unknown_frames_skipped=int(buf[7])
+            unknown_frames_skipped=int(buf[7]),
+            segments_skipped=int(buf[8]),
+            segments_reordered=int(buf[9]),
+            segments_interleaved=int(buf[10])
         )
 
     def read_trades(self, max_trades: int = 0) -> List[TradeRecord]:

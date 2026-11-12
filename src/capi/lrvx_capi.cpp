@@ -5300,6 +5300,40 @@ LrvxDataReaderHandle lrvx_data_reader_create_ordered(const char* data_dir, int64
   LRVX_CAPI_LEAVE;
 }
 
+LrvxDataReaderHandle lrvx_data_reader_create_ex(const char* data_dir, int64_t from_ns,
+                                                int64_t to_ns, const uint32_t* symbols,
+                                                uint32_t num_symbols, int64_t reorder_window_ns,
+                                                int32_t strict_ordering,
+                                                int32_t order_segments_by_time,
+                                                int32_t skip_segments_by_time)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  LRVX_CAPI_REQUIRE(data_dir);
+  replay::ReaderConfig cfg;
+  cfg.data_dir = data_dir;
+  if (from_ns > 0)
+  {
+    cfg.from_ns = from_ns;
+  }
+  if (to_ns > 0)
+  {
+    cfg.to_ns = to_ns;
+  }
+  if (symbols && num_symbols > 0)
+  {
+    cfg.symbols.insert(symbols, symbols + num_symbols);
+  }
+  if (reorder_window_ns > 0)
+  {
+    cfg.reorder_window_ns = reorder_window_ns;
+  }
+  cfg.strict_ordering = strict_ordering != 0;
+  cfg.order_segments_by_time = order_segments_by_time != 0;
+  cfg.skip_segments_by_time = skip_segments_by_time != 0;
+  return new replay::BinaryLogReader(cfg);
+  LRVX_CAPI_LEAVE;
+}
+
 LrvxDatasetSummary lrvx_data_reader_summary(LrvxDataReaderHandle h)
 {
   LRVX_CAPI_ENTER(h);
@@ -5315,8 +5349,10 @@ LrvxReaderStats lrvx_data_reader_stats(LrvxDataReaderHandle h)
   LRVX_CAPI_ENTER(h);
   auto* reader = static_cast<replay::BinaryLogReader*>(h);
   auto s = reader->stats();
-  return {s.files_read, s.events_read, s.trades_read, s.book_updates_read,
-          s.bytes_read, s.crc_errors, s.late_dropped, s.unknown_frames_skipped};
+  return {s.files_read, s.events_read, s.trades_read,
+          s.book_updates_read, s.bytes_read, s.crc_errors,
+          s.late_dropped, s.unknown_frames_skipped, s.segments_skipped,
+          s.segments_reordered, s.segments_interleaved};
   LRVX_CAPI_LEAVE;
 }
 
@@ -5350,6 +5386,8 @@ uint64_t lrvx_data_reader_read_trades(LrvxDataReaderHandle h, LrvxTradeRecord* t
 static_assert(sizeof(LrvxBBO) == 64, "LrvxBBO must be 64 bytes");
 static_assert(sizeof(LrvxBookUpdateHeader) == 48, "LrvxBookUpdateHeader must be 48 bytes");
 static_assert(sizeof(LrvxLevel) == 24, "LrvxLevel must be 24 bytes");
+static_assert(sizeof(LrvxReaderStats) == 11 * sizeof(uint64_t),
+              "LrvxReaderStats must be 11 x u64 (ABI version 6)");
 
 uint64_t lrvx_data_reader_read_bbo(LrvxDataReaderHandle h, LrvxBBO* bbos_out,
                                    uint64_t max_events)

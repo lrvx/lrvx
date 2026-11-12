@@ -360,6 +360,8 @@ if(LRVX_BUILD_CAPI)
   target_link_libraries(test_capi_bar_aggregation PRIVATE lrvx_capi)
   add_lrvx_test(test_capi_book_snapshot)
   target_link_libraries(test_capi_book_snapshot PRIVATE lrvx_capi)
+  add_lrvx_test(test_capi_reader_segments)
+  target_link_libraries(test_capi_reader_segments PRIVATE lrvx_capi)
   add_lrvx_test(test_capi_negative_book)
   target_link_libraries(test_capi_negative_book PRIVATE lrvx_capi)
   # The strategy-side case needs a strategy that already holds a book; the

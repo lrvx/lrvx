@@ -608,6 +608,7 @@ groups:
       functions:
         lrvx_data_reader_count_book_updates: __lrvx_dr_read_book_updates
         lrvx_data_reader_count_book_updates_from: __lrvx_dr_read_book_updates_from
+        lrvx_data_reader_create_ex: __lrvx_dr_create_ex
         lrvx_data_reader_create_filtered: __lrvx_dr_create_filtered
         lrvx_data_reader_read_bbo: __lrvx_dr_read_bbo
         lrvx_data_reader_read_bbo_from: __lrvx_dr_read_bbo_from
@@ -1449,6 +1450,7 @@ allowlist_functions:
     lrvx_data_reader_count_book_updates: *cpp_direct
     lrvx_data_reader_count_book_updates_from: *cpp_direct
     lrvx_data_reader_create: *cpp_direct
+    lrvx_data_reader_create_ex: *cpp_direct
     lrvx_data_reader_create_filtered: *cpp_direct
     lrvx_data_reader_create_ordered: *cpp_direct
     lrvx_data_reader_destroy: *cpp_direct
@@ -2047,6 +2049,7 @@ allowlist_functions:
     lrvx_capi_abi_version: *no_napi_wrapper
     lrvx_clear_last_error: *no_napi_wrapper
     lrvx_data_reader_create_filtered: *no_napi_wrapper
+    lrvx_data_reader_create_ordered: *no_napi_wrapper
     lrvx_data_reader_stats_p: *no_napi_wrapper
     lrvx_data_reader_summary_p: *no_napi_wrapper
     lrvx_data_writer_stats_p: *no_napi_wrapper

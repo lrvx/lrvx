@@ -6218,6 +6218,46 @@ static JSValue js_dr_create_filtered(JSContext* c, JSValueConst, int argc, JSVal
   return ret;
 }
 
+// (dir, fromNs, toNs, symbols, reorderWindowNs, strictOrdering,
+//  orderSegmentsByTime, skipSegmentsByTime). The prelude's DataReader passes
+// every argument; the two segment switches default to on.
+static JSValue js_dr_create_ex(JSContext* c, JSValueConst, int argc, JSValueConst* a)
+{
+  LRVX_JS_CSTRING_OR_THROW(dir, c, a[0]);
+  int64_t from_ns = toInt64(c, a[1]);
+  int64_t to_ns = toInt64(c, a[2]);
+  std::vector<uint32_t> syms;
+  if (argc > 3 && JS_IsArray(c, a[3]))
+  {
+    JSValue lenVal = JS_GetPropertyStr(c, a[3], "length");
+    uint32_t n = 0;
+    JS_ToUint32(c, &n, lenVal);
+    JS_FreeValue(c, lenVal);
+    for (uint32_t i = 0; i < n; i++)
+    {
+      JSValue e = JS_GetPropertyUint32(c, a[3], i);
+      syms.push_back(toUint32(c, e));
+      JS_FreeValue(c, e);
+    }
+  }
+  const int64_t reorder_window_ns = argc > 4 ? toInt64(c, a[4]) : 0;
+  auto flag = [&](int i, bool fallback)
+  {
+    if (argc <= i || JS_IsUndefined(a[i]) || JS_IsNull(a[i]))
+    {
+      return fallback ? 1 : 0;
+    }
+    return JS_ToBool(c, a[i]) > 0 ? 1 : 0;
+  };
+  JSValue ret = createHandleObject(
+      c,
+      lrvx_data_reader_create_ex(dir, from_ns, to_ns, syms.empty() ? nullptr : syms.data(),
+                                 static_cast<uint32_t>(syms.size()), reorder_window_ns,
+                                 flag(5, false), flag(6, true), flag(7, true)),
+      lrvx_data_reader_destroy);
+  return ret;
+}
+
 static JSValue js_dr_destroy(JSContext* c, JSValueConst, int, JSValueConst* a)
 {
   return js_generic_handle_destroy(c, a[0]);
@@ -6252,6 +6292,15 @@ static JSValue js_dr_stats(JSContext* c, JSValueConst, int, JSValueConst* a)
   JS_SetPropertyStr(c, o, "bookUpdatesRead", JS_NewInt64(c, static_cast<int64_t>(s.book_updates_read)));
   JS_SetPropertyStr(c, o, "bytesRead", JS_NewInt64(c, static_cast<int64_t>(s.bytes_read)));
   JS_SetPropertyStr(c, o, "crcErrors", JS_NewInt64(c, static_cast<int64_t>(s.crc_errors)));
+  JS_SetPropertyStr(c, o, "lateDropped", JS_NewInt64(c, static_cast<int64_t>(s.late_dropped)));
+  JS_SetPropertyStr(c, o, "unknownFramesSkipped",
+                    JS_NewInt64(c, static_cast<int64_t>(s.unknown_frames_skipped)));
+  JS_SetPropertyStr(c, o, "segmentsSkipped",
+                    JS_NewInt64(c, static_cast<int64_t>(s.segments_skipped)));
+  JS_SetPropertyStr(c, o, "segmentsReordered",
+                    JS_NewInt64(c, static_cast<int64_t>(s.segments_reordered)));
+  JS_SetPropertyStr(c, o, "segmentsInterleaved",
+                    JS_NewInt64(c, static_cast<int64_t>(s.segments_interleaved)));
   return o;
 }
 
@@ -8011,6 +8060,7 @@ bool registerLrvxBindings(JSContext* ctx)
   // DataReader
   addGlobalFunc(ctx, "__lrvx_dr_create", js_dr_create, 1);
   addGlobalFunc(ctx, "__lrvx_dr_create_filtered", js_dr_create_filtered, 4);
+  addGlobalFunc(ctx, "__lrvx_dr_create_ex", js_dr_create_ex, 8);
   addGlobalFunc(ctx, "__lrvx_dr_destroy", js_dr_destroy, 1);
   addGlobalFunc(ctx, "__lrvx_dr_count", js_dr_count, 1);
   addGlobalFunc(ctx, "__lrvx_dr_summary", js_dr_summary, 1);

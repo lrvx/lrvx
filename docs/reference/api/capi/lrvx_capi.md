@@ -1146,6 +1146,26 @@ LrvxDataReaderHandle lrvx_data_reader_create_filtered(const char* data_dir,
                                                        int64_t from_ns, int64_t to_ns,
                                                        const uint32_t* symbols,
                                                        uint32_t num_symbols);
+// reorder_window_ns <= 0 keeps the 10 s default; strict_ordering != 0 raises
+// on an event past the window instead of dropping it.
+LrvxDataReaderHandle lrvx_data_reader_create_ordered(const char* data_dir,
+                                                      int64_t from_ns, int64_t to_ns,
+                                                      const uint32_t* symbols,
+                                                      uint32_t num_symbols,
+                                                      int64_t reorder_window_ns,
+                                                      int32_t strict_ordering);
+// Plus the segment switches, both on (!= 0) in every other create function:
+// order_segments_by_time reads segments by time and merges overlapping Sorted
+// ones (0: file-name order); skip_segments_by_time leaves out the segments
+// whose proven bounds lie outside [from_ns, to_ns] (0: decode every segment).
+LrvxDataReaderHandle lrvx_data_reader_create_ex(const char* data_dir,
+                                                 int64_t from_ns, int64_t to_ns,
+                                                 const uint32_t* symbols,
+                                                 uint32_t num_symbols,
+                                                 int64_t reorder_window_ns,
+                                                 int32_t strict_ordering,
+                                                 int32_t order_segments_by_time,
+                                                 int32_t skip_segments_by_time);
 void lrvx_data_reader_destroy(LrvxDataReaderHandle reader);
 
 uint64_t lrvx_data_reader_count(LrvxDataReaderHandle reader);
@@ -1182,6 +1202,10 @@ uint64_t lrvx_data_reader_read_book_updates(LrvxDataReaderHandle reader,
 `LrvxBookUpdateHeader` fields (size: 48 B): `exchange_ts_ns`, `recv_ts_ns`, `seq`, `level_offset`, `symbol_id`, `bid_count`, `ask_count`, `event_type` (the record byte from the data reader, 0=snapshot, 1=delta, 2=top-of-book; the frame type from the merged tape reader, 2=snapshot, 3=delta, 6=top).
 
 `LrvxLevel` fields (size: 24 B): `price_raw`, `qty_raw`, `side` (0=bid, 1=ask).
+
+`LrvxReaderStats` fields (size: 88 B, eleven `uint64_t`, counters accumulated over the reader's lifetime): `files_read`, `events_read`, `trades_read`, `book_updates_read`, `bytes_read`, `crc_errors` (frames skipped for a CRC mismatch; the read goes on), `late_dropped` (events past the reorder window), `unknown_frames_skipped` (frames of a record type this build does not know), and, since ABI version 6, `segments_skipped` (segments not decoded because their proven bounds lie outside the range), `segments_reordered` (segments read at a different position than their file name gives them) and `segments_interleaved` (segments merged event by event with another because their ranges overlap).
+
+`LrvxDatasetSummary.first_event_ns` / `last_event_ns` are the earliest and latest event of every `Sorted` segment, exactly; a segment without the `Sorted` flag contributes the first and last event it wrote. See [BinaryLogReader, Reported time range](../replay/binary_log_reader.md#reported-time-range).
 
 Layout sizes are pinned with `static_assert`; language bindings (Codon, QuickJS) parse these structs from raw byte buffers and depend on exact offsets.
 

@@ -1,0 +1,91 @@
+# Smoke test: DataReader's segment switches and the segment counters in
+# ReaderStats, through the C ABI.
+#
+#   * create_ex(order_segments_by_time=...) reads two overlapping Sorted
+#     segments merged by time (default) or one after the other in file-name
+#     order, and reader_stats() reports segments_reordered and
+#     segments_interleaved accordingly
+#   * create_ex(skip_segments_by_time=...) with a range leaves out the
+#     segments whose bounds lie before it (default) or decodes them all;
+#     reader_stats() reports segments_skipped; the trades returned are the
+#     same either way
+
+import os
+
+from lrvx.tools import DataReader, DataWriter
+
+
+def check(label: str, ok: bool):
+    if not ok:
+        print("FAIL: " + label)
+        raise ValueError("smoke fail: " + label)
+    print("ok: " + label)
+
+
+MS = 1_000_000
+BASE = 1_700_000_000_000_000_000
+
+root = "/tmp/codon_reader_segments_smoke"
+os.system("rm -rf " + root)
+os.system("mkdir -p " + root)
+
+
+def write_segment(first_ns: int, n: int, step_ns: int):
+    # One writer per segment; segment files are named by the time the writer
+    # opened them, so they list in the order written.
+    w = DataWriter(root, 64, 0)
+    for i in range(n):
+        ts = first_ns + i * step_ns
+        w.write_trade(ts, ts, 100.0 + float(i), 1.0, i, 1, 0)
+    w.close()
+
+
+# First file: the even milliseconds 2..200. Second: the odd ones 1..99, so it
+# starts first in time and overlaps the first. Third: well after both.
+# Fourth: between the first and the third, overlapping nothing. Read order:
+# second, first, fourth, third -- four segments moved, two interleaved.
+write_segment(BASE + 2 * MS, 100, 2 * MS)
+write_segment(BASE + 1 * MS, 50, 2 * MS)
+write_segment(BASE + 1000 * MS, 50, MS)
+write_segment(BASE + 500 * MS, 50, MS)
+
+merged = DataReader.create_ex(root)
+trades = merged.read_trades()
+ts = [t.exchange_ts_ns for t in trades]
+check("default reader returns every trade", len(trades) == 250)
+check("default reader returns them in time order", ts == sorted(ts))
+s = merged.reader_stats()
+# read_trades walks the tape twice (a count, then the copy), and the counters
+# accumulate over the reader's lifetime: two segments per walk.
+check("segments_interleaved == 2 per walk", s.segments_interleaved == 4)
+check("segments_reordered == 4 per walk", s.segments_reordered == 8)
+check("segments_skipped == 0 without a range", s.segments_skipped == 0)
+
+by_name = DataReader.create_ex(root, order_segments_by_time=False)
+trades = by_name.read_trades()
+ts = [t.exchange_ts_ns for t in trades]
+check("file-name order returns every trade", len(trades) == 250)
+check("file-name order reads the first file first", ts[0] == BASE + 2 * MS)
+s = by_name.reader_stats()
+check("file-name order interleaves nothing", s.segments_interleaved == 0)
+check("file-name order reorders nothing", s.segments_reordered == 0)
+
+skipping = DataReader.create_ex(root, from_ns=BASE + 500 * MS)
+walking = DataReader.create_ex(root, from_ns=BASE + 500 * MS,
+                               skip_segments_by_time=False)
+a = skipping.read_trades()
+b = walking.read_trades()
+check("a range read returns the third and fourth segments", len(a) == 100)
+check("skipping changes nothing delivered",
+      [t.exchange_ts_ns for t in a] == [t.exchange_ts_ns for t in b])
+check("segments_skipped == 2 per walk with skipping on",
+      skipping.reader_stats().segments_skipped == 4)
+check("segments_skipped == 0 with skipping off",
+      walking.reader_stats().segments_skipped == 0)
+
+# create_filtered, the older form: the same range read.
+filtered = DataReader.create_filtered(root, BASE + 500 * MS, 0)
+check("create_filtered reads the same range", len(filtered.read_trades()) == 100)
+
+os.system("rm -rf " + root)
+print("done")
