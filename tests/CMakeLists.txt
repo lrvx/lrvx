@@ -257,6 +257,7 @@ if(LRVX_ENABLE_BACKTEST)
   add_lrvx_test(test_backtest_economics)
   add_lrvx_test(test_backtest_ctx_position)
   add_lrvx_test(test_backtest_run_tape)
+  add_lrvx_test(test_backtest_run_tape_bars_on_ticks)
   # Needs the backtest runner's tape path alongside the replay writer/reader,
   # and reads docs/spec/lrvx.md to check the recorded side-convention
   # decision.

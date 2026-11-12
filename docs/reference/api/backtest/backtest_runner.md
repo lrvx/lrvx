@@ -32,6 +32,9 @@ public:
   BacktestResult runTapeBars(const std::filesystem::path& data_dir,
                              std::chrono::nanoseconds interval,
                              std::optional<SymbolId> symbol = std::nullopt);
+  BacktestResult runTapeBarsOnTicks(const std::filesystem::path& data_dir,
+                                    std::chrono::nanoseconds interval,
+                                    std::optional<SymbolId> symbol = std::nullopt);
 
   // Interactive mode
   void start(replay::IMultiSegmentReader& reader);
@@ -77,19 +80,24 @@ public:
 | `runBars(bars)` | A `std::vector<BarEvent>` | Each bar updates the `SimulatedExecutor` — open first, then low, high and close, so resting orders and SL/TP match against the intrabar extremes — and is then dispatched to `Strategy::onBar` and any registered subscriber. An order the callback emits is held for the next bar's open (see below). Bars must be in non-decreasing `endTime` order |
 | `runTape(dir)` | One `.lrvx` directory | Opens the tape via `replay::createMultiSegmentReader`. Throws if `dir` is not a `.lrvx` directory or holds no segments |
 | `runTapeBars(dir, interval, symbol)` | One `.lrvx` directory, replayed as time bars | The tape's trades are aggregated into wall-clock-aligned bars of `interval` while it streams (`TimeBarPolicy`, the policy `aggregate_time_bars` uses: late trades dropped, the last still-open bar not delivered), and each closed bar goes through the same step as `runBars` -- so the next-open rule below applies. Each `BarEvent` carries `BarType::Time`, `barTypeParam` = interval in ns, buy volume and trade count; bar times are Unix nanoseconds, as `runBars` takes them. One symbol per run: with `symbol` only its trades are read, and a tape with none throws `std::invalid_argument`; without it a second symbol's trade stops the run with `std::invalid_argument`. A non-positive interval throws `std::invalid_argument`. Book records are not used |
+| `runTapeBarsOnTicks(dir, interval, symbol)` | One `.lrvx` directory: bars for the strategy, records for the executor | The executor is fed every trade and book record in time order, as `runTape` feeds it, with the latency, queue and slippage settings of tick replay. The bars `runTapeBars` builds for the same interval (the same bars, bit for bit) go to `Strategy::onBar` and the subscribers; `onTrade` and `onBookUpdate` are not called. Bar n is delivered when the first trade stamped at or after its end arrives, before that trade reaches the executor, on a clock set to the bar's end. An order sent from that callback is submitted then and never matched inside the call (`SimulatedExecutor::NextEventScope`): it first meets that trade, or with a submit deferral L the first record at or after the bar's end + L. Working stops and limits fill on the trades inside the next bars, a conditional never better than its trigger. One symbol per run as for `runTapeBars`, except that a book record of a second symbol stops the run too. Option-quote and pool-state records are counted as in `runTape` |
 | `runTapes(dirs)` | N `.lrvx` directories, merged on read | Symbols are rekeyed into the engine registry via `(metadata.exchange, name)`, so strategies that pre-resolved venue-tagged symbols see the merger's ids. Throws if any input is not `.lrvx`, or if two inputs declare overlapping book streams for the same symbol (`OverlappingBookStreamError`). `runTapes({t})` equals `runTape(t)` modulo the rekey |
 
 ## Records tick replay does not deliver
 
 `run`, `runTape` and `runTapes` deliver trades and book records (snapshot, delta, top of book) to
-the simulator, the strategy and every subscriber. A tape can also carry option-quote records
+the simulator, the strategy and every subscriber; `runTapeBarsOnTicks` delivers them to the
+simulator only. A tape can also carry option-quote records
 (`EventType::OptionQuote`) and DEX pool-state records (`EventType::PoolState`). Nothing in the
 runner consumes either: there is no strategy or subscriber callback for them and the
 `SimulatedExecutor` does not match against them. They are read, advance the clock and count in
 `eventCount`, and are otherwise skipped -- counted per kind in `state().optionQuoteCount` and
-`state().poolStateCount`, with one warning logged on the first. The Python `run_tape` / `run_tapes`
-stats report the same counts as `skipped_option_quotes` and `skipped_pool_states`. The C API,
-Node and Codon `LrvxBacktestStats` carry no such field; read the tape's option quotes directly
+`state().poolStateCount`, with one warning logged on the first. The Python `run_tape` /
+`run_tapes` / `run_tape_bars_on_ticks` stats report the same counts as `skipped_option_quotes` and
+`skipped_pool_states`, the C API's `LrvxBacktestStats` as `optionQuoteCount` and `poolStateCount`
+(0 for a run that read no tape), Node's run stats as `skippedOptionQuotes` and
+`skippedPoolStates`, and Codon's `BacktestStats` as `skipped_option_quotes` and
+`skipped_pool_states`. To use the records, read the tape's option quotes directly
 (`DataReader.read_option_quotes_from`) or drive pool state through `PoolStateReplay`.
 
 ## Bar callbacks fill at the next open
@@ -111,7 +119,9 @@ extremes either.
 
 Tick and book replay (`run`, `runTape`, `runTapes`) is not affected: there the next event is the
 next price, and the strategy callback runs after the event has been matched. `runTapeBars` is bar
-replay and follows the rule above.
+replay and follows the rule above. `runTapeBarsOnTicks` follows neither: its orders from `onBar`
+are not held for a bar but deferred to the next record of the tape, the first trade at or after the
+bar's end (see the table above).
 
 On bar replay the clock reads each bar's end time. A held order released at the next open with a
 positive submit deferral (`BacktestConfig::latency` order delay plus the submit ack latency) is
@@ -120,7 +130,7 @@ therefore accepted at a later bar's open, never inside the bar it was released i
 
 ## Reruns
 
-Every entry point — `run`, `runBars`, `runTape`, `runTapes`, `runTapeBars` and interactive `start` — clears the
+Every entry point — `run`, `runBars`, `runTape`, `runTapes`, `runTapeBars`, `runTapeBarsOnTicks` and interactive `start` — clears the
 previous run first: the executor's fills, live, held and conditional orders, market state and
 ladder, the built-in position tracker, the clock, and the event counters. A second run therefore
 reports that run, not the sum of every run so far, and repeats bit for bit.

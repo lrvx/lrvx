@@ -194,6 +194,10 @@ class BacktestStats:
     return_pct: float
     start_time_ns: int
     end_time_ns: int
+    # Option-quote and pool-state records a tape run read and delivered to
+    # nobody; 0 for a run that read no tape.
+    skipped_option_quotes: int = 0
+    skipped_pool_states: int = 0
 
     def __repr__(self) -> str:
         return (f"BacktestStats(trades={self.total_trades}, "
@@ -444,7 +448,12 @@ class SimulatedExecutor:
             raise ValueError("set_symbol_slippage: " + str.from_ptr(lrvx_last_error_message()))
 
     def set_queue_model(self, model: int, depth: int = 1):
+        """model is a QUEUE_* code; an unknown one raises ValueError with
+        the valid codes and leaves the model installed before."""
+        lrvx_clear_last_error()
         lrvx_simulated_executor_set_queue_model(self._handle, i32(model), u32(depth))
+        if int(lrvx_last_error_code()) != 0:
+            raise ValueError("set_queue_model: " + str.from_ptr(lrvx_last_error_message()))
 
     def submit_bracket(self, bracket_id: int, symbol: int,
                        entry_side: str, entry_type: str, entry_price: float,
@@ -949,7 +958,7 @@ class BacktestResult:
         List[i64] buffer has the correct memory layout.  Float fields
         are read back via a Ptr[f64] alias over the same buffer.
         """
-        buf = [i64(0)] * 29
+        buf = [i64(0)] * 31
         lrvx_backtest_result_stats(self._handle, buf.arr.ptr)
         fp = Ptr[f64](buf.arr.ptr)
         return BacktestStats(
@@ -981,7 +990,9 @@ class BacktestResult:
             time_weighted_return=fp[25],
             return_pct=fp[26],
             start_time_ns=int(buf[27]),
-            end_time_ns=int(buf[28])
+            end_time_ns=int(buf[28]),
+            skipped_option_quotes=int(buf[29]),
+            skipped_pool_states=int(buf[30])
         )
 
 

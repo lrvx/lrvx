@@ -81,6 +81,79 @@ std::string slippageModelNameList()
   return out;
 }
 
+const char* queueModelName(QueueModel model) noexcept
+{
+  switch (model)
+  {
+    case QueueModel::NONE:
+      return "none";
+    case QueueModel::TOB:
+      return "tob";
+    case QueueModel::FULL:
+      return "full";
+    case QueueModel::PRO_RATA:
+      return "pro_rata";
+    case QueueModel::PRO_RATA_WITH_FIFO:
+      return "pro_rata_with_fifo";
+    case QueueModel::TOP_PRO_LMM:
+      return "top_pro_lmm";
+    case QueueModel::PRO_RATA_WITH_PRIORITY:
+      return "pro_rata_with_priority";
+  }
+  return "unknown";
+}
+
+namespace
+{
+constexpr QueueModel kQueueModels[] = {QueueModel::NONE,
+                                       QueueModel::TOB,
+                                       QueueModel::FULL,
+                                       QueueModel::PRO_RATA,
+                                       QueueModel::PRO_RATA_WITH_FIFO,
+                                       QueueModel::TOP_PRO_LMM,
+                                       QueueModel::PRO_RATA_WITH_PRIORITY};
+}  // namespace
+
+std::optional<QueueModel> queueModelFromName(std::string_view name) noexcept
+{
+  for (QueueModel m : kQueueModels)
+  {
+    if (name == queueModelName(m))
+    {
+      return m;
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<QueueModel> queueModelFromCode(int32_t code) noexcept
+{
+  for (QueueModel m : kQueueModels)
+  {
+    if (code == static_cast<int32_t>(m))
+    {
+      return m;
+    }
+  }
+  return std::nullopt;
+}
+
+std::string queueModelNameList()
+{
+  std::string out;
+  for (QueueModel m : kQueueModels)
+  {
+    if (!out.empty())
+    {
+      out += ", ";
+    }
+    out += "'";
+    out += queueModelName(m);
+    out += "'";
+  }
+  return out;
+}
+
 bool RunnerFillSettings::customized() const noexcept
 {
   return slippageModel != SlippageModel::NONE || slippageTicks != 0 || slippageTickSize != 0.0 ||

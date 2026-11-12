@@ -1379,6 +1379,7 @@ allowlist_functions:
     lrvx_backtest_runner_run_replay_source: *cpp_direct
     lrvx_backtest_runner_run_tape: *cpp_direct
     lrvx_backtest_runner_run_tape_bars: *cpp_direct
+    lrvx_backtest_runner_run_tape_bars_on_ticks: *cpp_direct
     lrvx_backtest_runner_run_tapes: *cpp_direct
     lrvx_backtest_runner_set_executor: *cpp_direct
     lrvx_backtest_runner_set_kill_switch: *cpp_direct
@@ -2394,6 +2395,7 @@ allowlist_functions:
     lrvx_backtest_runner_run_replay_source: *no_quickjs_global
     lrvx_backtest_runner_run_tape: *no_quickjs_global
     lrvx_backtest_runner_run_tape_bars: *no_quickjs_global
+    lrvx_backtest_runner_run_tape_bars_on_ticks: *no_quickjs_global
     lrvx_backtest_runner_run_tapes: *no_quickjs_global
     lrvx_backtest_runner_set_executor: *no_quickjs_global
     lrvx_backtest_runner_set_kill_switch: *no_quickjs_global

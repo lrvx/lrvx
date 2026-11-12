@@ -402,32 +402,14 @@ class PySimulatedExecutor
 
   void setQueueModel(const std::string& model, uint32_t depth)
   {
-    QueueModel qm = QueueModel::NONE;
-    if (model == "tob")
+    // An unknown name is refused instead of switching queue simulation off.
+    const std::optional<QueueModel> qm = queueModelFromName(model);
+    if (!qm)
     {
-      qm = QueueModel::TOB;
+      throw LrvxError("E_VAL_002", "SimulatedExecutor.set_queue_model: model must be one of " +
+                                       queueModelNameList() + "; got '" + model + "'");
     }
-    else if (model == "full")
-    {
-      qm = QueueModel::FULL;
-    }
-    else if (model == "pro_rata")
-    {
-      qm = QueueModel::PRO_RATA;
-    }
-    else if (model == "pro_rata_with_fifo")
-    {
-      qm = QueueModel::PRO_RATA_WITH_FIFO;
-    }
-    else if (model == "top_pro_lmm")
-    {
-      qm = QueueModel::TOP_PRO_LMM;
-    }
-    else if (model == "pro_rata_with_priority")
-    {
-      qm = QueueModel::PRO_RATA_WITH_PRIORITY;
-    }
-    _executor.setQueueModel(qm, depth);
+    _executor.setQueueModel(*qm, depth);
   }
 
   void setQueueFifoTopN(uint32_t topN)

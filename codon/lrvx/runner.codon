@@ -73,6 +73,7 @@ from C import lrvx_backtest_runner_create_with_fill_settings(
     cobj, float, float, i32, i32, float, float, float,
     i64, i64, i64, i64, u64, i64, i64, cobj) -> cobj
 from C import lrvx_backtest_runner_run_tape_bars(cobj, cobj, i64, cobj, Ptr[i64]) -> i32
+from C import lrvx_backtest_runner_run_tape_bars_on_ticks(cobj, cobj, i64, cobj, Ptr[i64]) -> i32
 from C import lrvx_last_error_message() -> cobj
 from C import lrvx_backtest_runner_destroy(cobj)
 from C import lrvx_backtest_runner_set_strategy(cobj, cobj)
@@ -505,12 +506,14 @@ class BacktestRunner:
             time_weighted_return=fp[25],
             return_pct=fp[26],
             start_time_ns=int(buf[27]),
-            end_time_ns=int(buf[28])
+            end_time_ns=int(buf[28]),
+            skipped_option_quotes=int(buf[29]),
+            skipped_pool_states=int(buf[30])
         )
 
     def run_csv(self, path: str, symbol: str) -> BacktestStats:
         """Replay a OHLCV CSV file. Returns BacktestStats."""
-        buf = [i64(0)] * 29
+        buf = [i64(0)] * 31
         ok = lrvx_backtest_runner_run_csv(
             self._handle, path.c_str(), symbol.c_str(), buf.arr.ptr)
         if ok == i32(0):
@@ -523,7 +526,7 @@ class BacktestRunner:
         `lrvx tape record` (live) or `scripts/backfill_to_tape.py`
         (historical). Strategy.on_trade fires for each recorded
         event; on_bar does not."""
-        buf = [i64(0)] * 29
+        buf = [i64(0)] * 31
         ok = lrvx_backtest_runner_run_tape(
             self._handle, path.c_str(), buf.arr.ptr)
         if ok == i32(0):
@@ -548,11 +551,38 @@ class BacktestRunner:
         if interval_ns <= 0:
             raise ValueError("BacktestRunner.run_tape_bars: interval_seconds must be a "
                              "finite number of seconds of at least one nanosecond")
-        buf = [i64(0)] * 29
+        buf = [i64(0)] * 31
         sym = cobj()
         if symbol != "":
             sym = symbol.c_str()
         ok = lrvx_backtest_runner_run_tape_bars(
+            self._handle, path.c_str(), i64(interval_ns), sym, buf.arr.ptr)
+        if ok == i32(0):
+            raise ValueError(str.from_ptr(lrvx_last_error_message()))
+        return self._parse_stats(buf)
+
+    def run_tape_bars_on_ticks(self, path: str, interval_seconds: float,
+                               symbol: str = "") -> BacktestStats:
+        """Decide on bars, fill on ticks. Strategy.on_bar receives the bars
+        run_tape_bars builds from the tape, while the simulated executor is
+        fed every trade and book record as run_tape feeds it; on_trade does
+        not fire. Bar n reaches on_bar when the first trade stamped at or
+        after its end arrives, before that trade reaches the executor: an
+        order sent from on_bar is submitted at the bar's end and can first
+        match against that trade (with a submit latency L, the first record
+        at or after end + L). Working stops and limits fill on the prints
+        inside the next bars, a stop never better than its trigger. symbol
+        and the errors as for run_tape_bars."""
+        finite = interval_seconds > 0.0 and interval_seconds < 1e9
+        interval_ns = int(interval_seconds * 1e9) if finite else 0
+        if interval_ns <= 0:
+            raise ValueError("BacktestRunner.run_tape_bars_on_ticks: interval_seconds must be "
+                             "a finite number of seconds of at least one nanosecond")
+        buf = [i64(0)] * 31
+        sym = cobj()
+        if symbol != "":
+            sym = symbol.c_str()
+        ok = lrvx_backtest_runner_run_tape_bars_on_ticks(
             self._handle, path.c_str(), i64(interval_ns), sym, buf.arr.ptr)
         if ok == i32(0):
             raise ValueError(str.from_ptr(lrvx_last_error_message()))
@@ -577,7 +607,7 @@ class BacktestRunner:
             buf_i = paths[i].c_str()
             path_bufs.append(buf_i)
             path_ptrs[i] = buf_i
-        buf = [i64(0)] * 29
+        buf = [i64(0)] * 31
         ok = lrvx_backtest_runner_run_tapes(
             self._handle, path_ptrs.arr.ptr, u32(n_paths), buf.arr.ptr)
         if ok == i32(0):
@@ -589,7 +619,7 @@ class BacktestRunner:
         """Replay raw OHLCV arrays. timestamps in nanoseconds."""
         n = u32(len(timestamps))
         ts_buf   = [i64(t) for t in timestamps]
-        buf      = [i64(0)] * 29
+        buf      = [i64(0)] * 31
         ok = lrvx_backtest_runner_run_ohlcv(
             self._handle,
             ts_buf.arr.ptr, closes.arr.ptr, n,
@@ -608,7 +638,7 @@ class BacktestRunner:
         n = u32(len(start_ns))
         sn = [i64(t) for t in start_ns]
         en = [i64(t) for t in end_ns]
-        buf = [i64(0)] * 29
+        buf = [i64(0)] * 31
         ok = lrvx_backtest_runner_run_bars(
             self._handle,
             sn.arr.ptr, en.arr.ptr,

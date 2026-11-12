@@ -2136,9 +2136,14 @@ static JSValue js_executor_set_symbol_slippage(JSContext* ctx, JSValueConst, int
 static JSValue js_executor_set_queue_model(JSContext* ctx, JSValueConst, int,
                                            JSValueConst* argv)
 {
+  lrvx_clear_last_error();
   lrvx_simulated_executor_set_queue_model(static_cast<LrvxSimulatedExecutorHandle>(getHandle(ctx, argv[0])),
                                           static_cast<int32_t>(toInt64(ctx, argv[1])),
                                           toUint32(ctx, argv[2]));
+  if (lrvx_last_error_code() != 0)
+  {
+    return JS_ThrowTypeError(ctx, "setQueueModel: %s", lrvx_last_error_message());
+  }
   return JS_UNDEFINED;
 }
 static JSValue js_executor_set_queue_fifo_top_n(JSContext* ctx, JSValueConst, int,

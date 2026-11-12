@@ -257,6 +257,36 @@ class BacktestRunner : public ISignalHandler
                              std::chrono::nanoseconds interval,
                              std::optional<SymbolId> symbol = std::nullopt);
 
+  /// The strategy decides on bars, the executor matches on the tape. The
+  /// tape's records drive the simulated executor exactly as run() / runTape()
+  /// drive it: every trade and book record, in time order, with the latency,
+  /// queue and slippage settings of tick replay. Time bars of `interval` are
+  /// built from the same trades as runTapeBars() builds them (same bars, bit
+  /// for bit; the bar still open at the end is not delivered) and reach
+  /// Strategy::onBar and the market-data subscribers. Strategy::onTrade and
+  /// onBookUpdate are not called.
+  ///
+  /// Bar n is delivered when the first trade with a timestamp at or after its
+  /// end arrives, before that trade reaches the executor. The callback runs on
+  /// a clock set to the bar's end (or later, when book records past the end
+  /// came first). An order sent from it is submitted then, with its sampled
+  /// latency, and is never matched inside the call: with no latency its first
+  /// possible match is that trade, the first one stamped at or after the end
+  /// of bar n; with latency L, the first market record at or after
+  /// submit time + L. Orders, stops and take-profits already working are
+  /// triggered and filled by the trades inside the bars, by tick-replay rules
+  /// (a conditional never fills better than its trigger).
+  ///
+  /// One symbol per run, as runTapeBars(): with `symbol` set only its records
+  /// are read; without it a trade or book record of a second symbol stops the
+  /// run and throws std::invalid_argument. Option-quote and pool-state records
+  /// are counted, as in run(). Throws std::invalid_argument for a non-positive
+  /// interval or a `symbol` with no trade on the tape, and std::runtime_error
+  /// when `data_dir` is not a readable `.lrvx` directory.
+  BacktestResult runTapeBarsOnTicks(const std::filesystem::path& data_dir,
+                                    std::chrono::nanoseconds interval,
+                                    std::optional<SymbolId> symbol = std::nullopt);
+
   // ========== Interactive mode ==========
 
   /// Start backtest in interactive mode (starts paused, must call from separate thread)
@@ -304,7 +334,9 @@ class BacktestRunner : public ISignalHandler
   const BacktestConfig& config() const noexcept { return _config; }
 
  private:
-  void processEvent(const replay::ReplayEvent& event);
+  // Feeds one record to the executor and, with dispatchMarketData, hands it
+  // to the strategy and the market-data subscribers.
+  void processEvent(const replay::ReplayEvent& event, bool dispatchMarketData = true);
   // Clears everything a previous run left behind so run() / runBars() /
   // runTape() report their own run and not the sum of every run so far.
   void resetRunState();

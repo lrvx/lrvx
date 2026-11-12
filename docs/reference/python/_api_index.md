@@ -291,6 +291,7 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 - `run_ohlcv(self, ts: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol: str = '') -> typing.Any`
 - `run_tape(self, path: str) -> typing.Any`
 - `run_tape_bars(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any`
+- `run_tape_bars_on_ticks(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any`
 - `run_tapes(self, paths: collections.abc.Sequence[str]) -> typing.Any`
 - `set_executor(self, executor: Executor) -> None`
 - `set_executor(self, executor: VenueExecutor) -> None`

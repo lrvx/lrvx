@@ -44,6 +44,8 @@ Returned by `BacktestRunner.run_csv()` / `run_ohlcv()` and `BacktestResult.stats
 | `return_pct` | `float` | Net return (%) |
 | `start_time_ns` | `int` | Backtest start timestamp (ns) |
 | `end_time_ns` | `int` | Backtest end timestamp (ns) |
+| `skipped_option_quotes` | `int` | Option-quote records a tape run read and delivered to nobody (`run_tape`, `run_tapes`, `run_tape_bars_on_ticks`); 0 otherwise |
+| `skipped_pool_states` | `int` | Pool-state records a tape run read and delivered to nobody, as `skipped_option_quotes` |
 
 ---
 
@@ -87,7 +89,7 @@ SimulatedExecutor()
 | `advance_clock(timestamp_ns)` | Advance simulated time |
 | `set_default_slippage(model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)` | Configure slippage for all symbols |
 | `set_symbol_slippage(symbol, model, ticks=0, tick_size=0.0, bps=0.0, impact_coeff=0.0)` | Per-symbol slippage override |
-| `set_queue_model(model, depth=1)` | Configure limit order queue simulation |
+| `set_queue_model(model, depth=1)` | Configure limit order queue simulation. `model` is a `QUEUE_*` code from 0 (none) to 6 (pro_rata_with_priority); any other raises `ValueError` and the model installed before stays |
 | `close()` | Free resources |
 
 ### Properties

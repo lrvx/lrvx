@@ -1895,6 +1895,33 @@
     },
     {
       "group": "backtestrunner_replay",
+      "name": "lrvx_backtest_runner_run_tape_bars_on_ticks",
+      "params": [
+        {
+          "name": "runner",
+          "type": "LrvxBacktestRunnerHandle"
+        },
+        {
+          "name": "tape_dir",
+          "type": "const char *"
+        },
+        {
+          "name": "interval_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "symbol",
+          "type": "const char *"
+        },
+        {
+          "name": "stats_out",
+          "type": "LrvxBacktestStats *"
+        }
+      ],
+      "return_type": "int"
+    },
+    {
+      "group": "backtestrunner_replay",
       "name": "lrvx_backtest_runner_run_tapes",
       "params": [
         {
@@ -15429,6 +15456,14 @@
         {
           "name": "endTimeNs",
           "type": "int64_t"
+        },
+        {
+          "name": "optionQuoteCount",
+          "type": "uint64_t"
+        },
+        {
+          "name": "poolStateCount",
+          "type": "uint64_t"
         }
       ],
       "name": "LrvxBacktestStats"

@@ -36,6 +36,7 @@ built with options refuses `setExecutor`.
 | `runOhlcv(timestamps, closes, symbol)` | stats object | Replay raw arrays (timestamps as Float64Array, closes as Float64Array) |
 | `runTape(path)` | stats object | Replay a `.lrvx` tape directory — the canonical recording written by `lrvx tape record` or `scripts/backfill_to_tape.py` |
 | `runTapeBars(path, intervalSeconds, symbol?)` | stats object | Replay a `.lrvx` tape as time bars: trades aggregated while the tape streams, each closed bar to `onBar` with `runBars`' fill rules. Same result as `readTrades` -> `aggregateTimeBars` -> `runBars` for the same interval. `symbol` is required when the tape holds more than one; throws `LrvxError` on a bad interval, unknown symbol, unreadable tape or a symbol with no trades |
+| `runTapeBarsOnTicks(path, intervalSeconds, symbol?)` | stats object | Decide on bars, fill on ticks: `onBar` receives the `runTapeBars` bars, the executor is fed every trade and book record as `runTape` feeds it (`onTrade` and `onBookUpdate` do not fire). An order sent from bar n's `onBar` can first match against the first trade stamped at or after the end of bar n (with a submit latency L, the first record at or after the end + L). `symbol` and the errors as for `runTapeBars`. See [Decide on bars, fill on ticks](../../how-to/backtest.md#decide-on-bars-fill-on-ticks) |
 | `runTapes(paths)` | stats object | Merge N `.lrvx` tape directories on read and replay the merged stream. Symbols are rekeyed by `(metadata.exchange, name)` so two venues stay distinct. `runTapes([t])` equals `runTape(t)`; throws on bad paths or overlapping book streams |
 | `setExecutor(executor)` | `void` | Replace the built-in `SimulatedExecutor`. `null` detaches |
 | `addExecutionListener(listener)` | `void` | Attach an order-lifecycle listener. Multiple listeners may be attached; each fires for every order event |
@@ -43,6 +44,10 @@ built with options refuses `setExecutor`.
 | `trades()` | `BacktestTrades` | Closed trades from the most recent run |
 
 `equityCurve()` and `trades()` throw `LrvxError(E_RUN_002)` if no run has completed.
+
+Every run's stats object carries `skippedOptionQuotes` and `skippedPoolStates`: the option-quote
+and pool-state records a tape run (`runTape`, `runTapes`, `runTapeBarsOnTicks`) read and delivered
+to no callback or the executor, 0 for a run that read no tape.
 
 ### Stats object
 
@@ -94,7 +99,7 @@ exec.setQueueModel('tob', 1);
 | `onTopOfBook(symbol, bid, ask)` | Feed a touch-only frame. `bid` / `ask` are `{ price, qty }`; `null` means that side of the book is empty |
 | `advanceClock(timestampNs)` | Advance simulated time |
 | `setDefaultSlippage(model, ticks, tickSize, bps, impactCoeff)` | Configure slippage. `model` is one of `"none"`, `"fixed_ticks"`, `"fixed_bps"`, `"volume_impact"` |
-| `setQueueModel(model, depth)` | Configure limit order queue. `model` is one of `"none"`, `"tob"`, `"full"`, `"pro_rata"`, `"pro_rata_with_fifo"`, `"top_pro_lmm"`, `"pro_rata_with_priority"` |
+| `setQueueModel(model, depth)` | Configure limit order queue. `model` is one of `"none"`, `"tob"`, `"full"`, `"pro_rata"`, `"pro_rata_with_fifo"`, `"top_pro_lmm"`, `"pro_rata_with_priority"`, or its `QUEUE_*` code; anything else throws with the valid names and leaves the model installed before |
 | `fillCount` | Number of fills (property) |
 
 No symbol registry can be attached to this executor, so order prices are not checked against a

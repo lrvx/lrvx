@@ -512,6 +512,11 @@ export interface RunnerStats {
   avgWin: number;
   avgLoss: number;
   profitFactor: number;
+  /** Option-quote records a tape run read and delivered to no callback or
+   *  the executor; 0 for a run that read no tape. */
+  skippedOptionQuotes: number;
+  /** Pool-state records a tape run read and delivered to nobody. */
+  skippedPoolStates: number;
 }
 
 /** Stats attached to a `WalkForwardFold` and to a `GridSearchResult`.
@@ -910,6 +915,17 @@ export class BacktestRunner {
    *  tape's symbol id. Throws LrvxError on a bad interval, an unknown symbol,
    *  an unreadable tape or a symbol with no trades. */
   runTapeBars(path: string, intervalSeconds: number, symbol?: string): RunnerStats;
+  /** Decide on bars, fill on ticks. onBar receives the bars runTapeBars
+   *  builds from the tape, while the simulated executor is fed every trade
+   *  and book record as runTape feeds it; onTrade and onBookUpdate do not
+   *  fire. Bar n reaches onBar when the first trade stamped at or after its
+   *  end arrives, before that trade reaches the executor: an order sent from
+   *  onBar is submitted at the bar's end and can first match against that
+   *  trade (with a submit latency L, the first record at or after end + L).
+   *  Working stops and limits fill on the prints inside the next bars, a
+   *  stop never better than its trigger. `symbol` and the errors as for
+   *  runTapeBars. */
+  runTapeBarsOnTicks(path: string, intervalSeconds: number, symbol?: string): RunnerStats;
   /** Replace the built-in SimulatedExecutor with a binding-supplied one. */
   setExecutor(executor: Executor | null): void;
   /** Attach a listener for order lifecycle events. Multiple listeners

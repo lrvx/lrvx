@@ -255,6 +255,11 @@
         {
           "group": "backtestrunner_replay",
           "kind": "function",
+          "name": "lrvx_backtest_runner_run_tape_bars_on_ticks"
+        },
+        {
+          "group": "backtestrunner_replay",
+          "kind": "function",
           "name": "lrvx_backtest_runner_run_tapes"
         },
         {
@@ -5419,6 +5424,11 @@
         },
         {
           "kind": "method",
+          "name": "run_tape_bars_on_ticks",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "run_tapes",
           "parent": "BacktestRunner"
         },
@@ -8941,6 +8951,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_backtest_runner_run_tape_bars"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_backtest_runner_run_tape_bars_on_ticks"
         },
         {
           "kind": "c_import",
@@ -15023,6 +15037,11 @@
         {
           "kind": "method",
           "name": "runTapeBars",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "runTapeBarsOnTicks",
           "parent": "BacktestRunner"
         },
         {
@@ -24817,6 +24836,11 @@
         },
         {
           "kind": "method",
+          "name": "beginNextEventWindow",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "bestAskPrice",
           "parent": "SimulatedExecutor"
         },
@@ -24943,6 +24967,11 @@
         {
           "kind": "method",
           "name": "endBarCallbackWindow",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "endNextEventWindow",
           "parent": "SimulatedExecutor"
         },
         {
@@ -25103,6 +25132,11 @@
         {
           "kind": "method",
           "name": "netPositionRaw",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "nextEventWindowOpen",
           "parent": "SimulatedExecutor"
         },
         {
@@ -28689,6 +28723,11 @@
         {
           "kind": "method",
           "name": "runTapeBars",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "runTapeBarsOnTicks",
           "parent": "BacktestRunner"
         },
         {
@@ -32723,6 +32762,16 @@
         },
         {
           "kind": "method",
+          "name": "skippedOptionQuotes",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
+          "name": "skippedPoolStates",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
           "name": "sortinoRatio",
           "parent": "RunnerStats"
         },
@@ -35611,6 +35660,11 @@
         {
           "kind": "method",
           "name": "run_tape_bars",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "run_tape_bars_on_ticks",
           "parent": "BacktestRunner"
         },
         {
@@ -42544,6 +42598,7 @@
         "lrvx_backtest_runner_run_replay_source",
         "lrvx_backtest_runner_run_tape",
         "lrvx_backtest_runner_run_tape_bars",
+        "lrvx_backtest_runner_run_tape_bars_on_ticks",
         "lrvx_backtest_runner_run_tapes",
         "lrvx_backtest_runner_set_kill_switch",
         "lrvx_backtest_runner_set_order_validator",

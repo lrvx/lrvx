@@ -299,6 +299,45 @@ class SimulatedExecutor : public IOrderExecutor
    private:
     SimulatedExecutor& _exec;
   };
+  // Next-event window, the tick-matched counterpart of the bar-callback
+  // window. A driver that shows the strategy a bar built from trades and then
+  // keeps feeding the executor those trades (BacktestRunner::runTapeBarsOnTicks)
+  // opens it around the bar callback. An order submitted while it is open goes
+  // through the full submit path at the current clock -- SUBMITTED, rate
+  // limits, reduce-only, the sampled wire and ack latency -- but is never
+  // matched inside the call: it waits in the pending-submission queue for the
+  // first market event (onTrade / onBookUpdate / onTopOfBook) at or after
+  // now + latency, and is matched against the state that event leaves. With
+  // zero latency that is the very next event, so the market state the bar was
+  // built from can never fill it. Counted like the bar-callback window.
+  void beginNextEventWindow() noexcept { ++_nextEventDepth; }
+  void endNextEventWindow() noexcept
+  {
+    if (_nextEventDepth > 0)
+    {
+      --_nextEventDepth;
+    }
+  }
+  bool nextEventWindowOpen() const noexcept { return _nextEventDepth > 0; }
+
+  class NextEventScope
+  {
+   public:
+    explicit NextEventScope(SimulatedExecutor& exec) noexcept : _exec(exec)
+    {
+      _exec.beginNextEventWindow();
+    }
+    ~NextEventScope() { _exec.endNextEventWindow(); }
+
+    NextEventScope(const NextEventScope&) = delete;
+    NextEventScope& operator=(const NextEventScope&) = delete;
+    NextEventScope(NextEventScope&&) = delete;
+    NextEventScope& operator=(NextEventScope&&) = delete;
+
+   private:
+    SimulatedExecutor& _exec;
+  };
+
   // Orders still held, over every symbol. Orders whose symbol never gets
   // another bar stay held to the end of the run: they never reached the venue,
   // so they neither fill nor cancel.
@@ -520,6 +559,7 @@ class SimulatedExecutor : public IOrderExecutor
   // waiting for their symbol's next bar open.
   std::vector<Order> _heldBarOrders;
   size_t _barCallbackDepth{0};
+  size_t _nextEventDepth{0};
 
   // Slippage config: default + per-symbol overrides
   std::array<SlippageProfile, kMaxSymbols> _slippageFlat{};

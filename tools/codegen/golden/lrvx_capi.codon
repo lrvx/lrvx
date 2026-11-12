@@ -130,6 +130,7 @@ from C import lrvx_backtest_runner_run_csv(cobj, cobj, cobj, cobj) -> int
 from C import lrvx_backtest_runner_run_tape(cobj, cobj, cobj) -> int
 from C import lrvx_backtest_runner_run_tapes(cobj, Ptr[cobj], u32, cobj) -> int
 from C import lrvx_backtest_runner_run_tape_bars(cobj, cobj, i64, cobj, cobj) -> int
+from C import lrvx_backtest_runner_run_tape_bars_on_ticks(cobj, cobj, i64, cobj, cobj) -> int
 from C import lrvx_backtest_runner_run_ohlcv(cobj, Ptr[i64], Ptr[float], u32, cobj, cobj) -> int
 from C import lrvx_backtest_runner_run_bars(cobj, Ptr[i64], Ptr[i64], Ptr[float], Ptr[float], Ptr[float], Ptr[float], Ptr[float], u32, cobj, u8, u64, cobj) -> int
 from C import lrvx_backtest_runner_run_replay_source(cobj, cobj, cobj) -> int
