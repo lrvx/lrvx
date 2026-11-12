@@ -262,6 +262,10 @@ class BacktestRunner:
         """
         Replay a `.lrvx` tape as time bars of interval_seconds: the trades are aggregated while the tape streams (wall-clock aligned, the last still-open bar dropped, exactly as aggregate_time_bars does) and every closed bar goes to Strategy.on_bar with run_bars' fill rules -- an order sent from on_bar fills at the next bar's open. on_trade does not fire. symbol names the registry symbol to replay and is required when the tape holds more than one; its registry id must be the tape's symbol id. Same result as read_trades -> aggregate_time_bars -> run_bars for the same interval, without the trade array ever reaching Python.
         """
+    def run_tape_bars_on_ticks(self, path: str, *, interval_seconds: typing.SupportsFloat | typing.SupportsIndex, symbol: str = '') -> typing.Any:
+        """
+        Decide on bars, fill on ticks. Strategy.on_bar receives the same bars run_tape_bars builds from the tape, while the simulated executor is fed every trade and book record as run_tape feeds it. Bar n reaches on_bar when the first trade stamped at or after its end arrives, before that trade reaches the executor; an order sent from on_bar is submitted at the bar's end and can first match against that trade (with a submit latency L: the first record at or after end + L). Working stops and limits fill on the prints inside the next bars, a stop never better than its trigger. on_trade and on_book_update do not fire. One symbol per run, as run_tape_bars. Stats shape as run_tape, including skipped_option_quotes and skipped_pool_states.
+        """
     def run_tapes(self, paths: collections.abc.Sequence[str]) -> typing.Any:
         """
         Run a backtest off N `.lrvx` tapes merged on read. Symbols are rekeyed by (metadata.exchange, name) so two captures of the same venue/symbol collapse, and two different venues stay distinct. `run_tapes([t])` is equivalent to `run_tape(t)`. Stats shape mirrors run_tape, including skipped_option_quotes and skipped_pool_states.

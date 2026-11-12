@@ -176,7 +176,11 @@ bars moves the fill five minutes. That is the honest reading of bar data --
 a fill inside bar `n+1` would need a price at `start(n+1) + L`, and the bar
 reports only its open (earlier than the order's arrival) and a high, low and
 close with no times. If a sub-bar delay matters to the strategy, the run needs
-tick or book data (`run_tape`), where the clock moves with every event.
+tick or book data, where the clock moves with every event: `run_tape`, or, for
+a bar strategy, `run_tape_bars_on_ticks`, where an order sent from bar `n`'s
+callback with deferral `L` fills at the first trade or book record stamped at
+or after `end(n) + L`
+([Decide on bars, fill on ticks](backtest.md#decide-on-bars-fill-on-ticks)).
 
 Cancel and replace acks follow the same clock. A cancel sent from a bar
 callback with an ack latency shorter than one bar has landed by the next bar's

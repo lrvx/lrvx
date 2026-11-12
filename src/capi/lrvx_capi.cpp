@@ -4354,8 +4354,20 @@ void lrvx_simulated_executor_set_symbol_slippage(LrvxSimulatedExecutorHandle h, 
 void lrvx_simulated_executor_set_queue_model(LrvxSimulatedExecutorHandle h, int32_t model, uint32_t depth)
 {
   LRVX_CAPI_ENTER_VOID(h);
-  static_cast<LrvxSimulatedExecutorImpl*>(h)->executor.setQueueModel(
-      static_cast<QueueModel>(model), depth);
+  // An out-of-range code is refused, like a slippage model code, and the
+  // model installed before stays.
+  const std::optional<QueueModel> parsed = queueModelFromCode(model);
+  if (!parsed)
+  {
+    std::string codes;
+    for (int32_t code = 0; const auto m = queueModelFromCode(code); ++code)
+    {
+      codes += (code > 0 ? ", " : "") + std::to_string(code) + " (" + queueModelName(*m) + ")";
+    }
+    throw std::invalid_argument("queue model must be one of " + codes + "; got " +
+                                std::to_string(model));
+  }
+  static_cast<LrvxSimulatedExecutorImpl*>(h)->executor.setQueueModel(*parsed, depth);
   LRVX_CAPI_LEAVE_VOID;
 }
 
@@ -5411,6 +5423,12 @@ static_assert(sizeof(LrvxBookUpdateHeader) == 48, "LrvxBookUpdateHeader must be 
 static_assert(sizeof(LrvxLevel) == 24, "LrvxLevel must be 24 bytes");
 static_assert(sizeof(LrvxReaderStats) == 12 * sizeof(uint64_t),
               "LrvxReaderStats must be 12 x u64 (ABI version 6)");
+// Codon reads the run stats out of a 31 x i64 buffer.
+static_assert(sizeof(LrvxBacktestStats) == 31 * sizeof(uint64_t),
+              "LrvxBacktestStats must be 31 x 8 bytes (ABI version 6)");
+static_assert(offsetof(LrvxBacktestStats, optionQuoteCount) == 29 * sizeof(uint64_t) &&
+                  offsetof(LrvxBacktestStats, poolStateCount) == 30 * sizeof(uint64_t),
+              "the skipped-record counts close LrvxBacktestStats (ABI version 6)");
 
 uint64_t lrvx_data_reader_read_bbo(LrvxDataReaderHandle h, LrvxBBO* bbos_out,
                                    uint64_t max_events)
@@ -7984,6 +8002,34 @@ struct LrvxBacktestRunnerImpl
     return 1;
   }
 
+  int runTapeBarsOnTicks(const char* tapeDir, int64_t intervalNs, const char* symbol,
+                         LrvxBacktestStats* out)
+  {
+    if (intervalNs <= 0)
+    {
+      throw std::invalid_argument("interval_ns must be positive, got " +
+                                  std::to_string(intervalNs));
+    }
+    std::optional<SymbolId> sid;
+    if (symbol != nullptr && symbol[0] != '\0')
+    {
+      const uint32_t id = resolveSymbol(symbol);
+      if (id == 0)
+      {
+        throw std::invalid_argument(std::string("symbol '") + symbol + "' is not registered");
+      }
+      sid = id;
+    }
+    BacktestResult result = runner->runTapeBarsOnTicks(
+        std::filesystem::path(tapeDir), std::chrono::nanoseconds{intervalNs}, sid);
+    if (out)
+    {
+      fillStats(result.computeStats(), out);
+    }
+    lastResult = std::move(result);
+    return 1;
+  }
+
   void addExecutionListener(LrvxExecutionListenerImpl* impl)
   {
     if (impl == nullptr)
@@ -8117,8 +8163,13 @@ struct LrvxBacktestRunnerImpl
     return 0;
   }
 
-  static void fillStats(const BacktestStats& s, LrvxBacktestStats* out)
+  void fillStats(const BacktestStats& s, LrvxBacktestStats* out) const
   {
+    // Every run starts from cleared counters, so a run that read no tape
+    // reports zero here.
+    const BacktestState st = runner->state();
+    out->optionQuoteCount = st.optionQuoteCount;
+    out->poolStateCount = st.poolStateCount;
     out->totalTrades = s.totalTrades;
     out->winningTrades = s.winningTrades;
     out->losingTrades = s.losingTrades;
@@ -9248,6 +9299,18 @@ int lrvx_backtest_runner_run_tape_bars(LrvxBacktestRunnerHandle h,
   LRVX_CAPI_LEAVE;
 }
 
+int lrvx_backtest_runner_run_tape_bars_on_ticks(LrvxBacktestRunnerHandle h,
+                                                const char* tape_dir,
+                                                int64_t interval_ns,
+                                                const char* symbol,
+                                                LrvxBacktestStats* out)
+{
+  LRVX_CAPI_ENTER(h);
+  LRVX_CAPI_REQUIRE(tape_dir);
+  return toBacktestRunner(h)->runTapeBarsOnTicks(tape_dir, interval_ns, symbol, out);
+  LRVX_CAPI_LEAVE;
+}
+
 LrvxBacktestRunnerHandle lrvx_backtest_runner_create_with_fill_settings(
     LrvxRegistryHandle registry,
     double fee_rate,
@@ -9558,6 +9621,9 @@ void fillStatsStruct(const BacktestStats& s, LrvxBacktestStats* out)
   out->returnPct = s.returnPct;
   out->startTimeNs = s.startTimeNs.raw();
   out->endTimeNs = s.endTimeNs.raw();
+  // A result handle carries no record counts of the run that produced it.
+  out->optionQuoteCount = 0;
+  out->poolStateCount = 0;
 }
 
 }  // namespace

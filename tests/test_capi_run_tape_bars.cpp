@@ -432,3 +432,129 @@ TEST(CapiRunnerFillSettings, VolumeImpactIsRefusedOnBars)
   lrvx_backtest_runner_destroy(btr);
   lrvx_registry_destroy(reg);
 }
+
+// lrvx_backtest_runner_run_tape_bars_on_ticks: the bars on_bar sees are the
+// run_tape_bars bars, and an entry sent from bar n's callback fills at the
+// first print of its symbol stamped at or after the end of bar n.
+TEST_F(TapeBars, OnTicksSeesTheSameBarsAndFillsAtTheFirstPrintAfterTheBar)
+{
+  const std::string dir = _dir.string();
+  auto bars = oneCall(1, "AAA", 60.0);
+  auto ticks = run(1, lrvx_backtest_runner_create(_reg, 0.0004, 10'000.0),
+                   [&](LrvxBacktestRunnerHandle h, LrvxBacktestStats* st)
+                   {
+                     return lrvx_backtest_runner_run_tape_bars_on_ticks(h, dir.c_str(),
+                                                                        60 * kSec, "AAA", st);
+                   });
+  ASSERT_EQ(ticks.rc, 1) << lrvx_last_error_message();
+  ASSERT_EQ(ticks.bars.size(), bars.bars.size());
+  for (size_t i = 0; i < bars.bars.size(); ++i)
+  {
+    EXPECT_EQ(std::memcmp(&ticks.bars[i], &bars.bars[i], sizeof(LrvxBarData)), 0) << i;
+  }
+  ASSERT_FALSE(ticks.trades.empty());
+  // The first entry is sent from the first bar's callback.
+  const int64_t end1 = ticks.bars[0].end_time_ns;
+  const Trade* first = nullptr;
+  for (const auto& t : _all)
+  {
+    if (t.symbol == 1 && t.ts >= end1)
+    {
+      first = &t;
+      break;
+    }
+  }
+  ASSERT_NE(first, nullptr);
+  EXPECT_EQ(ticks.trades[0].entry_price, static_cast<double>(first->priceRaw) / 1e8);
+  EXPECT_EQ(ticks.trades[0].entry_time_ns, first->ts);
+}
+
+TEST_F(TapeBars, OnTicksBadArgumentsFail)
+{
+  const std::string dir = _dir.string();
+  auto* btr = lrvx_backtest_runner_create(_reg, 0.0, 1000.0);
+  LrvxBacktestStats st{};
+  EXPECT_EQ(lrvx_backtest_runner_run_tape_bars_on_ticks(btr, dir.c_str(), 0, "AAA", &st), 0);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("interval_ns"), std::string::npos);
+  EXPECT_EQ(lrvx_backtest_runner_run_tape_bars_on_ticks(btr, dir.c_str(), 60 * kSec, nullptr, &st),
+            0);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("more than one symbol"), std::string::npos)
+      << lrvx_last_error_message();
+  EXPECT_EQ(lrvx_backtest_runner_run_tape_bars_on_ticks(btr, dir.c_str(), 60 * kSec, "ZZZ", &st),
+            0);
+  EXPECT_EQ(lrvx_backtest_runner_run_tape_bars_on_ticks(btr, nullptr, 60 * kSec, "AAA", &st), 0);
+  lrvx_backtest_runner_destroy(btr);
+}
+
+// The stats struct says how many option-quote and pool-state records a tape
+// run read and delivered to nobody, as Python's skipped_* keys do.
+TEST(CapiRunStats, TapeRunsReportSkippedOptionQuotesAndPoolStates)
+{
+  const auto dir = std::filesystem::temp_directory_path() /
+                   ("lrvx_capi_skipped_" + std::to_string(std::random_device{}()));
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  {
+    lrvx::replay::WriterConfig cfg;
+    cfg.output_dir = dir;
+    lrvx::replay::BinaryLogWriter writer(cfg);
+    for (int i = 0; i < 10; ++i)
+    {
+      lrvx::replay::TradeRecord r{};
+      r.exchange_ts_ns = kT0 + i * 20 * kSec;
+      r.recv_ts_ns = r.exchange_ts_ns;
+      r.price_raw = 100'00000000;
+      r.qty_raw = 1'00000000;
+      r.symbol_id = 1;
+      r.trade_id = static_cast<uint64_t>(i + 1);
+      writer.writeTrade(r);
+      if (i < 3)
+      {
+        lrvx::replay::OptionQuoteRecord q{};
+        q.exchange_ts_ns = r.exchange_ts_ns + 1;
+        q.recv_ts_ns = q.exchange_ts_ns;
+        q.symbol_id = 1;
+        writer.writeOptionQuote(q);
+      }
+    }
+    writer.close();
+  }
+  auto* reg = lrvx_registry_create();
+  lrvx_registry_add_symbol(reg, "test", "AAA", 0.01);
+  // run_tape and run_tape_bars_on_ticks; run_tapes merges tapes that carry
+  // venue metadata, which this bare tape has none of.
+  for (int mode : {0, 2})
+  {
+    auto* btr = lrvx_backtest_runner_create(reg, 0.0, 1000.0);
+    uint32_t syms[] = {1};
+    LrvxStrategyCallbacks cb{};
+    auto* strat = lrvx_strategy_create(1, syms, 1, reg, cb);
+    lrvx_backtest_runner_set_strategy(btr, strat);
+    LrvxBacktestStats st{};
+    st.optionQuoteCount = 99;
+    st.poolStateCount = 99;
+    const std::string d = dir.string();
+    const char* dirs[] = {d.c_str()};
+    const int rc = mode == 0   ? lrvx_backtest_runner_run_tape(btr, d.c_str(), &st)
+                   : mode == 1 ? lrvx_backtest_runner_run_tapes(btr, dirs, 1, &st)
+                               : lrvx_backtest_runner_run_tape_bars_on_ticks(
+                                     btr, d.c_str(), 60 * kSec, "AAA", &st);
+    ASSERT_EQ(rc, 1) << mode << " " << lrvx_last_error_message();
+    EXPECT_EQ(st.optionQuoteCount, 3u) << "mode " << mode;
+    EXPECT_EQ(st.poolStateCount, 0u) << "mode " << mode;
+    // A run that reads no tape reports none.
+    LrvxBacktestStats bars{};
+    bars.optionQuoteCount = 99;
+    bars.poolStateCount = 99;
+    int64_t s[1] = {kT0};
+    int64_t e[1] = {kT0 + 60 * kSec};
+    double p[1] = {100.0};
+    ASSERT_EQ(lrvx_backtest_runner_run_bars(btr, s, e, p, p, p, p, p, 1, "AAA", 0, 0, &bars), 1);
+    EXPECT_EQ(bars.optionQuoteCount, 0u);
+    EXPECT_EQ(bars.poolStateCount, 0u);
+    lrvx_strategy_destroy(strat);
+    lrvx_backtest_runner_destroy(btr);
+  }
+  lrvx_registry_destroy(reg);
+  std::filesystem::remove_all(dir);
+}

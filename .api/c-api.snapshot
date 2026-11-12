@@ -51,6 +51,7 @@ lrvx_backtest_runner_run_ohlcv|int|LrvxBacktestRunnerHandle|const int64_t *|cons
 lrvx_backtest_runner_run_replay_source|int|LrvxBacktestRunnerHandle|LrvxReplaySourceHandle|LrvxBacktestStats *
 lrvx_backtest_runner_run_tape|int|LrvxBacktestRunnerHandle|const char *|LrvxBacktestStats *
 lrvx_backtest_runner_run_tape_bars|int|LrvxBacktestRunnerHandle|const char *|int64_t|const char *|LrvxBacktestStats *
+lrvx_backtest_runner_run_tape_bars_on_ticks|int|LrvxBacktestRunnerHandle|const char *|int64_t|const char *|LrvxBacktestStats *
 lrvx_backtest_runner_run_tapes|int|LrvxBacktestRunnerHandle|const char *const *|uint32_t|LrvxBacktestStats *
 lrvx_backtest_runner_set_executor|void|LrvxBacktestRunnerHandle|LrvxExecutorHandle
 lrvx_backtest_runner_set_kill_switch|void|LrvxBacktestRunnerHandle|LrvxKillSwitchHandle

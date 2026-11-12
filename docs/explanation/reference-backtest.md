@@ -100,6 +100,17 @@ class SmaCross : public lrvx::Strategy
 
 Run the same rules on the same file: fill at the next bar's open, fee on every fill's notional, trades closed by the fill that flattens. Compare the trade list before the statistics: a mismatch in `total_trades` or in the first entry's time and price locates the convention that differs, where a mismatch in `return_pct` alone does not.
 
+## The same strategy on a tape
+
+These rules are the rules of bar data, where a bar is all there is. On a recorded tape the same bar strategy can be run with the fills of the tape instead: `run_tape_bars_on_ticks` delivers the bars `run_tape_bars` builds, and matches every order on the tape's prints. The two runs differ in exactly the places the bar hides:
+
+- **Entry.** An order from bar n's callback fills at the first trade stamped at or after the end of bar n, instead of at bar n+1's open. Both are the first price after the decision; on bars the open stands in for it.
+- **Stops.** A stop that triggers inside a bar fills at the print that crossed it, instead of at the bar's low (high for a buy stop). Never better than its trigger, in either mode.
+- **Fill timestamps.** A fill carries the time of the trade it matched, not a bar's end time.
+- **Latency.** A submit latency moves a fill to the first print at or after the bar's end plus the latency, milliseconds later, instead of to a later bar's open.
+
+The bars, and so every decision the strategy makes, are the same in both. The difference in the results is the cost of filling at bar prices; [Decide on bars, fill on ticks](../how-to/backtest.md#decide-on-bars-fill-on-ticks) has the full set of rules.
+
 ## See also
 
 - [Sweep parameters over bars](../how-to/sweep-over-bars.md)

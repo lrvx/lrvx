@@ -82,4 +82,19 @@ std::optional<SlippageModel> slippageModelFromCode(int32_t code) noexcept;
 /// an error message.
 std::string slippageModelNameList();
 
+/// Snake_case name of a queue model as the bindings spell it: none, tob,
+/// full, pro_rata, pro_rata_with_fifo, top_pro_lmm, pro_rata_with_priority.
+const char* queueModelName(QueueModel model) noexcept;
+
+/// The queue model `name` spells; nullopt for any other string. Every binding
+/// that takes a queue model by name parses it here.
+std::optional<QueueModel> queueModelFromName(std::string_view name) noexcept;
+
+/// The queue model a numeric code (the enum value, as the C API takes it)
+/// stands for; nullopt when the code is out of range.
+std::optional<QueueModel> queueModelFromCode(int32_t code) noexcept;
+
+/// "'none', 'tob', ...": the valid queue model names for an error message.
+std::string queueModelNameList();
+
 }  // namespace lrvx

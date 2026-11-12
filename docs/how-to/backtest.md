@@ -322,6 +322,84 @@ Slippage and latency arguments are covered in
 submit latency moves a fill to a later bar's open:
 [Latency on bar replay](backtest-with-latency.md#latency-on-bar-replay).
 
+## Decide on bars, fill on ticks
+
+A tape holds every print, and a bar hides them: on bar replay a stop that
+triggers inside a bar fills at the bar's low, while the tape says it filled a
+tick or two past its trigger. `run_tape_bars_on_ticks` keeps both: the
+strategy is shown the bars `run_tape_bars` builds, and the simulated executor
+is fed the tape's own trades and book records, as `run_tape` feeds it.
+
+=== "Python"
+
+    ```python
+    stats = bt.run_tape_bars_on_ticks("data/tape", interval_seconds=300, symbol="BTCUSDT")
+    ```
+
+=== "Node.js"
+
+    ```javascript
+    const stats = bt.runTapeBarsOnTicks("data/tape", 300, "BTCUSDT");
+    ```
+
+=== "Codon"
+
+    ```python
+    stats = bt.run_tape_bars_on_ticks("data/tape", 300.0, "BTCUSDT")
+    ```
+
+=== "C++"
+
+    ```cpp
+    auto result = runner.runTapeBarsOnTicks("data/tape", std::chrono::minutes(5), btcId);
+    ```
+
+The three ways to run a strategy over a tape, side by side:
+
+| | `run_tape` | `run_tape_bars` | `run_tape_bars_on_ticks` |
+|---|---|---|---|
+| The strategy sees | every trade (`on_trade`) and book record | closed time bars (`on_bar`) | closed time bars (`on_bar`) |
+| The executor matches against | every trade and book record | each bar's open, low, high, close | every trade and book record |
+| An order sent from the callback first trades at | the current market (the record just shown) | the next bar's open | the first trade stamped at or after the bar's end |
+| A stop triggered inside a bar fills at | the print that crossed it | the bar's low (high for a buy stop) | the print that crossed it |
+| Submit latency of L | moves the fill to the first record at or after now + L | moves the fill to a later bar's open | moves the fill to the first record at or after the bar's end + L |
+| Use it for | strategies that react to prints or the book | fast sweeps of a bar strategy, and parity with bar data | a bar strategy whose fills should be the tape's |
+
+The rules of `run_tape_bars_on_ticks`, exactly:
+
+- Bar n reaches `on_bar` when the first trade stamped at or after its end
+  arrives, and before that trade reaches the executor. The bar is over by
+  then, and nothing it contains is new to the strategy. The callback runs on
+  a clock set to the bar's end, or later when book records stamped past the
+  end came first.
+- An order sent from that callback is submitted then, through the full submit
+  path (rate limits, reduce-only, the sampled latency), and is not matched
+  inside the call. With no latency it can first match against that trade: the
+  first trade stamped at or after the end of bar n, a trade stamped exactly at
+  the end included. With a submit latency L it waits for the first record at
+  or after the bar's end + L: 5 ms of latency moves a fill by milliseconds,
+  not by a bar.
+- Stops, take-profits, trailing stops and limits already working are matched
+  by the trades inside the following bars, by `run_tape`'s rules. A
+  conditional order never fills better than its trigger.
+- The bars are the bars `run_tape_bars` delivers for the same interval, bit
+  for bit, and the last bar, still open when the tape ends, is not delivered.
+  A trade later than its bar's bucket is left out of the bar and still reaches
+  the executor.
+- `on_trade` and `on_book_update` do not fire.
+- One symbol per run, as for `run_tape_bars`: `symbol` names it, and without
+  it a trade or book record of a second symbol raises.
+- The result has the same shape as the other runners' (stats, `trades()`,
+  `equity_curve()`); the stats also carry `skipped_option_quotes` and
+  `skipped_pool_states`, as `run_tape`'s do. The tape is streamed: memory does
+  not grow with the number of trades.
+
+A strategy that sends only market orders from `on_bar` gets exactly the fills
+`run_tape` gives the same orders sent from `on_trade` of the first trade at or
+after each bar's end. Choose `run_tape_bars` when bars are all the data there
+is, or to sweep many parameters fast; choose `run_tape_bars_on_ticks` for the
+fills of a bar strategy that the tape can actually support.
+
 ## Output
 
 ```
@@ -340,7 +418,7 @@ What still differs between producers is the *field set*, not the names:
 
 | Producer | Field set |
 |---|---|
-| `BacktestRunner.run_csv` / `run_ohlcv` / `run_bars` / `run_tape` / `run_tapes` | Headline metrics plus all three risk ratios |
+| `BacktestRunner.run_csv` / `run_ohlcv` / `run_bars` / `run_tape` / `run_tapes` / `run_tape_bars` / `run_tape_bars_on_ticks` | Headline metrics plus all three risk ratios; the tape runs `run_tape`, `run_tapes` and `run_tape_bars_on_ticks` add `skipped_option_quotes` and `skipped_pool_states` (Node: `skippedOptionQuotes` / `skippedPoolStates` on every run) |
 | `BacktestResult.stats()` | The full set |
 | `GridSearch.run()[i]["stats"]` | Python: whatever the factory returned (normally the `run_*` shape). Node: the fold shape |
 | `WalkForwardRunner` fold stats | The fold shape: the `run_*` set minus `avg_win` / `avg_loss` |

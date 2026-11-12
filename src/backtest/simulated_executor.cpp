@@ -133,6 +133,7 @@ void SimulatedExecutor::reset()
   _conditional_orders.clear();
   _heldBarOrders.clear();
   _barCallbackDepth = 0;
+  _nextEventDepth = 0;
   _fills.clear();
   _trailing_states.clear();
   _fillScanIds.clear();
@@ -647,11 +648,13 @@ stp_done:
   const int64_t deferNs =
       sampleOrderLatency() +
       (_submitAckDist.medianNs() > 0 ? sampleSubmitAckLatency() : 0);
-  if (deferNs > 0)
+  if (deferNs > 0 || _nextEventDepth > 0)
   {
     // Async path: ACCEPTED defers until the deadline. The order is held
     // aside; finishSubmission runs the existing book-add / queue-tracker /
-    // try-fill logic when it arrives.
+    // try-fill logic when it arrives. Inside a next-event window a zero
+    // deadline takes this path too, so the order meets the next event and
+    // not the state that is already here.
     enqueuePendingSubmission(accepted, deferNs);
     return;
   }
@@ -2978,9 +2981,21 @@ void SimulatedExecutor::finalizePendingCancels()
       if (it->id == orderId)
       {
         Order canceled = *it;
-        emitEvent(OrderEventStatus::CANCELED, canceled);
         *it = _conditional_orders.back();
         _conditional_orders.pop_back();
+        // As the synchronous cancel does: a trailing reference left here would
+        // arm a later trailing stop with the same id at this one's trigger.
+        for (auto trailingIt = _trailing_states.begin(); trailingIt != _trailing_states.end();
+             ++trailingIt)
+        {
+          if (trailingIt->first == orderId)
+          {
+            *trailingIt = _trailing_states.back();
+            _trailing_states.pop_back();
+            break;
+          }
+        }
+        emitEvent(OrderEventStatus::CANCELED, canceled);
         _compositeLogic.onOrderCanceled(canceled);
         break;
       }

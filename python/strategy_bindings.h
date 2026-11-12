@@ -2248,6 +2248,55 @@ class PyBacktestRunner
     return statsToDict(std::move(result));
   }
 
+  // Bars for the strategy, the tape's records for the executor: on_bar sees
+  // the bars run_tape_bars builds, and the orders it sends are matched by
+  // run_tape's rules from the first trade at or after the bar's end.
+  py::object run_tape_bars_on_ticks(const std::string& path, double interval_seconds,
+                                    const std::string& symbol = "")
+  {
+    if (!_host)
+    {
+      throw lrvx::LrvxError(
+          "E_RUN_001",
+          "BacktestRunner.run_tape_bars_on_ticks() called before set_strategy(). "
+          "Attach a strategy with set_strategy(MyStrategy()) first.");
+    }
+    const bool finite = std::isfinite(interval_seconds);
+    const auto interval = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::duration<double>(finite ? interval_seconds : 0.0));
+    if (!finite || interval.count() <= 0)
+    {
+      throw lrvx::LrvxError(
+          "E_VAL_002",
+          "BacktestRunner.run_tape_bars_on_ticks: interval_seconds must be a finite number of "
+          "seconds of at least one nanosecond, got " +
+              std::to_string(interval_seconds));
+    }
+    std::optional<SymbolId> sid;
+    if (!symbol.empty())
+    {
+      sid = resolveSymbol(symbol);
+    }
+    BacktestResult result;
+    try
+    {
+      result = _runner->runTapeBarsOnTicks(path, interval, sid);
+    }
+    catch (const std::invalid_argument& e)
+    {
+      if (sid)
+      {
+        throw lrvx::LrvxError("E_VAL_002",
+                              "BacktestRunner.run_tape_bars_on_ticks: the tape has no trade for "
+                              "symbol '" +
+                                  symbol + "' (id " + std::to_string(*sid) +
+                                  "); the registry id has to be the tape's symbol id");
+      }
+      throw lrvx::LrvxError("E_VAL_002", std::string(e.what()) + " as symbol=<name>");
+    }
+    return withSkippedRecords(statsToDict(std::move(result)));
+  }
+
   py::object run_tapes(const std::vector<std::string>& paths)
   {
     if (!_host)
@@ -3328,6 +3377,21 @@ inline void bindStrategy(py::module_& m)
            "tape holds more than one; its registry id must be the tape's symbol "
            "id. Same result as read_trades -> aggregate_time_bars -> run_bars for "
            "the same interval, without the trade array ever reaching Python.")
+      .def("run_tape_bars_on_ticks", &PyBacktestRunner::run_tape_bars_on_ticks,
+           py::arg("path"), py::kw_only(), py::arg("interval_seconds"),
+           py::arg("symbol") = "",
+           "Decide on bars, fill on ticks. Strategy.on_bar receives the same "
+           "bars run_tape_bars builds from the tape, while the simulated "
+           "executor is fed every trade and book record as run_tape feeds it. "
+           "Bar n reaches on_bar when the first trade stamped at or after its "
+           "end arrives, before that trade reaches the executor; an order sent "
+           "from on_bar is submitted at the bar's end and can first match "
+           "against that trade (with a submit latency L: the first record at or "
+           "after end + L). Working stops and limits fill on the prints inside "
+           "the next bars, a stop never better than its trigger. on_trade and "
+           "on_book_update do not fire. One symbol per run, as run_tape_bars. "
+           "Stats shape as run_tape, including skipped_option_quotes and "
+           "skipped_pool_states.")
       .def("run_tapes", &PyBacktestRunner::run_tapes, py::arg("paths"),
            "Run a backtest off N `.lrvx` tapes merged on read. "
            "Symbols are rekeyed by (metadata.exchange, name) so two "

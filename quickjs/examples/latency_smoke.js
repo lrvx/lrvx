@@ -94,6 +94,30 @@ function check(cond, msg) {
     ex.destroy();
 }
 
+// ── Queue model names ──────────────────────────────────────────────
+// Same for the queue model: an unknown name throws with the valid ones.
+{
+    var ex = new SimulatedExecutor();
+    var msg = '';
+    try { ex.setQueueModel('bogus', 1); }
+    catch (e) { msg = String(e.message); }
+    check(msg.indexOf("'bogus'") >= 0 && msg.indexOf("'pro_rata_with_priority'") >= 0 &&
+          msg.indexOf("'tob'") >= 0,
+          'setQueueModel rejects an unknown model: ' + msg);
+    msg = '';
+    try { ex.setQueueModel('toString', 1); }
+    catch (e) { msg = String(e.message); }
+    check(msg.indexOf("'none'") >= 0, 'setQueueModel rejects an inherited property name: ' + msg);
+    var ok = true;
+    try {
+        ['none', 'tob', 'full', 'pro_rata', 'pro_rata_with_fifo', 'top_pro_lmm',
+         'pro_rata_with_priority'].forEach(function (m) { ex.setQueueModel(m, 1); });
+    }
+    catch (e) { ok = false; }
+    check(ok, 'every valid queue model name is accepted');
+    ex.destroy();
+}
+
 if (failed > 0) {
     console.log('\n' + failed + ' check(s) failed');
     throw new Error('latency smoke test failed');

@@ -569,7 +569,7 @@ declare class L3Book {
 }
 
 declare type SlippageModelName = "none" | "fixed_ticks" | "fixed_bps" | "volume_impact";
-declare type QueueModelName = "none" | "tob" | "full";
+declare type QueueModelName = "none" | "tob" | "full" | "pro_rata" | "pro_rata_with_fifo" | "top_pro_lmm" | "pro_rata_with_priority";
 
 declare class SimulatedExecutor {
     constructor();

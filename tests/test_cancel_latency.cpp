@@ -339,3 +339,55 @@ TEST(CancelLatency, CancelAllHonoursAckLatencyLikeIndividualCancels)
     EXPECT_NE(entry.second, OrderId{5}) << "cancel-all on symbol 1 touched symbol 2";
   }
 }
+
+// A trailing stop cancelled through the ack path leaves no trailing reference
+// behind. The stale one used to stay in the executor: a later trailing stop
+// with the same id found it first, armed at the old high-water trigger, and
+// fired on a price its own trigger was nowhere near.
+TEST(CancelLatency, AsyncCancelOfATrailingStopForgetsItsTrailingReference)
+{
+  SimulatedClock clock;
+  SimulatedExecutor exec(clock);
+  exec.applyConfig(configWithCancelLatency(1'000'000));
+  std::vector<std::pair<OrderEventStatus, OrderId>> events;
+  exec.setOrderEventCallback([&](const OrderEvent& ev)
+                             { events.emplace_back(ev.status, ev.order.id); });
+
+  auto trailingSell = [](OrderId id)
+  {
+    Order o;
+    o.id = id;
+    o.symbol = 1;
+    o.side = Side::SELL;
+    o.type = OrderType::TRAILING_STOP;
+    o.quantity = Quantity::fromDouble(1.0);
+    o.trailingOffset = Price::fromDouble(5.0);
+    return o;
+  };
+
+  clock.advanceTo(UnixNanos::fromRaw(1'000));
+  exec.onTrade(1, Price::fromDouble(100.0), Quantity::fromDouble(1.0), true);
+  exec.submitOrder(trailingSell(7));
+  clock.advanceTo(UnixNanos::fromRaw(2'000));
+  exec.onTrade(1, Price::fromDouble(120.0), Quantity::fromDouble(1.0), true);  // trigger 115
+  exec.cancelOrder(7);
+  clock.advanceTo(UnixNanos::fromRaw(5'000'000));
+  exec.onTrade(1, Price::fromDouble(118.0), Quantity::fromDouble(1.0), true);  // ack lands
+  ASSERT_TRUE(std::any_of(events.begin(), events.end(), [](const auto& e)
+                          { return e.first == OrderEventStatus::CANCELED && e.second == 7; }));
+  ASSERT_TRUE(exec.conditionalOrders().empty());
+
+  // Same id again, armed at 100: its trigger is 95.
+  clock.advanceTo(UnixNanos::fromRaw(6'000'000));
+  exec.onTrade(1, Price::fromDouble(100.0), Quantity::fromDouble(1.0), true);
+  exec.submitOrder(trailingSell(7));
+  clock.advanceTo(UnixNanos::fromRaw(7'000'000));
+  exec.onTrade(1, Price::fromDouble(100.0), Quantity::fromDouble(1.0), true);
+  EXPECT_TRUE(exec.fills().empty()) << "fired at the cancelled order's trigger";
+  ASSERT_EQ(exec.conditionalOrders().size(), 1u);
+
+  clock.advanceTo(UnixNanos::fromRaw(8'000'000));
+  exec.onTrade(1, Price::fromDouble(94.0), Quantity::fromDouble(1.0), true);
+  ASSERT_EQ(exec.fills().size(), 1u);
+  EXPECT_DOUBLE_EQ(exec.fills()[0].price.toDouble(), 94.0);
+}

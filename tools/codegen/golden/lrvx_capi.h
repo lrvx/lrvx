@@ -313,6 +313,8 @@ extern "C"
     double returnPct;
     int64_t startTimeNs;
     int64_t endTimeNs;
+    uint64_t optionQuoteCount;
+    uint64_t poolStateCount;
   } LrvxBacktestStats;
 
   typedef struct
@@ -1082,6 +1084,9 @@ extern "C"
   int lrvx_backtest_runner_run_tape_bars(LrvxBacktestRunnerHandle runner, const char* tape_dir,
                                          int64_t interval_ns, const char* symbol,
                                          LrvxBacktestStats* stats_out);
+  int lrvx_backtest_runner_run_tape_bars_on_ticks(LrvxBacktestRunnerHandle runner,
+                                                  const char* tape_dir, int64_t interval_ns,
+                                                  const char* symbol, LrvxBacktestStats* stats_out);
   int lrvx_backtest_runner_run_ohlcv(LrvxBacktestRunnerHandle runner, const int64_t* timestamps_ns,
                                      const double* close_prices, uint32_t n, const char* symbol,
                                      LrvxBacktestStats* stats_out);

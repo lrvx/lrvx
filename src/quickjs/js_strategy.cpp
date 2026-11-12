@@ -147,7 +147,19 @@ void LrvxJsStrategy::loadStdlib()
       }
       return _slippageMap[model];
     };
-    const _queueMap = { none: 0, tob: 1, full: 2, pro_rata: 3, pro_rata_with_fifo: 4 };
+    // The names and codes of queueModelName / queueModelFromCode in
+    // backtest/runner_fill_settings; an unknown name throws like a slippage
+    // model name.
+    const _queueMap = { none: 0, tob: 1, full: 2, pro_rata: 3, pro_rata_with_fifo: 4,
+                        top_pro_lmm: 5, pro_rata_with_priority: 6 };
+    const _queueCode = (where, model) => {
+      if (!Object.prototype.hasOwnProperty.call(_queueMap, model)) {
+        throw new TypeError(where + ": model must be one of " +
+          Object.keys(_queueMap).map((k) => "'" + k + "'").join(", ") +
+          "; got '" + model + "'");
+      }
+      return _queueMap[model];
+    };
 
     class SimulatedExecutor {
       constructor() { this._h = __lrvx_simulated_executor_create(); }
@@ -210,7 +222,8 @@ void LrvxJsStrategy::loadStdlib()
                                             bps || 0, impactCoeff || 0);
       }
       setQueueModel(model, depth) {
-        __lrvx_simulated_executor_set_queue_model(this._h, _queueMap[model] || 0, depth || 1);
+        __lrvx_simulated_executor_set_queue_model(this._h, _queueCode("setQueueModel", model),
+                                                  depth || 1);
       }
       setQueueFifoTopN(topN) {
         __lrvx_simulated_executor_set_queue_fifo_top_n(this._h, topN || 0);

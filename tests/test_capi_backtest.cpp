@@ -55,6 +55,29 @@ TEST(CapiBacktest, SlippageRejectsUnknownModelCode)
   lrvx_simulated_executor_destroy(exec);
 }
 
+// Same for the queue model: an out-of-range code is refused with the valid
+// codes and names, and the model installed before stays.
+TEST(CapiBacktest, QueueModelRejectsUnknownModelCode)
+{
+  auto exec = lrvx_simulated_executor_create();
+  for (int32_t bad : {7, -1, 255})
+  {
+    lrvx_clear_last_error();
+    lrvx_simulated_executor_set_queue_model(exec, bad, 1);
+    EXPECT_NE(lrvx_last_error_code(), 0) << "model " << bad;
+    const std::string msg = lrvx_last_error_message();
+    EXPECT_NE(msg.find("1 (tob)"), std::string::npos) << msg;
+    EXPECT_NE(msg.find("6 (pro_rata_with_priority)"), std::string::npos) << msg;
+  }
+  for (int32_t good = 0; good <= 6; ++good)
+  {
+    lrvx_clear_last_error();
+    lrvx_simulated_executor_set_queue_model(exec, good, 1);
+    EXPECT_EQ(lrvx_last_error_code(), 0) << "model " << good;
+  }
+  lrvx_simulated_executor_destroy(exec);
+}
+
 TEST(CapiBacktest, TopOfBookMovesTheTouchAndKeepsDepth)
 {
   auto exec = lrvx_simulated_executor_create();

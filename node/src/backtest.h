@@ -333,42 +333,35 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   }
   void SetQueueModel(const Napi::CallbackInfo& info)
   {
-    // Accept either the string name or the exported QUEUE_* constant.
+    // Accept either the string name or the exported QUEUE_* constant. An
+    // unknown one of either throws and leaves the model installed before.
+    int32_t m = 0;
     if (info.Length() > 0 && info[0].IsNumber())
     {
-      const uint8_t code = static_cast<uint8_t>(info[0].As<Napi::Number>().Uint32Value());
-      uint32_t d0 = info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 1;
-      lrvx_simulated_executor_set_queue_model(_h, code, d0);
-      return;
+      m = info[0].As<Napi::Number>().Int32Value();
     }
-    std::string model = info[0].As<Napi::String>().Utf8Value();
-    uint8_t m = 0;
-    if (model == "tob")
+    else
     {
-      m = 1;
-    }
-    else if (model == "full")
-    {
-      m = 2;
-    }
-    else if (model == "pro_rata")
-    {
-      m = 3;
-    }
-    else if (model == "pro_rata_with_fifo")
-    {
-      m = 4;
-    }
-    else if (model == "top_pro_lmm")
-    {
-      m = 5;
-    }
-    else if (model == "pro_rata_with_priority")
-    {
-      m = 6;
+      const std::string model =
+          info.Length() > 0 ? info[0].ToString().Utf8Value() : std::string("undefined");
+      const auto parsed = lrvx::queueModelFromName(model);
+      if (!parsed)
+      {
+        Napi::Error::New(info.Env(), "setQueueModel: model must be one of " +
+                                         lrvx::queueModelNameList() + "; got '" + model + "'")
+            .ThrowAsJavaScriptException();
+        return;
+      }
+      m = static_cast<int32_t>(*parsed);
     }
     uint32_t depth = info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 1;
+    lrvx_clear_last_error();
     lrvx_simulated_executor_set_queue_model(_h, m, depth);
+    if (lrvx_last_error_code() != 0)
+    {
+      Napi::Error::New(info.Env(), std::string("setQueueModel: ") + lrvx_last_error_message())
+          .ThrowAsJavaScriptException();
+    }
   }
   void SetQueueFifoTopN(const Napi::CallbackInfo& info)
   {
