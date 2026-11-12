@@ -548,7 +548,9 @@ export interface Symbol {
 
 export class SymbolRegistry {
   constructor();
-  addSymbol(exchange: string, name: string, tickSize: number): Symbol;
+  /** `tickSize` is the venue's price increment; a backtest rejects orders
+   *  priced off it. Omitted, the book uses 0.01 and prices are not checked. */
+  addSymbol(exchange: string, name: string, tickSize?: number): Symbol;
   symbolCount(): number;
 }
 

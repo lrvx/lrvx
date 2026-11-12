@@ -119,6 +119,12 @@ ticks from best on our side. Backtest only.
 
 ### Signal Emission
 
+In a backtest, prices, triggers and trailing offsets must be whole numbers of the tick the symbol was
+registered with (`lrvx_registry_add_symbol(reg, exchange, name, tick)` with `tick > 0`). An order off
+the tick is rejected: `on_order_update` receives `REJECTED` with `ev.reject_reason` set to
+`price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`. A symbol registered with a tick of
+0 is not checked. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
+
 #### `emit_market_buy(symbol, qty) -> int`
 
 Submit a market buy order. Returns order ID.

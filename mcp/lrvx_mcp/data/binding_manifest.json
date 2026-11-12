@@ -14976,6 +14976,11 @@
         },
         {
           "kind": "method",
+          "name": "setSymbolRegistry",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "signalToOrder",
           "parent": "BacktestRunner"
         },
@@ -24751,6 +24756,11 @@
         },
         {
           "kind": "method",
+          "name": "emitRejected",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "emitTrailingUpdate",
           "parent": "SimulatedExecutor"
         },
@@ -24942,6 +24952,11 @@
         {
           "kind": "method",
           "name": "onTrade",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "orderTickRaw",
           "parent": "SimulatedExecutor"
         },
         {
@@ -25157,6 +25172,11 @@
         {
           "kind": "method",
           "name": "setSubmitAckLatencyDistribution",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "setSymbolRegistry",
           "parent": "SimulatedExecutor"
         },
         {
@@ -38433,6 +38453,11 @@
         {
           "kind": "method",
           "name": "set_submit_ack_latency_distribution",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "set_symbol_registry",
           "parent": "SimulatedExecutor"
         },
         {

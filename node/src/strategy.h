@@ -56,11 +56,15 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
     auto env = info.Env();
     std::string ex = info[0].As<Napi::String>().Utf8Value();
     std::string sym = info[1].As<Napi::String>().Utf8Value();
-    double tickSize = info.Length() > 2 ? info[2].As<Napi::Number>().DoubleValue() : 0.01;
+    // A tick passed here is the venue's, and a backtest refuses orders priced
+    // off it. Left out, the book uses 0.01 and order prices are not checked.
+    const bool hasTick = info.Length() > 2 && info[2].IsNumber();
+    double tickSize = hasTick ? info[2].As<Napi::Number>().DoubleValue() : 0.01;
     lrvx::SymbolInfo si;
     si.exchange = ex;
     si.symbol = sym;
     si.tickSize = lrvx::Price::fromDouble(tickSize);
+    si.tickSizeKnown = hasTick;
     uint32_t id = static_cast<uint32_t>(_reg->registerSymbol(si));
 
     // Return a Symbol object: { id, exchange, name, tickSize, valueOf() → id }

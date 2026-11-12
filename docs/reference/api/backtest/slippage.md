@@ -26,6 +26,15 @@ struct SlippageProfile
 | `FIXED_BPS` | Shift the fill by `bps` basis points of the fill price. `bps = 10.0` is 10 bps = 0.10%. |
 | `VOLUME_IMPACT` | Shift proportional to `impactCoeff * (orderQty / levelQty)`. Larger orders relative to top-of-book size move the price more. |
 
+## Slippage and the tick
+
+`FIXED_BPS` and `VOLUME_IMPACT` move a price by arithmetic, and `FIXED_TICKS` with a `tickSize` that is not the symbol's tick does too, so the result is usually not a price the venue could trade at. When the simulator knows the symbol's tick (see [SimulatedExecutor](./simulated_executor.md#order-prices-and-the-tick)), a fill the model moved is snapped back onto the tick against the taker: a buy up to the next tick, a sell down to the previous one. With a 0.1 tick and 7 bps, a buy at 100.0 fills at 100.1 rather than 100.07, and a sell at 100.0 at 99.9 rather than 99.93.
+
+Two fills are not snapped:
+
+- A fill priced over several book levels is a volume-weighted average, not a traded price. It is reported as the average plus the model's offset.
+- A fill on a symbol whose tick is not known (registered without one, or with a tick of zero) keeps the model's price.
+
 ## Applying slippage
 
 ```cpp

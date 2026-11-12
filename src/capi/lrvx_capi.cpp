@@ -429,7 +429,13 @@ uint32_t lrvx_registry_add_symbol(LrvxRegistryHandle registry, const char* excha
   SymbolInfo info;
   info.exchange = exchange;
   info.symbol = name;
-  info.tickSize = Price::fromDouble(tick_size);
+  // A positive tick is the venue's and order prices are checked against it;
+  // zero or less keeps the 0.01 default for books and checks nothing.
+  if (tick_size > 0.0)
+  {
+    info.tickSize = Price::fromDouble(tick_size);
+    info.tickSizeKnown = true;
+  }
   return reg->registerSymbol(info);
   LRVX_CAPI_LEAVE;
 }
@@ -7864,6 +7870,7 @@ struct LrvxBacktestRunnerImpl
     cfg.initialCapital = initialCapital;
     cfg.usePercentageFee = true;
     runner = std::make_unique<BacktestRunner>(cfg);
+    runner->setSymbolRegistry(reg);
   }
 
   void addExecutionListener(LrvxExecutionListenerImpl* impl)

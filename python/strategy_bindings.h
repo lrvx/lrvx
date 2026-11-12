@@ -2000,6 +2000,7 @@ class PyBacktestRunner
     cfg.initialCapital = initial_capital;
     cfg.usePercentageFee = true;
     _runner = std::make_unique<BacktestRunner>(cfg);
+    _runner->setSymbolRegistry(reg);
   }
 
   void set_strategy(PyStrategyBase* strat)
@@ -2635,14 +2636,21 @@ inline void bindStrategy(py::module_& m)
 
   py::class_<SymbolRegistry>(m, "SymbolRegistry")
       .def(py::init<>())
-      .def("add_symbol", [](SymbolRegistry& reg, const std::string& exchange, const std::string& symbol, double tick_size) -> PySymbol
+      // tick_size is the venue's price increment; a backtest refuses orders
+      // priced off it. Left out, the symbol gets a 0.01 tick for its book and
+      // order prices are not checked.
+      .def("add_symbol", [](SymbolRegistry& reg, const std::string& exchange, const std::string& symbol, std::optional<double> tick_size) -> PySymbol
            {
              lrvx::SymbolInfo info;
              info.exchange  = exchange;
              info.symbol    = symbol;
-             info.tickSize  = Price::fromDouble(tick_size);
+             if (tick_size)
+             {
+               info.tickSize = Price::fromDouble(*tick_size);
+               info.tickSizeKnown = true;
+             }
              uint32_t id = static_cast<uint32_t>(reg.registerSymbol(info));
-             return PySymbol{id, exchange, symbol, tick_size}; }, py::arg("exchange"), py::arg("symbol"), py::arg("tick_size") = 0.01)
+             return PySymbol{id, exchange, symbol, info.tickSize.toDouble()}; }, py::arg("exchange"), py::arg("symbol"), py::arg("tick_size") = py::none())
       .def("symbol_count", &SymbolRegistry::size);
 
   py::class_<PyTradeData>(m, "TradeData")

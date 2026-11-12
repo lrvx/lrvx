@@ -447,6 +447,8 @@ uint8_t  lrvx_registry_get_symbol_name(LrvxRegistryHandle registry,
 uint32_t lrvx_registry_symbol_count(LrvxRegistryHandle registry);
 ```
 
+A positive `tick_size` is the venue's price increment: a backtest runner built on this registry rejects orders priced off it ([SimulatedExecutor](../backtest/simulated_executor.md#order-prices-and-the-tick)). Zero or less registers the symbol with the 0.01 default tick for its book and checks no order price.
+
 ---
 
 ## Strategy

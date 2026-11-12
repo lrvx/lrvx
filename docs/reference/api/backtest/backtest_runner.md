@@ -160,9 +160,12 @@ t.join();
 ```cpp
 void setStrategy(IStrategy* strategy);
 void addMarketDataSubscriber(IMarketDataSubscriber* subscriber);
+void setSymbolRegistry(const SymbolRegistry* registry);
 ```
 
 `setStrategy` connects the strategy to receive market events. Use `addMarketDataSubscriber` to add additional subscribers (e.g., bar aggregators, analytics).
+
+`setSymbolRegistry` gives the simulator the symbols' ticks, so an order priced off a known tick is rejected the way a venue rejects it (see [SimulatedExecutor](./simulated_executor.md#order-prices-and-the-tick)). A venue stack attached with `setSimulatedExecutor` gets the same registry. The Python, Node and Codon `BacktestRunner` and `lrvx_backtest_runner_create` pass the registry they are constructed with; a C++ `BacktestRunner` checks nothing until this is called.
 
 ## Data Flow
 

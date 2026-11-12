@@ -14,7 +14,7 @@ const registry = new lrvx.SymbolRegistry();
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `addSymbol(exchange, name, tickSize)` | `Symbol` | Register a symbol |
+| `addSymbol(exchange, name, tickSize?)` | `Symbol` | Register a symbol. `tickSize` is the venue's price increment and a backtest rejects orders priced off it; left out, the book uses 0.01 and order prices are not checked |
 | `symbolCount()` | `number` | Number of registered symbols |
 
 ### Symbol
@@ -131,6 +131,8 @@ are the new touch.
 | `emit.withdrawLiquidity(liquidity)` | Withdraw AMM liquidity |
 | `emit.cancel(orderId)` | Cancel order |
 | `emit.closePosition()` | Close position (reduce-only) |
+
+In a backtest, a `limitBuy` / `limitSell` price that is not a whole number of the symbol's `tickSize` is rejected: `onOrderUpdate` receives `status` `"REJECTED"` with `rejectReason` `"price_off_tick"`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
 
 ---
 

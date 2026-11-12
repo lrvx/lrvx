@@ -117,6 +117,13 @@ this.trailingStop({ side: 'sell', offset: 100, qty: 0.1 })
 this.trailingStopPercent({ side: 'sell', callbackBps: 50, qty: 0.1 })
 ```
 
+### Prices and the tick
+
+A QuickJS strategy's symbols are registered without a tick, so its order prices are not checked
+against one. Other bindings register the venue's tick and a backtest rejects prices off it with
+`rejectReason` `price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`; see
+[SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
+
 ### Order management
 
 ```javascript

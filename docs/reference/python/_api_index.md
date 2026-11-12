@@ -1889,6 +1889,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - `set_stp_mode(self, mode: str) -> None`
 - `set_submit_ack_latency(self, latency_ns: typing.SupportsInt | typing.SupportsIndex, jitter_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `set_submit_ack_latency_distribution(self, dist: LatencyDistribution) -> None`
+- `set_symbol_registry(self, registry: typing.Any) -> None`
 - `set_symbol_slippage(self, symbol: typing.SupportsInt | typing.SupportsIndex, model: str, ticks: typing.SupportsInt | typing.SupportsIndex = 0, tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.0, bps: typing.SupportsFloat | typing.SupportsIndex = 0.0, impact_coeff: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None`
 - `set_top_priority_share(self, share: typing.SupportsFloat | typing.SupportsIndex) -> None`
 - `set_venue_availability(self, availability: typing.Any) -> None`
@@ -2097,7 +2098,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 
 **Members**
 
-- `add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.01) -> Symbol`
+- `add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol`
 - `symbol_count(self) -> int`
 
 ### `class TEMA`

@@ -150,6 +150,13 @@ class BacktestRunner : public ISignalHandler
   void setSimulatedExecutor(SimulatedExecutor* executor, SimulatedClock* clock);
   SimulatedExecutor* simulatedExecutorOverride() const noexcept { return _venueExecutor; }
 
+  /// The registry the run's symbols come from. The simulated executor reads
+  /// each symbol's tick from it and refuses orders priced off a known tick
+  /// (SimulatedExecutor::setSymbolRegistry); a venue stack attached later
+  /// gets it too. Without one, order prices are not checked. Caller retains
+  /// ownership.
+  void setSymbolRegistry(const SymbolRegistry* registry);
+
   /// Pre-trade gate parity with the live `Runner`. All four hooks are
   /// optional; an unset hook is a no-op (let the order through).
   ///
@@ -292,6 +299,7 @@ class BacktestRunner : public ISignalHandler
   // When non-null it receives market data and owns the run's fills.
   SimulatedExecutor* _venueExecutor{nullptr};
   SimulatedClock* _venueClock{nullptr};
+  const SymbolRegistry* _registry{nullptr};
   IStrategy* _strategy{nullptr};
   // Pre-trade gate stack — parity with live Runner. Caller-owned;
   // runner does not delete.

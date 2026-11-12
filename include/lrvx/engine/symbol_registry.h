@@ -29,13 +29,22 @@
 namespace lrvx
 {
 
+// Tick a symbol gets when it is registered without one. Books need a positive
+// tick, so they use it; order prices are not checked against it.
+inline constexpr Price kDefaultTickSize = Price::fromRaw(Price::Scale / 100);
+
 struct SymbolInfo
 {
   SymbolId id{0};
   std::string exchange;
   std::string symbol;
   InstrumentType type = InstrumentType::Spot;
-  Price tickSize{Price::fromDouble(0.01)};
+  Price tickSize{kDefaultTickSize};
+  // True when tickSize is the venue's price increment. A simulated venue
+  // refuses order prices off a known tick (see execution/order_price_rule.h).
+  // Any tickSize other than the default counts as known without this flag; set
+  // it to have an explicit 0.01 checked.
+  bool tickSizeKnown{false};
   ExchangeId exchangeId{InvalidExchangeId};
 
   std::optional<Price> strike;
