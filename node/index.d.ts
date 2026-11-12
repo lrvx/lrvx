@@ -512,6 +512,15 @@ export interface RunnerStats {
   avgWin: number;
   avgLoss: number;
   profitFactor: number;
+  /** Mean, median and longest holding time of the closed trades, in
+   *  nanoseconds; 0 when no trade closed. */
+  avgTradeDurationNs: number;
+  medianTradeDurationNs: number;
+  maxTradeDurationNs: number;
+  timeWeightedReturn: number;
+  /** Timestamps of the run's first and last fill; `0n` when nothing filled. */
+  startTimeNs: bigint;
+  endTimeNs: bigint;
   /** Option-quote records a tape run read and delivered to no callback or
    *  the executor; 0 for a run that read no tape. */
   skippedOptionQuotes: number;
@@ -897,14 +906,15 @@ export class BacktestRunner {
   ): RunnerStats;
   /** Replay a `.lrvx` tape directory through the backtest. The tape
    *  is the canonical recording format written by `lrvx tape record`
-   *  (live) or `scripts/backfill_to_tape.py` (historical). Returns
-   *  `null` if the tape cannot be read. */
-  runTape(path: string): RunnerStats | null;
+   *  (live) or `scripts/backfill_to_tape.py` (historical). Throws
+   *  `LrvxError` with the reason if the tape cannot be read. */
+  runTape(path: string): RunnerStats;
   /** Merge N `.lrvx` tape directories on read and replay the merged
    *  event stream through the backtest. Symbols are rekeyed by
    *  `(metadata.exchange, name)` so two venues stay distinct.
-   *  `runTapes([t])` is equivalent to `runTape(t)`. Throws on bad paths
-   *  or overlapping book streams across tapes. */
+   *  `runTapes([t])` is equivalent to `runTape(t)`. Throws `LrvxError`
+   *  with the reason on bad paths or overlapping book streams across
+   *  tapes. */
   runTapes(paths: string[]): RunnerStats;
   /** Replay a `.lrvx` tape as time bars of `intervalSeconds`: the trades are
    *  aggregated while the tape streams (wall-clock aligned, the last
@@ -2080,9 +2090,13 @@ export function tradePnl(
 
 // ── Data I/O ──────────────────────────────────────────────────────────
 
+/** `exchangeTsNs` / `recvTsNs` on every tape record are nanosecond clock
+ *  readings and arrive as `bigint`: a `number` cannot hold one exactly.
+ *  They compare against a `number` with `<` / `>`, but arithmetic needs
+ *  both sides `bigint` (`Number(a - b)` for a duration). */
 export interface TradeRecord {
-  exchangeTsNs: number;
-  recvTsNs: number;
+  exchangeTsNs: bigint;
+  recvTsNs: bigint;
   price: number;
   qty: number;
   tradeId: number;
@@ -2091,8 +2105,8 @@ export interface TradeRecord {
 }
 
 export interface BboRecord {
-  exchangeTsNs: number;
-  recvTsNs: number;
+  exchangeTsNs: bigint;
+  recvTsNs: bigint;
   seq: number;
   symbolId: number;
   /** Record byte: 0 = snapshot, 1 = delta, 2 = top-of-book. */
@@ -2109,8 +2123,8 @@ export interface BookLevel {
 }
 
 export interface BookUpdateRecord {
-  exchangeTsNs: number;
-  recvTsNs: number;
+  exchangeTsNs: bigint;
+  recvTsNs: bigint;
   seq: number;
   symbolId: number;
   eventType: number;

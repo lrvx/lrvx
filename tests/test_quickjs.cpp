@@ -4,6 +4,7 @@
 #include "js_strategy.h"
 
 #include "lrvx/backtest/backtest_result.h"
+#include "lrvx/backtest/backtest_runner.h"
 #include "lrvx/backtest/simulated_clock.h"
 #include "lrvx/backtest/simulated_executor.h"
 #include "lrvx/book/events/book_update_event.h"
@@ -4291,4 +4292,90 @@ TEST(JsIntegrationTest, DataReaderCountsTruncatedSegments)
   EXPECT_EQ(readGlobalInt32(jsStrat, "truncated"), 1);
   EXPECT_EQ(readGlobalInt32(jsStrat, "crc"), 0);
   std::filesystem::remove_all(dir);
+}
+
+// A script's modify() goes out as a Modify signal, which names only the order
+// id. Hosted on a BacktestRunner the replacement has to stay the order the
+// script placed: on its symbol and side, under the id the script holds, and
+// filling at the new price.
+TEST(JsIntegrationTest, ModifyOnBacktestRunnerKeepsTheOrderAndFillsAtTheNewPrice)
+{
+  TempJsFile script(R"(
+    var bars = 0;
+    var orderId = 0;
+    var fills = 0;
+    var fillOrderId = 0, fillSymbolId = 0, fillPrice = 0, fillQty = 0;
+    var fillIsSell = false;
+
+    class TestStrat extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+      onBar(ctx, bar) {
+        bars += 1;
+        if (bars === 1) {
+          orderId = this.limitSell({ symbol: "BTCUSDT", price: 110.0, qty: 1.0 });
+        } else if (bars === 3) {
+          this.modify(orderId, { price: 101.0, qty: 0.5 });
+        }
+      }
+      onFill(ctx, ev) {
+        fills += 1;
+        fillOrderId = ev.orderId;
+        fillSymbolId = ev.symbolId;
+        fillIsSell = (ev.side === "sell");
+        fillPrice = ev.fillPrice;
+        fillQty = ev.fillQty;
+      }
+    }
+    lrvx.register(new TestStrat());
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+  ASSERT_FALSE(symIds.empty());
+
+  auto bridge = std::make_unique<BridgeStrategy>(
+      1, std::vector<SymbolId>(symIds.begin(), symIds.end()), registry, callbacks);
+  jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+
+  // Six bars around 100; only the fifth reaches 102, through the modified 101
+  // and nowhere near the original 110.
+  constexpr int64_t kMinuteNs = 60'000'000'000LL;
+  std::vector<BarEvent> bars;
+  for (int i = 0; i < 6; ++i)
+  {
+    BarEvent ev{};
+    ev.symbol = symIds[0];
+    ev.barType = BarType::Time;
+    ev.barTypeParam = static_cast<uint64_t>(kMinuteNs);
+    ev.bar.open = Price::fromDouble(100.0);
+    ev.bar.high = Price::fromDouble(i == 4 ? 102.0 : 100.5);
+    ev.bar.low = Price::fromDouble(99.5);
+    ev.bar.close = Price::fromDouble(100.0);
+    ev.bar.startTime = TimePoint{std::chrono::nanoseconds{kMinuteNs * i}};
+    ev.bar.endTime = TimePoint{std::chrono::nanoseconds{kMinuteNs * (i + 1)}};
+    bars.push_back(ev);
+  }
+
+  BacktestRunner runner;
+  runner.setSymbolRegistry(&registry);
+  runner.setStrategy(bridge.get());
+  BacktestResult result = runner.runBars(bars);
+
+  ASSERT_EQ(readGlobalInt32(jsStrat, "bars"), 6);
+  const double orderId = readGlobalDouble(jsStrat, "orderId");
+  ASSERT_GT(orderId, 0.0);
+
+  ASSERT_EQ(result.fills().size(), 1u) << "the modified order never filled";
+  EXPECT_EQ(static_cast<double>(result.fills()[0].orderId), orderId);
+  EXPECT_EQ(result.fills()[0].symbol, symIds[0]);
+  EXPECT_EQ(result.fills()[0].side, Side::SELL);
+
+  EXPECT_EQ(readGlobalInt32(jsStrat, "fills"), 1);
+  EXPECT_EQ(readGlobalDouble(jsStrat, "fillOrderId"), orderId);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "fillSymbolId"), static_cast<int32_t>(symIds[0]));
+  EXPECT_TRUE(readGlobalInt32(jsStrat, "fillIsSell"));
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "fillPrice"), 101.0);
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "fillQty"), 0.5);
 }

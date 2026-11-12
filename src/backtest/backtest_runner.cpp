@@ -203,6 +203,7 @@ void BacktestRunner::resetRunState()
     _venueClock->reset();
   }
   _nextOrderId = 1;
+  _customOrders.clear();
   _eventCount = 0;
   _tradeCount = 0;
   _bookUpdateCount = 0;
@@ -1047,20 +1048,34 @@ void BacktestRunner::onSignal(const Signal& signal)
       {
         return;
       }
+      // A market order never rests, so there is nothing of it to modify.
+      if (_customExecutor != nullptr && order.type != OrderType::MARKET)
+      {
+        _customOrders[order.id] = order;
+      }
       exec.submitOrder(order);
       break;
     }
     case SignalType::Cancel:
       // Cancel / CancelAll / Modify do not add exposure — same
       // pass-through semantics as the live runner.
+      _customOrders.erase(signal.orderId);
       exec.cancelOrder(signal.orderId);
       break;
     case SignalType::CancelAll:
+      // order: not observable -- every order of the symbol is dropped
+      std::erase_if(_customOrders,
+                    [&](const auto& entry)
+                    { return entry.second.symbol == signal.symbol; });
       exec.cancelAllOrders(signal.symbol);
       break;
     case SignalType::Modify:
     {
-      Order newOrder{.id = _nextOrderId++, .price = signal.newPrice, .quantity = signal.newQuantity};
+      const Order newOrder = modifiedOrder(signal);
+      if (_customExecutor != nullptr)
+      {
+        _customOrders[newOrder.id] = newOrder;
+      }
       exec.replaceOrder(signal.orderId, newOrder);
       break;
     }
@@ -1085,6 +1100,11 @@ void BacktestRunner::onSignal(const Signal& signal)
       {
         return;
       }
+      if (_customExecutor != nullptr)
+      {
+        _customOrders[order1.id] = order1;
+        _customOrders[order2.id] = order2;
+      }
       OCOParams params{.order1 = order1, .order2 = order2};
       exec.submitOCO(params);
       break;
@@ -1095,6 +1115,29 @@ void BacktestRunner::onSignal(const Signal& signal)
       // the backtest CEX execution path.
       break;
   }
+}
+
+Order BacktestRunner::modifiedOrder(const Signal& sig)
+{
+  // An id nobody holds still goes to the executor under that id, so a custom
+  // executor sees the request and the built-in one finds nothing to replace.
+  Order order{.id = sig.orderId, .symbol = sig.symbol};
+  if (_customExecutor != nullptr)
+  {
+    if (const auto it = _customOrders.find(sig.orderId); it != _customOrders.end())
+    {
+      order = it->second;
+    }
+  }
+  else if (const Order* live = sim().findOrder(sig.orderId); live != nullptr)
+  {
+    order = *live;
+  }
+  order.price = sig.newPrice;
+  order.quantity = sig.newQuantity;
+  // The replacement is a fresh order: newQuantity is what is left to work.
+  order.filledQuantity = Quantity{};
+  return order;
 }
 
 Order BacktestRunner::signalToOrder(const Signal& sig)

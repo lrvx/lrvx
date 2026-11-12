@@ -106,11 +106,11 @@ function testSingleTapeRoundTrip()
     if (single[i].price !== merged[i].price) { priceOk = false; }
     if (single[i].qty !== merged[i].qty) { qtyOk = false; }
     if (single[i].side !== merged[i].side) { sideOk = false; }
-    // TradeRecord.exchangeTsNs is declared `number` for both DataReader
-    // and MergedTapeReader -- they used to disagree (number vs bigint),
-    // so `single[i].exchangeTsNs === merged[i].exchangeTsNs` was always
+    // TradeRecord.exchangeTsNs is declared `bigint` for both DataReader
+    // and MergedTapeReader. When the two disagreed (number vs bigint),
+    // `single[i].exchangeTsNs === merged[i].exchangeTsNs` was always
     // false and arithmetic between the two readers threw.
-    if (typeof single[i].exchangeTsNs !== 'number' || typeof merged[i].exchangeTsNs !== 'number')
+    if (typeof single[i].exchangeTsNs !== 'bigint' || typeof merged[i].exchangeTsNs !== 'bigint')
     {
       tsTypeOk = false;
     }
@@ -120,9 +120,9 @@ function testSingleTapeRoundTrip()
   check(qtyOk, 'qty preserved across rekey');
   check(sideOk, 'side preserved across rekey');
   check(typeof single[0]?.side === 'string', `side is a string (got ${typeof single[0]?.side})`);
-  check(tsTypeOk, 'exchangeTsNs is number on both readers');
+  check(tsTypeOk, 'exchangeTsNs is bigint on both readers');
   check(tsValueOk, 'exchangeTsNs matches exactly between DataReader and MergedTapeReader');
-  check(Number(single[0]?.exchangeTsNs) === Number(base),
+  check(single[0]?.exchangeTsNs === BigInt(base),
         `DataReader exchangeTsNs survives a real ns timestamp (${single[0]?.exchangeTsNs} == ${base})`);
 
   const tbl = mr.symbolTable();

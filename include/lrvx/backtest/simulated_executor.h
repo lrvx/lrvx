@@ -360,6 +360,10 @@ class SimulatedExecutor : public IOrderExecutor
   const std::vector<Fill>& fills() const { return _fills; }
   std::vector<Fill> extractFills() { return std::move(_fills); }
   const std::vector<Order>& conditionalOrders() const { return _conditional_orders; }
+  // The order as the executor holds it right now -- held for the next bar's
+  // open, resting, or waiting on its trigger. nullptr when no such order is
+  // live. The pointer is good until the next call that changes the order set.
+  const Order* findOrder(OrderId orderId) const;
 
   // Top-of-book accessors. Return 0 when the side is empty.
   Price bestBidPrice(SymbolId symbol) const;

@@ -76,6 +76,12 @@ Record shapes:
 
 `eventType` is the record byte: `0` snapshot, `1` delta, `2` top-of-book.
 
+`exchangeTsNs` and `recvTsNs` are `bigint` on every record, from `DataReader`
+and `MergedTapeReader` alike. They are clock readings, and a JS `number` is a
+double that steps 256 ns at a time at today's values. Comparisons against a
+`number` work; arithmetic needs both sides `bigint`, so take a difference
+first and convert it: `Number(b.exchangeTsNs - a.exchangeTsNs)`.
+
 `startTsNs`, `fromNs`, `toNs` accept either a `number` or a `bigint`. Pass
 `bigint` for real nanosecond timestamps — JS `number` is float64 and silently
 rounds values past 2^53 (e.g. `1765615835519000000` becomes

@@ -153,6 +153,12 @@ add_codon_executable(codon_aggregate_bars_smoke
 add_codon_executable(codon_strategy_dispatch_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/strategy_dispatch_smoke.codon)
 
+add_codon_executable(codon_modify_order_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/modify_order_smoke.codon)
+
+add_codon_executable(codon_backtest_runner_stats_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/backtest_runner_stats_smoke.codon)
+
 # The documented backtest-and-live walkthrough. Built here because it was
 # broken for as long as nothing compiled it: it passed List[u32] where
 # Strategy.__init__ wants List[int], and its on_trade handed a Price to an

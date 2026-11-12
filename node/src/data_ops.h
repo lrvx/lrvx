@@ -341,8 +341,10 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
     {
       const auto& t = trades[i];
       auto o = Napi::Object::New(env);
-      o.Set("exchangeTsNs", (double)t.exchange_ts_ns);
-      o.Set("recvTsNs", (double)t.recv_ts_ns);
+      // Clock readings: a wall-clock nanosecond value is past 2^53, where a
+      // double steps 256 ns at a time.
+      o.Set("exchangeTsNs", Napi::BigInt::New(env, t.exchange_ts_ns));
+      o.Set("recvTsNs", Napi::BigInt::New(env, t.recv_ts_ns));
       o.Set("price", (double)t.price_raw / 1e8);
       o.Set("qty", (double)t.qty_raw / 1e8);
       o.Set("tradeId", (double)t.trade_id);
@@ -392,8 +394,8 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
     for (size_t i = 0; i < bbos.size(); i++)
     {
       auto o = Napi::Object::New(env);
-      o.Set("exchangeTsNs", (double)bbos[i].exchange_ts_ns);
-      o.Set("recvTsNs", (double)bbos[i].recv_ts_ns);
+      o.Set("exchangeTsNs", Napi::BigInt::New(env, bbos[i].exchange_ts_ns));
+      o.Set("recvTsNs", Napi::BigInt::New(env, bbos[i].recv_ts_ns));
       o.Set("seq", (double)bbos[i].seq);
       o.Set("symbolId", bbos[i].symbol_id);
       o.Set("eventType", bbos[i].event_type);
@@ -456,8 +458,8 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
     {
       const auto& h = headers[i];
       auto o = Napi::Object::New(env);
-      o.Set("exchangeTsNs", (double)h.exchange_ts_ns);
-      o.Set("recvTsNs", (double)h.recv_ts_ns);
+      o.Set("exchangeTsNs", Napi::BigInt::New(env, h.exchange_ts_ns));
+      o.Set("recvTsNs", Napi::BigInt::New(env, h.recv_ts_ns));
       o.Set("seq", (double)h.seq);
       o.Set("symbolId", h.symbol_id);
       o.Set("eventType", h.event_type);
@@ -901,12 +903,10 @@ class MergedTapeReaderWrap : public Napi::ObjectWrap<MergedTapeReaderWrap>
     {
       auto o = Napi::Object::New(env);
       // Mirrors DataReaderWrap.ReadTrades (above): same TradeRecord
-      // interface, same field types. This used to hand back BigInt here
-      // while DataReader handed back Number for the same declared
-      // `number` fields, so `a.exchangeTsNs === b.exchangeTsNs` was
-      // always false and arithmetic between the two readers threw.
-      o.Set("exchangeTsNs", (double)trades[i].exchange_ts_ns);
-      o.Set("recvTsNs", (double)trades[i].recv_ts_ns);
+      // interface, same field types, so a record from one reader compares
+      // and subtracts against a record from the other.
+      o.Set("exchangeTsNs", Napi::BigInt::New(env, trades[i].exchange_ts_ns));
+      o.Set("recvTsNs", Napi::BigInt::New(env, trades[i].recv_ts_ns));
       o.Set("price", (double)trades[i].price_raw / 1e8);
       o.Set("qty", (double)trades[i].qty_raw / 1e8);
       o.Set("tradeId", (double)trades[i].trade_id);
@@ -936,9 +936,9 @@ class MergedTapeReaderWrap : public Napi::ObjectWrap<MergedTapeReaderWrap>
       const auto& h = headers[i];
       auto o = Napi::Object::New(env);
       // Mirrors DataReaderWrap.ReadBookUpdates: same BookUpdateRecord
-      // interface (`number` fields), same reasoning as ReadTrades above.
-      o.Set("exchangeTsNs", (double)h.exchange_ts_ns);
-      o.Set("recvTsNs", (double)h.recv_ts_ns);
+      // interface, same reasoning as ReadTrades above.
+      o.Set("exchangeTsNs", Napi::BigInt::New(env, h.exchange_ts_ns));
+      o.Set("recvTsNs", Napi::BigInt::New(env, h.recv_ts_ns));
       o.Set("seq", (double)h.seq);
       o.Set("symbolId", h.symbol_id);
       o.Set("eventType", h.event_type);

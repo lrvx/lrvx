@@ -1188,6 +1188,8 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
         {"lrvx_backtest_runner_create_with_fill_settings: ", ""},
         {"lrvx_backtest_runner_run_tape_bars_on_ticks: ", ""},
         {"lrvx_backtest_runner_run_tape_bars: ", ""},
+        {"lrvx_backtest_runner_run_tapes: ", ""},
+        {"lrvx_backtest_runner_run_tape: ", ""},
     };
     for (const auto& [from, to] : kNames)
     {
@@ -1296,7 +1298,9 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
                      int ok = lrvx_backtest_runner_run_tape(_handle, path.c_str(), &s);
                      if (!ok)
                      {
-                       return info.Env().Null();
+                       lrvxError(info.Env(), camelCaseNames(lrvx_last_error_message()))
+                           .ThrowAsJavaScriptException();
+                       return info.Env().Undefined();
                      }
                      return statsToJs(info.Env(), s);
                    });
@@ -1338,10 +1342,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
                          _handle, cstrs.data(), n, &s);
                      if (!ok)
                      {
-                       Napi::Error::New(
-                           env,
-                           "BacktestRunner.runTapes failed (invalid paths or "
-                           "overlapping book streams)")
+                       lrvxError(env, camelCaseNames(lrvx_last_error_message()))
                            .ThrowAsJavaScriptException();
                        return env.Undefined();
                      }
@@ -1548,6 +1549,14 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     obj.Set("avgWin", Napi::Number::New(env, s.avgWin));
     obj.Set("avgLoss", Napi::Number::New(env, s.avgLoss));
     obj.Set("profitFactor", Napi::Number::New(env, s.profitFactor));
+    // Durations are differences and fit a double; the run's bounds are clock
+    // readings and do not.
+    obj.Set("avgTradeDurationNs", Napi::Number::New(env, s.avgTradeDurationNs));
+    obj.Set("medianTradeDurationNs", Napi::Number::New(env, s.medianTradeDurationNs));
+    obj.Set("maxTradeDurationNs", Napi::Number::New(env, s.maxTradeDurationNs));
+    obj.Set("timeWeightedReturn", Napi::Number::New(env, s.timeWeightedReturn));
+    obj.Set("startTimeNs", Napi::BigInt::New(env, s.startTimeNs));
+    obj.Set("endTimeNs", Napi::BigInt::New(env, s.endTimeNs));
     // Option-quote and pool-state records a tape run read and delivered to
     // nobody; 0 for a run that read no tape.
     obj.Set("skippedOptionQuotes",

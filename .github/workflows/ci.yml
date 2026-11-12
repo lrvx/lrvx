@@ -571,8 +571,9 @@ jobs:
                    codon_reader_segments_smoke \
                    codon_order_group_smoke codon_run_trace_smoke \
                    codon_strategy_e2e_smoke codon_targets_smoke \
-                   codon_trace_attach_smoke codon_sma_crossover \
-                   codon_pairs_strategy; do
+                   codon_trace_attach_smoke codon_modify_order_smoke \
+                   codon_backtest_runner_stats_smoke \
+                   codon_sma_crossover codon_pairs_strategy; do
           echo "── $bin"
           out=$(LD_LIBRARY_PATH=build/src/capi:$HOME/.codon/lib/codon \
                 "./build/codon/$bin" 2>&1)

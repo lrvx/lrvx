@@ -1,0 +1,128 @@
+# Smoke test: Strategy.modify_order in a backtest. Mirrors
+# python/tests/test_runner_modify_order.py:
+#   * the modified order stays on its symbol and side, keeps the id the
+#     strategy holds, and fills at the new price for the new quantity
+#   * the modified order cancels by the same id
+
+from C import lrvx_registry_create() -> cobj
+from C import lrvx_registry_destroy(cobj)
+from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+
+from lrvx.runner import BacktestRunner
+from lrvx.strategy import Strategy, SymbolContext
+from lrvx.types import BarData, OrderEventData
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+class ModifyOnce(Strategy):
+    """Limit on the first bar, modify on the third, optional cancel on the fourth."""
+    side: str
+    rest_px: float
+    new_px: float
+    new_qty: float
+    cancel_after: bool
+    seen: int
+    order_id: int
+    fill_ids: List[int]
+    fill_symbols: List[int]
+    fill_sides: List[str]
+    fill_prices: List[float]
+    fill_qtys: List[float]
+
+    def __init__(self, symbols: List[int], side: str, rest_px: float, new_px: float,
+                 new_qty: float, cancel_after: bool):
+        super().__init__(symbols)
+        self.side = side
+        self.rest_px = rest_px
+        self.new_px = new_px
+        self.new_qty = new_qty
+        self.cancel_after = cancel_after
+        self.seen = 0
+        self.order_id = 0
+        self.fill_ids = list[int]()
+        self.fill_symbols = list[int]()
+        self.fill_sides = list[str]()
+        self.fill_prices = list[float]()
+        self.fill_qtys = list[float]()
+
+    def on_bar(self, ctx: SymbolContext, bar: BarData):
+        self.seen += 1
+        if self.seen == 1:
+            if self.side == "buy":
+                self.order_id = self.limit_buy(self.rest_px, 1.0)
+            else:
+                self.order_id = self.limit_sell(self.rest_px, 1.0)
+        elif self.seen == 3:
+            self.modify_order(self.order_id, self.new_px, self.new_qty)
+        elif self.seen == 4 and self.cancel_after:
+            self.cancel_order(self.order_id)
+
+    def on_fill(self, ctx: SymbolContext, ev: OrderEventData):
+        self.fill_ids.append(ev.order_id)
+        self.fill_symbols.append(ev.symbol)
+        self.fill_sides.append(ev.side)
+        self.fill_prices.append(ev.fill_price)
+        self.fill_qtys.append(ev.fill_qty)
+
+
+MINUTE = 60_000_000_000
+T0 = 1_788_220_800_000_000_000
+
+
+def run(side: str, rest_px: float, new_px: float, new_qty: float, cancel_after: bool,
+        spike_high: float, spike_low: float) -> ModifyOnce:
+    """Six bars around 100; only the fifth leaves the 99.5 .. 100.5 band."""
+    reg = lrvx_registry_create()
+    sym = int(lrvx_registry_add_symbol(reg, "test".c_str(), "BTCUSDT".c_str(), 0.5))
+    strat = ModifyOnce([sym], side, rest_px, new_px, new_qty, cancel_after)
+    bt = BacktestRunner(reg, 0.0, 10_000.0)
+    bt.set_strategy(strat)
+    n = 6
+    highs = [100.5] * n
+    lows = [99.5] * n
+    highs[4] = spike_high
+    lows[4] = spike_low
+    bt.run_bars([T0 + MINUTE * i for i in range(n)], [T0 + MINUTE * (i + 1) for i in range(n)],
+                [100.0] * n, highs, lows, [100.0] * n, [10.0] * n, "BTCUSDT", 0, MINUTE)
+    bt.close()
+    lrvx_registry_destroy(reg)
+    return strat
+
+
+buy = run("buy", 90.0, 99.0, 2.0, False, 100.5, 98.0)
+check(buy.order_id != 0, "buy: the limit returned an order id")
+check(len(buy.fill_ids) == 1, "buy: the modified order filled once")
+if len(buy.fill_ids) == 1:
+    check(buy.fill_ids[0] == buy.order_id, "buy: the fill carries the strategy's order id")
+    check(buy.fill_symbols[0] == 1, "buy: the fill is on the order's symbol")
+    check(buy.fill_sides[0] == "buy", "buy: the fill is a buy")
+    check(buy.fill_prices[0] == 99.0, "buy: filled at the new price")
+    check(buy.fill_qtys[0] == 2.0, "buy: filled for the new quantity")
+
+sell = run("sell", 110.0, 101.0, 0.5, False, 102.0, 99.5)
+check(len(sell.fill_ids) == 1, "sell: the modified order filled once")
+if len(sell.fill_ids) == 1:
+    check(sell.fill_ids[0] == sell.order_id, "sell: the fill carries the strategy's order id")
+    check(sell.fill_symbols[0] == 1, "sell: the fill is on the order's symbol")
+    check(sell.fill_sides[0] == "sell", "sell: the fill is a sell")
+    check(sell.fill_prices[0] == 101.0, "sell: filled at the new price")
+    check(sell.fill_qtys[0] == 0.5, "sell: filled for the new quantity")
+
+# Unmodified, the order at 99 would fill on the fifth bar; a cancel that finds
+# it by the strategy's id on the fourth leaves nothing to fill.
+canceled = run("buy", 90.0, 99.0, 2.0, True, 100.5, 98.0)
+check(len(canceled.fill_ids) == 0, "cancel: the modified order cancels by the same id")
+
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")

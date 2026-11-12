@@ -15001,6 +15001,11 @@
         },
         {
           "kind": "method",
+          "name": "modifiedOrder",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "notifyPaused",
           "parent": "BacktestRunner"
         },
@@ -25086,6 +25091,11 @@
         },
         {
           "kind": "method",
+          "name": "findOrder",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "findPendingOrder",
           "parent": "SimulatedExecutor"
         },
@@ -32852,12 +32862,22 @@
         },
         {
           "kind": "method",
+          "name": "avgTradeDurationNs",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
           "name": "avgWin",
           "parent": "RunnerStats"
         },
         {
           "kind": "method",
           "name": "calmarRatio",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
+          "name": "endTimeNs",
           "parent": "RunnerStats"
         },
         {
@@ -32883,6 +32903,16 @@
         {
           "kind": "method",
           "name": "maxDrawdownPct",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
+          "name": "maxTradeDurationNs",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
+          "name": "medianTradeDurationNs",
           "parent": "RunnerStats"
         },
         {
@@ -32918,6 +32948,16 @@
         {
           "kind": "method",
           "name": "sortinoRatio",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
+          "name": "startTimeNs",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
+          "name": "timeWeightedReturn",
           "parent": "RunnerStats"
         },
         {
