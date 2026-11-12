@@ -66,7 +66,7 @@ public:
 | from_ns    | `optional<int64_t>`     | Start timestamp filter (inclusive)       |
 | to_ns      | `optional<int64_t>`     | End timestamp filter (inclusive)         |
 | symbols    | `set<uint32_t>`         | Symbol IDs to include (empty = all)      |
-| verify_crc | `bool`                  | Verify CRC32 checksums (default: true)   |
+| verify_crc | `bool`                  | Check each frame's payload against its CRC32 and skip a frame that fails (default: true). `false` delivers such a frame as it parses. See [ReaderStats](#readerstats) for the cost |
 | reorder_window_ns | `int64_t`        | Bounded reorder buffer, default 10 s. Events arriving more than this far behind the emit cursor cannot be placed in order any more, so the reader throws `LrvxError` with the observed delta. The default covers exchange-WS jitter and the 99th percentile of reconnect-induced cross-block inversions on real tapes. Memory bound is roughly `reorder_window_ns x peak_event_rate x sizeof(ReplayEvent)` — about 36 MB at 10 s and a 10k ev/s burst |
 | skip_segments_by_time | `bool`           | With `from_ns` or `to_ns` set, do not decode segments that provably hold nothing in range (default: true). See [Time-ranged reads](#time-ranged-reads). The events returned are the same either way |
 | order_segments_by_time | `bool`          | Read segments in time order of their first event and merge overlapping ones (default: true). `false` reads them in file-name order. See [Ordering guarantee](#ordering-guarantee) |
@@ -192,6 +192,7 @@ struct ReaderStats
   uint64_t unknown_frames_skipped{0}; // frames of a record type this build does not know
   uint64_t segments_reordered{0};     // see Ordering guarantee
   uint64_t segments_interleaved{0};   // see Ordering guarantee
+  uint64_t segments_truncated{0};     // segments cut short by undecodable data
 };
 ```
 
@@ -199,12 +200,27 @@ A frame whose payload does not match its CRC is skipped and counted in
 `crc_errors`, and the read goes on with the next frame; nothing is thrown. A
 frame of a known type whose payload is too short to parse is counted the same
 way. A frame of a type this build does not know is stepped over by its length
-and counted in `unknown_frames_skipped`. Two faults end the segment instead,
-silently, since no next frame can be found: on an uncompressed segment a frame
-length above 10 MiB (counted in `crc_errors`), and on a compressed segment a
-block that fails to decompress or carries an invalid header. The CRC is
-checked on every read; `ReaderConfig::verify_crc` is not consulted by these
-readers. Every read path counts these, at any thread count.
+and counted in `unknown_frames_skipped`.
+
+Data that cannot be decoded ends the segment instead, since no next frame can
+be found past it: a compressed block that fails to decompress, has an invalid
+header, sizes above 100 MiB or fewer frames than its header counts; an
+uncompressed frame whose length is above 10 MiB; and a segment with an index
+whose file ends before it. The reader delivers the events before that point,
+counts the segment in `segments_truncated`, and goes on with the next segment;
+the read still returns `true`. `run(aggregators, n)` with several workers on
+one segment delivers the same events: the ranges after the worker that met
+the damage are dropped. A segment without an index is still being written, so
+a frame or block cut short at its end is its live tail and is not counted. The
+validator reports every segment counted here as damaged.
+
+`ReaderConfig::verify_crc` (default `true`) switches the CRC check on every
+read path, `ParallelReader` included. With it off a damaged payload is
+delivered as whatever it parses to, provided it is long enough for its record
+type; the segment index's own CRC is checked either way. On a 60-segment tape
+of 6 million trades (Apple M-series, one thread, `streamForEach`), the check
+costs 0.75 s against 0.42 s without it uncompressed, and 0.37 s against 0.13 s
+with LZ4. Every read path counts these, at any thread count.
 
 `bytes_read` counts the segment-file bytes a read consumed as event data:
 every frame (header and payload) of an uncompressed segment, every block
@@ -254,8 +270,15 @@ so the result is exactly the full read filtered to the range:
   it is not a bound. The block index is: each entry holds its block's minimum
   and the blocks do not overlap. A segment whose first block starts after
   `to_ns` is not decoded; one that ends before `from_ns` costs its last block,
-  since a block's maximum is not on disk. Not used when the first block's
-  minimum is `<= 0`, where the writer does not check block order.
+  since a block's maximum is not on disk: the segment is opened, its index
+  read and that block decompressed (about 70 us per segment for 1000-event
+  blocks; a range at the end of a 60-segment LZ4 tape reads in 6.6 ms against
+  2.4 ms at its start). No exact upper bound is available without a format
+  change: the next segment's minimum bounds nothing unless the segments are
+  already known to be disjoint, and caching the last block's maximum would
+  only help a second read on the same reader. Not used when the first
+  block's minimum is `<= 0`, where writers before the current one did not
+  check block order.
 * **Any other segment** (no `Sorted` flag, still being written, no usable
   index) is read in full, as before.
 
@@ -325,6 +348,11 @@ public:
   bool isValid() const;
   bool isCompressed() const;
   bool hasIndex() const;
+
+  void setVerifyCrc(bool verify);  // default true
+  uint64_t crcErrors() const;
+  uint64_t unknownFramesSkipped() const;
+  bool truncated() const;          // stopped on undecodable data
 };
 ```
 

@@ -241,6 +241,7 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
     o.Set("segmentsSkipped", (double)s.segments_skipped);
     o.Set("segmentsReordered", (double)s.segments_reordered);
     o.Set("segmentsInterleaved", (double)s.segments_interleaved);
+    o.Set("segmentsTruncated", (double)s.segments_truncated);
     return o;
   }
   Napi::Value ReadTrades(const Napi::CallbackInfo& info)

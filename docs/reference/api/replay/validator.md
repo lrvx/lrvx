@@ -220,6 +220,16 @@ public:
 };
 ```
 
+`rebuild_index` replaces an index that fails validation with one built by
+`IndexBuilder::buildForSegment`. On an uncompressed segment that is one entry
+every `index_interval` frames; on a compressed one it is one entry per block
+holding the block's smallest `exchange_ts_ns`, as the writer stores it, so a
+rebuilt index matches the writer's byte for byte when the interval is the
+writer's. The header's `first_event_ns` / `last_event_ns` keep what the writer
+recorded (on a compressed segment, arrival order); a header left at zero is
+filled from the first non-zero and last events in stored order. A block that
+cannot be decoded fails the rebuild and leaves the segment as it was.
+
 ### Repair Usage
 
 ```cpp

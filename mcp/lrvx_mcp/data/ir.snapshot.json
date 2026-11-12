@@ -16772,6 +16772,10 @@
         {
           "name": "segments_interleaved",
           "type": "uint64_t"
+        },
+        {
+          "name": "segments_truncated",
+          "type": "uint64_t"
         }
       ],
       "name": "LrvxReaderStats"

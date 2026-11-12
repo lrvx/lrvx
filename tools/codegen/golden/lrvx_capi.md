@@ -467,6 +467,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 | `segments_skipped` | `uint64_t` |
 | `segments_reordered` | `uint64_t` |
 | `segments_interleaved` | `uint64_t` |
+| `segments_truncated` | `uint64_t` |
 
 ### `LrvxTradeRecord`
 

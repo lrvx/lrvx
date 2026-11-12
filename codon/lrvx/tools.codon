@@ -955,6 +955,9 @@ class ReaderStats:
     # Segments whose events were merged with another segment's because their
     # time ranges overlap.
     segments_interleaved: int
+    # Segments whose read stopped early on data that cannot be decoded; the
+    # rest of such a segment is not delivered.
+    segments_truncated: int
 
 
 @dataclass
@@ -1164,8 +1167,8 @@ class DataReader:
 
     def reader_stats(self) -> ReaderStats:
         """Return reader I/O statistics."""
-        # LrvxReaderStats: 11 x u64 = 88 bytes (ABI version 6)
-        buf = [i64(0)] * 11
+        # LrvxReaderStats: 12 x u64 = 96 bytes (ABI version 6)
+        buf = [i64(0)] * 12
         lrvx_data_reader_stats_p(self._h, Ptr[byte](buf.arr.ptr))
         return ReaderStats(
             files_read=int(buf[0]),
@@ -1178,7 +1181,8 @@ class DataReader:
             unknown_frames_skipped=int(buf[7]),
             segments_skipped=int(buf[8]),
             segments_reordered=int(buf[9]),
-            segments_interleaved=int(buf[10])
+            segments_interleaved=int(buf[10]),
+            segments_truncated=int(buf[11])
         )
 
     def read_trades(self, max_trades: int = 0) -> List[TradeRecord]:

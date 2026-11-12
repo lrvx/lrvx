@@ -165,6 +165,7 @@ Reader statistics.
 | `unknown_frames_skipped` | `int` | Frames of a record type this build does not know, stepped over by their length |
 | `segments_reordered` | `int` | Segments read at a different position than their file name gives them |
 | `segments_interleaved` | `int` | Segments whose events were merged with another segment's because their time ranges overlap |
+| `segments_truncated` | `int` | Segments whose read stopped early on data that cannot be decoded: a compressed block that fails to decompress or has a bad header, an uncompressed frame claiming more than 10 MiB. The rest of such a segment is not delivered; the read goes on with the next segment |
 
 Counters accumulate over the reader's lifetime, on every read path and thread
 count.

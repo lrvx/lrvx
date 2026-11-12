@@ -6301,6 +6301,8 @@ static JSValue js_dr_stats(JSContext* c, JSValueConst, int, JSValueConst* a)
                     JS_NewInt64(c, static_cast<int64_t>(s.segments_reordered)));
   JS_SetPropertyStr(c, o, "segmentsInterleaved",
                     JS_NewInt64(c, static_cast<int64_t>(s.segments_interleaved)));
+  JS_SetPropertyStr(c, o, "segmentsTruncated",
+                    JS_NewInt64(c, static_cast<int64_t>(s.segments_truncated)));
   return o;
 }
 

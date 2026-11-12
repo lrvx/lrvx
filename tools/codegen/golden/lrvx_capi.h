@@ -406,6 +406,7 @@ extern "C"
     uint64_t segments_skipped;
     uint64_t segments_reordered;
     uint64_t segments_interleaved;
+    uint64_t segments_truncated;
   } LrvxReaderStats;
 
   typedef struct

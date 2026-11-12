@@ -13,6 +13,7 @@
 #include "support/streaming_indicator_cases.h"
 
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -4138,5 +4139,83 @@ TEST(JsIntegrationTest, DataReaderSegmentSwitchesAndCounters)
   EXPECT_EQ(readGlobalInt32(jsStrat, "skipCount"), 1);
   EXPECT_EQ(readGlobalInt32(jsStrat, "skipped"), 2);
   EXPECT_EQ(readGlobalInt32(jsStrat, "walkedSkipped"), 0);
+  std::filesystem::remove_all(dir);
+}
+
+// stats().segmentsTruncated: an uncompressed frame given a length above the
+// 10 MiB limit ends its segment, and the prelude DataReader reports it.
+TEST(JsIntegrationTest, DataReaderCountsTruncatedSegments)
+{
+  const auto dir = std::filesystem::temp_directory_path() / "lrvx_test_qjs_reader_truncated";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  const std::string script = "var tapeDir = '" + dir.string() + "';" + R"(
+    var BASE = 1700000000000000000n;
+    var MS = 1000000n;
+    for (var s = 0; s < 3; s++) {
+      var w = new DataWriter(tapeDir, 4, 0);
+      for (var i = 0; i < 100; i++) {
+        var ts = BASE + BigInt(s * 1000 + i) * MS;
+        w.writeTrade(ts, ts, 100.0 + i, 1.0, i, 1, true);
+      }
+      w.close();
+      w.destroy();
+    }
+    var clean = new DataReader({ dir: tapeDir });
+    var cleanCount = clean.readTrades().length;
+    var cleanTruncated = Number(clean.stats().segmentsTruncated);
+    clean.destroy();
+
+    class S extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+    }
+    lrvx.register(new S());
+  )";
+  {
+    TempJsFile file(script);
+    SymbolRegistry registry;
+    LrvxJsStrategy jsStrat(file.path(), registry);
+    EXPECT_EQ(readGlobalInt32(jsStrat, "cleanCount"), 300);
+    EXPECT_EQ(readGlobalInt32(jsStrat, "cleanTruncated"), 0);
+  }
+
+  std::vector<std::filesystem::path> segments;
+  for (const auto& e : std::filesystem::directory_iterator(dir))
+  {
+    if (e.path().extension() == ".lrvx")
+    {
+      segments.push_back(e.path());
+    }
+  }
+  std::sort(segments.begin(), segments.end());
+  ASSERT_EQ(segments.size(), 3u);
+  {
+    std::FILE* f = std::fopen(segments[1].string().c_str(), "r+b");
+    ASSERT_NE(f, nullptr);
+    const uint32_t size = 11u * 1024u * 1024u;
+    std::fseek(f, 64 + 40 * (12 + 48), SEEK_SET);
+    ASSERT_EQ(std::fwrite(&size, sizeof(size), 1, f), 1u);
+    std::fclose(f);
+  }
+
+  const std::string read = "var tapeDir = '" + dir.string() + "';" + R"(
+    var r = new DataReader({ dir: tapeDir });
+    var count = r.readTrades().length;
+    var st = r.stats();
+    var truncated = Number(st.segmentsTruncated);
+    var crc = Number(st.crcErrors);
+    r.destroy();
+
+    class S extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+    }
+    lrvx.register(new S());
+  )";
+  TempJsFile file(read);
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(file.path(), registry);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "count"), 240);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "truncated"), 1);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "crc"), 0);
   std::filesystem::remove_all(dir);
 }

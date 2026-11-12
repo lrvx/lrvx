@@ -68,8 +68,10 @@ namespace SegmentFlags
 inline constexpr uint8_t HasIndex = 0x01;
 inline constexpr uint8_t Compressed = 0x02;
 inline constexpr uint8_t Encrypted = 0x04;
-// Set when the writer guarantees exchange_ts_ns is monotonically non-decreasing
-// across all events in the segment (within and across block boundaries).
+// Set when exchange_ts_ns is non-decreasing over the events in the order the
+// segment stores them, within and across block boundaries. On a compressed
+// segment that is the order after the writer sorted each block, not the
+// arrival order.
 inline constexpr uint8_t Sorted = 0x08;
 }  // namespace SegmentFlags
 

@@ -8,14 +8,118 @@
  */
 
 #include "lrvx/replay/ops/index_builder.h"
+#include "lrvx/replay/ops/compression.h"
 #include "segment_bounds.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <limits>
 
 namespace lrvx::replay
 {
+
+namespace
+{
+
+// The readers' ceilings: a frame above 10 MiB or a block above 100 MiB is a
+// damaged length field.
+constexpr uint32_t kMaxFrameBytes = 10u * 1024u * 1024u;
+constexpr uint32_t kMaxBlockBytes = 100u * 1024u * 1024u;
+
+struct CompressedScan
+{
+  std::vector<IndexEntry> entries;
+  uint32_t event_count{0};
+  // First non-zero and last exchange_ts_ns in stored order.
+  int64_t first_ts{0};
+  int64_t last_ts{0};
+};
+
+// Walks the blocks of a compressed segment between its header and `data_end`
+// and indexes each one the way BinaryLogWriter::flushBlock does: one entry per
+// block, at the block header's offset, holding the smallest exchange_ts_ns in
+// the block (the first int64 of each frame payload, 0 for a payload shorter
+// than that). Returns an error message, or an empty string.
+std::string scanCompressedSegment(std::FILE* file, const SegmentHeader& header,
+                                  uint64_t data_end, bool verify_crc, CompressedScan& out)
+{
+  std::vector<std::byte> packed;
+  std::vector<std::byte> block;
+  uint64_t pos = sizeof(SegmentHeader);
+  while (pos < data_end)
+  {
+    CompressedBlockHeader bh{};
+    if (data_end - pos < sizeof(bh) || std::fseek(file, static_cast<long>(pos), SEEK_SET) != 0 ||
+        std::fread(&bh, sizeof(bh), 1, file) != 1)
+    {
+      return "Truncated block header at offset " + std::to_string(pos);
+    }
+    if (!bh.isValid())
+    {
+      return "Invalid block magic at offset " + std::to_string(pos);
+    }
+    if (bh.compressed_size > kMaxBlockBytes || bh.original_size > kMaxBlockBytes ||
+        bh.compressed_size > data_end - pos - sizeof(bh))
+    {
+      return "Block size out of range at offset " + std::to_string(pos);
+    }
+    packed.resize(bh.compressed_size);
+    if (std::fread(packed.data(), 1, packed.size(), file) != packed.size())
+    {
+      return "Failed to read block at offset " + std::to_string(pos);
+    }
+    block.resize(bh.original_size);
+    if (Compressor::decompress(header.compressionType(), packed.data(), packed.size(),
+                               block.data(), block.size()) != block.size())
+    {
+      return "Decompression failed at offset " + std::to_string(pos);
+    }
+
+    int64_t block_min = std::numeric_limits<int64_t>::max();
+    size_t off = 0;
+    for (uint16_t i = 0; i < bh.event_count; ++i)
+    {
+      FrameHeader frame{};
+      if (off + sizeof(frame) > block.size())
+      {
+        return "Block at offset " + std::to_string(pos) + " holds fewer frames than it counts";
+      }
+      std::memcpy(&frame, block.data() + off, sizeof(frame));
+      off += sizeof(frame);
+      if (frame.size > kMaxFrameBytes || off + frame.size > block.size())
+      {
+        return "Frame overruns block at offset " + std::to_string(pos);
+      }
+      if (verify_crc && Crc32::compute(block.data() + off, frame.size) != frame.crc32)
+      {
+        return "CRC mismatch in block at offset " + std::to_string(pos);
+      }
+      int64_t ts = 0;
+      if (frame.size >= sizeof(int64_t))
+      {
+        std::memcpy(&ts, block.data() + off, sizeof(ts));
+      }
+      off += frame.size;
+
+      block_min = std::min(block_min, ts);
+      if (out.first_ts == 0)
+      {
+        out.first_ts = ts;
+      }
+      out.last_ts = ts;
+      ++out.event_count;
+    }
+    if (bh.event_count > 0)
+    {
+      out.entries.push_back(IndexEntry{.timestamp_ns = block_min, .file_offset = pos});
+    }
+    pos += sizeof(bh) + bh.compressed_size;
+  }
+  return {};
+}
+
+}  // namespace
 
 IndexBuilder::IndexBuilder(IndexBuilderConfig config) : _config(std::move(config)) {}
 
@@ -63,7 +167,29 @@ IndexBuildResult IndexBuilder::buildForSegment(const std::filesystem::path& segm
   int64_t first_ts = 0;
   int64_t last_ts = 0;
 
-  while (static_cast<uint64_t>(std::ftell(file)) < data_end)
+  // A compressed segment is indexed per block, as the writer indexes it.
+  if (header.isCompressed())
+  {
+    CompressedScan scan;
+    const std::string error = scanCompressedSegment(file, header, data_end, _config.verify_crc, scan);
+    if (!error.empty())
+    {
+      result.error = error;
+      std::fclose(file);
+      return result;
+    }
+    index_entries = std::move(scan.entries);
+    event_count = scan.event_count;
+    // The header records the first and last event in arrival order, which
+    // the blocks no longer hold once the writer sorted them; keep what the
+    // writer stored, and fill a header left at zero (a segment whose writer
+    // was killed) from the first non-zero and last event in stored order.
+    first_ts = header.first_event_ns != 0 ? header.first_event_ns : scan.first_ts;
+    last_ts = header.last_event_ns != 0 ? header.last_event_ns : scan.last_ts;
+    std::fseek(file, static_cast<long>(data_end), SEEK_SET);
+  }
+
+  while (!header.isCompressed() && static_cast<uint64_t>(std::ftell(file)) < data_end)
   {
     uint64_t frame_offset = static_cast<uint64_t>(std::ftell(file));
 
@@ -171,8 +297,18 @@ IndexBuildResult IndexBuilder::buildForSegment(const std::filesystem::path& segm
   SegmentIndexHeader idx_header{};
   idx_header.interval = _config.index_interval;
   idx_header.entry_count = static_cast<uint32_t>(index_entries.size());
-  idx_header.first_ts_ns = first_ts;
-  idx_header.last_ts_ns = last_ts;
+  if (header.isCompressed())
+  {
+    // As the writer fills them for a compressed segment: the first and last
+    // block minimum.
+    idx_header.first_ts_ns = index_entries.front().timestamp_ns;
+    idx_header.last_ts_ns = index_entries.back().timestamp_ns;
+  }
+  else
+  {
+    idx_header.first_ts_ns = first_ts;
+    idx_header.last_ts_ns = last_ts;
+  }
   idx_header.crc32 = Crc32::compute(index_entries.data(), index_entries.size() * sizeof(IndexEntry));
 
   if (std::fwrite(&idx_header, sizeof(idx_header), 1, file) != 1)
@@ -207,6 +343,16 @@ IndexBuildResult IndexBuilder::buildForSegment(const std::filesystem::path& segm
   }
 
   std::fclose(file);
+
+  // A rebuilt index shorter than the one it replaces leaves the old tail
+  // behind; the file ends where the new index does.
+  const uint64_t new_size =
+      data_end + sizeof(SegmentIndexHeader) + index_entries.size() * sizeof(IndexEntry);
+  std::error_code ec;
+  if (std::filesystem::file_size(segment_path, ec) > new_size && !ec)
+  {
+    std::filesystem::resize_file(segment_path, new_size, ec);
+  }
 
   result.success = true;
   result.events_scanned = event_count;

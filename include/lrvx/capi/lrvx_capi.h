@@ -27,7 +27,8 @@
  * has_ask. 5: LrvxSymbolContext grew last_touch_ns, LrvxEventTypeStatsRow
  * grew book_tops and LrvxStrategyCallbacks grew on_touch; the recorder
  * on_book_update byte gained 2 (top). 6: LrvxReaderStats grew
- * segments_skipped, segments_reordered and segments_interleaved. */
+ * segments_skipped, segments_reordered, segments_interleaved and
+ * segments_truncated. */
 #define LRVX_CAPI_ABI_VERSION 6
 
 /* Declared by a header that carries lrvx_best_bid_raw_opt and its two
@@ -467,6 +468,11 @@ extern "C"
     // Segments whose events were merged with another segment's because their
     // time ranges overlap.
     uint64_t segments_interleaved;
+    // Segments whose read stopped early on data that cannot be decoded (a
+    // compressed block that fails to decompress or has a bad header, an
+    // uncompressed frame claiming more than 10 MiB). The rest of such a
+    // segment is not delivered; the read goes on with the next segment.
+    uint64_t segments_truncated;
   } LrvxReaderStats;
 
   typedef struct

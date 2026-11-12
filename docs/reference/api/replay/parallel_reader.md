@@ -57,7 +57,7 @@ public:
 | from_ns           | `optional<int64_t>`  | Start timestamp filter                |
 | to_ns             | `optional<int64_t>`  | End timestamp filter                  |
 | symbols           | `set<uint32_t>`      | Symbol IDs to include                 |
-| verify_crc        | `bool`               | Verify CRC32 checksums                |
+| verify_crc        | `bool`               | Check frames against their CRC32 (default: true); as `ReaderConfig::verify_crc` |
 | sort_output       | `bool`               | Merge to timestamp order              |
 
 ## Statistics
@@ -72,6 +72,7 @@ struct ParallelReaderStats
   uint64_t bytes_read;
   uint64_t crc_errors;
   uint64_t unknown_frames_skipped;
+  uint64_t segments_truncated;
   int64_t start_time_ns;
   int64_t end_time_ns;
 
@@ -80,10 +81,11 @@ struct ParallelReaderStats
 };
 ```
 
-`bytes_read`, `crc_errors` and `unknown_frames_skipped` have the definitions
-of the `ReaderStats` fields of the same names: segment-file bytes consumed as
-event data, without segment headers or indexes; frames skipped for a CRC
-mismatch; frames of a record type this build does not know. Every path counts
+`bytes_read`, `crc_errors`, `unknown_frames_skipped` and `segments_truncated`
+have the definitions of the `ReaderStats` fields of the same names:
+segment-file bytes consumed as event data, without segment headers or indexes;
+frames skipped for a CRC mismatch; frames of a record type this build does not
+know; segments whose read stopped early on data that cannot be decoded. Every path counts
 all of the fields above, `segments_processed`, `events_read`, `trades_read`
 and `book_updates_read` included: one thread, sorted and unsorted output, and
 `forEachBatch`. The counters accumulate across calls on the same reader. On

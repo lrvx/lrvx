@@ -143,7 +143,11 @@ class BinaryLogWriter
   std::vector<std::byte> _sort_buffer;
   uint16_t _block_event_count{0};
   int64_t _block_first_timestamp{0};
+  // Maximum of the last block flushed in this segment; meaningful once
+  // _have_last_block is set. A flag rather than a sentinel value, since every
+  // int64_t, zero and negative included, is a timestamp a block can end on.
   int64_t _last_block_max_ts{0};
+  bool _have_last_block{false};
   int64_t _last_event_ts{0};
   bool _have_last_event_ts{false};
   // True once this segment has seen a timestamp go backwards, whichever path

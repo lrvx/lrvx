@@ -100,6 +100,14 @@ struct ReaderConfig
   std::optional<int64_t> from_ns;
   std::optional<int64_t> to_ns;
   std::set<uint32_t> symbols;
+
+  // Check each frame's payload against its CRC32 and skip (and count in
+  // ReaderStats::crc_errors) a frame that does not match. false skips the
+  // check: a damaged payload is then delivered as whatever it parses to, as
+  // long as it is long enough for its record type. Every read path of this
+  // reader and of ParallelReader honours it. The segment index's own CRC is
+  // checked either way, since a bad index could send a range read to the
+  // wrong place.
   bool verify_crc{true};
 
   // Cross-block reorder window used by streamForEach / run() on
@@ -202,9 +210,7 @@ struct ReaderStats
   // path or thread count delivered it.
   uint64_t bytes_read{0};
   // Frames skipped because their payload failed its CRC, or (a known type)
-  // was too short to parse. The read goes on with the next frame. An
-  // uncompressed frame claiming more than 10 MiB is counted here too and ends
-  // its segment, since the next frame cannot be found.
+  // was too short to parse. The read goes on with the next frame.
   uint64_t crc_errors{0};
   // Events discarded because they arrived past reorder_window_ns.
   // Always 0 when ReaderConfig::strict_ordering is set (the reader
@@ -220,6 +226,14 @@ struct ReaderStats
   // Segments whose events were merged with another segment's because their
   // time ranges overlap.
   uint64_t segments_interleaved{0};
+  // Segments whose read ended early on data that cannot be decoded: a
+  // compressed block with a bad header, that fails to decompress or whose
+  // frames overrun it, or an uncompressed frame claiming more than 10 MiB. No
+  // next frame can be found past such a point, so the rest of the segment is
+  // not delivered; the read goes on with the next segment. A frame or block
+  // cut short at the end of a segment still being written (no index yet) is
+  // the live tail, not damage, and is not counted.
+  uint64_t segments_truncated{0};
 };
 
 struct ReplayEvent
@@ -537,6 +551,15 @@ class BinaryLogIterator
   uint64_t crcErrors() const { return _crc_errors; }
   uint64_t unknownFramesSkipped() const { return _unknown_frames_skipped; }
 
+  // True once the iterator stopped on data it cannot decode (see
+  // ReaderStats::segments_truncated); next() then returns false although the
+  // segment goes on.
+  bool truncated() const { return _truncated; }
+
+  // Whether frames are checked against their CRC (default true). See
+  // ReaderConfig::verify_crc.
+  void setVerifyCrc(bool verify) { _verify_crc = verify; }
+
   // Event-data bytes read from the file so far: each whole frame (header and
   // payload) of an uncompressed segment, each whole block (header and
   // compressed payload) of a compressed one. The segment header and the index
@@ -574,8 +597,16 @@ class BinaryLogIterator
   // assigned block range.
   bool _stop_at_block_end{false};
 
+  // Stops the iterator on undecodable data: records it and returns false.
+  bool truncate();
+  // Whether bytes before `end` of the file may still be missing because the
+  // segment is being written: no index, so the data runs to end of file.
+  bool liveTail() const { return !_header.hasIndex(); }
+
   uint64_t _crc_errors{0};
   uint64_t _unknown_frames_skipped{0};
+  bool _verify_crc{true};
+  bool _truncated{false};
   uint64_t _bytes_consumed{0};
   uint64_t _last_event_offset{0};
   uint64_t _block_file_offset{0};

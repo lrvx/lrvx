@@ -157,6 +157,13 @@ struct BlockMeta
 // decompression. Stops at index trailer if present, otherwise at the
 // first invalid header or EOF.
 //
+// Where the walk stops on damage rather than at the end of the data (a bad
+// block header, or with an index in place a block or header that runs past
+// it), the damaged position is listed as one more block: the worker that
+// reaches it stops there and counts the segment in segments_truncated, as the
+// single-thread walk does. A live segment's torn tail (no index) is not
+// listed.
+//
 // Returns true if at least one valid block was discovered (false
 // only on outright IO failure or invalid segment header). Callers
 // can treat an empty out_blocks as "process this segment single-
@@ -214,16 +221,34 @@ inline bool scanBlockOffsetsForSegment(const std::filesystem::path& path,
     {
       break;
     }
-    CompressedBlockHeader bh;
-    if (std::fread(&bh, sizeof(bh), 1, f) != 1 || !bh.isValid())
+    const auto damaged_here = [&]
     {
+      out_blocks.push_back(BlockMeta{static_cast<uint64_t>(pos), 0, 0, 0, 0});
+    };
+    CompressedBlockHeader bh;
+    if (std::fread(&bh, sizeof(bh), 1, f) != 1)
+    {
+      if (out_hdr.hasIndex())
+      {
+        damaged_here();
+      }
+      break;
+    }
+    if (!bh.isValid())
+    {
+      damaged_here();
       break;
     }
     const long data_pos = std::ftell(f);
     if (data_pos < 0 ||
         static_cast<long>(bh.compressed_size) > stop_at - data_pos)
     {
-      // Truncated tail (live-tape write in progress) — stop here.
+      // Truncated tail (live-tape write in progress) — stop here. With an
+      // index the data must reach it, so this is damage.
+      if (out_hdr.hasIndex())
+      {
+        damaged_here();
+      }
       break;
     }
     out_blocks.push_back(BlockMeta{static_cast<uint64_t>(pos),
@@ -710,7 +735,7 @@ using detail::IndexWindow;
 using detail::indexWindow;
 
 // Adds the iterator's own counters -- bytes consumed, frames failing their CRC,
-// frames of an unknown type -- to ReaderStats when the segment read ends, on
+// frames of an unknown type, a stop on undecodable data -- to ReaderStats when the segment read ends, on
 // every return path including a callback that stops the walk.
 class IteratorTally
 {
@@ -721,6 +746,7 @@ class IteratorTally
     _stats.bytes_read += _iter.bytesConsumed();
     _stats.crc_errors += _iter.crcErrors();
     _stats.unknown_frames_skipped += _iter.unknownFramesSkipped();
+    _stats.segments_truncated += _iter.truncated() ? 1 : 0;
   }
 
   IteratorTally(const IteratorTally&) = delete;
@@ -926,12 +952,16 @@ class ReorderBuffer
 // range is correctly merged. Boundary effects at the partition seam
 // between workers are documented at IAggregator::merge (sliding-
 // window aggregators may underreport on that seam).
+//
+// A block that cannot be decoded ends the worker's range there, as it ends
+// the segment on the single-thread path; run() then drops the ranges of the
+// workers after it (see ReaderStats::segments_truncated).
 template <typename Filter>
 bool streamBlockRangeImpl(const std::filesystem::path& path,
                           std::span<const BlockMeta> blocks,
                           BinaryLogReader::EventCallback& callback,
                           ReaderStats& stats, int64_t reorder_window_ns,
-                          bool strict_ordering, Filter passes_filter)
+                          bool strict_ordering, bool verify_crc, Filter passes_filter)
 {
   if (blocks.empty())
   {
@@ -942,6 +972,7 @@ bool streamBlockRangeImpl(const std::filesystem::path& path,
   {
     return false;
   }
+  iter.setVerifyCrc(verify_crc);
   IteratorTally tally(iter, stats);
   iter.setStopAtBlockEnd(true);
 
@@ -955,7 +986,7 @@ bool streamBlockRangeImpl(const std::filesystem::path& path,
     {
       if (!iter.seekToBlockOffset(bm.file_offset))
       {
-        return false;
+        return iter.truncated();
       }
       ReplayEvent event;
       while (iter.next(event))
@@ -971,6 +1002,10 @@ bool streamBlockRangeImpl(const std::filesystem::path& path,
           return false;
         }
       }
+      if (iter.truncated())
+      {
+        return true;
+      }
     }
     return true;
   }
@@ -985,7 +1020,11 @@ bool streamBlockRangeImpl(const std::filesystem::path& path,
   {
     if (!iter.seekToBlockOffset(bm.file_offset))
     {
-      return false;
+      if (!iter.truncated())
+      {
+        return false;
+      }
+      break;
     }
     ReplayEvent event;
     while (iter.next(event))
@@ -994,6 +1033,10 @@ bool streamBlockRangeImpl(const std::filesystem::path& path,
       {
         return false;
       }
+    }
+    if (iter.truncated())
+    {
+      break;
     }
   }
 
@@ -1287,6 +1330,7 @@ bool BinaryLogReader::readSegment(const std::filesystem::path& path, EventCallba
   {
     return false;
   }
+  iter.setVerifyCrc(_config.verify_crc);
   IteratorTally tally(iter, _stats);
 
   bool stop_past_to = false;
@@ -1372,6 +1416,7 @@ bool BinaryLogReader::readSegmentFrom(const SegmentInfo& segment, int64_t start_
   {
     return false;
   }
+  iter.setVerifyCrc(_config.verify_crc);
   IteratorTally tally(iter, _stats);
 
   ++_stats.files_read;
@@ -1582,6 +1627,7 @@ bool BinaryLogReader::mergeSortedRun(const ReadGroup& run, std::optional<int64_t
       }
 
       auto cursor = std::make_unique<SortedCursor>(segment.path, _stats);
+      cursor->iter.setVerifyCrc(_config.verify_crc);
       if (!cursor->iter.isValid())
       {
         // Every segment whose range overlaps the current position holds an
@@ -2023,6 +2069,7 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
     const std::size_t n_blocks = blocks.size();
     const int64_t reorder_W = _config.reorder_window_ns;
     const bool strict_ordering = _config.strict_ordering;
+    const bool verify_crc = _config.verify_crc;
     const std::filesystem::path& seg_path = segment.path;
 
     std::vector<std::thread> threads;
@@ -2033,7 +2080,8 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
       const std::size_t hi = ((ti + 1) * n_blocks) / workers_for_segment;
       threads.push_back(makeThread(
           "lrvx.replay.reader", [this, ti, lo, hi, &blocks, &worker_panels, &local_stats, &ok,
-                                 &error_mutex, &first_error, &seg_path, reorder_W, strict_ordering]()
+                                 &error_mutex, &first_error, &seg_path, reorder_W, strict_ordering,
+                                 verify_crc]()
           {
             try
             {
@@ -2055,7 +2103,7 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
               };
               std::span<const BlockMeta> slice(blocks.data() + lo, hi - lo);
               if (!streamBlockRangeImpl(seg_path, slice, cb, local_stats[ti],
-                                        reorder_W, strict_ordering, filter))
+                                        reorder_W, strict_ordering, verify_crc, filter))
               {
                 ok.store(false, std::memory_order_relaxed);
               }
@@ -2083,9 +2131,23 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
       return false;
     }
 
-    // Merge this segment's worker panels into the master panel.
-    for (auto& panel : worker_panels)
+    // A worker that stopped on undecodable data ends the segment there, as
+    // the single-thread path does: the ranges after it are dropped, panels
+    // and counters alike.
+    std::size_t kept = workers_for_segment;
+    for (std::size_t ti = 0; ti < workers_for_segment; ++ti)
     {
+      if (local_stats[ti].segments_truncated > 0)
+      {
+        kept = ti + 1;
+        break;
+      }
+    }
+
+    // Merge this segment's worker panels into the master panel.
+    for (std::size_t ti = 0; ti < kept; ++ti)
+    {
+      auto& panel = worker_panels[ti];
       for (std::size_t k = 0; k < aggregators.size(); ++k)
       {
         if (aggregators[k] != nullptr && panel[k] != nullptr)
@@ -2095,8 +2157,9 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
       }
     }
     // Sum local stats from this segment's workers into master.
-    for (const auto& s : local_stats)
+    for (std::size_t ti = 0; ti < kept; ++ti)
     {
+      const auto& s = local_stats[ti];
       _stats.files_read += s.files_read;
       _stats.segments_skipped += s.segments_skipped;
       _stats.events_read += s.events_read;
@@ -2106,6 +2169,7 @@ bool BinaryLogReader::run(std::span<IAggregator* const> aggregators,
       _stats.crc_errors += s.crc_errors;
       _stats.late_dropped += s.late_dropped;
       _stats.unknown_frames_skipped += s.unknown_frames_skipped;
+      _stats.segments_truncated += s.segments_truncated;
     }
   }
 
@@ -2156,6 +2220,7 @@ bool BinaryLogReader::streamSegmentWithStats(const std::filesystem::path& path,
   {
     return false;
   }
+  iter.setVerifyCrc(_config.verify_crc);
   IteratorTally tally(iter, stats);
 
   bool stop_past_to = false;
@@ -2238,6 +2303,7 @@ bool BinaryLogReader::readSegmentStreamingFrom(const SegmentInfo& segment,
   {
     return false;
   }
+  iter.setVerifyCrc(_config.verify_crc);
   IteratorTally tally(iter, _stats);
 
   ++_stats.files_read;
@@ -2481,7 +2547,9 @@ DatasetSummary BinaryLogReader::inspectWithSymbols(const std::filesystem::path& 
   // Then walk every event to collect symbols. The walk sees every timestamp
   // as well, so the time range it reports is the exact one whatever the
   // segments' flags.
-  ReaderConfig config{.data_dir = data_dir, .verify_crc = false};  // Skip CRC for speed
+  // Frames are checked against their CRC as on every read: a damaged frame
+  // must not put its symbol or timestamp into the summary.
+  ReaderConfig config{.data_dir = data_dir};
   BinaryLogReader reader(std::move(config));
 
   int64_t first = 0;
@@ -2610,7 +2678,7 @@ BinaryLogIterator::~BinaryLogIterator()
 
 bool BinaryLogIterator::next(ReplayEvent& out)
 {
-  if (!_file)
+  if (!_file || _truncated)
   {
     return false;
   }
@@ -2646,34 +2714,33 @@ bool BinaryLogIterator::nextUncompressed(ReplayEvent& out)
 
     const long frame_pos = std::ftell(_file);
 
-    // Read frame header
+    // Read frame header. With an index the data must run up to it, so a file
+    // ending first has lost bytes; without one this is the end of the data
+    // or the tail of a segment still being written.
     FrameHeader frame;
     if (std::fread(&frame, sizeof(frame), 1, _file) != 1)
     {
-      return false;  // EOF or error
+      return liveTail() ? false : truncate();
     }
 
     // A length this large is a corrupt header, not a record: there is no safe
     // way to find the next frame, so stop.
     if (frame.size > kMaxFrameBytes)
     {
-      ++_crc_errors;
-      return false;
+      return truncate();
     }
 
     // Read payload
     _payload_buffer.resize(frame.size);
     if (std::fread(_payload_buffer.data(), 1, frame.size, _file) != frame.size)
     {
-      return false;  // Torn frame at the tail of a live segment
+      return liveTail() ? false : truncate();
     }
     _bytes_consumed += sizeof(frame) + frame.size;
 
     _last_event_offset = frame_pos >= 0 ? static_cast<uint64_t>(frame_pos) : 0;
 
-    // Verify CRC
-    uint32_t computed_crc = Crc32::compute(_payload_buffer);
-    if (computed_crc != frame.crc32)
+    if (_verify_crc && Crc32::compute(_payload_buffer) != frame.crc32)
     {
       ++_crc_errors;
       continue;
@@ -2717,20 +2784,21 @@ bool BinaryLogIterator::nextCompressed(ReplayEvent& out)
 
   for (;;)
   {
-    // Parse next frame from decompressed block data
+    // Parse next frame from decompressed block data. The block header counts
+    // more frames than its data holds, or a frame overruns the block: the
+    // block decompressed to something that is not a frame stream.
     if (_block_offset + sizeof(FrameHeader) > _block_data.size())
     {
-      return false;
+      return truncate();
     }
 
     FrameHeader frame;
     std::memcpy(&frame, _block_data.data() + _block_offset, sizeof(frame));
     _block_offset += sizeof(FrameHeader);
 
-    // Sanity check
     if (frame.size > kMaxFrameBytes || _block_offset + frame.size > _block_data.size())
     {
-      return false;
+      return truncate();
     }
 
     const std::byte* payload = _block_data.data() + _block_offset;
@@ -2738,8 +2806,7 @@ bool BinaryLogIterator::nextCompressed(ReplayEvent& out)
     --_block_events_remaining;
     _last_event_offset = _block_file_offset;
 
-    // Verify CRC
-    if (Crc32::compute(payload, frame.size) != frame.crc32)
+    if (_verify_crc && Crc32::compute(payload, frame.size) != frame.crc32)
     {
       ++_crc_errors;
     }
@@ -2786,17 +2853,19 @@ bool BinaryLogIterator::loadNextBlock()
 
   const long block_pos = std::ftell(_file);
 
-  // Read compressed block header
+  // Read compressed block header. As for an uncompressed frame, a file that
+  // ends before its index has lost bytes; without an index it is the end of
+  // the data or a live tail.
   CompressedBlockHeader block_header;
   if (std::fread(&block_header, sizeof(block_header), 1, _file) != 1)
   {
-    return false;  // EOF or error
+    return liveTail() ? false : truncate();
   }
   _block_file_offset = block_pos >= 0 ? static_cast<uint64_t>(block_pos) : 0;
 
   if (!block_header.isValid())
   {
-    return false;  // Invalid block
+    return truncate();
   }
 
   // Sanity check sizes — the 100 MB ceiling is a coarse upper bound for
@@ -2807,7 +2876,7 @@ bool BinaryLogIterator::loadNextBlock()
   if (block_header.compressed_size > 100 * 1024 * 1024 ||
       block_header.original_size > 100 * 1024 * 1024)
   {
-    return false;
+    return truncate();
   }
 
   const long payload_pos = std::ftell(_file);
@@ -2831,7 +2900,8 @@ bool BinaryLogIterator::loadNextBlock()
   if (payload_pos < 0 ||
       static_cast<long>(block_header.compressed_size) > stop_at - payload_pos)
   {
-    return false;
+    // Past the data: a block still being written, or a damaged length.
+    return liveTail() ? false : truncate();
   }
 
   // Read compressed data
@@ -2839,7 +2909,7 @@ bool BinaryLogIterator::loadNextBlock()
   if (std::fread(_payload_buffer.data(), 1, block_header.compressed_size, _file) !=
       block_header.compressed_size)
   {
-    return false;
+    return liveTail() ? false : truncate();
   }
   _bytes_consumed += sizeof(block_header) + block_header.compressed_size;
 
@@ -2852,7 +2922,7 @@ bool BinaryLogIterator::loadNextBlock()
 
   if (decompressed_size != block_header.original_size)
   {
-    return false;  // Decompression failed
+    return truncate();
   }
 
   // Intra-block sort on Sorted=false segments. Lifts the 95th-percentile
@@ -3064,6 +3134,13 @@ bool BinaryLogIterator::seekToTimestamp(int64_t target_ts_ns)
   // seekToFileOffset also drops a decompressed block the iterator may hold,
   // whose tail would otherwise be replayed after the seek.
   return seekToFileOffset(window->start);
+}
+
+bool BinaryLogIterator::truncate()
+{
+  _truncated = true;
+  _block_events_remaining = 0;
+  return false;
 }
 
 void BinaryLogIterator::discardBlockState()

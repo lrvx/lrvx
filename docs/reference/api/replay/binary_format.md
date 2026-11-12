@@ -47,7 +47,7 @@ The replay system uses a compact binary format optimized for sequential reads an
 | 0   | HasIndex   | Segment contains seek index    |
 | 1   | Compressed | Data is LZ4 compressed         |
 | 2   | Encrypted  | Data is encrypted (reserved)   |
-| 3   | Sorted     | Writer guarantees `exchange_ts_ns` is monotonically non-decreasing across every event in the segment, within and across block boundaries |
+| 3   | Sorted     | `exchange_ts_ns` is non-decreasing over every event in the order the segment stores it, within and across block boundaries. On a compressed segment that is the order after the writer sorted each block, not the arrival order. Zero and negative timestamps order like any other value |
 
 ## FrameHeader (12 bytes)
 
