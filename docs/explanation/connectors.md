@@ -168,7 +168,7 @@ The trade-off: every push that touches connectors runs the full lrvx CI. The `co
 `connectors/tests/` holds two kinds of test:
 
 - `unit_test_*.cpp` are offline — no exchange endpoints and no credentials; the few that need a live session use a listener on `127.0.0.1`. Order-serialization tests fake the transport (`ITransport`) or the client-provided injection point and assert on the exact request body a connector builds; protocol tests feed raw WebSocket frames straight into a connector's message handler. They build and register with `ctest` whenever `LRVX_BUILD_CONNECTORS=ON` and `LRVX_BUILD_TESTS=ON` — no extra flag — and run in the default CI matrix.
-- `integration_test_*.cpp` connect to real exchange WebSocket endpoints. Building them is gated by both `LRVX_BUILD_TESTS=ON` and `LRVX_BUILD_CONNECTOR_INTEGRATION_TESTS=ON`; running them via `ctest` requires the further `LRVX_RUN_CONNECTOR_INTEGRATION_TESTS=ON`. The default lrvx CI build skips them entirely.
+- `integration_test_*.cpp` connect to the venues' real public endpoints (market-data WebSockets and REST instrument info), never with credentials. Building them is gated by both `LRVX_BUILD_TESTS=ON` and `LRVX_BUILD_CONNECTOR_INTEGRATION_TESTS=ON`; running them via `ctest` requires the further `LRVX_RUN_CONNECTOR_INTEGRATION_TESTS=ON`. The default lrvx CI build skips them entirely.
 
 To build the integration tests locally:
 
@@ -178,6 +178,14 @@ cmake -B build -DLRVX_BUILD_CONNECTORS=ON \
                 -DLRVX_BUILD_CONNECTOR_INTEGRATION_TESTS=ON
 cmake --build build
 ```
+
+### What each layer verifies
+
+| Layer | How to run | Verifies |
+|---|---|---|
+| Default tests (`unit_test_*`) | `ctest` in any build with `LRVX_BUILD_CONNECTORS=ON` and `LRVX_BUILD_TESTS=ON`; no network | Instrument-info parsing and registration against recorded venue responses (`connectors/tests/fixtures/instrument_info/`) fed through an injected `instrumentFetch`; the tick rule on order prices; the exact request bodies the executors build, sent to a fake transport; WebSocket frame handling fed from strings or a loopback server; refusals turned into events. |
+| Network tests (`integration_test_*`) | Build with `-DLRVX_BUILD_CONNECTOR_INTEGRATION_TESTS=ON`, then run the binaries under `build/connectors/tests/` directly, or add `-DLRVX_RUN_CONNECTOR_INTEGRATION_TESTS=ON` and run `ctest -R integration_test_` | Public endpoints only, no credentials. `integration_test_instrument_info` runs `loadInstrumentSpecs()` (the step `start()` runs before it opens a socket) with the default `instrumentInfoUrl` and the default libcurl fetch, for Bybit linear and spot `BTCUSDT`, Bitget futures and spot `BTCUSDT`, Hyperliquid `BTC` and a Polymarket token picked from `/sampling-markets`; it reads the same endpoint itself and checks the registered tick and size step against what the venue publishes at that moment, and that an unknown symbol is reported in `instrumentInfoError()` and left with its tick unknown. `integration_test_bybit`, `_bitget` and `_hyperliquid` start the connectors on the public market-data streams for 12 s and expect books and trades. |
+| Venue credentials only | Not automated | Everything on a private endpoint: order submit, cancel, amend/modify, the venue's refusals of TP/SL and of off-tick prices, fills on the private stream, and Hyperliquid signing. Without real funds this is done on the venues' test environments: Bybit testnet (`api-testnet.bybit.com`), Bitget demo trading (demo products under a demo API key), Hyperliquid testnet (`api.hyperliquid-testnet.xyz`). Polymarket's order path is not covered by any of them. |
 
 ## Hyperliquid signing daemon
 
