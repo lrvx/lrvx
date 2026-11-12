@@ -17,6 +17,52 @@ Adding a new venue is a self-contained module under `lrvx/archives/` that implem
 
 The CSV layout is recognised from the file's header row (or, for Binance files without one, from the column count). A file whose first row matches no layout the exchange publishes raises `lrvx.archives.UnknownLayoutError`, naming the row it found and the layouts it expected; nothing is written. A file with data rows of which none parse raises `lrvx.archives.NothingParsedError`. Rows that fail to parse in a file where others parse are counted in `rows_invalid`. An import that writes nothing because every trade is on the tape already is not an error: it returns `trades_written=0` with the trades counted in `rows_skipped`. The CLI reports either error as one line on stderr and exits with status 1.
 
+## Days and time zones
+
+`--from` and `--to` (`date_from` / `date_to`) name the exchange's own daily files, both included, and the exchanges do not cut their days at the same hour:
+
+| Exchange | A day is | `--from 2024-01-15 --to 2024-01-15` covers |
+|---|---|---|
+| Binance | a UTC day | 2024-01-15T00:00Z to 2024-01-16T00:00Z |
+| Bybit | a UTC day | 2024-01-15T00:00Z to 2024-01-16T00:00Z |
+| OKX | a UTC+8 day | 2024-01-14T16:00Z to 2024-01-15T16:00Z |
+| Bitget | a UTC+8 day | 2024-01-14T16:00Z to 2024-01-15T16:00Z |
+
+Asking OKX or Bitget for one UTC day therefore yields a day shifted eight hours earlier; to cover the UTC day 2024-01-15 in full, import 2024-01-15 and 2024-01-16 from them. The tape stores every trade at its exchange timestamp, so the shift is in which trades land, not in their times. The CLI summary line names the first and last trade actually written, in UTC, and for an OKX or Bitget range also the UTC span the requested days cover:
+
+```text
+lrvx archive okx: trades_written=... rows_read=... rows_skipped=0 rows_invalid=0 rows_other_instruments=0 files=1 first_trade=2024-01-14T16:00:00.071Z last_trade=2024-01-15T15:59:59.934Z (OKX days are UTC+8 days: 2024-01-15 to 2024-01-15 covers 2024-01-14T16:00:00Z to 2024-01-15T16:00:00Z)
+```
+
+The same two timestamps are in the returned stats as `first_ts_ns` and `last_ts_ns` (nanoseconds, 0 when nothing was written). Each module states its boundary as `DAY_UTC_OFFSET_HOURS` (0 or 8).
+
+## Symbols
+
+Each range form checks the symbol against the form its exchange and market use before making any request, and fails with an example of the expected form:
+
+| Exchange | Market | Symbol |
+|---|---|---|
+| Binance | spot | `BTCUSDT` |
+| Binance | um-futures | `BTCUSDT`, `BTCUSDT_240329` |
+| Binance | cm-futures | `BTCUSD_PERP`, `BTCUSD_240329` |
+| Bybit | spot | `BTCUSDT` |
+| Bybit | linear | `BTCUSDT`, `BTCPERP`, `BTC-27DEC24` |
+| Bybit | inverse | `BTCUSD`, `BTCUSDZ24` |
+| OKX | spot / swap | `BTC-USDT` / `BTC-USDT-SWAP` |
+| OKX | futures / option | `BTC-USD-240329` / `BTC-USD-240329-50000-C` |
+| Bitget | spot, umcbl / cmcbl / dmcbl | `BTCUSDT` / `BTCPERP` / `BTCUSD` (no `_UMCBL`-style suffix) |
+
+The check is on the shape only; whether the exchange lists the symbol shows when its files are looked up.
+
+## Downloads
+
+The range forms share one download policy:
+
+- A file the archive does not publish (HTTP 404 or 410, or the 403 a CDN answers for a missing object) is asked for once and not retried.
+- A timeout, a dropped connection, a 5xx answer, a body shorter than its `Content-Length`, and a body that does not open as the zip or gzip it should be are retried, three attempts in all with a growing pause; if all fail the import stops with the URL and the last error.
+- Without `--skip-missing`, a missing day stops the range with an error naming its URL. With `--skip-missing` the range steps over days the archive does not publish; a download that keeps failing for another reason still stops it.
+- A range in which no day is published fails, with or without `--skip-missing`, naming the symbol, market and dates and the first URL tried. The CLI exits with status 1.
+
 ## Append and dedup
 
 All four trade importers append by default and dedup the same way: a row is skipped when its trade id is already on the tape for the same symbol within the incoming file's time range. A trade keeps its exchange timestamp, so only that range can hold a copy of it, and the dedup read covers that range instead of the whole tape. Re-importing a day adds nothing, a new day lands in full, an overlapping range keeps each trade once, and days may be imported in any order (a later day first, or a day that fills a gap). `--no-append` turns the check off.
@@ -237,13 +283,22 @@ lrvx archive bitget \
   --parallel 4
 ```
 
-Bitget specifically matters for production reproduction: `md_collector` deployments on Singapore default to Bitget feeds for multi-symbol fixtures, so the archive lets researchers re-run the same `(exchange, name)` keying that the live capture used.
-
 ## Shared download cache
 
-All exchange-specific importers share one on-disk cache, rooted by default at `~/.lrvx/archive-cache/`. Override with `LRVX_ARCHIVE_CACHE=/some/path` (env var) or by passing `mirror=...` to the range form. Each exchange writes under its own subdirectory (`bybit/`, `okx/`, `bitget/`) so the cache layout stays predictable. The Binance range form uses a temporary directory unless `mirror` is given.
+Every range form, for every exchange and product (Binance aggTrades and bookTicker included), keeps the files it downloads in one on-disk cache, so a second run over the same days downloads nothing. The layout is the same for all of them:
 
-The cache has no auto-eviction; it grows monotonically. Wipe it whenever you want — the download path is idempotent and will refetch what is missing.
+```text
+~/.lrvx/archive-cache/<exchange>/<market>/<symbol>/<file name as published>
+```
+
+`<symbol>` is the symbol in the file's URL: the instrument family (`BTC-USD`) for OKX futures and options chain files. Bitget also keeps a `<symbol>-<YYYY-MM-DD>.parts` list of a finished day's parts there.
+
+- `LRVX_ARCHIVE_CACHE=/some/path` moves the root (`/some/path/<exchange>/...`).
+- `--mirror DIR` (`mirror=DIR`) uses `DIR` in place of `~/.lrvx/archive-cache/<exchange>` for that import, with the same layout below it.
+
+A download is written to a temporary name (`.<file>.<random>.part`) in the destination directory and renamed onto the file's real name only when it has arrived in full and opens as an archive, so an interrupted run never leaves a partial file under the real name. If a cached file nevertheless fails to open during an import, it is deleted from the cache and the import stops with an error; running it again downloads the file afresh. A file passed with `--csv` is never deleted.
+
+The cache is not evicted automatically and grows with what you import. To clear it, delete the directory (`rm -rf ~/.lrvx/archive-cache`, or one exchange's subdirectory, or single files); the next import downloads what is missing.
 
 ## Cross-exchange research
 
@@ -266,7 +321,8 @@ The `(exchange, name)` keying is the contract: every cross-exchange analysis tha
 A new exchange importer is one module under `lrvx/archives/<exchange>.py` exposing:
 
 - `trades_to_lrvx(csv_path, out_tape, *, symbol_id, symbol_name, market, ...)` — parse one day's CSV, write trades via `DataWriter`, append-safe by the venue's trade id. `lrvx.archives._layout.CsvFile` recognises the layouts the exchange publishes and counts unparsable rows; `lrvx.archives._dedup.TradeFile` and `write_trade_file` do the bounded parse and the dedup described above.
-- `range_to_lrvx(symbol, market, date_from, date_to, out_tape, *, mirror, parallel, ...)` — download a date range, hand each day to the single-day function, merge `metadata.json` with the union counters.
+- `range_to_lrvx(symbol, market, date_from, date_to, out_tape, *, mirror, parallel, ...)` — download a date range, hand each day to the single-day function, merge `metadata.json` with the union counters. `lrvx.archives._download.fetch` downloads one file under the policy above, `lrvx.archives._range.fetch_days` fetches the days of a range and handles missing ones, and `lrvx.archives._cache.exchange_dir` resolves the cache directory.
+- `check_symbol(symbol, market)` — the local symbol shape check, and `DAY_UTC_OFFSET_HOURS`, the UTC offset in hours of the exchange's day boundary.
 
 Register the new module in `archives/__init__.py`, add a `lrvx archive <exchange>` subparser in `lrvx/cli.py`, and write tests under `python/tests/` whose fixtures copy the real header and row shapes, plus a real-download test gated on `LRVX_ARCHIVE_NETWORK_TESTS=1`. The CLI and tests work generically against the `ArchiveReader` Protocol; no changes elsewhere in the framework are required.
 

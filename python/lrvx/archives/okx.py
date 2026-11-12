@@ -17,8 +17,14 @@ with ``<FILE>`` by market:
     ``BTC-USD-240329-50000-C``)
 
 A day is a UTC+8 calendar day: the file for 2024-01-15 holds trades
-from 2024-01-14T16:00Z to 2024-01-15T16:00Z. Files usually appear two
-days after the day ends.
+from 2024-01-14T16:00Z to 2024-01-15T16:00Z, and ``date_from`` /
+``date_to`` name such days. Files usually appear two days after the day
+ends.
+
+The range form caches the downloaded files under
+``<cache_root>/okx/<market>/<instrument>/`` (the family, ``BTC-USD``,
+for futures and options chain files; ``mirror`` replaces
+``<cache_root>/okx``), with the download policy of ``_download``.
 
 The CSV layout is read from the header row. OKX publishes:
 
@@ -53,17 +59,14 @@ the other rows are counted in ``rows_other_instruments``.
 from __future__ import annotations
 
 import json
-import shutil
-import time
-import urllib.error
-import urllib.request
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple, Union
 
-from . import _cache, _dedup, _layout
+from . import _cache, _dedup, _layout, _range
+from ._download import evict_if_corrupt
+from ._download import fetch as _download
 
 
 _BASE_URL = "https://static.okx.com/cdn/okex/traderecords/trades/daily"
@@ -91,6 +94,9 @@ _LAYOUTS = (
 
 DateLike = Union[str, date]
 
+# The archive's days start at midnight UTC+8.
+DAY_UTC_OFFSET_HOURS = 8
+
 
 class InstrumentNotInFileError(ValueError):
     """The file parsed but holds no trade of the requested instrument."""
@@ -109,32 +115,52 @@ class ConvertStats:
     last_trade_id: int = 0
 
 
-def _check_symbol(symbol: str, market: str) -> None:
+_SHAPES = {
+    "spot": ("<BASE>-<QUOTE>", "BTC-USDT"),
+    "swap": ("<BASE>-<QUOTE>-SWAP", "BTC-USDT-SWAP"),
+    "futures": ("<BASE>-<QUOTE>-<YYMMDD>", "BTC-USD-240329"),
+    "option": ("<BASE>-<QUOTE>-<YYMMDD>-<STRIKE>-<C or P>",
+               "BTC-USD-240329-50000-C"),
+}
+
+
+def check_symbol(symbol: str, market: str) -> None:
+    """Raise ValueError unless ``symbol`` has the shape of an OKX
+    ``market`` instrument id. A local check; no request is made."""
     if market not in _MARKETS:
         raise ValueError(
             f"unknown market '{market}'. expected one of {sorted(_MARKETS)}"
         )
     parts = symbol.split("-")
-    ok = {
+    # The quote may carry a margin tag, as in the family BTC-USD_UM.
+    pair = (len(parts) >= 2 and _range.is_upper_alnum(parts[0])
+            and all(_range.is_upper_alnum(t) for t in parts[1].split("_")))
+    expiry = len(parts) >= 3 and parts[2].isdigit() and len(parts[2]) == 6
+    ok = pair and {
         "spot": len(parts) == 2,
         "swap": len(parts) == 3 and parts[2] == "SWAP",
-        "futures": len(parts) == 3 and parts[2].isdigit() and len(parts[2]) == 6,
-        "option": len(parts) == 5 and parts[2].isdigit() and parts[4] in ("C", "P"),
+        "futures": len(parts) == 3 and expiry,
+        "option": (len(parts) == 5 and expiry
+                   and parts[3].replace(".", "", 1).isdigit()
+                   and parts[4] in ("C", "P")),
     }[market]
     if not ok:
-        example = {"spot": "BTC-USDT", "swap": "BTC-USDT-SWAP",
-                   "futures": "BTC-USD-240329",
-                   "option": "BTC-USD-240329-50000-C"}[market]
-        raise ValueError(
-            f"'{symbol}' is not an OKX {market} instrument id (e.g. {example})")
+        expected, example = _SHAPES[market]
+        raise _range.bad_symbol("OKX", market, symbol,
+                                f"an instrument id {expected}", example)
+
+
+def _url_symbol(symbol: str, market: str) -> str:
+    """The instrument the file is named after: the family for the
+    futures and option chain files."""
+    return "-".join(symbol.split("-")[:2]) if market in _CHAIN else symbol
 
 
 def _archive_name(symbol: str, market: str, day: date) -> str:
-    _check_symbol(symbol, market)
+    check_symbol(symbol, market)
     iso = day.isoformat()
     if market in _CHAIN:
-        family = "-".join(symbol.split("-")[:2])
-        return f"{family}-{_CHAIN[market]}-trades-{iso}.zip"
+        return f"{_url_symbol(symbol, market)}-{_CHAIN[market]}-trades-{iso}.zip"
     return f"{symbol}-trades-{iso}.zip"
 
 
@@ -144,38 +170,8 @@ def _archive_url(symbol: str, market: str, day: date) -> str:
 
 
 def _mirror_path(mirror: Path, symbol: str, market: str, day: date) -> Path:
-    return mirror / market / _archive_name(symbol, market, day)
-
-
-def _download(url: str, dest: Path, *, retries: int = 3,
-              backoff: float = 2.0) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + ".tmp")
-    last_err: Optional[BaseException] = None
-    for attempt in range(retries):
-        try:
-            with urllib.request.urlopen(url, timeout=60) as resp, open(tmp, "wb") as f:
-                shutil.copyfileobj(resp, f)
-            tmp.replace(dest)
-            return
-        except urllib.error.HTTPError as e:
-            last_err = e
-            if tmp.exists():
-                tmp.unlink()
-            if e.code in (403, 404):
-                break
-            if attempt < retries - 1:
-                time.sleep(backoff * (2 ** attempt))
-        except (urllib.error.URLError, OSError, TimeoutError) as e:
-            last_err = e
-            if tmp.exists():
-                try:
-                    tmp.unlink()
-                except OSError:
-                    pass
-            if attempt < retries - 1:
-                time.sleep(backoff * (2 ** attempt))
-    raise RuntimeError(f"failed to download {url}: {last_err}") from last_err
+    return (mirror / market / _url_symbol(symbol, market)
+            / _archive_name(symbol, market, day))
 
 
 class _Other:
@@ -410,18 +406,6 @@ def trades_to_lrvx(
         write_metadata=write_metadata, qty_multiplier=qty_multiplier)
 
 
-def _coerce_day(d: DateLike) -> date:
-    return d if isinstance(d, date) else date.fromisoformat(d)
-
-
-def _iter_days(date_from: DateLike, date_to: DateLike) -> Iterator[date]:
-    cur = _coerce_day(date_from)
-    end = _coerce_day(date_to)
-    while cur <= end:
-        yield cur
-        cur += timedelta(days=1)
-
-
 def range_to_lrvx(
     symbol: str,
     market: str,
@@ -440,39 +424,36 @@ def range_to_lrvx(
     skip_missing: bool = False,
     qty_multiplier: float = 1.0,
 ) -> ConvertStats:
-    """Convert a range of OKX days (UTC+8 dates, inclusive) into lrvx.
-    Uses the shared archive cache (``~/.lrvx/archive-cache/okx``) when
-    ``mirror`` is omitted.
+    """Convert a range of OKX days (UTC+8 dates, inclusive) into lrvx:
+    ``date_from="2024-01-15"`` starts at 2024-01-14T16:00Z.
 
-    For futures and options, a day whose chain file holds no trade of
-    ``symbol`` adds nothing; the range raises
-    ``InstrumentNotInFileError`` only when no day held one."""
-    _check_symbol(symbol, market)
-    days = list(_iter_days(date_from, date_to))
+    Files are taken from, and missing ones downloaded into, the cache:
+    ``<cache_root>/okx`` (``~/.lrvx/archive-cache/okx`` unless
+    ``LRVX_ARCHIVE_CACHE`` says otherwise), or ``mirror`` when given,
+    laid out as ``<market>/<instrument or family>/<file name as
+    published>``.
+
+    The instrument id's shape is checked before any request. A range in
+    which no day is published raises ``NoFilesError``; a missing day
+    raises ``FileNotFoundError`` unless ``skip_missing``. For futures
+    and options, a day whose chain file holds no trade of ``symbol``
+    adds nothing; the range raises ``InstrumentNotInFileError`` only
+    when no day held one."""
+    check_symbol(symbol, market)
+    days = _range.days_between(date_from, date_to)
     if not days:
         return ConvertStats()
+    mirror = _cache.exchange_dir("okx", mirror)
 
-    if mirror is None:
-        mirror = _cache.cache_root() / "okx"
-    mirror = Path(mirror).expanduser()
-    mirror.mkdir(parents=True, exist_ok=True)
-
-    def _ensure(day: date) -> Tuple[date, Optional[Path]]:
+    def _ensure(day: date) -> Path:
         local = _mirror_path(mirror, symbol, market, day)
-        if local.exists():
-            return day, local
-        try:
+        if not local.exists():
             _download(_archive_url(symbol, market, day), local)
-        except Exception:
-            if skip_missing:
-                return day, None
-            raise
-        return day, local
+        return local
 
-    pairs: List[Tuple[date, Optional[Path]]] = []
-    with ThreadPoolExecutor(max_workers=max(1, int(parallel))) as ex:
-        for pair in ex.map(_ensure, days):
-            pairs.append(pair)
+    pairs = _range.fetch_days(days, _ensure, parallel=parallel,
+                              skip_missing=skip_missing,
+                              what=f"okx {market} trades {symbol}")
 
     agg = ConvertStats()
     absent: List[str] = []
@@ -480,14 +461,15 @@ def range_to_lrvx(
         if path is None:
             continue
         try:
-            s = _convert_file(
-                path, Path(out_tape).expanduser(),
-                symbol_id=symbol_id, symbol_name=symbol, market=market,
-                exchange_id=exchange_id, exchange_name=exchange_name,
-                append=append, max_segment_mb=max_segment_mb,
-                compression=compression, write_metadata=False,
-                qty_multiplier=qty_multiplier,
-            )
+            with evict_if_corrupt(path):
+                s = _convert_file(
+                    path, Path(out_tape).expanduser(),
+                    symbol_id=symbol_id, symbol_name=symbol, market=market,
+                    exchange_id=exchange_id, exchange_name=exchange_name,
+                    append=append, max_segment_mb=max_segment_mb,
+                    compression=compression, write_metadata=False,
+                    qty_multiplier=qty_multiplier,
+                )
         except InstrumentNotInFileError as e:
             absent.append(str(e))
             agg.files_processed += 1
@@ -527,6 +509,7 @@ __all__ = [
     "ConvertStats",
     "InstrumentNotInFileError",
     "NothingParsedError",
+    "check_symbol",
     "UnknownLayoutError",
     "trades_to_lrvx",
     "range_to_lrvx",
