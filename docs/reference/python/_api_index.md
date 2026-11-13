@@ -1288,6 +1288,8 @@ Members:
 - *property* `strategy_id: None`
 - *property* `symbol: int`
 - *property* `symbol: None`
+- *property* `trailing_bps: int`
+- *property* `trailing_bps: None`
 - *property* `trailing_offset: float`
 - *property* `trailing_offset: None`
 - *property* `trigger_price: float`

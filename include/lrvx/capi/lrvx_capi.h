@@ -1573,6 +1573,18 @@ extern "C"
   // a runner or a live engine reads the net position of the fills reported
   // for its own orders, not the account's and not another strategy's.
   void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventData* event);
+
+  // The callback rate, in basis points, of a percent trailing stop
+  // (lrvx_emit_trailing_stop_percent). LrvxOrder carries a trailing stop's
+  // fixed offset in trailing_offset_raw and has no field for the rate, so a
+  // callback that is handed an LrvxOrder asks for it here: valid only for
+  // the pointer the callback received, on the thread it runs on, until it
+  // returns (LrvxExecutorCallbacks.submit / replace / submit_oco and every
+  // LrvxExecutionListenerCallbacks callback). A percent trailing stop has
+  // trailing_offset_raw 0 and a rate above 0; every other order, a copy of
+  // the struct, and any pointer outside its callback read 0. NULL reads 0
+  // and records an error.
+  int32_t lrvx_order_trailing_bps(const LrvxOrder* order);
   // The engine's counterpart of lrvx_runner_on_order_event. The event is
   // queued and returns at once; the callbacks run on the strategy's own
   // order-event consumer thread, like its trade, book and bar callbacks run

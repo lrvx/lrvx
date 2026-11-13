@@ -70,6 +70,9 @@ struct PyOrder
   double filled_quantity{0.0};
   double trigger_price{0.0};
   double trailing_offset{0.0};
+  // The callback rate of a percent trailing stop, in basis points; 0 for an
+  // order with a fixed offset and for every other order.
+  int32_t trailing_bps{0};
   int64_t created_at_ns{0};
   int64_t exchange_ts_ns{0};
 };
@@ -94,6 +97,9 @@ inline PyOrder pyOrderFromC(const LrvxOrder* o)
   po.filled_quantity = static_cast<double>(o->filled_quantity_raw) / 1e8;
   po.trigger_price = static_cast<double>(o->trigger_price_raw) / 1e8;
   po.trailing_offset = static_cast<double>(o->trailing_offset_raw) / 1e8;
+  // The struct has no field for it: read while the callback that was handed
+  // `o` is still running.
+  po.trailing_bps = lrvx_order_trailing_bps(o);
   po.created_at_ns = o->created_at_ns;
   po.exchange_ts_ns = o->exchange_ts_ns;
   return po;
@@ -1261,6 +1267,7 @@ inline lrvx::Order pyOrderToLrvx(const PyOrder& po)
   o.filledQuantity = lrvx::Quantity::fromDouble(po.filled_quantity);
   o.triggerPrice = lrvx::Price::fromDouble(po.trigger_price);
   o.trailingOffset = lrvx::Price::fromDouble(po.trailing_offset);
+  o.trailingCallbackRate = po.trailing_bps;
   return o;
 }
 
@@ -1326,6 +1333,7 @@ inline PyOrder lrvxOrderToPy(const lrvx::Order& o)
   po.filled_quantity = o.filledQuantity.toDouble();
   po.trigger_price = o.triggerPrice.toDouble();
   po.trailing_offset = o.trailingOffset.toDouble();
+  po.trailing_bps = o.trailingCallbackRate;
   return po;
 }
 

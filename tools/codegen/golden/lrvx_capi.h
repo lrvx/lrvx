@@ -1361,6 +1361,7 @@ extern "C"
   void lrvx_runner_set_executor(LrvxRunnerHandle runner, LrvxExecutorHandle executor);
   void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id);
   void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventData* event);
+  int32_t lrvx_order_trailing_bps(const LrvxOrder* order);
   void lrvx_backtest_runner_add_execution_listener(LrvxBacktestRunnerHandle runner,
                                                    LrvxExecutionListenerHandle listener);
   void lrvx_backtest_runner_set_executor(LrvxBacktestRunnerHandle runner,

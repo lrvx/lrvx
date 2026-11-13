@@ -9569,6 +9569,17 @@
       "return_type": "uint32_t"
     },
     {
+      "group": "execution",
+      "name": "lrvx_order_trailing_bps",
+      "params": [
+        {
+          "name": "order",
+          "type": "const LrvxOrder *"
+        }
+      ],
+      "return_type": "int32_t"
+    },
+    {
       "group": "risk",
       "name": "lrvx_order_validator_create",
       "params": [

@@ -109,6 +109,21 @@ console.log('=== sync runner: events reach the strategy that issued the order ==
   runner.stop();
 }
 
+console.log('=== an order handed to an executor names its trailing callback rate ===');
+{
+  const reg = new lrvx.SymbolRegistry();
+  const sym = reg.addSymbol('test', 'ETHUSDT', 0.01);
+  const runner = new lrvx.Runner(reg, () => {}, false);
+  const submitted = [];
+  runner.setExecutor({submit(order) { submitted.push(order); }});
+  runner.addStrategy({symbols: [sym], onTrade(_c, _t, emit) { emit.limitBuy(100, 1); }});
+  runner.start();
+  runner.onTrade(Number(sym), 100, 1, true, 1000n);
+  runner.stop();
+  check(submitted.length === 1 && submitted[0].trailingBps === 0,
+        `a limit order reads trailingBps 0 (${submitted[0] && submitted[0].trailingBps})`);
+}
+
 console.log('=== threaded runner: the event is queued behind the trades before it ===');
 {
   const {sym, runner, heard, ids} = build(true);

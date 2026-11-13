@@ -336,16 +336,14 @@ def _make_sim_bridge(sim: Any) -> Any:
         def _submit(self, order: Any) -> None:
             order_type = order.order_type or "market"
             offset = float(order.trailing_offset)
-            if order_type == "trailing_stop" and offset <= 0:
-                # A percent trailing stop: the order the runner hands an
-                # executor has no field for the rate.
+            bps = int(getattr(order, "trailing_bps", 0) or 0)
+            if order_type == "trailing_stop" and offset <= 0 and bps <= 0:
                 raise ValueError(
-                    f"order {order.id}: a trailing stop reached the simulator with no "
-                    "trailing offset; trailing_stop_percent cannot be routed through an "
-                    "executor, use trailing_stop(offset=...)")
-            # The trigger of a stop or take-profit and the offset of a
-            # trailing stop: without them the simulator took the order as one
-            # triggered at its limit price, or at nothing.
+                    f"order {order.id}: a trailing stop reached the simulator with neither "
+                    "a trailing offset nor a callback rate")
+            # The trigger of a stop or take-profit and the offset or callback
+            # rate of a trailing stop: without them the simulator took the
+            # order as one triggered at its limit price, or at nothing.
             self._sim.submit_order(
                 order.id,
                 order.side or "buy",
@@ -357,6 +355,7 @@ def _make_sim_bridge(sim: Any) -> Any:
                 reduce_only=bool(order.reduce_only),
                 trigger=float(order.trigger_price),
                 trailing_offset=offset,
+                trailing_bps=bps,
             )
             self._working[int(order.id)] = [int(order.symbol), float(order.quantity)]
 

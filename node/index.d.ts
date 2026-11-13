@@ -394,6 +394,9 @@ export interface Order {
   filledQuantity: number;
   triggerPrice: number;
   trailingOffset: number;
+  /** Callback rate of a percent trailing stop, in basis points; 0 for a
+   *  trailing stop with a fixed `trailingOffset` and for every other order. */
+  trailingBps: number;
   /** Absolute nanosecond clock readings: a `Number` is a double and steps
    *  256 ns at present-day magnitudes. */
   createdAtNs: bigint;

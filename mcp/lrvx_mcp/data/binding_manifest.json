@@ -2358,6 +2358,11 @@
           "name": "lrvx_order_tracker_total_count"
         },
         {
+          "group": "execution",
+          "kind": "function",
+          "name": "lrvx_order_trailing_bps"
+        },
+        {
           "group": "risk",
           "kind": "function",
           "name": "lrvx_order_validator_create"
@@ -10776,6 +10781,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_order_tracker_total_count"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_order_trailing_bps"
         },
         {
           "kind": "c_import",
@@ -32112,6 +32121,11 @@
         },
         {
           "kind": "method",
+          "name": "trailingBps",
+          "parent": "Order"
+        },
+        {
+          "kind": "method",
           "name": "trailingOffset",
           "parent": "Order"
         },
@@ -38248,6 +38262,11 @@
         },
         {
           "kind": "method",
+          "name": "trailing_bps",
+          "parent": "Order"
+        },
+        {
+          "kind": "method",
           "name": "trailing_offset",
           "parent": "Order"
         },
@@ -43909,6 +43928,7 @@
         "lrvx_live_engine_on_order_event",
         "lrvx_live_engine_order_closed",
         "lrvx_live_engine_set_executor",
+        "lrvx_order_trailing_bps",
         "lrvx_runner_on_order_event",
         "lrvx_runner_order_closed",
         "lrvx_runner_set_executor"

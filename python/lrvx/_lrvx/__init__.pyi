@@ -1812,6 +1812,14 @@ class Order:
     def symbol(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
     @property
+    def trailing_bps(self) -> int:
+        """
+        Callback rate of a percent trailing stop (trailing_stop_percent), in basis points; 0 for a trailing stop with a fixed trailing_offset and for every other order.
+        """
+    @trailing_bps.setter
+    def trailing_bps(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
     def trailing_offset(self) -> float:
         ...
     @trailing_offset.setter

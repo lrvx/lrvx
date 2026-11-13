@@ -3666,6 +3666,10 @@ inline void bindStrategy(py::module_& m)
       .def_readwrite("filled_quantity", &lrvx::PyOrder::filled_quantity)
       .def_readwrite("trigger_price", &lrvx::PyOrder::trigger_price)
       .def_readwrite("trailing_offset", &lrvx::PyOrder::trailing_offset)
+      .def_readwrite("trailing_bps", &lrvx::PyOrder::trailing_bps,
+                     "Callback rate of a percent trailing stop (trailing_stop_percent), in "
+                     "basis points; 0 for a trailing stop with a fixed trailing_offset and for "
+                     "every other order.")
       .def_readwrite("created_at_ns", &lrvx::PyOrder::created_at_ns)
       .def_readwrite("exchange_ts_ns", &lrvx::PyOrder::exchange_ts_ns);
 

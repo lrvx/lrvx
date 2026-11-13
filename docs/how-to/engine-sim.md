@@ -72,7 +72,7 @@ The strategy's orders reach the simulator through the runner's executor hook:
 
 | Strategy call | Simulator |
 |---------------|-----------|
-| an order (`market_buy`, `limit_sell`, ...) | `submit_order` under the order's id, with the trigger of a stop or take-profit order and the offset of a trailing stop. They used to be left out, so a stop reached the simulator without its trigger. `trailing_stop_percent` is refused (the order a runner hands an executor has no field for the rate); use `trailing_stop(offset=...)` |
+| an order (`market_buy`, `limit_sell`, ...) | `submit_order` under the order's id, with the trigger of a stop or take-profit order and the offset of a trailing stop. They used to be left out, so a stop reached the simulator without its trigger. A `trailing_stop_percent` goes with its callback rate (`trailing_bps`), which `Order.trailing_bps` carries to an executor; it used to be refused |
 | `cancel_order(id)` | `cancel_order(id)` |
 | `cancel_all_orders()` | `cancel_all(symbol)` |
 | `modify_order(id, price, qty)` | `cancel_order(id)`, then `submit_order` of the order with its new price and quantity under the same id. A modify used to be dropped: the hook had no `replace`. |

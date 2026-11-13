@@ -6693,8 +6693,82 @@ struct LrvxReplaySourceImpl
   LrvxReplaySourceCallbacks cb;
 };
 
+// LrvxOrder has no field for a trailing stop's callback rate and its shape
+// is frozen, so the rate travels beside the struct: while a callback is
+// running with an LrvxOrder, that pointer answers lrvx_order_trailing_bps on
+// the thread the callback runs on.
+struct TrailingBpsInCallback
+{
+  const LrvxOrder* order;
+  int32_t bps;
+};
+inline thread_local std::vector<TrailingBpsInCallback> t_trailingBpsInCallback;
+
+class TrailingBpsScope
+{
+ public:
+  TrailingBpsScope(const LrvxOrder* order, int32_t bps) : _order(bps != 0 ? order : nullptr)
+  {
+    if (_order != nullptr)
+    {
+      t_trailingBpsInCallback.push_back({_order, bps});
+    }
+  }
+  ~TrailingBpsScope()
+  {
+    if (_order == nullptr)
+    {
+      return;
+    }
+    auto& open = t_trailingBpsInCallback;
+    for (auto it = open.rbegin(); it != open.rend(); ++it)
+    {
+      if (it->order == _order)
+      {
+        open.erase(std::next(it).base());
+        break;
+      }
+    }
+  }
+  TrailingBpsScope(const TrailingBpsScope&) = delete;
+  TrailingBpsScope& operator=(const TrailingBpsScope&) = delete;
+
+ private:
+  const LrvxOrder* _order;
+};
+
+inline int32_t trailingBpsInCallback(const LrvxOrder* order) noexcept
+{
+  const auto& open = t_trailingBpsInCallback;
+  for (auto it = open.rbegin(); it != open.rend(); ++it)
+  {
+    if (it->order == order)
+    {
+      return it->bps;
+    }
+  }
+  return 0;
+}
+
+// An LrvxOrder on its way into a binding callback, with its trailing
+// callback rate readable for as long as it lives. Lives where it was made:
+// its address is what the accessor is asked about.
+class PackedOrder : public LrvxOrder
+{
+ public:
+  PackedOrder(const LrvxOrder& order, int32_t trailingBps)
+      : LrvxOrder(order), _scope(this, trailingBps)
+  {
+  }
+  PackedOrder(const PackedOrder&) = delete;
+  PackedOrder& operator=(const PackedOrder&) = delete;
+
+ private:
+  TrailingBpsScope _scope;
+};
+
 // Pack a lrvx::Order into the ABI-stable LrvxOrder for binding callbacks.
-inline LrvxOrder packOrder(const lrvx::Order& o) noexcept
+inline PackedOrder packOrder(const lrvx::Order& o)
 {
   LrvxOrder fo{};
   fo.id = o.id;
@@ -6721,7 +6795,7 @@ inline LrvxOrder packOrder(const lrvx::Order& o) noexcept
   fo.exchange_ts_ns = o.exchangeTimestamp.has_value()
                           ? o.exchangeTimestamp->time_since_epoch().count()
                           : 0;
-  return fo;
+  return PackedOrder(fo, o.trailingCallbackRate);
 }
 
 struct LrvxExecutionListenerImpl
@@ -7184,10 +7258,22 @@ inline LrvxOrder signalToLrvxOrder(const Signal& sig) noexcept
 class ForwardedOrders
 {
  public:
-  void put(const LrvxOrder& order)
+  void put(const LrvxOrder& order, int32_t trailingBps = 0)
   {
     std::lock_guard lock(_mutex);
     _orders[order.id] = order;
+    if (trailingBps != 0)
+    {
+      _trailingBps[order.id] = trailingBps;
+    }
+  }
+  // The callback rate a percent trailing stop on record was sent with; 0 for
+  // every other order.
+  int32_t trailingBpsOf(uint64_t id)
+  {
+    std::lock_guard lock(_mutex);
+    const auto it = _trailingBps.find(id);
+    return it == _trailingBps.end() ? 0 : it->second;
   }
   // The two legs of an OCO. The venue cancels one when the other fills or
   // is cancelled, so whatever takes one off the record takes both.
@@ -7216,6 +7302,7 @@ class ForwardedOrders
   {
     std::lock_guard lock(_mutex);
     _orders.erase(id);
+    _trailingBps.erase(id);
     if (const auto it = _ocoSibling.find(id); it != _ocoSibling.end())
     {
       const uint64_t sibling = it->second;
@@ -7235,12 +7322,17 @@ class ForwardedOrders
     std::erase_if(_ocoSibling,
                   [&](const auto& entry)
                   { return _orders.find(entry.first) == _orders.end(); });
+    // order: not observable -- every rate whose order is gone is dropped
+    std::erase_if(_trailingBps,
+                  [&](const auto& entry)
+                  { return _orders.find(entry.first) == _orders.end(); });
   }
   void clear()
   {
     std::lock_guard lock(_mutex);
     _orders.clear();
     _ocoSibling.clear();
+    _trailingBps.clear();
   }
   // Applies `change` to the order on record under `id`, in place, and
   // returns the result; nullopt when the id is not on record.
@@ -7265,6 +7357,8 @@ class ForwardedOrders
   std::unordered_map<uint64_t, LrvxOrder> _orders;
   // Each OCO leg on record -> the other leg.
   std::unordered_map<uint64_t, uint64_t> _ocoSibling;
+  // Percent trailing stops on record -> their callback rate in bps.
+  std::unordered_map<uint64_t, int32_t> _trailingBps;
   std::atomic<uint64_t> _nextLegId{lrvx::kRunnerOrderIdBase + 1};
 };
 
@@ -7528,10 +7622,11 @@ class RunnerSignalHandler : public ISignalHandler
           // the record.
           if (restsOnTheVenue(sig))
           {
-            _forwarded->put(fo);
+            _forwarded->put(fo, sig.trailingCallbackRate);
           }
           if (exec->cb.submit != nullptr)
           {
+            const TrailingBpsScope rate(&fo, sig.trailingCallbackRate);
             exec->cb.submit(exec->cb.user_data, &fo);
           }
           break;
@@ -7573,6 +7668,7 @@ class RunnerSignalHandler : public ISignalHandler
           }
           if (exec->cb.replace != nullptr)
           {
+            const TrailingBpsScope rate(&*fo, _forwarded->trailingBpsOf(sig.orderId));
             exec->cb.replace(exec->cb.user_data, sig.orderId, &*fo);
           }
           break;
@@ -9645,6 +9741,14 @@ void lrvx_runner_set_executor(LrvxRunnerHandle runner, LrvxExecutorHandle execut
   toRunner(runner)->setExecutor(
       static_cast<capi_impl::LrvxExecutorImpl*>(executor));
   LRVX_CAPI_LEAVE_VOID;
+}
+
+int32_t lrvx_order_trailing_bps(const LrvxOrder* order)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  LRVX_CAPI_REQUIRE(order);
+  return trailingBpsInCallback(order);
+  LRVX_CAPI_LEAVE;
 }
 
 void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id)

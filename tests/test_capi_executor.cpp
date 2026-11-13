@@ -48,6 +48,14 @@ struct ExecState
   LrvxOrder last_replace_order{};
   LrvxOrder last_oco_first{};
   LrvxOrder last_oco_second{};
+
+  // lrvx_order_trailing_bps asked inside the callback, of the pointer the
+  // callback was handed and of a copy of the struct.
+  int32_t last_submit_trailing_bps{-1};
+  int32_t last_submit_copy_trailing_bps{-1};
+  int64_t last_submit_trailing_offset_raw{-1};
+  int32_t last_replace_trailing_bps{-1};
+  const LrvxOrder* last_submit_pointer{nullptr};
 };
 
 void ex_submit(void* ud, const LrvxOrder* o)
@@ -60,6 +68,11 @@ void ex_submit(void* ud, const LrvxOrder* o)
   s->last_submit_type = o->type;
   s->last_submit_price_raw = o->price_raw;
   s->last_submit_qty_raw = o->quantity_raw;
+  s->last_submit_trailing_offset_raw = o->trailing_offset_raw;
+  s->last_submit_trailing_bps = lrvx_order_trailing_bps(o);
+  const LrvxOrder copy = *o;
+  s->last_submit_copy_trailing_bps = lrvx_order_trailing_bps(&copy);
+  s->last_submit_pointer = o;
 }
 void ex_cancel(void* ud, uint64_t id)
 {
@@ -79,6 +92,7 @@ void ex_replace(void* ud, uint64_t old_id, const LrvxOrder* o)
   s->replace++;
   s->last_replace_old_id = old_id;
   s->last_replace_order = *o;
+  s->last_replace_trailing_bps = lrvx_order_trailing_bps(o);
 }
 void ex_oco(void* ud, const LrvxOrder* first, const LrvxOrder* second)
 {
@@ -601,6 +615,110 @@ TEST(CapiExecutor, BacktestRunnerSetExecutorRoutesSignals)
   EXPECT_EQ(rc, 1);
   EXPECT_GE(s.submit.load(), 1)
       << "BacktestRunner must route through the binding executor when set";
+
+  lrvx_strategy_destroy(strat);
+  lrvx_backtest_runner_destroy(btr);
+  lrvx_registry_destroy(registry);
+  lrvx_executor_destroy(exec);
+}
+
+// LrvxOrder has a trailing offset and no callback rate, so a percent trailing
+// stop reached an executor as a trailing stop with nothing to trail by.
+TEST(CapiExecutor, APercentTrailingStopCarriesItsCallbackRateToTheExecutor)
+{
+  ExecState s;
+  auto* exec = lrvx_executor_create(make_cb(s));
+  auto* registry = lrvx_registry_create();
+  const uint32_t sym = lrvx_registry_add_symbol(registry, "test", "BTC", 0.01);
+  auto* runner = lrvx_runner_create(registry, nullptr, nullptr);
+  lrvx_runner_set_executor(runner, exec);
+  uint32_t syms[] = {sym};
+  LrvxStrategyCallbacks scb{};
+  auto* strat = lrvx_strategy_create(1, syms, 1, registry, scb);
+  lrvx_runner_add_strategy(runner, strat);
+
+  const uint64_t percent = lrvx_emit_trailing_stop_percent(strat, sym, 1, 150, 100000000LL);
+  ASSERT_EQ(s.submit.load(), 1);
+  EXPECT_EQ(s.last_submit_id, percent);
+  EXPECT_EQ(s.last_submit_type, 6) << "TRAILING_STOP";
+  EXPECT_EQ(s.last_submit_trailing_offset_raw, 0);
+  EXPECT_EQ(s.last_submit_trailing_bps, 150);
+  EXPECT_EQ(s.last_submit_copy_trailing_bps, 0) << "a copy of the struct is not the order";
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_order_trailing_bps(s.last_submit_pointer), 0)
+      << "the pointer answers only inside its callback";
+
+  // A modify is sent as the order it names, rate included.
+  lrvx_emit_modify(strat, percent, 9900000000LL, 50000000LL);
+  ASSERT_EQ(s.replace.load(), 1);
+  EXPECT_EQ(s.last_replace_trailing_bps, 150);
+
+  // A fixed-offset trailing stop and a limit order read 0.
+  lrvx_emit_trailing_stop(strat, sym, 1, 200000000LL, 100000000LL);
+  EXPECT_EQ(s.last_submit_trailing_offset_raw, 200000000LL);
+  EXPECT_EQ(s.last_submit_trailing_bps, 0);
+  lrvx_emit_limit_buy(strat, sym, 10000000000LL, 100000000LL);
+  EXPECT_EQ(s.last_submit_trailing_bps, 0);
+
+  // The record forgets the rate with the order.
+  lrvx_emit_cancel(strat, percent);
+  lrvx_emit_modify(strat, percent, 9900000000LL, 50000000LL);
+  EXPECT_EQ(s.replace.load(), 1) << "a cancelled order is not modified";
+
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_order_trailing_bps(nullptr), 0);
+  EXPECT_NE(lrvx_last_error_code(), 0);
+  lrvx_clear_last_error();
+
+  lrvx_runner_destroy(runner);
+  lrvx_strategy_destroy(strat);
+  lrvx_registry_destroy(registry);
+  lrvx_executor_destroy(exec);
+}
+
+// The backtest runner's executor path packs a whole Order; the rate is on it.
+TEST(CapiExecutor, ABacktestExecutorReadsTheCallbackRateToo)
+{
+  ExecState s;
+  auto* exec = lrvx_executor_create(make_cb(s));
+  auto* registry = lrvx_registry_create();
+  const uint32_t sym = lrvx_registry_add_symbol(registry, "test", "BTC", 0.01);
+  auto* btr = lrvx_backtest_runner_create(registry, 0.0, 10000.0);
+  lrvx_backtest_runner_set_executor(btr, exec);
+
+  struct St
+  {
+    LrvxStrategyHandle h;
+    uint32_t sym;
+    bool fired;
+  } st{nullptr, sym, false};
+  auto on_bar = +[](void* ud, const LrvxSymbolContext*, const LrvxBarData*)
+  {
+    auto* p = static_cast<St*>(ud);
+    if (!p->fired)
+    {
+      p->fired = true;
+      lrvx_emit_trailing_stop_percent(p->h, p->sym, 1, 75, 100000000LL);
+    }
+  };
+  LrvxStrategyCallbacks scb{};
+  scb.on_bar = on_bar;
+  scb.user_data = &st;
+  uint32_t syms[] = {sym};
+  auto* strat = lrvx_strategy_create(1, syms, 1, registry, scb);
+  st.h = strat;
+  lrvx_backtest_runner_set_strategy(btr, strat);
+
+  int64_t starts[1] = {1'000'000'000};
+  int64_t ends[1] = {1'999'999'999};
+  double opens[1] = {100.0}, highs[1] = {101.0}, lows[1] = {99.0};
+  double closes[1] = {100.5}, volumes[1] = {10.0};
+  LrvxBacktestStats stats{};
+  ASSERT_EQ(lrvx_backtest_runner_run_bars(btr, starts, ends, opens, highs, lows, closes, volumes,
+                                          1, "BTC", 0, 0, &stats),
+            1);
+  ASSERT_GE(s.submit.load(), 1);
+  EXPECT_EQ(s.last_submit_trailing_bps, 75);
 
   lrvx_strategy_destroy(strat);
   lrvx_backtest_runner_destroy(btr);

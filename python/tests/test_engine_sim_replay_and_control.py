@@ -29,7 +29,7 @@ def _registry():
 
 
 def _order(order_id, order_type, *, side="sell", price=0.0, quantity=1.0, trigger=0.0,
-           offset=0.0):
+           offset=0.0, bps=0):
     order = lrvx.Order()
     order.id = order_id
     order.side = side
@@ -40,6 +40,7 @@ def _order(order_id, order_type, *, side="sell", price=0.0, quantity=1.0, trigge
     order.time_in_force = "gtc"
     order.trigger_price = trigger
     order.trailing_offset = offset
+    order.trailing_bps = bps
     return order
 
 
@@ -97,15 +98,75 @@ def test_a_stop_reaches_the_simulator_with_its_trigger():
     assert sim.calls[1][3] == 94.5, "a stop-limit keeps its limit price beside the trigger"
 
 
-def test_a_trailing_stop_with_no_offset_is_refused():
-    """A percent trailing stop: the executor's order has no field for the
-    rate, and submitting it without one would be some other order."""
+def test_a_trailing_stop_with_neither_offset_nor_rate_is_refused():
     sim = RecordingSim()
     bridge = engine_cli._make_sim_bridge(sim)
     with pytest.raises(ValueError) as excinfo:
         bridge.submit(_order(4, "trailing_stop"))
-    assert "trailing_stop_percent" in str(excinfo.value)
+    assert "neither" in str(excinfo.value)
     assert sim.calls == []
+
+
+def test_a_percent_trailing_stop_reaches_the_simulator_with_its_rate():
+    """The order a runner hands an executor had no field for the rate, so
+    the bridge refused every trailing_stop_percent."""
+    sim = RecordingSim()
+    bridge = engine_cli._make_sim_bridge(sim)
+    bridge.submit(_order(5, "trailing_stop", bps=150))
+    kwargs = sim.calls[0][5]
+    assert kwargs["trailing_bps"] == 150
+    assert kwargs["trailing_offset"] == 0.0
+
+
+class TrailsByPercent(lrvx.Strategy):
+    def __init__(self, symbols):
+        super().__init__(symbols)
+        self.order_id = None
+
+    def on_trade(self, ctx, trade):
+        if self.order_id is None:
+            self.order_id = self.trailing_stop_percent("sell", 200, 1.0)
+
+
+class Collecting(lrvx.Executor):
+    def __init__(self):
+        super().__init__()
+        self.orders = []
+
+    def submit(self, order):
+        self.orders.append((order.order_type, order.trailing_offset, order.trailing_bps))
+
+
+def test_an_executor_reads_the_rate_of_the_order_it_is_handed():
+    reg, sym = _registry()
+    runner = lrvx.Runner(reg, lambda signal: None)
+    executor = Collecting()
+    runner.set_executor(executor)
+    strategy = TrailsByPercent([sym])
+    runner.add_strategy(strategy)
+    runner.start()
+    runner.on_trade(sym, 100.0, 1.0, True, T0)
+    runner.stop()
+    assert executor.orders == [("trailing_stop", 0.0, 200)]
+
+
+def test_a_percent_trailing_stop_trails_in_the_real_simulator():
+    reg, sym = _registry()
+    sim = lrvx.SimulatedExecutor()
+    bridge = engine_cli._make_sim_bridge(sim)
+    runner = lrvx.Runner(reg, lambda signal: None)
+    runner.set_executor(bridge)
+    strategy = TrailsByPercent([sym])
+    runner.add_strategy(strategy)
+    runner.start()
+    sim.on_best_levels(int(sym), 100.0, 5.0, 100.5, 5.0)
+    runner.on_trade(sym, 100.0, 1.0, True, T0)
+    assert strategy.order_id, lrvx.last_error()
+    sim.on_trade(int(sym), 110.0, True)
+    assert sim.fill_count == 0, "the stop trails 2% under the high"
+    sim.on_trade(int(sym), 107.0, False)
+    assert sim.fill_count == 1, "110 less 2% is 107.8"
+    runner.stop()
 
 
 def test_a_stop_triggers_where_it_says_in_the_real_simulator():
