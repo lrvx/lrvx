@@ -114,6 +114,12 @@ void LrvxJsStrategy::loadStdlib()
   const char* registerCode = R"(
     var __lrvx_registered_strategy = null;
 
+    // The default for an argument that was left out, where the default is
+    // not 0. `value || fallback` also replaced a 0 the caller wrote.
+    function __lrvxOr(value, fallback) {
+      return value === undefined || value === null ? fallback : value;
+    }
+
     class OrderBook {
       // An omitted tick size defaults; an explicit 0 is an error and has to
       // reach the book, which rejects it. `||` turned it into 0.01 instead.
@@ -131,8 +137,8 @@ void LrvxJsStrategy::loadStdlib()
       bestAsk() { return __lrvx_book_best_ask(this._h); }
       mid() { return __lrvx_book_mid(this._h); }
       spread() { return __lrvx_book_spread(this._h); }
-      getBids(maxLevels) { return __lrvx_book_get_bids(this._h, maxLevels || 20); }
-      getAsks(maxLevels) { return __lrvx_book_get_asks(this._h, maxLevels || 20); }
+      getBids(maxLevels) { return __lrvx_book_get_bids(this._h, __lrvxOr(maxLevels, 20)); }
+      getAsks(maxLevels) { return __lrvx_book_get_asks(this._h, __lrvxOr(maxLevels, 20)); }
       isCrossed() { return __lrvx_book_is_crossed(this._h); }
       clear() { __lrvx_book_clear(this._h); }
     }
@@ -168,7 +174,7 @@ void LrvxJsStrategy::loadStdlib()
         // JS convention: type 0 = market (default), 1 = limit.
         // C API convention: LIMIT=0, MARKET=1.
         var cType = (type === 1) ? 0 : 1;
-        __lrvx_simulated_executor_submit(this._h, id, side === "buy" ? 0 : 1, price, qty, cType, symbol || 1);
+        __lrvx_simulated_executor_submit(this._h, id, side === "buy" ? 0 : 1, price, qty, cType, __lrvxOr(symbol, 1));
       }
       onBar(symbol, closePrice) { __lrvx_simulated_executor_on_bar(this._h, symbol, closePrice); }
       // Open-aware form: moves the market to the open (releasing any order
@@ -223,7 +229,7 @@ void LrvxJsStrategy::loadStdlib()
       }
       setQueueModel(model, depth) {
         __lrvx_simulated_executor_set_queue_model(this._h, _queueCode("setQueueModel", model),
-                                                  depth || 1);
+                                                  __lrvxOr(depth, 1));
       }
       setQueueFifoTopN(topN) {
         __lrvx_simulated_executor_set_queue_fifo_top_n(this._h, topN || 0);
@@ -241,7 +247,7 @@ void LrvxJsStrategy::loadStdlib()
           return 0;
         };
         __lrvx_simulated_executor_submit_bracket(
-          this._h, opts.bracketId, opts.symbol || 1,
+          this._h, opts.bracketId, __lrvxOr(opts.symbol, 1),
           sideU(opts.entrySide), typeU(opts.entryType),
           opts.entryPrice, opts.quantity,
           sideU(opts.tpSide), typeU(opts.tpType), opts.tpPrice,
@@ -255,7 +261,7 @@ void LrvxJsStrategy::loadStdlib()
       }
       submitIceberg(id, side, price, total, visible, symbol) {
         __lrvx_simulated_executor_submit_iceberg(this._h, id, side === "buy" ? 0 : 1,
-          price, total, visible, symbol || 1);
+          price, total, visible, __lrvxOr(symbol, 1));
       }
       setIcebergRefreshLatency(latencyNs) {
         __lrvx_simulated_executor_set_iceberg_refresh_latency(this._h, latencyNs || 0);
@@ -280,7 +286,7 @@ void LrvxJsStrategy::loadStdlib()
       autoRandomOutages(perDay, meanDurationNs, onOpenOrders, seed) {
         __lrvx_venue_availability_auto_random_outages(
           this._h, perDay, meanDurationNs,
-          _outageMap[onOpenOrders || "cancel_all"] || 0, seed || 0xC0FFEE);
+          _outageMap[onOpenOrders || "cancel_all"] || 0, __lrvxOr(seed, 0xC0FFEE));
       }
       isUp(nowNs) { return __lrvx_venue_availability_is_up(this._h, nowNs); }
       get handle() { return this._h; }
@@ -295,7 +301,7 @@ void LrvxJsStrategy::loadStdlib()
           usePercentageFee === undefined || usePercentageFee ? 1 : 0,
           fixedFeePerTrade || 0,
           riskFreeRate || 0,
-          annualizationFactor || 252.0);
+          __lrvxOr(annualizationFactor, 252.0));
       }
       destroy() { __lrvx_backtest_result_destroy(this._h); }
       recordFill(orderId, symbol, side, price, qty, timestampNs) {
@@ -323,7 +329,7 @@ void LrvxJsStrategy::loadStdlib()
     }
 
     class VolumeProfile {
-      constructor(tickSize) { this._h = __lrvx_vprofile_create(tickSize || 0.01); }
+      constructor(tickSize) { this._h = __lrvx_vprofile_create(__lrvxOr(tickSize, 0.01)); }
       destroy() { __lrvx_vprofile_destroy(this._h); }
       addTrade(price, qty, isBuy) { __lrvx_vprofile_add_trade(this._h, price, qty, isBuy ? 1 : 0); }
       poc() { return __lrvx_vprofile_poc(this._h); }
@@ -346,7 +352,7 @@ void LrvxJsStrategy::loadStdlib()
     }
 
     class FootprintBar {
-      constructor(tickSize) { this._h = __lrvx_fp_create(tickSize || 0.01); }
+      constructor(tickSize) { this._h = __lrvx_fp_create(__lrvxOr(tickSize, 0.01)); }
       destroy() { __lrvx_fp_destroy(this._h); }
       addTrade(price, qty, isBuy) { __lrvx_fp_add_trade(this._h, price, qty, isBuy ? 1 : 0); }
       totalDelta() { return __lrvx_fp_total_delta(this._h); }
@@ -356,7 +362,8 @@ void LrvxJsStrategy::loadStdlib()
 
     class MarketProfile {
       constructor(tickSize, periodMinutes, sessionStartNs) {
-        this._h = __lrvx_mp_create(tickSize || 0.01, periodMinutes || 30, sessionStartNs || 0);
+        this._h = __lrvx_mp_create(__lrvxOr(tickSize, 0.01), __lrvxOr(periodMinutes, 30),
+                                   sessionStartNs || 0);
       }
       destroy() { __lrvx_mp_destroy(this._h); }
       addTrade(timestampNs, price, qty, isBuy) { __lrvx_mp_add_trade(this._h, timestampNs, price, qty, isBuy ? 1 : 0); }
@@ -406,8 +413,8 @@ void LrvxJsStrategy::loadStdlib()
       constructor(opts) {
         opts = opts || {};
         this._h = __lrvx_ojt_create(
-          opts.maxOrders || 1000000,
-          opts.maxRecordsPerOrder || 64,
+          __lrvxOr(opts.maxOrders, 1000000),
+          __lrvxOr(opts.maxRecordsPerOrder, 64),
           opts.sampleRate === undefined ? 1.0 : opts.sampleRate,
           opts.sampleSalt || 0);
       }
@@ -581,7 +588,7 @@ void LrvxJsStrategy::loadStdlib()
       constructor(dataDir) { this._h = __lrvx_part_create(dataDir); }
       destroy() { __lrvx_part_destroy(this._h); }
       byTime(numPartitions, warmupNs) {
-        return __lrvx_part_by_time(this._h, numPartitions || 2, warmupNs || 0);
+        return __lrvx_part_by_time(this._h, __lrvxOr(numPartitions, 2), warmupNs || 0);
       }
       byDuration(durationNs, warmupNs) {
         return __lrvx_part_by_duration(this._h, durationNs, warmupNs || 0);
@@ -788,7 +795,7 @@ void LrvxJsStrategy::loadStdlib()
       DeltaBookEncoder: class {
         constructor(opts) {
           var o = opts || {};
-          this._h = __lrvx_delta_book_encoder_create(o.anchorEvery || 100);
+          this._h = __lrvx_delta_book_encoder_create(__lrvxOr(o.anchorEvery, 100));
         }
         destroy() {
           if (this._h) { __lrvx_delta_book_encoder_destroy(this._h); this._h = null; }

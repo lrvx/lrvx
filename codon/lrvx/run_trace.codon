@@ -1,10 +1,9 @@
 # lrvx/run_trace.codon -- .lrvxrun strategy-trace recorder + reader.
 #
 # Wraps the C ABI handles. The recorder writes signal / order-event /
-# fill records; the reader reports per-kind counts. Per-record
-# accessors are exposed only for the headline numeric fields. Variable
-# payloads (signal name, payload bytes, order reason) round-trip
-# faithfully on disk; the Python and Node bindings expose them.
+# fill records; the reader reports per-kind counts and reads every record
+# back (read_all_signals / read_all_order_events / read_all_fills), with
+# the same fields the Python and Node readers return.
 
 # The C ABI handshake runs when this module is imported: see
 # lrvx/abi.codon. Every module that declares a `from C import`
@@ -16,7 +15,7 @@ from C import lrvx_run_recorder_create(cobj, cobj, cobj, int) -> cobj
 from C import lrvx_run_recorder_destroy(cobj)
 from C import lrvx_run_recorder_add_tape_ref(cobj, cobj, cobj, int, int)
 from C import lrvx_run_recorder_set_run_ended_ns(cobj, int)
-from C import lrvx_run_recorder_write_signal(cobj, int, int, u32, u32, int, cobj, int, cobj, int, cobj, int)
+from C import lrvx_run_recorder_write_signal64(cobj, int, int, int, u32, int, cobj, int, cobj, int, cobj, int)
 from C import lrvx_run_recorder_write_order_event(cobj, int, int, int, int, int, int, u32, u8, u8, u8, u32, cobj, int)
 from C import lrvx_run_recorder_write_fill(cobj, int, int, int, int, int, int, int, u32, u8, u8)
 from C import lrvx_run_recorder_close(cobj)
@@ -28,6 +27,17 @@ from C import lrvx_run_reader_signal_count(cobj) -> int
 from C import lrvx_run_reader_signal_id64(cobj, int) -> int
 from C import lrvx_run_reader_order_event_count(cobj) -> int
 from C import lrvx_run_reader_fill_count(cobj) -> int
+from C import lrvx_run_reader_strategy_id(cobj, cobj, int) -> int
+from C import lrvx_run_reader_strategy_hash(cobj, cobj, int) -> int
+from C import lrvx_run_reader_tape_ref_count(cobj) -> int
+from C import lrvx_run_reader_tape_ref_path(cobj, int, cobj, int) -> int
+from C import lrvx_run_reader_signal_header(cobj, int, Ptr[int], Ptr[int], Ptr[u32], Ptr[u32], Ptr[int], Ptr[int], Ptr[int], Ptr[int])
+from C import lrvx_run_reader_signal_name(cobj, int, cobj, int) -> int
+from C import lrvx_run_reader_signal_symbol_ids(cobj, int, Ptr[u32], int) -> int
+from C import lrvx_run_reader_signal_payload(cobj, int, cobj, int) -> int
+from C import lrvx_run_reader_order_event_header(cobj, int, Ptr[int], Ptr[int], Ptr[int], Ptr[int], Ptr[int], Ptr[int], Ptr[u32], Ptr[u8], Ptr[u8], Ptr[u8], Ptr[u32], Ptr[int])
+from C import lrvx_run_reader_order_event_reason(cobj, int, cobj, int) -> int
+from C import lrvx_run_reader_fill(cobj, int, Ptr[int], Ptr[int], Ptr[int], Ptr[int], Ptr[int], Ptr[int], Ptr[int], Ptr[u32], Ptr[u8], Ptr[u8])
 
 
 def _cstr(s: str) -> Ptr[byte]:
@@ -75,6 +85,50 @@ class TraceCounts:
     fills: int
 
 
+@dataclass
+class TraceSignal:
+    run_ts_ns: int
+    feed_ts_ns: int
+    # The low 32 bits of the id; signal_id64 is the whole id.
+    signal_id: int
+    signal_id64: int
+    flags: int
+    strength_raw: int
+    name: str
+    symbol_ids: List[int]
+    payload: str
+
+
+@dataclass
+class TraceOrderEvent:
+    run_ts_ns: int
+    feed_ts_ns: int
+    order_id: int
+    parent_signal_id: int
+    price_raw: int
+    qty_raw: int
+    symbol_id: int
+    event_kind: int
+    side: int
+    order_type: int
+    flags: int
+    reason: str
+
+
+@dataclass
+class TraceFill:
+    run_ts_ns: int
+    feed_ts_ns: int
+    order_id: int
+    fill_id: int
+    price_raw: int
+    qty_raw: int
+    fee_raw: int
+    symbol_id: int
+    side: int
+    liquidity: int
+
+
 class TraceRecorder:
     _h: cobj
 
@@ -100,11 +154,12 @@ class TraceRecorder:
         name_buf = _cstr(name) if len(name) > 0 else cobj()
         sids_buf = _u32_array(symbol_ids) if len(symbol_ids) > 0 else cobj()
         payload_buf = _cstr(payload) if len(payload) > 0 else cobj()
-        lrvx_run_recorder_write_signal(self._h, run_ts_ns, feed_ts_ns,
-                                         u32(signal_id), u32(flags), strength_raw,
-                                         name_buf, len(name),
-                                         sids_buf, len(symbol_ids),
-                                         payload_buf, len(payload))
+        # The whole 64-bit id is written; it used to be cut to 32 bits.
+        lrvx_run_recorder_write_signal64(self._h, run_ts_ns, feed_ts_ns,
+                                           signal_id, u32(flags), strength_raw,
+                                           name_buf, len(name),
+                                           sids_buf, len(symbol_ids),
+                                           payload_buf, len(payload))
 
     def write_order_event(self, run_ts_ns: int, order_id: int,
                           event_kind: int = 1, side: int = 0,
@@ -159,6 +214,104 @@ class TraceReader:
         """The whole 64-bit id of signal `index` (0 when out of range). For
         a signal a runner captured it is the order id the signal asks for."""
         return lrvx_run_reader_signal_id64(self._h, index)
+
+    def strategy_id(self) -> str:
+        n = lrvx_run_reader_strategy_id(self._h, cobj(), 0)
+        buf = Ptr[byte](n + 1)
+        return str(buf, lrvx_run_reader_strategy_id(self._h, buf, n))
+
+    def strategy_hash(self) -> str:
+        n = lrvx_run_reader_strategy_hash(self._h, cobj(), 0)
+        buf = Ptr[byte](n + 1)
+        return str(buf, lrvx_run_reader_strategy_hash(self._h, buf, n))
+
+    def tape_ref_paths(self) -> List[str]:
+        out = List[str]()
+        for i in range(lrvx_run_reader_tape_ref_count(self._h)):
+            n = lrvx_run_reader_tape_ref_path(self._h, i, cobj(), 0)
+            buf = Ptr[byte](n + 1)
+            out.append(str(buf, lrvx_run_reader_tape_ref_path(self._h, i, buf, n)))
+        return out
+
+    def read_all_signals(self) -> List[TraceSignal]:
+        out = List[TraceSignal]()
+        run_ts = Ptr[int](1)
+        feed_ts = Ptr[int](1)
+        sid = Ptr[u32](1)
+        flags = Ptr[u32](1)
+        strength = Ptr[int](1)
+        name_len = Ptr[int](1)
+        sym_count = Ptr[int](1)
+        payload_len = Ptr[int](1)
+        for i in range(lrvx_run_reader_signal_count(self._h)):
+            lrvx_run_reader_signal_header(self._h, i, run_ts, feed_ts, sid, flags,
+                                           strength, name_len, sym_count, payload_len)
+            name_buf = Ptr[byte](name_len[0] + 1)
+            name = str(name_buf, lrvx_run_reader_signal_name(self._h, i, name_buf, name_len[0]))
+            symbols = List[int]()
+            if sym_count[0] > 0:
+                sym_buf = Ptr[u32](sym_count[0])
+                got = lrvx_run_reader_signal_symbol_ids(self._h, i, sym_buf, sym_count[0])
+                for k in range(got):
+                    symbols.append(int(sym_buf[k]))
+            payload_buf = Ptr[byte](payload_len[0] + 1)
+            payload = str(payload_buf,
+                          lrvx_run_reader_signal_payload(self._h, i, payload_buf, payload_len[0]))
+            out.append(TraceSignal(
+                run_ts_ns=run_ts[0], feed_ts_ns=feed_ts[0], signal_id=int(sid[0]),
+                signal_id64=lrvx_run_reader_signal_id64(self._h, i),
+                flags=int(flags[0]), strength_raw=strength[0], name=name,
+                symbol_ids=symbols, payload=payload))
+        return out
+
+    def read_all_order_events(self) -> List[TraceOrderEvent]:
+        out = List[TraceOrderEvent]()
+        run_ts = Ptr[int](1)
+        feed_ts = Ptr[int](1)
+        order_id = Ptr[int](1)
+        parent = Ptr[int](1)
+        price = Ptr[int](1)
+        qty = Ptr[int](1)
+        symbol = Ptr[u32](1)
+        kind = Ptr[u8](1)
+        side = Ptr[u8](1)
+        order_type = Ptr[u8](1)
+        flags = Ptr[u32](1)
+        reason_len = Ptr[int](1)
+        for i in range(lrvx_run_reader_order_event_count(self._h)):
+            lrvx_run_reader_order_event_header(self._h, i, run_ts, feed_ts, order_id, parent,
+                                                price, qty, symbol, kind, side, order_type,
+                                                flags, reason_len)
+            reason_buf = Ptr[byte](reason_len[0] + 1)
+            reason = str(reason_buf,
+                         lrvx_run_reader_order_event_reason(self._h, i, reason_buf, reason_len[0]))
+            out.append(TraceOrderEvent(
+                run_ts_ns=run_ts[0], feed_ts_ns=feed_ts[0], order_id=order_id[0],
+                parent_signal_id=parent[0], price_raw=price[0], qty_raw=qty[0],
+                symbol_id=int(symbol[0]), event_kind=int(kind[0]), side=int(side[0]),
+                order_type=int(order_type[0]), flags=int(flags[0]), reason=reason))
+        return out
+
+    def read_all_fills(self) -> List[TraceFill]:
+        out = List[TraceFill]()
+        run_ts = Ptr[int](1)
+        feed_ts = Ptr[int](1)
+        order_id = Ptr[int](1)
+        fill_id = Ptr[int](1)
+        price = Ptr[int](1)
+        qty = Ptr[int](1)
+        fee = Ptr[int](1)
+        symbol = Ptr[u32](1)
+        side = Ptr[u8](1)
+        liquidity = Ptr[u8](1)
+        for i in range(lrvx_run_reader_fill_count(self._h)):
+            lrvx_run_reader_fill(self._h, i, run_ts, feed_ts, order_id, fill_id, price, qty,
+                                 fee, symbol, side, liquidity)
+            out.append(TraceFill(
+                run_ts_ns=run_ts[0], feed_ts_ns=feed_ts[0], order_id=order_id[0],
+                fill_id=fill_id[0], price_raw=price[0], qty_raw=qty[0], fee_raw=fee[0],
+                symbol_id=int(symbol[0]), side=int(side[0]), liquidity=int(liquidity[0])))
+        return out
 
     def close(self):
         if self._h != cobj():

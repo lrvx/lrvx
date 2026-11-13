@@ -217,9 +217,30 @@ Each takes a plain JS object, or `null` to detach.
 | `setExecutor(executor)` | Replace the executor. Sync only — `capabilities()` is read inline |
 | `orderClosed(orderId)` | Tell the runner an order it sent to the executor is finished. `orderId` is a `number` or a `bigint` |
 
-With an executor attached the runner keeps every order that can rest, by id, so that `emit.modify` reaches `executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `orderClosed(orderId)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. `emit.cancel` drops the entry by itself, and market, IOC and FOK orders are never kept.
+With an executor attached the runner keeps every order that can rest, by id, so that `emit.modify` reaches `executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `orderClosed(orderId)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. `emit.cancel` drops the entry by itself, and market, IOC and FOK orders are never kept. The two legs of an OCO leave the record together: a cancel of either leg, or `orderClosed` with either leg's id, drops both, because the venue cancels the other leg when one fills or is cancelled.
 
-An `emit.modify` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor. `emit.modify` clears `lrvx.lastError()` on entry, and after a refused one it reads `modify: order <id> is not on record with this executor ... [unknown_order]`.
+An `emit.modify` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor, and after it `lrvx.lastError()` reads `modify: order <id> is not on record with this executor ... [unknown_order]`.
+
+#### Reading why a signal went nowhere
+
+Every `emit.*` function clears `lrvx.lastError()` on entry. Read it right after the emit, inside the callback that emitted: `''` means nothing refused the signal, otherwise it says what did.
+
+| `lrvx.lastError()` ends in | What happened |
+|----------------------------|---------------|
+| `[kill_switch]` | `killSwitch.check` returned `false` |
+| `[order_validator]` | `orderValidator.validate` returned `false` |
+| `[risk_manager]` | `riskManager.allow` returned `false` |
+| `[unknown_order]` | an `emit.modify` named an order the runner's executor record does not hold |
+
+A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached neither on_signal nor the executor [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned; a drop used to leave nothing behind.
+
+#### Argument checks
+
+Every `emit.*` function checks its arguments before it emits and throws a `TypeError` that names the call, such as `emit.cancel(orderId) expected: orderId is a non-negative integer Number or a BigInt`:
+
+- a price, quantity or liquidity must be a `number`;
+- an order id (`emit.cancel`, `emit.modify`) must be a non-negative integer `number` or a `bigint`. `emit.cancel` used to read it unchecked: `NaN`, a negative or a fractional number was converted and a cancel for whatever id came out was emitted, and a `bigint` threw a bare `A number was expected`;
+- the optional symbol must be a `Symbol` or a symbol id; left out or `undefined`, it is the strategy's first symbol.
 
 #### What a hook is handed
 

@@ -10,6 +10,7 @@ from C import lrvx_strategy_create_p(u32, Ptr[u32], u32, cobj, cobj) -> cobj
 from C import lrvx_strategy_set_id(cobj, u32)
 from C import lrvx_registry_get_symbol_name(cobj, u32, cobj, int, cobj, int) -> u8
 from C import lrvx_strategy_destroy(cobj)
+from C import lrvx_clear_last_error()
 from C import lrvx_emit_market_buy(cobj, u32, i64) -> u64
 from C import lrvx_emit_market_sell(cobj, u32, i64) -> u64
 from C import lrvx_emit_limit_buy(cobj, u32, i64, i64) -> u64
@@ -283,44 +284,51 @@ class Strategy:
     # Signal emission -- same API as Python Strategy
     # ------------------------------------------------------------------
 
+    def _emitting(self) -> cobj:
+        """The handle every emit calls through. The last error is cleared
+        first, so last_error() (lrvx.abi) read right after an emit is ""
+        unless that emit left a reason."""
+        lrvx_clear_last_error()
+        return self._handle
+
     def emit_market_buy(self, symbol: int, qty: float) -> int:
         """Submit a market buy order. Returns order ID."""
         return int(lrvx_emit_market_buy(
-            self._handle, u32(symbol),
+            self._emitting(), u32(symbol),
             Quantity.from_double(qty).raw()))
 
     def emit_market_sell(self, symbol: int, qty: float) -> int:
         """Submit a market sell order. Returns order ID."""
         return int(lrvx_emit_market_sell(
-            self._handle, u32(symbol),
+            self._emitting(), u32(symbol),
             Quantity.from_double(qty).raw()))
 
     def emit_limit_buy(self, symbol: int, price: float, qty: float) -> int:
         """Submit a limit buy order. Returns order ID."""
         return int(lrvx_emit_limit_buy(
-            self._handle, u32(symbol),
+            self._emitting(), u32(symbol),
             Price.from_double(price).raw(),
             Quantity.from_double(qty).raw()))
 
     def emit_limit_sell(self, symbol: int, price: float, qty: float) -> int:
         """Submit a limit sell order. Returns order ID."""
         return int(lrvx_emit_limit_sell(
-            self._handle, u32(symbol),
+            self._emitting(), u32(symbol),
             Price.from_double(price).raw(),
             Quantity.from_double(qty).raw()))
 
     def emit_cancel(self, order_id: int):
         """Cancel an order by ID."""
-        lrvx_emit_cancel(self._handle, u64(order_id))
+        lrvx_emit_cancel(self._emitting(), u64(order_id))
 
     def emit_cancel_all(self, symbol: int):
         """Cancel all orders for a symbol."""
-        lrvx_emit_cancel_all(self._handle, u32(symbol))
+        lrvx_emit_cancel_all(self._emitting(), u32(symbol))
 
     def emit_modify(self, order_id: int, new_price: float, new_qty: float):
         """Modify an existing order."""
         lrvx_emit_modify(
-            self._handle, u64(order_id),
+            self._emitting(), u64(order_id),
             Price.from_double(new_price).raw(),
             Quantity.from_double(new_qty).raw())
 
@@ -328,7 +336,7 @@ class Strategy:
                          qty: float) -> int:
         """Submit a stop market order. side: 0=BUY, 1=SELL."""
         return int(lrvx_emit_stop_market(
-            self._handle, u32(symbol), u8(side),
+            self._emitting(), u32(symbol), u8(side),
             Price.from_double(trigger).raw(),
             Quantity.from_double(qty).raw()))
 
@@ -336,7 +344,7 @@ class Strategy:
                         limit_price: float, qty: float) -> int:
         """Submit a stop limit order. side: 0=BUY, 1=SELL."""
         return int(lrvx_emit_stop_limit(
-            self._handle, u32(symbol), u8(side),
+            self._emitting(), u32(symbol), u8(side),
             Price.from_double(trigger).raw(),
             Price.from_double(limit_price).raw(),
             Quantity.from_double(qty).raw()))
@@ -345,7 +353,7 @@ class Strategy:
                                 qty: float) -> int:
         """Submit a take profit market order."""
         return int(lrvx_emit_take_profit_market(
-            self._handle, u32(symbol), u8(side),
+            self._emitting(), u32(symbol), u8(side),
             Price.from_double(trigger).raw(),
             Quantity.from_double(qty).raw()))
 
@@ -353,7 +361,7 @@ class Strategy:
                                limit_price: float, qty: float) -> int:
         """Submit a take profit limit order."""
         return int(lrvx_emit_take_profit_limit(
-            self._handle, u32(symbol), u8(side),
+            self._emitting(), u32(symbol), u8(side),
             Price.from_double(trigger).raw(),
             Price.from_double(limit_price).raw(),
             Quantity.from_double(qty).raw()))
@@ -362,7 +370,7 @@ class Strategy:
                            qty: float) -> int:
         """Submit a trailing stop order."""
         return int(lrvx_emit_trailing_stop(
-            self._handle, u32(symbol), u8(side),
+            self._emitting(), u32(symbol), u8(side),
             Price.from_double(offset).raw(),
             Quantity.from_double(qty).raw()))
 
@@ -370,7 +378,7 @@ class Strategy:
                                    callback_bps: int, qty: float) -> int:
         """Submit a trailing stop with percentage callback (bps). 100 = 1%."""
         return int(lrvx_emit_trailing_stop_percent(
-            self._handle, u32(symbol), u8(side),
+            self._emitting(), u32(symbol), u8(side),
             i32(callback_bps),
             Quantity.from_double(qty).raw()))
 
@@ -378,7 +386,7 @@ class Strategy:
                            tif: int) -> int:
         """Submit a limit buy with TimeInForce. tif: 0=GTC, 1=IOC, 2=FOK, 4=POST_ONLY."""
         return int(lrvx_emit_limit_buy_tif(
-            self._handle, u32(symbol),
+            self._emitting(), u32(symbol),
             Price.from_double(price).raw(),
             Quantity.from_double(qty).raw(),
             u8(tif)))
@@ -387,14 +395,14 @@ class Strategy:
                             tif: int) -> int:
         """Submit a limit sell with TimeInForce."""
         return int(lrvx_emit_limit_sell_tif(
-            self._handle, u32(symbol),
+            self._emitting(), u32(symbol),
             Price.from_double(price).raw(),
             Quantity.from_double(qty).raw(),
             u8(tif)))
 
     def emit_close_position(self, symbol: int) -> int:
         """Close entire position for a symbol (reduce-only market order)."""
-        return int(lrvx_emit_close_position(self._handle, u32(symbol)))
+        return int(lrvx_emit_close_position(self._emitting(), u32(symbol)))
 
     # ------------------------------------------------------------------
     # Context queries

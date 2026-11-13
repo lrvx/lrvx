@@ -83,7 +83,7 @@ max_segment_mb, exchange_id, compression)` and expose `add_symbol`,
 | Field | Default | Description |
 |-------|---------|-------------|
 | `output_dir` | — | Directory for recorded segments. |
-| `max_segment_bytes` | 256 MB | Maximum segment size before rotation. |
+| `max_segment_bytes` | 256 MB | Maximum segment size before rotation; `0` is the default. |
 | `exchange_id` | 0 | Exchange identifier in segment headers. |
 | `compression` | `None` | `None` or `LZ4`. |
 | `metadata` | `nullopt` | Optional `RecordingMetadata` written alongside segments. |

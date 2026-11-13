@@ -25,11 +25,15 @@ using RotationCallback = std::filesystem::path (*)(void* user_data,
                                                    const std::filesystem::path& output_dir,
                                                    uint32_t segment_number);
 
+inline constexpr uint64_t kDefaultMaxSegmentBytes = 256ull << 20;
+
 struct WriterConfig
 {
   std::filesystem::path output_dir;
   std::string output_filename;  // If set, use this filename for first segment
-  uint64_t max_segment_bytes{256ull << 20};
+  // 0 is read as kDefaultMaxSegmentBytes: a bound of zero bytes would give
+  // every event a segment of its own.
+  uint64_t max_segment_bytes{kDefaultMaxSegmentBytes};
   uint64_t buffer_size{64ull << 10};
   uint8_t exchange_id{0};
   bool sync_on_rotate{true};

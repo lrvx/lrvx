@@ -1398,6 +1398,8 @@ extern "C"
   // Data Writer
   // ============================================================
 
+  // max_segment_mb 0 is the 256 MB default, here and in
+  // lrvx_binary_log_recorder_hook_create(_ex).
   LrvxDataWriterHandle lrvx_data_writer_create(const char* output_dir, uint64_t max_segment_mb,
                                                uint8_t exchange_id);
   void lrvx_data_writer_destroy(LrvxDataWriterHandle writer);
@@ -1534,6 +1536,10 @@ extern "C"
   // on record is ignored. A market, IOC or FOK order is never kept and needs
   // no call, and a Cancel the strategy emits drops the entry by itself.
   //
+  // The two legs of an OCO leave the record together: the venue cancels the
+  // other leg when one fills or is cancelled, so a Cancel of either leg, or
+  // this call with either leg's id, drops both.
+  //
   // A Modify that names an id not on record (never forwarded, not an order
   // that rests, cancelled, or reported closed here) is not sent to the
   // executor: lrvx_emit_modify returns with the reason in
@@ -1666,6 +1672,15 @@ extern "C"
                                       int64_t strength_raw, const char* name, size_t name_len,
                                       const uint32_t* symbol_ids, size_t symbol_count,
                                       const uint8_t* payload, size_t payload_len);
+  // lrvx_run_recorder_write_signal with the whole 64-bit id, stored as a
+  // captured signal's is: low 32 bits in signal_id, high 32 in the bytes
+  // after it that used to be reserved. An id below 2^32 writes the same
+  // bytes as lrvx_run_recorder_write_signal.
+  void lrvx_run_recorder_write_signal64(LrvxRunRecorderHandle handle, int64_t run_ts_ns,
+                                        int64_t feed_ts_ns, uint64_t signal_id, uint32_t flags,
+                                        int64_t strength_raw, const char* name, size_t name_len,
+                                        const uint32_t* symbol_ids, size_t symbol_count,
+                                        const uint8_t* payload, size_t payload_len);
   void lrvx_run_recorder_write_order_event(LrvxRunRecorderHandle handle, int64_t run_ts_ns,
                                            int64_t feed_ts_ns, uint64_t order_id,
                                            uint64_t parent_signal_id, int64_t price_raw,
@@ -2480,6 +2495,16 @@ extern "C"
   // Risk
   // ============================================================
 
+  // The kill switch, the order validator and the risk manager are asked in
+  // that order about every signal, and returning 0 drops it. The emit that
+  // produced the signal has already returned an order id, so a drop leaves
+  // its reason in the last error of the emitting thread, the way a refused
+  // Modify does: lrvx_last_error_message reads
+  //   "emit: <type> signal for order <id> on symbol <n> was dropped by the
+  //    <gate>; it reached neither on_signal nor the executor [<token>]"
+  // with <gate> / <token> one of kill switch / kill_switch, order validator /
+  // order_validator, risk manager / risk_manager. Call lrvx_clear_last_error
+  // before the lrvx_emit_* call and read lrvx_last_error_code after it.
   LrvxRiskManagerHandle lrvx_risk_manager_create(LrvxRiskManagerCallbacks callbacks);
   LrvxRiskManagerHandle lrvx_risk_manager_create_p(const LrvxRiskManagerCallbacks* callbacks);
   void lrvx_risk_manager_destroy(LrvxRiskManagerHandle rm);
@@ -2502,11 +2527,13 @@ extern "C"
 
   // validate returns 0 for a segment that fails its checks and for a file it
   // could not read; only the unreadable file leaves a reason in
-  // lrvx_last_error_message. merge returns 0 when no segment was merged, with
-  // the reason there. When it merged some segments and could not open others
-  // it still returns 1, and the last error names each one it skipped
-  // ("merged N segment(s); skipped: Cannot open: <path>; ..."). Call
-  // lrvx_clear_last_error first to tell the cases apart.
+  // lrvx_last_error_message. merge returns 1 only when every input was merged
+  // and at least one event was written, the rule every merge call follows
+  // (LrvxMergeResult.success, lrvx_segment_merge_dir_report). It returns 0
+  // when no segment was merged, with the reason in the last error, and 0 when
+  // it merged some segments and could not open others: the segments that
+  // opened are still written to the output, and the last error names each one
+  // it skipped ("merged N segment(s); skipped: Cannot open: <path>; ...").
   uint8_t lrvx_segment_validate(const char* path);
   uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path);
   /* input_paths is one buffer holding num_paths consecutive NUL-terminated

@@ -85,4 +85,22 @@ check('fill id', fills[0].fillId === 12345);
 check('fill liquidity', fills[0].liquidity === 1);
 
 reader.destroy();
+
+// An id above 32 bits is written whole, as a Number or as a BigInt. It used
+// to be cut to its low half.
+var widePath = path + '_wide';
+var wide = new lrvx.TraceRecorder({ path: widePath, strategyId: 'qjs-wide' });
+wide.writeSignal({ runTsNs: 1n, signalId: 7 * 4294967296 + 5, name: 'number' });
+wide.writeSignal({ runTsNs: 2n, signalId: (7n << 32n) + 6n, name: 'bigint' });
+wide.writeSignal({ runTsNs: 3n, signalId: 4294967295, name: 'small' });
+wide.close();
+var wideReader = new lrvx.TraceReader(widePath);
+var wideSigs = wideReader.readAllSignals();
+check('a wide Number id reads back whole', wideSigs[0].signalId64 === 7 * 4294967296 + 5);
+check('and its low half is signalId', wideSigs[0].signalId === 5);
+check('a wide BigInt id reads back whole', wideSigs[1].signalId64 === 7 * 4294967296 + 6);
+check('an id below 2^32 is unchanged',
+      wideSigs[2].signalId === 4294967295 && wideSigs[2].signalId64 === 4294967295);
+wideReader.destroy();
+
 console.log('quickjs run-trace smoke ok');

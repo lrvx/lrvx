@@ -180,6 +180,11 @@ this.modify(orderId, { price: 50100, qty: 0.2 })
 this.closePosition()
 ```
 
+Every order method above, from `marketBuy` to `closePosition`, clears the last error on entry.
+`lrvx.lastError()`, read right after one inside the callback that called it, is `''` unless that
+call left a reason; a reason an earlier call left (a `recompressSegment` that failed, say) is not
+read as the order's.
+
 ---
 
 ## Context queries

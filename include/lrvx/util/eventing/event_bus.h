@@ -425,12 +425,15 @@ class EventBus : public ISubsystem
       : _cpuAffinity(performance::createCpuAffinity())
 #endif
   {
-    // _constructed is value-initialized to 0, which is its empty state; only
-    // _published has a non-zero one.
-    for (auto& p : _published)
-    {
-      p.store(-1, std::memory_order_relaxed);
-    }
+    // _constructed and _published are value-initialized to 0. For
+    // _constructed that is the empty state. A _published stamp is only ever
+    // compared with the sequence a reader wants from that slot, and the
+    // sequences that map to slot i are i, i + Capacity, i + 2 * Capacity, ...:
+    // 0 is one of them for slot 0 alone. So slot 0 is the one slot whose
+    // zero would read as "sequence 0 is published" and needs a stamp no
+    // sequence equals; every other slot's zero already is one. stop() leaves
+    // the slots a run claimed at -1, which is as good.
+    _published[0].store(-1, std::memory_order_relaxed);
   }
 
   ~EventBus() { stop(); }
@@ -1885,6 +1888,9 @@ class EventBus : public ISubsystem
   inline Event* slot_ptr(size_t idx) noexcept { return std::launder(reinterpret_cast<Event*>(_storage[idx].data)); }
   inline Event& slot_ref(size_t idx) noexcept { return *slot_ptr(idx); }
 
+  // The sequence last published into each slot. Read only as "is it the
+  // sequence I want from this slot"; a slot that holds none carries 0 (never
+  // used; -1 for slot 0, see the constructor) or -1 (emptied by stop()).
   alignas(64) std::array<std::atomic<int64_t>, CapacityPow2> _published{};
   // _constructed values: 0 = empty/reclaimed, 1 = valid event. A slot is
   // stamped only by a publish that owns its sequence, so there is no third

@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 777 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
+**Surface:** 778 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
 
 ## Opaque handles
 
@@ -1430,6 +1430,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `void lrvx_run_recorder_add_tape_ref(LrvxRunRecorderHandle handle, const char * path, const char * content_hash, int64_t first_event_ns, int64_t last_event_ns)`
 - `void lrvx_run_recorder_set_run_ended_ns(LrvxRunRecorderHandle handle, int64_t ns)`
 - `void lrvx_run_recorder_write_signal(LrvxRunRecorderHandle handle, int64_t run_ts_ns, int64_t feed_ts_ns, uint32_t signal_id, uint32_t flags, int64_t strength_raw, const char * name, size_t name_len, const uint32_t * symbol_ids, size_t symbol_count, const uint8_t * payload, size_t payload_len)`
+- `void lrvx_run_recorder_write_signal64(LrvxRunRecorderHandle handle, int64_t run_ts_ns, int64_t feed_ts_ns, uint64_t signal_id, uint32_t flags, int64_t strength_raw, const char * name, size_t name_len, const uint32_t * symbol_ids, size_t symbol_count, const uint8_t * payload, size_t payload_len)`
 - `void lrvx_run_recorder_write_order_event(LrvxRunRecorderHandle handle, int64_t run_ts_ns, int64_t feed_ts_ns, uint64_t order_id, uint64_t parent_signal_id, int64_t price_raw, int64_t qty_raw, uint32_t symbol_id, uint8_t event_kind, uint8_t side, uint8_t order_type, uint32_t flags, const char * reason, size_t reason_len)`
 - `void lrvx_run_recorder_write_fill(LrvxRunRecorderHandle handle, int64_t run_ts_ns, int64_t feed_ts_ns, uint64_t order_id, uint64_t fill_id, int64_t price_raw, int64_t qty_raw, int64_t fee_raw, uint32_t symbol_id, uint8_t side, uint8_t liquidity)`
 - `void lrvx_run_recorder_close(LrvxRunRecorderHandle handle)`

@@ -128,6 +128,23 @@ public:
 | `applyVenueLot`        | The same for the venue's quantity step: writes it into an entry that declares no lot, or whose lot an earlier call applied. |
 | `venueTickLog`         | The ticks `applyVenueTick` and the lots `applyVenueLot` wrote, shared with copies taken earlier. |
 
+### Ids
+
+Every `registerSymbol` overload draws a new id from one sequence: one above the highest id the
+registry has handed out or loaded, starting at 1. `0` is never a symbol's id. It is what a refused
+registration returns: `registerSymbol(ExchangeId, symbol)` for an exchange that is not registered,
+and `registerSymbol(info)` for an invalid scale or for an explicit `info.id` that a symbol with
+another name already holds (nothing is changed then).
+
+The two name overloads used to number from 0 (the size of the id-to-name table) while
+`registerSymbol(info)` numbered from the entry count plus one. The first symbol registered by name
+therefore had id 0, the same value a refused registration returns, and copying its `SymbolInfo`
+into another registry (as `BacktestRunner` does with a strategy's symbols) gave it a different id
+there, because an `info.id` of 0 asks for a new one. A registry that mixes explicit and assigned
+ids now assigns above the highest explicit id, where it used to fill in from the entry count: after
+an explicit id 9, the next assigned id is 10. An explicit id that another symbol holds used to
+replace that symbol's entry while its name still resolved to the id.
+
 ## The venue's tick for an entry registered first
 
 `registerSymbol` never changes an existing entry: it returns its id. The usual live setup registers
@@ -223,14 +240,24 @@ auto bybitEquiv = registry.getEquivalentOnExchange(btcBinance, bybitExchangeId);
 Both writers emit the symbols in ascending id order, so two registries holding the same entries
 write the same bytes however the entries were added; the order used to be the hash map's.
 
+`saveToFile` writes `<path>.tmp` and renames it over `path` only after every write, the flush and
+the close have succeeded. It returns false when the temporary cannot be created, when a write or
+the close fails (a full disk), and when the rename fails; the file that was at `path` is then
+untouched and the temporary is removed. It used to open `path` itself for writing, check nothing
+after that and return true, so a save that ran out of space returned true and had already
+truncated the previous file.
+
 A load either takes the whole input or none of it. `deserialize` returns false and leaves the
 registry with no symbols when the blob is too short for its header, carries another magic or a
 version this build does not read, ends before the last entry its count announces (every read is
-bounds-checked; a truncated blob used to load entries built from zeros and return true), or holds
-an entry whose scale `registerSymbol` would refuse. `loadFromFile` returns false and leaves the
-registry with no symbols when the file does not parse, and when an entry of the `symbols` array
-lacks its `id`, `exchange` or `symbol`; such an entry used to end the load quietly, with the entries
-before it kept and those after it dropped. A file that cannot be opened or is empty returns false
+bounds-checked; a truncated blob used to load entries built from zeros and return true), holds
+an entry whose scale `registerSymbol` would refuse, holds two entries with one id, or has bytes
+left after the last entry its count announces. `loadFromFile` returns false and leaves the
+registry with no symbols when the file does not parse, when an entry of the `symbols` array
+lacks its `id`, `exchange` or `symbol` (such an entry used to end the load quietly, with the entries
+before it kept and those after it dropped), and when two entries carry one id. A duplicate id used
+to load with the later entry in the table and both names resolving to it; trailing bytes used to
+be ignored. A file that cannot be opened or is empty returns false
 and leaves the registry as it was. The exchanges and the equivalence table are not part of either
 format and are not touched by a load, failed or not.
 

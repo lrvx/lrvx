@@ -3,13 +3,17 @@
 #   * the modified order stays on its symbol and side, keeps the id the
 #     strategy holds, and fills at the new price for the new quantity
 #   * the modified order cancels by the same id
+#   * every emit clears the last error first: a reason an earlier call left
+#     is not read after it
 
 from C import lrvx_registry_create() -> cobj
 from C import lrvx_registry_destroy(cobj)
 from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
 
+from lrvx.abi import last_error
 from lrvx.runner import BacktestRunner
 from lrvx.strategy import Strategy, SymbolContext
+from lrvx.tools import validate_segment
 from lrvx.types import BarData, OrderEventData
 
 failed = 0
@@ -38,6 +42,8 @@ class ModifyOnce(Strategy):
     fill_sides: List[str]
     fill_prices: List[float]
     fill_qtys: List[float]
+    stale_before: List[str]
+    errors_after: List[str]
 
     def __init__(self, symbols: List[int], side: str, rest_px: float, new_px: float,
                  new_qty: float, cancel_after: bool):
@@ -54,18 +60,31 @@ class ModifyOnce(Strategy):
         self.fill_sides = list[str]()
         self.fill_prices = list[float]()
         self.fill_qtys = list[float]()
+        self.stale_before = list[str]()
+        self.errors_after = list[str]()
+
+    def leave_a_stale_error(self):
+        """A call that fails and leaves its reason, as any earlier call may."""
+        validate_segment("/no/such/lrvx-modify-order-smoke-segment.lrvx")
+        self.stale_before.append(last_error())
 
     def on_bar(self, ctx: SymbolContext, bar: BarData):
         self.seen += 1
         if self.seen == 1:
+            self.leave_a_stale_error()
             if self.side == "buy":
                 self.order_id = self.limit_buy(self.rest_px, 1.0)
             else:
                 self.order_id = self.limit_sell(self.rest_px, 1.0)
+            self.errors_after.append(last_error())
         elif self.seen == 3:
+            self.leave_a_stale_error()
             self.modify_order(self.order_id, self.new_px, self.new_qty)
+            self.errors_after.append(last_error())
         elif self.seen == 4 and self.cancel_after:
+            self.leave_a_stale_error()
             self.cancel_order(self.order_id)
+            self.errors_after.append(last_error())
 
     def on_fill(self, ctx: SymbolContext, ev: OrderEventData):
         self.fill_ids.append(ev.order_id)
@@ -122,6 +141,14 @@ if len(sell.fill_ids) == 1:
 # it by the strategy's id on the fourth leaves nothing to fill.
 canceled = run("buy", 90.0, 99.0, 2.0, True, 100.5, 98.0)
 check(len(canceled.fill_ids) == 0, "cancel: the modified order cancels by the same id")
+
+# limit, modify and cancel each ran after a call that left a reason behind.
+check(len(canceled.stale_before) == 3, "three emits ran after a failed call")
+for stale in canceled.stale_before:
+    check(stale != "", "the failed call left its reason: " + stale)
+check(len(canceled.errors_after) == 3, "and last_error() was read after each")
+for after in canceled.errors_after:
+    check(after == "", "the emit cleared it: '" + after + "'")
 
 if failed > 0:
     raise ValueError(str(failed) + " check(s) failed")

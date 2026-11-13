@@ -23,7 +23,7 @@ print(f"Merged {result['segments_merged']} segments, {result['events_written']} 
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `success` | `bool` | Whether merge succeeded |
+| `success` | `bool` | `True` only when every input was merged and at least one event was written |
 | `output_path` | `str` | Output file path |
 | `segments_merged` | `int` | Input segments processed |
 | `events_written` | `int` | Events in output |
@@ -40,7 +40,9 @@ result = lrvx.merge_dir("./raw_data", "./merged_data")
 
 A segment that cannot be opened is skipped and listed in `errors` as `"Cannot open: <path>"`; the
 others are still merged, `segments_merged` counts them, and `success` is `False` because `errors`
-is not empty.
+is not empty. `merge` follows the same rule, and so does every other binding and the C API:
+`lrvx_segment_merge`, Node and QuickJS `mergeSegments` and Codon `merge_segments` return false for
+a merge that skipped an input.
 
 ---
 
@@ -185,6 +187,26 @@ if not result['valid']:
 | `has_errors` | `bool` | Has error-level issues |
 | `has_critical` | `bool` | Has critical issues |
 | `issues` | `list[dict]` | Issue details |
+
+Each issue is a dict with `type`, `message`, `severity` (0 info, 1 warning, 2 error, 3 critical),
+`file_offset` and `timestamp_ns`. `type` is an int that says which check failed; compare it with
+the module constants:
+
+| Constant | Meaning |
+|----------|---------|
+| `ISSUE_INVALID_MAGIC`, `ISSUE_INVALID_VERSION`, `ISSUE_INVALID_FLAGS`, `ISSUE_HEADER_CORRUPTED` | the segment header |
+| `ISSUE_FRAME_CRC_MISMATCH`, `ISSUE_FRAME_SIZE_TOO_LARGE`, `ISSUE_FRAME_TYPE_UNKNOWN`, `ISSUE_FRAME_TRUNCATED` | one frame |
+| `ISSUE_BLOCK_MAGIC_INVALID`, `ISSUE_BLOCK_DECOMPRESSION_FAILED`, `ISSUE_BLOCK_SIZE_MISMATCH` | one compressed block |
+| `ISSUE_INDEX_CRC_MISMATCH`, `ISSUE_INDEX_MAGIC_INVALID`, `ISSUE_INDEX_OUT_OF_BOUNDS`, `ISSUE_INDEX_NOT_SORTED` | the index |
+| `ISSUE_TIMESTAMP_OUT_OF_ORDER`, `ISSUE_TIMESTAMP_JUMP_TOO_LARGE`, `ISSUE_EVENT_COUNT_MISMATCH`, `ISSUE_FILE_TRUNCATED` | the events as a whole |
+| `ISSUE_FILE_NOT_FOUND`, `ISSUE_FILE_READ_ERROR` | the file or directory could not be read |
+| `ISSUE_SEGMENT_RANGE_OVERLAP` | dataset level: two segments cover intersecting time ranges |
+
+```python
+missing = [i for i in result["issues"] if i["type"] == lrvx.ISSUE_FILE_NOT_FOUND]
+```
+
+The issues of `validate_dataset` (its own `issues` list and each segment's) carry `type` too.
 
 ### `validate_dataset(data_dir) -> dict`
 

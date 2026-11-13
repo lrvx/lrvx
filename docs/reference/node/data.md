@@ -13,6 +13,10 @@ writer.flush();
 writer.close();
 ```
 
+`maxSegmentMb` of 0, or left out, is the 256 MB default; the same holds for
+`BinaryLogRecorderHook`. An explicit 0 used to be a bound of zero bytes, which gave every event a
+segment of its own.
+
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `writeTrade(exchangeTsNs, recvTsNs, price, qty, tradeId, symbolId, side)` | `boolean` | Write a trade record |
@@ -164,8 +168,12 @@ is missing or cannot be listed.
 `validateSegment(path)`, `validate(path)` and `mergeSegments(inputDir, outputPath)` clear it on
 entry as well. `validateSegment` returns `false`, and `validate` returns `valid: false`, both for a
 segment that fails its checks and for a file that could not be read; only the unreadable file
-leaves a reason, so `''` means the segment was read and is not valid. `mergeSegments` returns
-`false` when no segment was merged, and `lastError()` says why.
+leaves a reason, so `''` means the segment was read and is not valid. `mergeSegments` follows
+the rule `mergeDir`'s `success` does: `true` only when every input was merged and at least one
+event was written. It returns `false` when no segment was merged, and `false` when some inputs
+could not be opened while the others were merged: the output is then written from the inputs that
+opened, and `lastError()` reads `merged N segment(s); skipped: Cannot open: <path>; ...`. It
+returned `true` for such a merge.
 
 ```javascript
 if (!lrvx.recompress('in.lrvx', 'out.lrvx', 'lz4')) {

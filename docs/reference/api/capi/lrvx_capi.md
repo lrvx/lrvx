@@ -646,6 +646,28 @@ All return `OrderId` (`uint64_t`), 0 on failure. `cancel` and `modify` return vo
 | `lrvx_emit_cancel_all(s, sym)` | Cancel all orders for symbol |
 | `lrvx_emit_modify(s, order_id, new_price_raw, new_qty_raw)` | Modify order |
 
+On a runner or a live engine a signal can be refused after the emit has assigned its order id. The
+reason is then in the last error of the thread that emitted: call `lrvx_clear_last_error()` before
+the emit and read `lrvx_last_error_code()` / `lrvx_last_error_message()` after it.
+
+| The message ends in | What happened |
+|---------------------|---------------|
+| `[kill_switch]` | the kill switch's `check` returned 0 |
+| `[order_validator]` | the order validator's `validate` returned 0 |
+| `[risk_manager]` | the risk manager's `allow` returned 0 |
+| `[unknown_order]` | a modify named an order the executor record does not hold |
+
+A drop reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached
+neither on_signal nor the executor [<token>]`; the gates are asked in the order kill switch, order
+validator, risk manager. A drop used to leave nothing behind. The Python, Node, QuickJS and Codon
+emit methods clear the last error on entry themselves.
+
+The record a runner or a live engine keeps of the orders it forwarded to an executor treats the two
+legs of an OCO as one: a cancel of either leg, or `lrvx_runner_order_closed` /
+`lrvx_live_engine_order_closed` with either leg's id, drops both, because the venue cancels the other
+leg when one fills or is cancelled. Each leg used to stay until it was cancelled or closed by its own
+id.
+
 ---
 
 ## Context queries
@@ -1282,9 +1304,12 @@ void lrvx_binary_log_recorder_hook_stats_p(void* hook, void* out);
 ```c
 // Quick validate/merge. validate returns 0 for a segment that fails its
 // checks and for a file it could not read; only the second leaves a reason in
-// lrvx_last_error_message. merge returns 0 when no segment was merged, with
-// the reason there; when it merged some segments and could not open others it
-// returns 1 and the last error lists the ones it skipped.
+// lrvx_last_error_message. merge returns 1 only when every input was merged
+// and at least one event was written, which is what LrvxMergeResult.success
+// and lrvx_segment_merge_dir_report say too. It returns 0 when no segment was
+// merged, with the reason in the last error, and 0 when it merged some
+// segments and could not open others: the output is written from the ones
+// that opened, and the last error lists the ones it skipped.
 uint8_t lrvx_segment_validate(const char* path);
 uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path);
 

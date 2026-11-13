@@ -70,7 +70,20 @@ The validator checks `trade_count`, `fill_count`, the per-fill `(symbol, side, p
 
 It also recomputes `strategy_sha256` and `tape_sha256` from what was actually extracted and re-hashes the running engine's version, then compares all three against the values the manifest recorded at pack time. This catches a bundle whose `strategy.py` or tape changed after packing, even if `expected_output.json` was re-recorded to match the new content. It is not a substitute for signing: the manifest lives unsigned in the same archive it describes, so a party who edits the strategy can recompute these hashes too. What it does catch is accidental drift and an engine-version mismatch, which is the common case this format exists for.
 
-When the bundle ships an `expected.lrvxrun/` trace, the validator also compares its signal, order-event and fill counts with a trace captured from the replay. A trace that is present but cannot be read fails validation with a `lrvxrun_read_error` diff line naming the side and the reader's error; it is never skipped. A bundle with no expected trace (packed before traces rode along) is compared on the JSON fields alone, as before.
+When the bundle ships an `expected.lrvxrun/` trace, the validator also compares it with a trace captured from the replay. What is compared depends on what the expected trace holds, and the result says which in `lrvxrun_compared` (the same value in `actual` and `expected`):
+
+| Bundle | Expected trace holds | Compared | `lrvxrun_compared` |
+|--------|----------------------|----------|--------------------|
+| Manifest has `lrvxrun_signals_recorded: true` (every bundle packed now) | one signal and one submit order event per order the strategy sent, one fill per fill | `lrvxrun_signal_count`, `lrvxrun_order_count`, `lrvxrun_fill_count` | `signals, order events, fills` |
+| No `lrvxrun_signals_recorded`, and the trace has at least one signal or order event | the same three record kinds | the same three counts | `signals, order events, fills` |
+| No `lrvxrun_signals_recorded`, and the trace has no signal and no order event | fills only | `lrvxrun_fill_count` | `fills` |
+| No `expected.lrvxrun/` at all | nothing | the JSON fields alone | key absent |
+
+The third row is a bundle packed while pack lost its signals: the runner's order ids are `(subscriber id << 32) + n`, the trace writer took a 32-bit signal id, and the refused write was swallowed together with the order event that followed it. Such a trace has fills and nothing else, so it cannot say how many signals the run emitted; the replay's signal and order-event counts are left out of both sides instead of being compared with zero. A trace from that time with any signal or order event in it recorded all of them, because one run's ids are all in the same range.
+
+Pack now writes the signal with its whole 64-bit id (`signal_id64` on the record is the order id, and the order event's and the fill's `order_id` equal it), and a signal or order event that cannot be written fails the pack or the replay with a `RuntimeError` naming the trace and the writer's error. Nothing about the trace is skipped quietly.
+
+A trace that is present but cannot be read fails validation with a `lrvxrun_read_error` diff line naming the side and the reader's error; it is never skipped.
 
 If you need stricter comparison (per-fill timestamps, intermediate equity curve), open an issue. The current set is the minimum that catches engine-level regressions; extending it is cheap once a real divergence shows up.
 

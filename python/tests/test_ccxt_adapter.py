@@ -713,6 +713,146 @@ class CcxtBrokerTests(unittest.TestCase):
         asyncio.run(go())
         self.assertEqual(closed, [43, 44])
 
+    def _run_with_orders(self, fake, script, *, errors=None):
+        """Starts a broker on `fake` with the orders stream, hands
+        `script(broker, btc)` the running broker, and returns the broker and
+        the order ids the runner was told are closed."""
+        broker = CcxtBroker(
+            "binance", exchange=fake,
+            on_error=(lambda ctx, e: errors.append((ctx, e))) if errors is not None else None)
+        closed = []
+
+        class RunnerSpy:
+            def __init__(self, inner):
+                self._inner = inner
+
+            def order_closed(self, order_id):
+                closed.append(order_id)
+                self._inner.order_closed(order_id)
+
+            def __getattr__(self, name):
+                return getattr(self._inner, name)
+
+        async def go():
+            btc = await broker.add_symbol("BTC/USDT")
+            broker.add_strategy(lrvx.Strategy([btc]))
+            fake.init_queues()
+            run_task = asyncio.create_task(
+                broker.run(streams=("orders",), reconcile=False))
+            await asyncio.sleep(0)
+            broker._runner = RunnerSpy(broker._runner)
+            await script(broker, btc)
+            await broker.stop()
+            try:
+                await run_task
+            except (asyncio.CancelledError, ValueError):
+                pass
+
+        asyncio.run(go())
+        return broker, closed
+
+    def test_a_terminal_order_update_drops_the_order_from_the_brokers_maps(self):
+        """The maps from lrvx order id to the exchange's id and to what was
+        placed only ever grew: an order that filled, was cancelled by the
+        venue, expired or was rejected stayed in them for the life of the
+        broker."""
+        fake = FakeCcxtExchange()
+        seen = {}
+
+        async def script(broker, btc):
+            for lrvx_id in (42, 43, 44, 45, 46):
+                broker._on_signal(_make_signal(
+                    symbol_id=int(btc), order_type="LIMIT", side="buy",
+                    quantity=0.5, price=99.0, order_id=lrvx_id))
+            await asyncio.sleep(0.02)
+            ids = dict(broker._lrvx_to_ccxt_order)
+            seen.update(ids)
+            fake.feed_orders([
+                {"id": ids[42], "symbol": "BTC/USDT", "status": "open", "filled": 0.1},
+                {"id": ids[43], "symbol": "BTC/USDT", "status": "closed", "filled": 0.5},
+                {"id": ids[44], "symbol": "BTC/USDT", "status": "canceled"},
+                {"id": ids[45], "symbol": "BTC/USDT", "status": "expired"},
+                {"id": ids[46], "symbol": "BTC/USDT", "status": "rejected"},
+            ])
+            await asyncio.sleep(0.05)
+
+        broker, closed = self._run_with_orders(fake, script)
+        self.assertEqual(closed, [43, 44, 45, 46])
+        self.assertEqual(broker._lrvx_to_ccxt_order, {42: seen[42]})
+        self.assertEqual(list(broker._placed_orders), [42])
+        self.assertEqual(broker._ccxt_orders_by_sym, {"BTC/USDT": {seen[42]}})
+
+    def test_the_maps_stay_empty_over_many_closed_orders(self):
+        fake = FakeCcxtExchange()
+
+        async def script(broker, btc):
+            for lrvx_id in range(1000, 1300):
+                broker._on_signal(_make_signal(
+                    symbol_id=int(btc), order_type="LIMIT", side="buy",
+                    quantity=0.5, price=99.0, order_id=lrvx_id))
+            await asyncio.sleep(0.05)
+            fake.feed_orders([
+                {"id": ccxt_id, "symbol": "BTC/USDT", "status": "closed", "filled": 0.5}
+                for ccxt_id in list(broker._lrvx_to_ccxt_order.values())])
+            await asyncio.sleep(0.05)
+
+        broker, closed = self._run_with_orders(fake, script)
+        self.assertEqual(len(closed), 300)
+        self.assertEqual(broker._lrvx_to_ccxt_order, {})
+        self.assertEqual(broker._placed_orders, {})
+        self.assertEqual(broker._ccxt_orders_by_sym, {})
+
+    def test_an_order_the_exchange_answers_as_finished_is_not_kept(self):
+        """A market order is usually closed in the answer to its placement,
+        and no update follows on a broker that runs without the orders
+        stream."""
+
+        class FillsAtOnce(FakeCcxtExchange):
+            async def create_market_buy_order(self, sym, qty):
+                res = self._record("create_market_buy_order", (sym, qty), {})
+                res["status"] = "closed"
+                return res
+
+        fake = FillsAtOnce()
+
+        async def script(broker, btc):
+            for lrvx_id in (7, 8, 9):
+                broker._on_signal(_make_signal(
+                    symbol_id=int(btc), order_type="MARKET", side="buy",
+                    quantity=0.5, order_id=lrvx_id))
+            broker._on_signal(_make_signal(
+                symbol_id=int(btc), order_type="LIMIT", side="buy",
+                quantity=0.5, price=99.0, order_id=10))
+            await asyncio.sleep(0.05)
+
+        broker, closed = self._run_with_orders(fake, script)
+        self.assertEqual(closed, [7, 8, 9])
+        self.assertEqual(list(broker._lrvx_to_ccxt_order), [10])
+        self.assertEqual(list(broker._placed_orders), [10])
+        self.assertEqual({k: len(v) for k, v in broker._ccxt_orders_by_sym.items()},
+                         {"BTC/USDT": 1})
+
+    def test_a_cancel_for_an_order_that_finished_is_reported_not_sent(self):
+        fake = FakeCcxtExchange()
+        errors = []
+
+        async def script(broker, btc):
+            broker._on_signal(_make_signal(
+                symbol_id=int(btc), order_type="LIMIT", side="buy",
+                quantity=0.5, price=99.0, order_id=42))
+            await asyncio.sleep(0.02)
+            fake.feed_orders([{"id": broker._lrvx_to_ccxt_order[42], "symbol": "BTC/USDT",
+                               "status": "closed", "filled": 0.5}])
+            await asyncio.sleep(0.05)
+            broker._on_signal(_make_signal(symbol_id=0, order_type="CANCEL", order_id=42))
+            await asyncio.sleep(0.02)
+
+        self._run_with_orders(fake, script, errors=errors)
+        self.assertEqual([c for c in fake.calls if c[0] == "cancel_order"], [])
+        refused = [e for _, e in errors if isinstance(e, ValueError)]
+        self.assertEqual(len(refused), 1, errors)
+        self.assertIn("CANCEL: no ccxt order id tracked", str(refused[0]))
+
     # ── reconciliation ───────────────────────────────────────────────
     def test_reconciliation_dispatches_initial_position(self):
         fake = FakeCcxtExchange(positions=[

@@ -102,6 +102,30 @@ there = validate_dataset(tape_dir)
 check(there.total_segments == 1, "validate_dataset reads a directory that is there")
 check(last_error() == "", "and leaves no error behind: '" + last_error() + "'")
 
+# A 0 MB segment size is the default, not a bound of 0 bytes (which gave
+# every event a segment of its own).
+zero_dir = root + "-zero"
+wz = DataWriter(zero_dir, 0, 0)
+for i in range(5):
+    wz.write_trade((10 + i) * SEC, (10 + i) * SEC, 100.0 + float(i), 1.0, i + 1, 1, 0)
+wz.close()
+zero = validate_dataset(zero_dir)
+check(zero.total_segments == 1, "DataWriter(dir, 0, 0) writes one segment: " + str(zero.total_segments))
+check(zero.total_events == 5, "holding the five events")
+
+# A merge that skipped an input is not a success, for merge_segments as for
+# merge_dir; the inputs that opened are still written.
+with open(tape_dir + "/zz_bad.lrvx", "w") as f:
+    f.write("x" * 256)
+check(not merge_segments(tape_dir, root + "-merged-short"),
+      "merge_segments returns False when an input was skipped")
+check("zz_bad.lrvx" in last_error(), "and last_error() names it: " + last_error())
+check("merged 1 segment(s)" in last_error(), "beside what it did merge")
+short = merge_dir(tape_dir, root + "-merged-short-dir")
+check(not short.success and short.segments_merged == 1 and short.events_written == 3,
+      "merge_dir says the same, with the counts of what was written")
+check(len(short.errors) == 1 and "zz_bad.lrvx" in short.errors[0], "and lists the input")
+
 if failed > 0:
     raise ValueError(str(failed) + " check(s) failed")
 print("done")

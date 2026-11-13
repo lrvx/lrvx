@@ -75,6 +75,17 @@ Pass any subset of `("trades", "book", "bbo", "orders")` to `run(streams=...)`:
 | `bbo`     | `watch_bids_asks(sym)`    | `runner.on_book_top(sym_id, bid, ask)`                         |
 | `orders`  | `watch_orders()`          | strategy's `on_order_update(ccxt_sym, status, filled, avg)`    |
 
+The broker keeps, for every order it placed that is still open, the exchange's
+order id and what was placed, so that a later `cancel_order` or `modify_order`
+can name it to the exchange. An order leaves those maps when the strategy
+cancels it, when `orders` reports a terminal status for it (`closed`,
+`canceled`, `expired`, `rejected`), and at once when the exchange's answer to
+the placement already carries a terminal status, as a market order's usually
+does. `Runner.order_closed` is called for it at the same moment. A
+`cancel_order` or `modify_order` for an order that has left is not sent; it is
+reported through `on_error`. Without the `orders` stream only the last of the
+three applies, so run it when the strategy places orders that rest.
+
 `trades` and `book` yield a snapshot per call. `bbo` yields a touch-only
 frame: it lands in the strategy's touch fields without replacing the depth
 book `book` maintains, so the touch stays fresh between (often throttled)

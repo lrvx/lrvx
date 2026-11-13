@@ -47,6 +47,34 @@ CODON_FIXTURE_BIN = BUILD_DIR / "codon" / "codon_byte_identical_fixture"
 CODON_LIB_DIR = BUILD_DIR / "src" / "capi"
 
 
+def codon_runtime_dirs(env: Dict[str, str]) -> List[Path]:
+    """Where the Codon runtime libraries (libcodonrt, libomp) live.
+
+    A Codon executable loads them at run time and macOS does not find
+    them by itself. They sit in ``lib/codon`` beside the compiler's
+    ``bin``, so this looks the compiler up where codon/CMakeLists.txt
+    does (``$CODON_HOME/bin``, ``~/.codon/bin``, then PATH) and follows a
+    symlinked ``bin/codon`` to the real installation."""
+    compilers: List[Path] = []
+    if env.get("CODON_HOME"):
+        compilers.append(Path(env["CODON_HOME"]) / "bin" / "codon")
+    if env.get("HOME"):
+        compilers.append(Path(env["HOME"]) / ".codon" / "bin" / "codon")
+    on_path = shutil.which("codon", path=env.get("PATH"))
+    if on_path:
+        compilers.append(Path(on_path))
+
+    dirs: List[Path] = []
+    for compiler in compilers:
+        if not compiler.exists():
+            continue
+        for binary in (compiler, compiler.resolve()):
+            lib = binary.parent.parent / "lib" / "codon"
+            if lib.is_dir() and lib not in dirs:
+                dirs.append(lib)
+    return dirs
+
+
 def _read_via_pybind(out_dir: Path) -> Dict[str, List[Dict[str, Any]]]:
     """Read records back through pybind11 TraceReader. Used as the
     canonical reader for every binding's output — the goal is to compare
@@ -120,8 +148,9 @@ def run_codon(out_dir: Path) -> Optional[Dict[str, List[Dict[str, Any]]]]:
         print(f"[skip] codon: {CODON_FIXTURE_BIN} missing")
         return None
     env = dict(os.environ)
-    env["DYLD_LIBRARY_PATH"] = str(CODON_LIB_DIR) + ":" + env.get("DYLD_LIBRARY_PATH", "")
-    env["LD_LIBRARY_PATH"] = str(CODON_LIB_DIR) + ":" + env.get("LD_LIBRARY_PATH", "")
+    libs = ":".join(str(d) for d in [CODON_LIB_DIR, *codon_runtime_dirs(env)])
+    env["DYLD_LIBRARY_PATH"] = libs + ":" + env.get("DYLD_LIBRARY_PATH", "")
+    env["LD_LIBRARY_PATH"] = libs + ":" + env.get("LD_LIBRARY_PATH", "")
     _check(subprocess.run([str(CODON_FIXTURE_BIN), str(out_dir)],
                           env=env, capture_output=True, text=True))
     return _read_via_pybind(out_dir)

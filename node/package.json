@@ -30,7 +30,7 @@
   "scripts": {
     "build": "cmake-js compile",
     "rebuild": "cmake-js rebuild",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p ../quickjs/types/tsconfig.json",
     "build:authoring": "tsc -p authoring/tsconfig.json",
     "prepack": "npm run build:authoring"
   },

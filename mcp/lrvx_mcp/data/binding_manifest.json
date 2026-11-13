@@ -2948,6 +2948,11 @@
           "name": "lrvx_run_recorder_write_signal"
         },
         {
+          "group": "lrvxrun",
+          "kind": "function",
+          "name": "lrvx_run_recorder_write_signal64"
+        },
+        {
           "group": "strategyrunner_synchronous",
           "kind": "function",
           "name": "lrvx_runner_add_strategy"
@@ -4897,11 +4902,23 @@
         },
         {
           "kind": "class",
+          "name": "TraceFill"
+        },
+        {
+          "kind": "class",
+          "name": "TraceOrderEvent"
+        },
+        {
+          "kind": "class",
           "name": "TraceReader"
         },
         {
           "kind": "class",
           "name": "TraceRecorder"
+        },
+        {
+          "kind": "class",
+          "name": "TraceSignal"
         },
         {
           "kind": "class",
@@ -8038,6 +8055,11 @@
         },
         {
           "kind": "method",
+          "name": "_emitting",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "_load_symbol_names",
           "parent": "Strategy"
         },
@@ -8548,6 +8570,21 @@
         },
         {
           "kind": "method",
+          "name": "read_all_fills",
+          "parent": "TraceReader"
+        },
+        {
+          "kind": "method",
+          "name": "read_all_order_events",
+          "parent": "TraceReader"
+        },
+        {
+          "kind": "method",
+          "name": "read_all_signals",
+          "parent": "TraceReader"
+        },
+        {
+          "kind": "method",
           "name": "run_ended_ns",
           "parent": "TraceReader"
         },
@@ -8559,6 +8596,21 @@
         {
           "kind": "method",
           "name": "signal_id64",
+          "parent": "TraceReader"
+        },
+        {
+          "kind": "method",
+          "name": "strategy_hash",
+          "parent": "TraceReader"
+        },
+        {
+          "kind": "method",
+          "name": "strategy_id",
+          "parent": "TraceReader"
+        },
+        {
+          "kind": "method",
+          "name": "tape_ref_paths",
           "parent": "TraceReader"
         },
         {
@@ -11171,6 +11223,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_run_recorder_write_signal"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_run_recorder_write_signal64"
         },
         {
           "kind": "c_import",
@@ -26465,6 +26521,11 @@
         },
         {
           "kind": "method",
+          "name": "nextSymbolIdLocked",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
           "name": "registerExchange",
           "parent": "SymbolRegistry"
         },
@@ -26481,6 +26542,11 @@
         {
           "kind": "method",
           "name": "serialize",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
+          "name": "setSymbolNameLocked",
           "parent": "SymbolRegistry"
         },
         {
@@ -44617,7 +44683,8 @@
         "lrvx_run_recorder_set_run_ended_ns",
         "lrvx_run_recorder_write_fill",
         "lrvx_run_recorder_write_order_event",
-        "lrvx_run_recorder_write_signal"
+        "lrvx_run_recorder_write_signal",
+        "lrvx_run_recorder_write_signal64"
       ],
       "codon": {
         "present": true,

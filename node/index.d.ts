@@ -259,7 +259,13 @@ export interface ClosedBar {
 /** Order-emission helper passed as the third arg to strategy callbacks.
  *  Every `symbol` argument is optional and defaults to the strategy's
  *  first subscribed symbol. The functions that send an order return its id:
- *  the `orderId` its events carry, and what `cancel` and `modify` take. */
+ *  the `orderId` its events carry, and what `cancel` and `modify` take.
+ *
+ *  An argument of the wrong type is a `TypeError` naming the call, thrown
+ *  before anything is emitted. Every function clears `lastError()` on entry:
+ *  read right after the emit, it is `''` unless the signal was dropped by a
+ *  pre-trade gate (it then ends in `[kill_switch]`, `[order_validator]` or
+ *  `[risk_manager]`) or a modify was refused (`[unknown_order]`). */
 export interface EmitMethods {
   marketBuy(qty: number, symbol?: Symbol | number): number;
   marketSell(qty: number, symbol?: Symbol | number): number;
@@ -272,13 +278,14 @@ export interface EmitMethods {
     symbol?: Symbol | number,
   ): number;
   withdrawLiquidity(liquidity: number, symbol?: Symbol | number): number;
-  cancel(orderId: number): void;
+  /** `orderId` is a non-negative integer Number or a BigInt. */
+  cancel(orderId: number | bigint): void;
   /** Change the price and quantity of a working order. It keeps its id,
    *  symbol, side and type; `newQty` is the quantity left to work. The id
    *  is the one the emitting function returned, which is also `ev.orderId`
    *  in the order's events. A refused modify arrives as a
    *  `REPLACE_REJECTED` event and leaves the order as it was. */
-  modify(orderId: number, newPrice: number, newQty: number): void;
+  modify(orderId: number | bigint, newPrice: number, newQty: number): void;
   closePosition(symbol?: Symbol | number): number;
   /** Most recent closed bar for `(symbol, barType, barTypeParam)`, or
    *  `null` when none has closed yet. `barType` uses the `BarData.barType`
@@ -2664,7 +2671,11 @@ export function validate(
 ): SegmentValidationResult;
 /** Recursive dataset validation across all segments under `dir`. */
 export function validateDataset(dir: string): DatasetValidationResult;
-/** Concatenate one or more input segments into a single output. */
+/** Merge the segments under `inputPath` into one output. `true` only when
+ *  every input was merged and at least one event was written, as
+ *  `mergeDir`'s `success` is; `false` when none was merged and when some
+ *  could not be opened while the others were written. `lastError()` says
+ *  which. */
 export function mergeSegments(inputPath: string, outputPath: string): boolean;
 /** Merge every segment under a directory into one output. */
 export function mergeDir(dir: string, outputPath: string): MergeDirResult;
@@ -3414,7 +3425,8 @@ export interface TraceTapeRefInput {
 export interface TraceSignalInput {
   runTsNs: number | bigint;
   feedTsNs?: number | bigint;
-  signalId?: number;
+  /** The whole 64-bit id is written; a BigInt keeps one above 2^53 exact. */
+  signalId?: number | bigint;
   flags?: number;
   strengthRaw?: number;
   name?: string;

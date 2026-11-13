@@ -16,6 +16,8 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 
 namespace
@@ -99,4 +101,76 @@ TEST(CapiRunTrace, SignalId64OfAWrittenRecordAndOfANullHandle)
   EXPECT_NE(lrvx_last_error_code(), 0);
   lrvx_clear_last_error();
   std::filesystem::remove_all(dir);
+}
+
+namespace
+{
+
+// The signal frames of a trace: its first segment without the 64-byte
+// header, which carries the wall clock at which the segment was opened.
+std::string signalFrames(const std::filesystem::path& dir)
+{
+  std::ifstream in(dir / "signals-000000.bin", std::ios::binary);
+  std::string all((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  return all.size() > 64 ? all.substr(64) : std::string{};
+}
+
+}  // namespace
+
+TEST(CapiRunTrace, WriteSignal64KeepsAnIdAbove32Bits)
+{
+  const auto dir = scratch("wide");
+  const uint64_t wide = (uint64_t{7} << 32) + 5;
+  LrvxRunRecorderHandle recorder = lrvx_run_recorder_create(dir.string().c_str(), "s", "h", 1);
+  ASSERT_NE(recorder, nullptr) << lrvx_last_error_message();
+  const uint32_t syms[] = {1};
+  lrvx_run_recorder_write_signal64(recorder, 10, 0, wide, 0, 0, "x", 1, syms, 1, nullptr, 0);
+  lrvx_run_recorder_close(recorder);
+  lrvx_run_recorder_destroy(recorder);
+
+  LrvxRunReaderHandle reader = lrvx_run_reader_open(dir.string().c_str());
+  ASSERT_NE(reader, nullptr) << lrvx_last_error_message();
+  EXPECT_EQ(lrvx_run_reader_signal_id64(reader, 0), wide);
+  int64_t run_ts = 0, feed_ts = 0, strength = 0;
+  uint32_t low = 0, flags = 0;
+  uint64_t name_len = 0, symbol_count = 0, payload_len = 0;
+  lrvx_run_reader_signal_header(reader, 0, &run_ts, &feed_ts, &low, &flags, &strength, &name_len,
+                                &symbol_count, &payload_len);
+  EXPECT_EQ(low, 5u);
+  lrvx_run_reader_close(reader);
+  std::filesystem::remove_all(dir);
+}
+
+TEST(CapiRunTrace, WriteSignal64OfASmallIdWritesTheBytesWriteSignalDoes)
+{
+  const auto narrow = scratch("narrow_bytes");
+  const auto wide = scratch("wide_bytes");
+  const uint32_t syms[] = {1, 2};
+  const uint8_t payload[] = {9, 8, 7};
+
+  LrvxRunRecorderHandle a = lrvx_run_recorder_create(narrow.string().c_str(), "s", "h", 1);
+  ASSERT_NE(a, nullptr) << lrvx_last_error_message();
+  lrvx_run_recorder_write_signal(a, 10, 9, 0xFFFFFFFFu, 3, -4, "name", 4, syms, 2, payload, 3);
+  lrvx_run_recorder_close(a);
+  lrvx_run_recorder_destroy(a);
+
+  LrvxRunRecorderHandle b = lrvx_run_recorder_create(wide.string().c_str(), "s", "h", 1);
+  ASSERT_NE(b, nullptr) << lrvx_last_error_message();
+  lrvx_run_recorder_write_signal64(b, 10, 9, 0xFFFFFFFFull, 3, -4, "name", 4, syms, 2, payload, 3);
+  lrvx_run_recorder_close(b);
+  lrvx_run_recorder_destroy(b);
+
+  const std::string first = signalFrames(narrow);
+  ASSERT_FALSE(first.empty());
+  EXPECT_EQ(first, signalFrames(wide));
+  std::filesystem::remove_all(narrow);
+  std::filesystem::remove_all(wide);
+}
+
+TEST(CapiRunTrace, WriteSignal64OnANullHandleLeavesAReason)
+{
+  lrvx_clear_last_error();
+  lrvx_run_recorder_write_signal64(nullptr, 1, 0, 1, 0, 0, nullptr, 0, nullptr, 0, nullptr, 0);
+  EXPECT_NE(lrvx_last_error_code(), 0);
+  lrvx_clear_last_error();
 }

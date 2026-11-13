@@ -286,9 +286,32 @@ runner.stop()
 | `set_executor(executor)` | Replace the executor |
 | `order_closed(order_id)` | Tell the runner an order it sent to the executor is finished |
 
-With an executor attached the runner keeps every order that can rest, by id, so that a strategy's `modify_order` reaches `Executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `order_closed(order_id)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. A `cancel_order` from the strategy drops the entry by itself, and market, IOC and FOK orders are never kept. `CcxtBroker` calls it for every terminal status its orders stream reports.
+With an executor attached the runner keeps every order that can rest, by id, so that a strategy's `modify_order` reaches `Executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `order_closed(order_id)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. A `cancel_order` from the strategy drops the entry by itself, and market, IOC and FOK orders are never kept. The two legs of an OCO leave the record together: a cancel of either leg, or `order_closed` with either leg's id, drops both, because the venue cancels the other leg when one fills or is cancelled.
 
-A `modify_order` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor. `modify_order` clears `lrvx.last_error()` on entry, and after a refused one it reads `modify: order <id> is not on record with this executor ... [unknown_order]`, on the thread the strategy ran on.
+`CcxtBroker` calls `order_closed` for every terminal status (`closed`, `canceled`, `expired`, `rejected`) its orders stream reports, and for an order the exchange already reports finished in the answer to its placement. It drops the order from its own maps at the same moment, so they hold open orders only; they used to hold every order ever placed. A `cancel_order` or `modify_order` the strategy still sends for such an order is not sent to the exchange and is reported through `on_error` as `ValueError("CANCEL: no ccxt order id tracked ...")` / `"MODIFY: ..."`.
+
+A `modify_order` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor, and after it `lrvx.last_error()` reads `modify: order <id> is not on record with this executor ... [unknown_order]`.
+
+#### Reading why a signal went nowhere
+
+Every emit method (`market_buy`, `limit_sell`, `stop_market`, `cancel_order`, `modify_order`, `close_position`, the `emit_*` forms, ...) clears `lrvx.last_error()` on entry. Read it right after the emit, inside the callback that emitted (it is per thread): `''` means nothing refused the signal, otherwise it says what did.
+
+| `lrvx.last_error()` ends in | What happened |
+|-----------------------------|---------------|
+| `[kill_switch]` | `KillSwitch.check` returned `False` |
+| `[order_validator]` | `OrderValidator.validate` returned `False` |
+| `[risk_manager]` | `RiskManager.allow` returned `False` |
+| `[unknown_order]` | a `modify_order` named an order the runner's executor record does not hold |
+
+A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached neither on_signal nor the executor [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned; a drop used to leave nothing behind.
+
+```python
+def on_trade(self, ctx, trade):
+    order_id = self.limit_buy(trade.price - 1.0, 0.1)
+    why = lrvx.last_error()
+    if why:
+        print("order", order_id, "went nowhere:", why)
+```
 
 A `MarketDataRecorderHook` subclass overrides any of `on_trade(trade)`,
 `on_book_update(symbol, is_snapshot, bids, asks, ts_ns)`,

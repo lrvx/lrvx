@@ -4425,13 +4425,20 @@ uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path)
   }
   else if (!result.errors.empty())
   {
-    // Still a merge, and still 1: the segments that opened were merged. The
-    // ones that did not are named here, each as the merge reported it.
+    // Not a success, as MergeResult::success says: the output is short. The
+    // segments that opened were written; the ones that did not are named
+    // here, each as the merge reported it.
     const std::string why = "merged " + std::to_string(result.segments_merged) +
                             " segment(s); skipped: " + joinErrors(result.errors, "; ");
     lrvxCapiNoteException(__func__, why.c_str());
   }
-  return result.segments_merged > 0 ? 1 : 0;
+  else if (!result.success)
+  {
+    const std::string why = "merged " + std::to_string(result.segments_merged) +
+                            " segment(s) that hold no event: " + input_dir;
+    lrvxCapiNoteException(__func__, why.c_str());
+  }
+  return result.success ? 1 : 0;
   LRVX_CAPI_LEAVE;
 }
 
@@ -7099,7 +7106,7 @@ inline LrvxOrder signalToLrvxOrder(const Signal& sig) noexcept
 // kept (see restsOnTheVenue), and an entry goes with its cancel, when the
 // host reports the order closed (lrvx_runner_order_closed /
 // lrvx_live_engine_order_closed: nothing here hears of a fill by itself) and
-// when the executor is swapped. Signals arrive from more than one consumer
+// when the executor is swapped. The two legs of an OCO go together. Signals arrive from more than one consumer
 // thread, hence the lock.
 class ForwardedOrders
 {
@@ -7109,10 +7116,27 @@ class ForwardedOrders
     std::lock_guard lock(_mutex);
     _orders[order.id] = order;
   }
+  // The two legs of an OCO. The venue cancels one when the other fills or
+  // is cancelled, so whatever takes one off the record takes both.
+  void putOco(const LrvxOrder& first, const LrvxOrder& second)
+  {
+    std::lock_guard lock(_mutex);
+    _orders[first.id] = first;
+    _orders[second.id] = second;
+    _ocoSibling[first.id] = second.id;
+    _ocoSibling[second.id] = first.id;
+  }
   void erase(uint64_t id)
   {
     std::lock_guard lock(_mutex);
     _orders.erase(id);
+    if (const auto it = _ocoSibling.find(id); it != _ocoSibling.end())
+    {
+      const uint64_t sibling = it->second;
+      _ocoSibling.erase(it);
+      _ocoSibling.erase(sibling);
+      _orders.erase(sibling);
+    }
   }
   void eraseSymbol(uint32_t symbol)
   {
@@ -7121,11 +7145,16 @@ class ForwardedOrders
     std::erase_if(_orders,
                   [&](const auto& entry)
                   { return entry.second.symbol == symbol; });
+    // order: not observable -- every pair whose legs are gone is dropped
+    std::erase_if(_ocoSibling,
+                  [&](const auto& entry)
+                  { return _orders.find(entry.first) == _orders.end(); });
   }
   void clear()
   {
     std::lock_guard lock(_mutex);
     _orders.clear();
+    _ocoSibling.clear();
   }
   // Applies `change` to the order on record under `id`, in place, and
   // returns the result; nullopt when the id is not on record.
@@ -7148,6 +7177,8 @@ class ForwardedOrders
  private:
   std::mutex _mutex;
   std::unordered_map<uint64_t, LrvxOrder> _orders;
+  // Each OCO leg on record -> the other leg.
+  std::unordered_map<uint64_t, uint64_t> _ocoSibling;
   std::atomic<uint64_t> _nextLegId{lrvx::kRunnerOrderIdBase + 1};
 };
 
@@ -7279,50 +7310,7 @@ class RunnerSignalHandler : public ISignalHandler
       }
       view.strength_raw = 0;
       view.symbol_ids = {static_cast<uint32_t>(sig.symbol)};
-      const char* name = "unknown";
-      switch (sig.type)
-      {
-        case SignalType::Market:
-          name = "market";
-          break;
-        case SignalType::Limit:
-          name = "limit";
-          break;
-        case SignalType::Cancel:
-          name = "cancel";
-          break;
-        case SignalType::CancelAll:
-          name = "cancel_all";
-          break;
-        case SignalType::Modify:
-          name = "modify";
-          break;
-        case SignalType::StopMarket:
-          name = "stop_market";
-          break;
-        case SignalType::StopLimit:
-          name = "stop_limit";
-          break;
-        case SignalType::TakeProfitMarket:
-          name = "take_profit_market";
-          break;
-        case SignalType::TakeProfitLimit:
-          name = "take_profit_limit";
-          break;
-        case SignalType::TrailingStop:
-          name = "trailing_stop";
-          break;
-        case SignalType::OCO:
-          name = "oco";
-          break;
-        case SignalType::ProvideLiquidity:
-          name = "provide_liquidity";
-          break;
-        case SignalType::WithdrawLiquidity:
-          name = "withdraw_liquidity";
-          break;
-      }
-      view.name = name;
+      view.name = signalName(sig.type);
       recorder->writeSignal(view);
     }
 
@@ -7395,10 +7383,15 @@ class RunnerSignalHandler : public ISignalHandler
     // Each get() below returns a strong reference that outlives whatever
     // destroy() may do concurrently on another thread for the rest of this
     // scope -- see tracker_ownership.h.
+    //
+    // A drop is not silent: the emit that produced the signal returned an
+    // order id, so the reason is left in the last error of this thread, which
+    // is the thread that emitted.
     if (auto ks = _kill.get(); ks && ks->cb.check != nullptr)
     {
       if (ks->cb.check(ks->cb.user_data, &fs) == 0)
       {
+        noteDropped(sig, "kill switch", kDroppedByKillSwitch);
         return;
       }
     }
@@ -7406,6 +7399,7 @@ class RunnerSignalHandler : public ISignalHandler
     {
       if (ov->cb.validate(ov->cb.user_data, &fs) == 0)
       {
+        noteDropped(sig, "order validator", kDroppedByOrderValidator);
         return;
       }
     }
@@ -7413,6 +7407,7 @@ class RunnerSignalHandler : public ISignalHandler
     {
       if (rm->cb.allow(rm->cb.user_data, &fs) == 0)
       {
+        noteDropped(sig, "risk manager", kDroppedByRiskManager);
         return;
       }
     }
@@ -7503,8 +7498,7 @@ class RunnerSignalHandler : public ISignalHandler
           fo2.id = _forwarded->nextLegId();
           fo2.price_raw = sig.triggerPrice.raw();
           fo2.trigger_price_raw = 0;
-          _forwarded->put(fo1);
-          _forwarded->put(fo2);
+          _forwarded->putOco(fo1, fo2);
           if (exec->cb.submit_oco != nullptr)
           {
             exec->cb.submit_oco(exec->cb.user_data, &fo1, &fo2);
@@ -7534,6 +7528,63 @@ class RunnerSignalHandler : public ISignalHandler
   }
 
  private:
+  // The names a captured signal carries in a trace, and the ones the reason
+  // for a drop uses.
+  static const char* signalName(SignalType type) noexcept
+  {
+    switch (type)
+    {
+      case SignalType::Market:
+        return "market";
+      case SignalType::Limit:
+        return "limit";
+      case SignalType::Cancel:
+        return "cancel";
+      case SignalType::CancelAll:
+        return "cancel_all";
+      case SignalType::Modify:
+        return "modify";
+      case SignalType::StopMarket:
+        return "stop_market";
+      case SignalType::StopLimit:
+        return "stop_limit";
+      case SignalType::TakeProfitMarket:
+        return "take_profit_market";
+      case SignalType::TakeProfitLimit:
+        return "take_profit_limit";
+      case SignalType::TrailingStop:
+        return "trailing_stop";
+      case SignalType::OCO:
+        return "oco";
+      case SignalType::ProvideLiquidity:
+        return "provide_liquidity";
+      case SignalType::WithdrawLiquidity:
+        return "withdraw_liquidity";
+    }
+    return "unknown";
+  }
+
+  // The tokens a drop's reason ends in, as a refused Modify's ends in
+  // [unknown_order].
+  static constexpr const char* kDroppedByKillSwitch = "kill_switch";
+  static constexpr const char* kDroppedByOrderValidator = "order_validator";
+  static constexpr const char* kDroppedByRiskManager = "risk_manager";
+
+  static void noteDropped(const Signal& sig, const char* gate, const char* token) noexcept
+  {
+    try
+    {
+      const std::string why = std::string(signalName(sig.type)) + " signal for order " +
+                              std::to_string(sig.orderId) + " on symbol " +
+                              std::to_string(sig.symbol) + " was dropped by the " + gate +
+                              "; it reached neither on_signal nor the executor [" + token + "]";
+      lrvxCapiNoteException("emit", why.c_str());
+    }
+    catch (...)
+    {
+    }
+  }
+
   // Market orders and IOC / FOK orders are answered at once and never rest.
   static bool restsOnTheVenue(const Signal& sig) noexcept
   {
@@ -11286,20 +11337,13 @@ extern "C" void lrvx_run_recorder_set_run_ended_ns(LrvxRunRecorderHandle handle,
   LRVX_CAPI_LEAVE_VOID;
 }
 
-extern "C" void lrvx_run_recorder_write_signal(LrvxRunRecorderHandle handle,
-                                               int64_t run_ts_ns, int64_t feed_ts_ns,
-                                               uint32_t signal_id, uint32_t flags,
-                                               int64_t strength_raw,
-                                               const char* name, size_t name_len,
-                                               const uint32_t* symbol_ids, size_t symbol_count,
-                                               const uint8_t* payload, size_t payload_len)
+namespace
 {
-  LRVX_CAPI_ENTER_VOID(handle);
-  auto* rec = asRecorder(handle);
-  if (rec == nullptr)
-  {
-    return;
-  }
+void writeSignalView(lrvx::run::TraceRecorder* rec, int64_t run_ts_ns, int64_t feed_ts_ns,
+                     uint64_t signal_id, uint32_t flags, int64_t strength_raw, const char* name,
+                     size_t name_len, const uint32_t* symbol_ids, size_t symbol_count,
+                     const uint8_t* payload, size_t payload_len)
+{
   lrvx::run::SignalView s;
   s.run_ts_ns = run_ts_ns;
   s.feed_ts_ns = feed_ts_ns;
@@ -11319,6 +11363,40 @@ extern "C" void lrvx_run_recorder_write_signal(LrvxRunRecorderHandle handle,
     s.payload = std::string_view(reinterpret_cast<const char*>(payload), payload_len);
   }
   rec->writeSignal(s);
+}
+}  // namespace
+
+extern "C" void lrvx_run_recorder_write_signal(LrvxRunRecorderHandle handle,
+                                               int64_t run_ts_ns, int64_t feed_ts_ns,
+                                               uint32_t signal_id, uint32_t flags,
+                                               int64_t strength_raw,
+                                               const char* name, size_t name_len,
+                                               const uint32_t* symbol_ids, size_t symbol_count,
+                                               const uint8_t* payload, size_t payload_len)
+{
+  LRVX_CAPI_ENTER_VOID(handle);
+  if (auto* rec = asRecorder(handle))
+  {
+    writeSignalView(rec, run_ts_ns, feed_ts_ns, signal_id, flags, strength_raw, name, name_len,
+                    symbol_ids, symbol_count, payload, payload_len);
+  }
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+extern "C" void lrvx_run_recorder_write_signal64(LrvxRunRecorderHandle handle,
+                                                 int64_t run_ts_ns, int64_t feed_ts_ns,
+                                                 uint64_t signal_id, uint32_t flags,
+                                                 int64_t strength_raw,
+                                                 const char* name, size_t name_len,
+                                                 const uint32_t* symbol_ids, size_t symbol_count,
+                                                 const uint8_t* payload, size_t payload_len)
+{
+  LRVX_CAPI_ENTER_VOID(handle);
+  if (auto* rec = asRecorder(handle))
+  {
+    writeSignalView(rec, run_ts_ns, feed_ts_ns, signal_id, flags, strength_raw, name, name_len,
+                    symbol_ids, symbol_count, payload, payload_len);
+  }
   LRVX_CAPI_LEAVE_VOID;
 }
 

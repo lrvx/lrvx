@@ -11787,6 +11787,61 @@
       "return_type": "void"
     },
     {
+      "group": "lrvxrun",
+      "name": "lrvx_run_recorder_write_signal64",
+      "params": [
+        {
+          "name": "handle",
+          "type": "LrvxRunRecorderHandle"
+        },
+        {
+          "name": "run_ts_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "feed_ts_ns",
+          "type": "int64_t"
+        },
+        {
+          "name": "signal_id",
+          "type": "uint64_t"
+        },
+        {
+          "name": "flags",
+          "type": "uint32_t"
+        },
+        {
+          "name": "strength_raw",
+          "type": "int64_t"
+        },
+        {
+          "name": "name",
+          "type": "const char *"
+        },
+        {
+          "name": "name_len",
+          "type": "size_t"
+        },
+        {
+          "name": "symbol_ids",
+          "type": "const uint32_t *"
+        },
+        {
+          "name": "symbol_count",
+          "type": "size_t"
+        },
+        {
+          "name": "payload",
+          "type": "const uint8_t *"
+        },
+        {
+          "name": "payload_len",
+          "type": "size_t"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
       "group": "strategyrunner_synchronous",
       "name": "lrvx_runner_add_strategy",
       "params": [

@@ -70,7 +70,7 @@ public:
 |-------|---------|-------------|
 | `output_dir` | - | Directory for segment files. |
 | `output_filename` | - | Optional filename for first segment. |
-| `max_segment_bytes` | 256 MB | Maximum segment size before rotation. |
+| `max_segment_bytes` | 256 MB (`kDefaultMaxSegmentBytes`) | Maximum segment size before rotation. `0` is read as the default by the writer's constructor, so it means the same through every binding and the C API. |
 | `buffer_size` | 64 KB | Internal write buffer size. |
 | `exchange_id` | 0 | Exchange identifier in segment header. |
 | `sync_on_rotate` | true | Sync to disk on segment rotation. |

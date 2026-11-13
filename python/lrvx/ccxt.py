@@ -785,6 +785,13 @@ class CcxtBroker:
         lrvx_id = int(getattr(sig, "order_id", 0) or 0)
         if not ccxt_id:
             return
+        if str(res.get("status", "")) in _TERMINAL_ORDER_STATUSES:
+            # Finished in the answer to its placement (a market order
+            # usually is): there is nothing left to cancel or modify, and no
+            # update for it may ever arrive, so it is not kept.
+            if lrvx_id and self._runner is not None:
+                self._runner.order_closed(lrvx_id)
+            return
         if lrvx_id:
             self._lrvx_to_ccxt_order[lrvx_id] = str(ccxt_id)
             order_type = (getattr(sig, "order_type", "") or "").upper()
@@ -1029,22 +1036,33 @@ class CcxtBroker:
 
 
     def _note_order_closed(self, o: Mapping[str, Any]) -> None:
-        """Pass a terminal status on to the runner, by lrvx order id.
+        """Forget an order the exchange reports finished, and pass the news
+        on to the runner by lrvx order id.
 
         The runner drops the order from the record it keeps for an attached
-        executor (``Runner.order_closed``). The broker's own maps are left as
-        they are: a CANCEL or MODIFY the strategy still sends for the order
-        goes to the exchange, which answers for itself.
+        executor (``Runner.order_closed``). The broker drops it from its own
+        maps, which otherwise held every order ever placed: a CANCEL or
+        MODIFY the strategy still sends for it is reported through
+        ``on_error`` ("no ccxt order id tracked") and nothing is sent.
         """
-        if self._runner is None:
-            return
         ccxt_id = o.get("id")
         if ccxt_id is None:
             return
         ccxt_id = str(ccxt_id)
         for lrvx_id, known in list(self._lrvx_to_ccxt_order.items()):
-            if known == ccxt_id:
+            if known != ccxt_id:
+                continue
+            del self._lrvx_to_ccxt_order[lrvx_id]
+            self._placed_orders.pop(lrvx_id, None)
+            if self._runner is not None:
                 self._runner.order_closed(lrvx_id)
+        # By the exchange's id as well: an order placed with no lrvx id is
+        # in this set only.
+        for ccxt_sym in [s for s, ids in self._ccxt_orders_by_sym.items() if ccxt_id in ids]:
+            ids = self._ccxt_orders_by_sym[ccxt_sym]
+            ids.discard(ccxt_id)
+            if not ids:
+                del self._ccxt_orders_by_sym[ccxt_sym]
 
 
 __all__ = ["CcxtBroker", "UnsupportedOrderType"]

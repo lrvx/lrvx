@@ -119,6 +119,8 @@ The id is 64 bits wide: `(signal_id_hi << 32) | signal_id`. A signal a runner ca
 
 Readers report both: the 32-bit `signal_id` (C++ `OwnedSignal::signal_id`, C `lrvx_run_reader_signal_header`, `signal_id` / `signalId` in the bindings) is the low half, unchanged, and the whole id is C++ `OwnedSignal::signalId64()`, C `lrvx_run_reader_signal_id64`, Python `signal_id64`, Node and QuickJS `signalId64`, Codon `TraceReader.signal_id64(index)`.
 
+Writers take the whole id: C++ `SignalView::signal_id`, C `lrvx_run_recorder_write_signal64` (`lrvx_run_recorder_write_signal` takes 32 bits and writes a zero high half), and `write_signal` / `writeSignal` in Python, Node, QuickJS and Codon.
+
 Followed in order by:
 
 1. `name_len` bytes of UTF-8 signal name (no terminator).

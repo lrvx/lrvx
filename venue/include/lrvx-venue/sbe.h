@@ -15,7 +15,8 @@
  * fields a newer schema version appended -- forward compatibility.
  *
  * These helpers are the hand-written substrate the market-data and order-entry
- * codecs are built on; the per-message schemas live in venue/schema/*.xml.
+ * codecs are built on; the per-message schemas are the .xml files in
+ * venue/schema/.
  */
 #pragma once
 

@@ -154,6 +154,11 @@ quantities are not checked. See
 read back what an entry holds: they return `u8(1)` for a registered id and fill a `Ptr[float]` with
 the value and a `Ptr[u8]` with whether orders are checked against it.
 
+Every emit method, and the string-symbol forms that call them, clears the last error on entry.
+`last_error()` from `lrvx.abi`, read right after an emit inside the callback that emitted, is `""`
+unless that emit left a reason; a reason an earlier call left (a `validate_segment` that failed, say)
+is not read as the emit's.
+
 #### `emit_market_buy(symbol, qty) -> int`
 
 Submit a market buy order. Returns order ID.

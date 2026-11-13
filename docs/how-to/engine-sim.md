@@ -52,6 +52,33 @@ The trade count reported at the end counts trades *delivered to the strategy*,
 not trades read from the tape, so it is the number to check when a filter is in
 play.
 
+## What the simulator sees and does
+
+Every tape trade that feeds the strategy is shown to the simulator first
+(its clock is advanced to the trade and the trade is passed to
+`SimulatedExecutor.on_trade_qty`), so it has a price to fill against. A tape
+replays trades only: a market order fills at the last trade, and a resting
+limit order, which the simulator fills from a book or a bar, stays open.
+The replay used to feed the strategy alone, so the simulator never saw a
+price and no order ever filled.
+
+The strategy's orders reach the simulator through the runner's executor hook:
+
+| Strategy call | Simulator |
+|---------------|-----------|
+| an order (`market_buy`, `limit_sell`, ...) | `submit_order` under the order's id |
+| `cancel_order(id)` | `cancel_order(id)` |
+| `cancel_all_orders()` | `cancel_all(symbol)` |
+| `modify_order(id, price, qty)` | `cancel_order(id)`, then `submit_order` of the order with its new price and quantity under the same id. A modify used to be dropped: the hook had no `replace`. |
+
+After each trade the orders the simulator has filled completely are reported
+to the runner (`Runner.order_closed`), which drops them from the record it
+keeps for `modify_order`. A later `modify_order` of a filled order is then
+refused by the runner with `[unknown_order]` in `lrvx.last_error()` and is
+not sent to the simulator as a new order. A partly filled order stays on
+record until the rest fills. Orders placed over the control server go to the
+simulator directly and are not part of that record.
+
 ## Drive it from an agent
 
 The banner prints a ready-made `lrvx-mcp init` invocation:

@@ -449,3 +449,22 @@ TEST_F(ReplayWriterRotationTest, ACompressedSegmentClosesOnReachingTheBoundExact
 
   EXPECT_EQ(countTrades(), trades);
 }
+
+// A bound of 0 bytes is no bound anyone asked for: every event crossed it, so
+// each got a segment of its own. 0 is the default bound.
+TEST_F(ReplayWriterRotationTest, AZeroBoundIsTheDefaultBound)
+{
+  writeUncompressedTrades(0, 50);
+  EXPECT_EQ(sortedSegments().size(), 1u);
+  EXPECT_EQ(countTrades(), 50u);
+
+  WriterConfig cfg{};
+  EXPECT_EQ(cfg.max_segment_bytes, kDefaultMaxSegmentBytes);
+}
+
+TEST_F(ReplayWriterRotationTest, AZeroBoundIsTheDefaultBoundWhenCompressed)
+{
+  writeUniformCompressibleTape(0, 16, 200);
+  EXPECT_EQ(sortedSegments().size(), 1u);
+  EXPECT_EQ(countTrades(), 200u);
+}

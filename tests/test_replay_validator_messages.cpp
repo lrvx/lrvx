@@ -103,3 +103,22 @@ TEST(ValidatorMessages, ADatasetPathThatIsNotADirectoryIsAnIssueNotAnException)
       << issue->message;
   std::filesystem::remove_all(dir);
 }
+
+// repair() said "File not found" and nothing else; validate() names the file
+// in the same words.
+TEST(ValidatorMessages, RepairNamesTheFileItCannotFind)
+{
+  const auto dir = scratchDir("repair");
+  const auto missing = dir / "no_such_segment.lrvx";
+
+  const RepairResult direct = SegmentRepairer().repair(missing);
+  EXPECT_FALSE(direct.success);
+  ASSERT_EQ(direct.errors.size(), 1u);
+  EXPECT_EQ(direct.errors.front(), "File not found: " + missing.string());
+
+  SegmentValidationResult validation;
+  const RepairResult given = SegmentRepairer().repair(missing, validation);
+  ASSERT_EQ(given.errors.size(), 1u);
+  EXPECT_EQ(given.errors.front(), "File not found: " + missing.string());
+  std::filesystem::remove_all(dir);
+}
