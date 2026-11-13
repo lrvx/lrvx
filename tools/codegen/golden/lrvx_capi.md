@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 780 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
+**Surface:** 781 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
 
 ## Opaque handles
 
@@ -1418,6 +1418,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `LrvxLiveEngineHandle lrvx_live_engine_create(LrvxRegistryHandle registry)`
 - `void lrvx_live_engine_destroy(LrvxLiveEngineHandle engine)`
 - `void lrvx_live_engine_add_strategy(LrvxLiveEngineHandle engine, LrvxStrategyHandle strategy, LrvxOnSignalCallback on_signal, void * user_data)`
+- `void lrvx_live_engine_drain(LrvxLiveEngineHandle engine)`
 - `void lrvx_live_engine_start(LrvxLiveEngineHandle engine)`
 - `void lrvx_live_engine_stop(LrvxLiveEngineHandle engine)`
 - `void lrvx_live_engine_publish_trade(LrvxLiveEngineHandle engine, uint32_t symbol, double price, double qty, uint8_t is_buy, int64_t exchange_ts_ns)`

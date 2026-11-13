@@ -675,14 +675,31 @@ The Python, Node, QuickJS and Codon emit methods clear the last error on entry t
 
 `lrvx_runner_on_order_event(runner, event)` and `lrvx_live_engine_on_order_event(engine, event)`
 report one order event a venue sent (a broker's order update or fill) to the strategies, the way the
-backtest runner delivers its simulator's. The runner's position tracker sees the event first; then
-`on_fill` fires for `PARTIALLY_FILLED` and `FILLED` (and only `on_fill`) and `on_order_update` for
-every other status, with the same `LrvxSymbolContext` and `LrvxOrderEventData` a backtest passes, so
-the position an `on_fill` reads counts the fill. `event->status` is an `lrvx::OrderEventStatus` code
-and `event->order_type` an `lrvx::OrderType` code; `fill_qty_raw` / `fill_price_raw` are this fill's
-own. The strategy whose id is `order_id >> 32` receives the event; an id from no attached strategy's
-block goes to every strategy subscribed to the symbol. The callbacks run on the calling thread. A
-status, side or order type out of range delivers nothing and leaves the reason in the last error.
+backtest runner delivers its simulator's. The position tracker of the strategy that issued the order
+sees the event first; then `on_fill` fires for `PARTIALLY_FILLED` and `FILLED` (and only `on_fill`)
+and `on_order_update` for every other status, with the same `LrvxSymbolContext` and
+`LrvxOrderEventData` a backtest passes, so the position an `on_fill` reads counts the fill.
+`event->status` is an `lrvx::OrderEventStatus` code and `event->order_type` an `lrvx::OrderType`
+code; `fill_qty_raw` / `fill_price_raw` are this fill's own. A status, side or order type out of
+range delivers nothing and leaves the reason in the last error.
+
+Positions are per strategy, as in a backtest: each strategy attached to a runner or a live engine
+reads the net of the fills reported for its own orders. The strategy whose id is `order_id >> 32`
+receives the event and counts the fill. The second leg of an OCO, whose id comes from the runner's
+block, goes to the strategy of its first leg while the pair is on record: report a leg's events
+before `lrvx_runner_order_closed`. An id no attached strategy issued goes to every strategy
+subscribed to the symbol and counts in no position.
+
+| | `lrvx_runner_on_order_event` | `lrvx_live_engine_on_order_event` |
+|---|---|---|
+| Thread | the calling thread | the strategy's order-event consumer thread; the call queues the event and returns |
+| Order among order events | as reported | as reported |
+| Order against market data | as called | after every trade, book update and bar published before the report has been handed to that strategy; market data published after the report may arrive on either side of it |
+| Engine not started, or stopped | | the calling thread; an event queued before `lrvx_live_engine_stop` is delivered before it returns |
+
+`lrvx_live_engine_drain(engine)` returns once every strategy has been handed everything published so
+far (trades, books, bars, order events) and whatever those callbacks published in turn, and at once
+on an engine that is not running. It must not be called from a strategy callback.
 
 The record a runner or a live engine keeps of the orders it forwarded to an executor treats the two
 legs of an OCO as one: a cancel of either leg, or `lrvx_runner_order_closed` /

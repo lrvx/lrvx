@@ -498,6 +498,7 @@ from C import lrvx_set_log_callback(cobj, cobj)
 from C import lrvx_live_engine_create(cobj) -> cobj
 from C import lrvx_live_engine_destroy(cobj)
 from C import lrvx_live_engine_add_strategy(cobj, cobj, cobj, cobj)
+from C import lrvx_live_engine_drain(cobj)
 from C import lrvx_live_engine_start(cobj)
 from C import lrvx_live_engine_stop(cobj)
 from C import lrvx_live_engine_publish_trade(cobj, u32, float, float, u8, i64)

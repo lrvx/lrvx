@@ -1561,16 +1561,44 @@ extern "C"
   // lrvx::OrderType code, as in the events a strategy receives; fill_qty_raw
   // and fill_price_raw are this fill's own quantity and price, not the
   // order's running totals. The strategy that issued the order (its id is
-  // order_id >> 32) receives the event; an id from no attached strategy's
-  // block goes to every strategy subscribed to the symbol. Runs the
-  // callbacks on the calling thread. A status, side or order type outside
-  // its range is refused: nothing is delivered and the reason is in
-  // lrvx_last_error_message.
+  // order_id >> 32) receives the event, and the second leg of an OCO goes to
+  // the strategy of its first leg while the pair is on record (report a
+  // leg's events before lrvx_runner_order_closed). An id no attached
+  // strategy issued goes to every strategy subscribed to the symbol and
+  // counts in no position. Runs the callbacks on the calling thread. A
+  // status, side or order type outside its range is refused: nothing is
+  // delivered and the reason is in lrvx_last_error_message.
+  //
+  // Positions are per strategy, as in a backtest: each strategy attached to
+  // a runner or a live engine reads the net position of the fills reported
+  // for its own orders, not the account's and not another strategy's.
   void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventData* event);
-  // The engine's counterpart. The callbacks run on the calling thread, not on
-  // a strategy's consumer thread.
+  // The engine's counterpart of lrvx_runner_on_order_event. The event is
+  // queued and returns at once; the callbacks run on the strategy's own
+  // order-event consumer thread, like its trade, book and bar callbacks run
+  // on the consumers of their buses, never on the calling thread.
+  //
+  // Ordering. A strategy hears its order events in the order they were
+  // reported. An order event is handed to a strategy only after that strategy
+  // has been handed every trade, book update and bar published to the engine
+  // before the event was reported, so a fill never overtakes the market data
+  // that preceded it. Market data published after the report may arrive on
+  // either side of the event: the four streams have a consumer each and no
+  // common sequence. lrvx_live_engine_drain is the barrier for a caller that
+  // needs more than that.
+  //
+  // Before lrvx_live_engine_start and after lrvx_live_engine_stop there is no
+  // consumer thread, and the callbacks run on the calling thread. An event
+  // queued before stop is delivered before stop returns.
   void lrvx_live_engine_on_order_event(LrvxLiveEngineHandle engine,
                                        const LrvxOrderEventData* event);
+
+  // Returns once every strategy has been handed everything published to the
+  // engine so far (trades, books, bars and order events) and whatever those
+  // callbacks published in turn. Returns at once on an engine that is not
+  // running. Never call it from a strategy callback: it would wait for the
+  // callback it is in.
+  void lrvx_live_engine_drain(LrvxLiveEngineHandle engine);
   void lrvx_backtest_runner_add_execution_listener(LrvxBacktestRunnerHandle runner,
                                                    LrvxExecutionListenerHandle listener);
   void lrvx_backtest_runner_set_executor(LrvxBacktestRunnerHandle runner,

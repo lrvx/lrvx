@@ -7793,6 +7793,17 @@
       "return_type": "void"
     },
     {
+      "group": "lrvxliveengine_disruptor",
+      "name": "lrvx_live_engine_drain",
+      "params": [
+        {
+          "name": "engine",
+          "type": "LrvxLiveEngineHandle"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
       "group": "execution",
       "name": "lrvx_live_engine_on_order_event",
       "params": [

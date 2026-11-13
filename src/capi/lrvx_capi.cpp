@@ -13,6 +13,7 @@
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/log/abstract_logger.h"
 #include "lrvx/log/log_stream.h"
+#include "queued_order_event.h"
 #include "tracker_ownership.h"
 
 #include "lrvx/aggregator/bar.h"
@@ -7198,6 +7199,19 @@ class ForwardedOrders
     _ocoSibling[first.id] = second.id;
     _ocoSibling[second.id] = first.id;
   }
+  // The id an OCO's second leg was issued beside: the first leg's, which is
+  // in its strategy's block. nullopt for anything that is not a second leg on
+  // record.
+  std::optional<uint64_t> firstLegOf(uint64_t id)
+  {
+    if (id < lrvx::kRunnerOrderIdBase)
+    {
+      return std::nullopt;
+    }
+    std::lock_guard lock(_mutex);
+    const auto it = _ocoSibling.find(id);
+    return it == _ocoSibling.end() ? std::nullopt : std::optional<uint64_t>{it->second};
+  }
   void erase(uint64_t id)
   {
     std::lock_guard lock(_mutex);
@@ -7716,15 +7730,29 @@ static void mirrorBookToRecorder(LrvxMarketDataRecorderImpl* r, const BookUpdate
 }
 
 // Order events a venue reported, on their way to the strategies of a runner
-// or a live engine. The position tracker sees each event first, as in the
-// backtest runner, so the context a strategy's on_fill reads already counts
-// the fill.
+// or a live engine. Each strategy has a position tracker of its own, as it
+// has in a backtest: it counts the fills of the orders that strategy issued
+// and nothing else. The tracker sees an event before the strategy does, as
+// in the backtest runner, so the context a strategy's on_fill reads already
+// counts the fill.
 class ReportedOrderEvents
 {
  public:
-  void attach(BridgeStrategy* s) { s->sharePositionManager(_positions); }
+  void attach(BridgeStrategy* s)
+  {
+    auto positions = std::make_shared<MultiModePositionTracker>(0xFEFEFEFEu);
+    s->sharePositionManager(positions);
+    _positions[s->id()] = std::move(positions);
+  }
 
-  void deliver(const std::vector<BridgeStrategy*>& strategies, const LrvxOrderEventData& d)
+  MultiModePositionTracker* positionsOf(SubscriberId strategy) const
+  {
+    const auto it = _positions.find(strategy);
+    return it == _positions.end() ? nullptr : it->second.get();
+  }
+
+  // Refuses a status, side or order type out of range.
+  static OrderEvent toEvent(const LrvxOrderEventData& d)
   {
     if (d.status > static_cast<uint8_t>(OrderEventStatus::REPLACED_GAS))
     {
@@ -7767,31 +7795,55 @@ class ReportedOrderEvents
     ev.isMaker = d.is_maker != 0;
     ev.marketPosition = static_cast<MarketPosition>(d.market_position);
     ev.distanceToBestTicks = d.distance_to_best_ticks;
+    return ev;
+  }
 
-    ev.dispatchTo(*_positions);
+  // An order id is (subscriber id << 32) + n: the strategy that issued the
+  // order is the one that hears of it and whose position counts it. The
+  // second leg of an OCO has an id from the runner's block and belongs to
+  // the strategy of its first leg for as long as the pair is on record.
+  // nullopt for an id no attached strategy issued (an order placed by hand):
+  // every strategy hears of it and no position counts it.
+  std::optional<SubscriberId> ownerOf(uint64_t orderId, ForwardedOrders& forwarded) const
+  {
+    const uint64_t issued = forwarded.firstLegOf(orderId).value_or(orderId);
+    const auto owner = static_cast<SubscriberId>(issued >> 32);
+    return _positions.find(owner) != _positions.end() ? std::optional<SubscriberId>{owner}
+                                                      : std::nullopt;
+  }
 
-    // An order id is (subscriber id << 32) + n: the strategy that issued the
-    // order is the one that hears of it. An id from no strategy's block (an
-    // OCO's second leg, an order placed by hand) goes to every strategy, and
-    // each ignores a symbol it is not subscribed to.
-    const auto owner = static_cast<SubscriberId>(d.order_id >> 32);
+  // Runs on the thread that hands the strategy its order events.
+  void deliverOwned(BridgeStrategy* owner, const OrderEvent& ev) const
+  {
+    if (auto* positions = positionsOf(owner->id()))
+    {
+      ev.dispatchTo(*positions);
+    }
+    owner->onOrderEvent(ev);
+  }
+
+  // The whole delivery on the calling thread.
+  void deliver(const std::vector<BridgeStrategy*>& strategies, ForwardedOrders& forwarded,
+               const OrderEvent& ev) const
+  {
+    const std::optional<SubscriberId> owner = ownerOf(ev.order.id, forwarded);
     for (BridgeStrategy* s : strategies)
     {
-      if (s->id() == owner)
+      if (!owner)
       {
         s->onOrderEvent(ev);
+      }
+      else if (s->id() == *owner)
+      {
+        deliverOwned(s, ev);
         return;
       }
-    }
-    for (BridgeStrategy* s : strategies)
-    {
-      s->onOrderEvent(ev);
     }
   }
 
  private:
-  std::shared_ptr<MultiModePositionTracker> _positions{
-      std::make_shared<MultiModePositionTracker>(0xFEFEFEFEu)};
+  // Written while strategies are attached, before any event is reported.
+  std::unordered_map<SubscriberId, std::shared_ptr<MultiModePositionTracker>> _positions;
 };
 
 struct LrvxRunnerImpl
@@ -8061,6 +8113,36 @@ struct LrvxLiveEngineImpl
   std::vector<BridgeStrategy*> strategies;
   ReportedOrderEvents orderEvents;
 
+  // A strategy's consumer on the order-event bus: its own thread, like the
+  // ones the trade, book and bar buses give it.
+  struct OrderEventConsumer
+  {
+    LrvxLiveEngineImpl* engine;
+    BridgeStrategy* strategy;
+    // The strategy's consumer index on every bus of this engine.
+    uint32_t index;
+
+    void onQueuedOrderEvent(const QueuedOrderEvent& queued)
+    {
+      if (!queued.toEveryone && queued.owner != strategy->id())
+      {
+        return;
+      }
+      engine->awaitMarketData(index, queued.marketHead);
+      if (queued.toEveryone)
+      {
+        strategy->onOrderEvent(queued.event);
+      }
+      else
+      {
+        engine->orderEvents.deliverOwned(strategy, queued.event);
+      }
+    }
+  };
+  using OrderEventBus = EventBus<QueuedOrderEvent>;
+  std::unique_ptr<OrderEventBus> orderBus;
+  std::vector<std::unique_ptr<OrderEventConsumer>> orderConsumers;
+
   // Latest pre-trade hooks attached to this engine. Stored here (rather
   // than only on the handlers) so newly-added strategies inherit the
   // existing setting. Caller owns the *Impl objects; we hold non-owning ptrs.
@@ -8078,8 +8160,85 @@ struct LrvxLiveEngineImpl
       : registry(reg),
         tradeBus(std::make_unique<TradeBus>()),
         bookBus(std::make_unique<BookUpdateBus>()),
-        barBus(std::make_unique<BarBus>())
+        barBus(std::make_unique<BarBus>()),
+        orderBus(std::make_unique<OrderEventBus>())
   {
+    // A fill reported just before stop() still reaches its strategy.
+    orderBus->enableDrainOnStop();
+  }
+
+  // Holds an order event back until consumer `index` has been handed the
+  // market data published before the event was reported. A bus that is not
+  // running or whose consumer has failed is not waited for.
+  void awaitMarketData(uint32_t index, const std::array<int64_t, 3>& head) const
+  {
+    const auto passed = [index](const auto& bus, int64_t seq)
+    {
+      return !bus.running() || bus.consumerFailed(index) || bus.consumedThrough(index) >= seq;
+    };
+    BusyBackoff backoff;
+    while (!(passed(*tradeBus, head[0]) && passed(*bookBus, head[1]) &&
+             passed(*barBus, head[2])))
+    {
+      backoff.pause();
+    }
+  }
+
+  // Queues the event for the strategies' order-event consumers. With the
+  // engine not running there is no consumer thread, and the event is
+  // delivered on the calling thread.
+  void reportOrderEvent(const OrderEvent& ev)
+  {
+    const std::optional<SubscriberId> owner = orderEvents.ownerOf(ev.order.id, *forwarded);
+    QueuedOrderEvent queued;
+    queued.event = ev;
+    queued.owner = owner.value_or(SubscriberId{});
+    queued.toEveryone = !owner.has_value();
+    queued.marketHead = {tradeBus->claimedThrough(), bookBus->claimedThrough(),
+                         barBus->claimedThrough()};
+    if (orderBus->publish(std::move(queued)) < 0)
+    {
+      orderEvents.deliver(strategies, *forwarded, ev);
+    }
+  }
+
+  // Returns once every consumer in service has handled everything published
+  // so far on the four buses, including what those callbacks published in
+  // turn. Returns at once when the engine is not running.
+  void drain() const
+  {
+    const auto heads = [this]
+    {
+      return std::array<int64_t, 4>{tradeBus->claimedThrough(), bookBus->claimedThrough(),
+                                    barBus->claimedThrough(), orderBus->claimedThrough()};
+    };
+    const auto consumed = [](const auto& bus, int64_t seq)
+    {
+      const uint32_t n = bus.consumerCount();
+      for (uint32_t i = 0; i < n; ++i)
+      {
+        if (!bus.consumerFailed(i) && bus.consumedThrough(i) < seq)
+        {
+          return false;
+        }
+      }
+      return true;
+    };
+    BusyBackoff backoff;
+    for (;;)
+    {
+      if (!orderBus->running())
+      {
+        return;
+      }
+      const auto before = heads();
+      if (consumed(*tradeBus, before[0]) && consumed(*bookBus, before[1]) &&
+          consumed(*barBus, before[2]) && consumed(*orderBus, before[3]) && heads() == before)
+      {
+        return;
+      }
+      backoff.pause();
+    }
   }
 
   void addStrategy(BridgeStrategy* s, LrvxOnSignalCallback cb, void* ud)
@@ -8098,6 +8257,11 @@ struct LrvxLiveEngineImpl
     tradeBus->subscribe(s);
     bookBus->subscribe(s);
     barBus->subscribe(s);
+    orderConsumers.push_back(std::make_unique<OrderEventConsumer>(
+        OrderEventConsumer{this, s, static_cast<uint32_t>(strategies.size())}));
+    // Parked: order events are rare next to market data, and a fourth
+    // spinning consumer per strategy would cost more than their wake-up.
+    orderBus->subscribeStatic(orderConsumers.back().get(), true, OrderEventBus::WaitMode::PARKED);
     strategies.push_back(s);
   }
 
@@ -8192,6 +8356,7 @@ struct LrvxLiveEngineImpl
     tradeBus->start();
     bookBus->start();
     barBus->start();
+    orderBus->start();
     for (auto* s : strategies)
     {
       s->start();
@@ -8228,6 +8393,8 @@ struct LrvxLiveEngineImpl
     {
       s->stop();
     }
+    // First, while the market-data consumers it may be waiting for still run.
+    orderBus->stop();
     tradeBus->stop();
     bookBus->stop();
     barBus->stop();
@@ -9492,7 +9659,8 @@ void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventDat
   LRVX_CAPI_ENTER_VOID(runner);
   LRVX_CAPI_REQUIRE_VOID(event);
   auto* impl = toRunner(runner);
-  impl->orderEvents.deliver(impl->strategies, *event);
+  impl->orderEvents.deliver(impl->strategies, impl->handler.forwarded(),
+                            ReportedOrderEvents::toEvent(*event));
   LRVX_CAPI_LEAVE_VOID;
 }
 
@@ -9741,8 +9909,14 @@ void lrvx_live_engine_on_order_event(LrvxLiveEngineHandle engine, const LrvxOrde
 {
   LRVX_CAPI_ENTER_VOID(engine);
   LRVX_CAPI_REQUIRE_VOID(event);
-  auto* impl = toLiveEngine(engine);
-  impl->orderEvents.deliver(impl->strategies, *event);
+  toLiveEngine(engine)->reportOrderEvent(ReportedOrderEvents::toEvent(*event));
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_live_engine_drain(LrvxLiveEngineHandle engine)
+{
+  LRVX_CAPI_ENTER_VOID(engine);
+  toLiveEngine(engine)->drain();
   LRVX_CAPI_LEAVE_VOID;
 }
 

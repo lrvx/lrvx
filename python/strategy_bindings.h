@@ -1741,9 +1741,30 @@ class PyLiveEngine
   }
 
   void order_closed(uint64_t order_id) { lrvx_live_engine_order_closed(_engine, order_id); }
+  // Released like the publish_* methods: the event is queued behind a ring a
+  // consumer drains, and on an engine that is not running the callbacks run
+  // here and take the GIL themselves.
   void on_order_event(const LrvxOrderEventData& ev)
   {
-    lrvx_live_engine_on_order_event(_engine, &ev);
+    std::string why;
+    {
+      py::gil_scoped_release release;
+      lrvx_clear_last_error();
+      lrvx_live_engine_on_order_event(_engine, &ev);
+      if (lrvx_last_error_code() != 0)
+      {
+        why = lrvx_last_error_message();
+      }
+    }
+    if (!why.empty())
+    {
+      throw std::runtime_error("Runner.on_order_event: " + why);
+    }
+  }
+  void drain()
+  {
+    py::gil_scoped_release release;
+    lrvx_live_engine_drain(_engine);
   }
 
   void set_executor(std::shared_ptr<lrvx::PyExecutor> exec)
@@ -1888,6 +1909,15 @@ class PyRunner
     else
     {
       _sync->order_closed(order_id);
+    }
+  }
+
+  // A synchronous runner has delivered everything by the time a call returns.
+  void drain()
+  {
+    if (_live)
+    {
+      _live->drain();
     }
   }
 
@@ -2160,15 +2190,13 @@ class PyRunner
     {
       ev.last_fill_at_ns = ts_ns;
     }
-    lrvx_clear_last_error();
     if (_live)
     {
       _live->on_order_event(ev);
+      return;
     }
-    else
-    {
-      _sync->on_order_event(ev);
-    }
+    lrvx_clear_last_error();
+    _sync->on_order_event(ev);
     if (lrvx_last_error_code() != 0)
     {
       throw std::runtime_error(std::string("Runner.on_order_event: ") + lrvx_last_error_message());
@@ -3840,13 +3868,23 @@ inline void bindStrategy(py::module_& m)
            "Report one order event a venue sent (a broker's order update or fill) to the "
            "strategy that issued the order, through the callbacks a backtest uses: "
            "PARTIALLY_FILLED and FILLED reach Strategy.on_fill(ctx, event) and only on_fill, "
-           "every other status reaches Strategy.on_order_update(ctx, event). The runner's "
-           "position tracker sees the event first, so ctx.position inside on_fill counts the "
-           "fill. side is 'buy' or 'sell'; status and order_type are the names OrderEventData "
-           "carries ('ACCEPTED', 'CANCELED', 'limit', ...); fill_qty and fill_price are this "
-           "fill's own, not the order's running totals. An order id from no attached "
-           "strategy's block goes to every strategy subscribed to the symbol. The callbacks run "
+           "every other status reaches Strategy.on_order_update(ctx, event). Each strategy has "
+           "a position of its own, as in a backtest: the fill counts in the position of the "
+           "strategy that issued the order, before on_fill runs, so ctx.position inside on_fill "
+           "counts it. side is 'buy' or 'sell'; status and order_type are the names "
+           "OrderEventData carries ('ACCEPTED', 'CANCELED', 'limit', ...); fill_qty and "
+           "fill_price are this fill's own, not the order's running totals. An order id no "
+           "attached strategy issued goes to every strategy subscribed to the symbol and counts "
+           "in no position. On a synchronous runner the callbacks run on the calling thread. On "
+           "a threaded runner the event is queued and the callbacks run on the strategy's "
+           "order-event consumer thread, after every trade, book and bar published before the "
+           "report has been handed to that strategy; before start() and after stop() they run "
            "on the calling thread. ValueError for an unknown side, status or order type.")
+      .def("drain", &PyRunner::drain,
+           "Return once every strategy has been handed everything published so far (trades, "
+           "books, bars, order events) and whatever those callbacks published in turn. A "
+           "threaded runner's barrier; a synchronous runner has nothing queued and returns at "
+           "once, as does a runner that is not started. Never call it from a strategy callback.")
       .def("attach_trace_recorder", [](PyRunner& r, py::object recorder)
            {
              // Accepts a lrvx.TraceRecorder or None. The TraceRecorder

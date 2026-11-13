@@ -1848,6 +1848,11 @@
           "name": "lrvx_live_engine_destroy"
         },
         {
+          "group": "lrvxliveengine_disruptor",
+          "kind": "function",
+          "name": "lrvx_live_engine_drain"
+        },
+        {
           "group": "execution",
           "kind": "function",
           "name": "lrvx_live_engine_on_order_event"
@@ -10356,6 +10361,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_live_engine_drain"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_live_engine_on_order_event"
         },
         {
@@ -17749,6 +17758,16 @@
         },
         {
           "kind": "method",
+          "name": "claimedThrough",
+          "parent": "EventBus"
+        },
+        {
+          "kind": "method",
+          "name": "consumedThrough",
+          "parent": "EventBus"
+        },
+        {
+          "kind": "method",
           "name": "consumerCount",
           "parent": "EventBus"
         },
@@ -17885,6 +17904,11 @@
         {
           "kind": "method",
           "name": "runConsumer",
+          "parent": "EventBus"
+        },
+        {
+          "kind": "method",
+          "name": "running",
           "parent": "EventBus"
         },
         {
@@ -39040,6 +39064,11 @@
         },
         {
           "kind": "method",
+          "name": "drain",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "on_bar",
           "parent": "Runner"
         },
@@ -44669,6 +44698,7 @@
         "lrvx_live_engine_add_strategy",
         "lrvx_live_engine_create",
         "lrvx_live_engine_destroy",
+        "lrvx_live_engine_drain",
         "lrvx_live_engine_publish_bar",
         "lrvx_live_engine_publish_book_snapshot",
         "lrvx_live_engine_publish_book_top",

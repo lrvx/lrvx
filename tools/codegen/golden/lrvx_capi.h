@@ -1756,6 +1756,7 @@ extern "C"
   void lrvx_live_engine_destroy(LrvxLiveEngineHandle engine);
   void lrvx_live_engine_add_strategy(LrvxLiveEngineHandle engine, LrvxStrategyHandle strategy,
                                      LrvxOnSignalCallback on_signal, void* user_data);
+  void lrvx_live_engine_drain(LrvxLiveEngineHandle engine);
   void lrvx_live_engine_start(LrvxLiveEngineHandle engine);
   void lrvx_live_engine_stop(LrvxLiveEngineHandle engine);
   void lrvx_live_engine_publish_trade(LrvxLiveEngineHandle engine, uint32_t symbol, double price,
