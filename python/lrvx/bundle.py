@@ -293,7 +293,7 @@ def _run_strategy_against_tape(
         else:
             new_price = float(getattr(sig, "new_price", 0.0) or 0.0)
             new_qty = float(getattr(sig, "new_quantity", 0.0) or 0.0)
-            taken = sim.modify_order(oid, new_price, new_qty, int(sym))
+            taken = sim.modify_order(oid, new_price, new_qty, int(sym)) == "accepted"
             done = []
             if taken and oid in sent:
                 side, kind = sent[oid][0], sent[oid][1]

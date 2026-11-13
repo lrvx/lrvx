@@ -68,6 +68,7 @@ class SimulatedExecutor : public IOrderExecutor
   explicit SimulatedExecutor(IClock& clock);
 
   void setOrderEventCallback(OrderEventCallback cb);
+  const OrderEventCallback& orderEventCallback() const noexcept { return _callback; }
 
   // Where the executor reads each symbol's tick. An order whose limit price,
   // trigger price or trailing distance is off a known tick is rejected at

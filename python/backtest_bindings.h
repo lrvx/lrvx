@@ -200,29 +200,59 @@ class PySimulatedExecutor
   // The replacement BacktestRunner builds for a Modify on its built-in
   // simulator: the live order with the new price and quantity applied. An id
   // the simulator does not hold still goes to replaceOrder, under `symbol`,
-  // so the refusal is the simulator's. True when the simulator took the
-  // replacement: the order was working and afterwards either carries the new
-  // price and quantity or is gone, filled as the replacement. A refused
-  // replacement leaves the original working as it was.
-  bool modifyOrder(uint64_t id, double newPrice, double newQty, uint32_t symbol)
+  // so the refusal is the simulator's. What the simulator decided is read
+  // from the event it emits for the request, not from the order afterwards:
+  // with a replace ack latency the original keeps working until the ack.
+  //   "accepted"  REPLACED: the replacement is working now.
+  //   "pending"   REPLACE_SUBMITTED (it waits on the replace ack latency), or
+  //               no event (held for a venue outage): the outcome arrives
+  //               later as a REPLACED or REPLACE_REJECTED order event.
+  //   "refused"   REPLACE_REJECTED or REJECTED_RATE_LIMIT: the original is
+  //               left as it was.
+  std::string modifyOrder(uint64_t id, double newPrice, double newQty, uint32_t symbol)
   {
     Order order{.id = id, .symbol = symbol};
-    const Order* live = _executor.findOrder(id);
-    const bool wasLive = live != nullptr;
-    if (wasLive)
+    if (const Order* live = _executor.findOrder(id))
     {
       order = *live;
     }
     applyModify(order, Price::fromDouble(newPrice), Quantity::fromDouble(newQty));
-    _executor.replaceOrder(id, order);
-    if (!wasLive)
+
+    std::optional<OrderEventStatus> decision;
+    SimulatedExecutor::OrderEventCallback outer = _executor.orderEventCallback();
+    struct Restore
     {
-      return false;
+      SimulatedExecutor& executor;
+      SimulatedExecutor::OrderEventCallback& outer;
+      ~Restore() { executor.setOrderEventCallback(std::move(outer)); }
+    } restore{_executor, outer};
+    _executor.setOrderEventCallback(
+        [&](const OrderEvent& ev)
+        {
+          const bool answers = ev.status == OrderEventStatus::REPLACED ||
+                               ev.status == OrderEventStatus::REPLACE_SUBMITTED ||
+                               ev.status == OrderEventStatus::REPLACE_REJECTED ||
+                               ev.status == OrderEventStatus::REJECTED_RATE_LIMIT;
+          if (!decision && answers && ev.order.id == id)
+          {
+            decision = ev.status;
+          }
+          if (outer)
+          {
+            outer(ev);
+          }
+        });
+    _executor.replaceOrder(id, order);
+    if (decision == OrderEventStatus::REPLACED)
+    {
+      return "accepted";
     }
-    const Order* now = _executor.findOrder(id);
-    return now == nullptr ||
-           (now->quantity == order.quantity && now->price == order.price &&
-            now->triggerPrice == order.triggerPrice);
+    if (decision == OrderEventStatus::REPLACE_REJECTED ||
+        decision == OrderEventStatus::REJECTED_RATE_LIMIT)
+    {
+      return "refused";
+    }
+    return "pending";
   }
 
   bool orderIsLive(uint64_t id) const { return _executor.findOrder(id) != nullptr; }
@@ -734,8 +764,11 @@ inline void bindBacktest(py::module_& m)
            "moves to new_price, the limit of any other; new_quantity is what is left to work. "
            "An off-tick replacement, or an id that is no longer working, is refused and the "
            "order is left as it was. symbol is used only when the simulator does not hold "
-           "the order. Returns True when the replacement was taken, False when it was "
-           "refused.",
+           "the order. Returns what the simulator decided: 'accepted' when the replacement "
+           "is working now; 'pending' when it waits on the replace ack latency or a venue "
+           "outage, the original working meanwhile and the outcome arriving later as a "
+           "REPLACED or REPLACE_REJECTED order event; 'refused' when it was rejected (off "
+           "tick or lot, not working, rate limited) and the original is left as it was.",
            py::arg("order_id"), py::arg("new_price"), py::arg("new_quantity"),
            py::arg("symbol"))
       .def("order_is_live", &PySimulatedExecutor::orderIsLive,
