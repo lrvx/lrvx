@@ -337,6 +337,39 @@ inline std::string describeReturned(const Napi::Value& v)
   }
 }
 
+// What a hook threw, for a report: the message of anything that carries a
+// string one, an Error above all, and otherwise the value described as
+// describeReturned does. Only the message of an Error was read, so a thrown
+// Symbol, string or plain object was reported with an empty message.
+inline std::string describeThrown(const Napi::Error& e)
+{
+  Napi::Value v = e.Value();
+  if (v.IsEmpty())
+  {
+    return "threw a value that could not be read";
+  }
+  if (v.IsObject())
+  {
+    try
+    {
+      Napi::Value m = v.As<Napi::Object>().Get("message");
+      if (m.IsString())
+      {
+        std::string msg = m.As<Napi::String>().Utf8Value();
+        if (!msg.empty())
+        {
+          return msg;
+        }
+      }
+    }
+    catch (const Napi::Error&)
+    {
+      // A message getter that throws: describe the value instead.
+    }
+  }
+  return "threw " + describeReturned(v);
+}
+
 inline uint8_t callGate(Napi::FunctionReference& fn, Napi::Env env, const LrvxSignal* sig,
                         HookErrorSink* sink, const char* hook, const char* method)
 {
@@ -352,7 +385,7 @@ inline uint8_t callGate(Napi::FunctionReference& fn, Napi::Env env, const LrvxSi
   catch (const Napi::Error& e)
   {
     // node-addon-api cleared the pending JS exception when it built this.
-    reportHookError(sink, hook, method, e.Message());
+    reportHookError(sink, hook, method, describeThrown(e));
     return 0;
   }
   catch (const std::exception& e)
@@ -735,7 +768,7 @@ struct ExecutorHost
     }
     catch (const Napi::Error& e)
     {
-      reportHookError(self->errors, "executor", "capabilities", e.Message());
+      reportHookError(self->errors, "executor", "capabilities", describeThrown(e));
       return;
     }
     catch (const std::exception& e)

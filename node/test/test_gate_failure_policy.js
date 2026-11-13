@@ -109,6 +109,12 @@ function runGateScenarios() {
       ['returns a Symbol', () => Symbol('allow'), 'boolean'],
       ['returns an object whose toString throws',
        () => ({ toString() { throw new Error('no string'); } }), 'boolean'],
+      // A thrown value that is not an Error used to be reported with an
+      // empty message.
+      ['throws a Symbol', () => { throw Symbol('deny'); }, 'threw a symbol'],
+      ['throws a string', () => { throw 'plain refusal'; }, "threw 'plain refusal'"],
+      ['throws an object whose message getter throws',
+       () => { throw { get message() { throw new Error('inner'); } }; }, 'threw an object'],
     ]) {
       checkGateFailure(setter, method, hookName, mode, impl, wanted);
     }
