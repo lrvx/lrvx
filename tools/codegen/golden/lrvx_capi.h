@@ -2396,6 +2396,8 @@ extern "C"
   void lrvx_registry_destroy(LrvxRegistryHandle registry);
   uint32_t lrvx_registry_add_symbol(LrvxRegistryHandle registry, const char* exchange,
                                     const char* name, double tick_size);
+  uint32_t lrvx_registry_add_symbol_with_lot(LrvxRegistryHandle registry, const char* exchange,
+                                             const char* name, double tick_size, double lot_size);
   uint8_t lrvx_registry_get_symbol_id(LrvxRegistryHandle registry, const char* exchange,
                                       const char* name, uint32_t* id_out);
   uint8_t lrvx_registry_get_symbol_name(LrvxRegistryHandle registry, uint32_t symbol_id,

@@ -436,6 +436,39 @@ VenueTickResult SymbolRegistry::applyVenueTick(SymbolId id, Price venueTick)
   return {VenueTickOutcome::Applied, info.tickSize};
 }
 
+VenueLotResult SymbolRegistry::applyVenueLot(SymbolId id, Quantity venueLot)
+{
+  std::lock_guard lock(_mutex);
+  auto it = _symbols.find(id);
+  if (it == _symbols.end())
+  {
+    return {VenueTickOutcome::UnknownSymbol, Quantity{}};
+  }
+  SymbolInfo& info = it->second;
+  if (venueLot.raw() <= 0)
+  {
+    return {VenueTickOutcome::InvalidTick, info.lotSize};
+  }
+  const int64_t declared = orderLotRaw(info);
+  if (declared == venueLot.raw())
+  {
+    return {VenueTickOutcome::Unchanged, info.lotSize};
+  }
+  if (declared != 0)
+  {
+    // A lot the venue wrote here is the venue's to change again; any other
+    // was declared by the caller.
+    const auto applied = _venueTicks->lotFor(id);
+    if (!applied || applied->raw() != info.lotSize.raw())
+    {
+      return {VenueTickOutcome::Conflict, info.lotSize};
+    }
+  }
+  info.lotSize = venueLot;
+  _venueTicks->recordLot(id, venueLot);
+  return {VenueTickOutcome::Applied, info.lotSize};
+}
+
 void SymbolRegistry::clear()
 {
   std::lock_guard lock(_mutex);
@@ -867,6 +900,11 @@ bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
     {
       std::fprintf(f, ", \"tick_size_known\": true");
     }
+    // Likewise only when a lot is declared.
+    if (sym.lotSize.raw() > 0)
+    {
+      std::fprintf(f, ", \"lot_size\": %lld", static_cast<long long>(sym.lotSize.raw()));
+    }
 
     if (sym.strike.has_value())
     {
@@ -1013,6 +1051,12 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
       {
         info.tickSizeKnown = *v == "true";
       }
+      // Absent from a file written before lots were persisted, and from an
+      // entry that declares none: the quantity is not checked.
+      if (const auto* v = field("lot_size"))
+      {
+        info.lotSize = Quantity::fromRaw(std::stoll(*v));
+      }
       if (const auto* v = field("strike"))
       {
         info.strike = Price::fromRaw(std::stoll(*v));
@@ -1091,10 +1135,12 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
 //   [1 byte] instrument type
 //   [8 bytes] tick_size (v2+)
 //   [1 byte] flags (0x01 strike, 0x02 expiry, 0x04 option_type,
-//            0x08 settlement_ccy, 0x10 tick_size_known)
+//            0x08 settlement_ccy, 0x10 tick_size_known, 0x20 lot_size)
 //   [8 bytes] strike (if flag set)
 //   [8 bytes] expiry (if flag set)
 //   [1 byte] option_type (if flag set)
+//   ... v3 contract spec, v4 scales ...
+//   [8 bytes] lot_size (v5, if flag set)
 
 static constexpr uint32_t kSymbolRegistryMagic = 0x47455253;  // "SREG"
 // v3 adds the contract spec (multiplier / settlement_type / exercise_style /
@@ -1102,6 +1148,13 @@ static constexpr uint32_t kSymbolRegistryMagic = 0x47455253;  // "SREG"
 // v4 adds per-symbol fixed-point scale (price_scale / qty_scale). Older files
 // load with the default 1e8 scale, so they are byte-identical in behavior.
 static constexpr uint32_t kSymbolRegistryVersion = 4;
+// v5 adds the declared lot (lot_size), eight bytes at the end of an entry
+// whose flags carry kFlagLotSize. It is written only when some entry declares
+// a lot, so a registry without one serializes to the same v4 bytes as before
+// and a build that predates lots still reads it; such a build refuses v5
+// rather than misreading the extra bytes.
+static constexpr uint32_t kSymbolRegistryVersionWithLots = 5;
+static constexpr uint8_t kFlagLotSize = 0x20;
 // A flag bit rather than a version: a reader that predates it ignores the bit
 // and loads the symbol as it always did.
 static constexpr uint8_t kFlagTickSizeKnown = 0x10;
@@ -1157,9 +1210,16 @@ std::vector<std::byte> SymbolRegistry::serialize() const
     }
   };
 
+  bool anyLot = false;
+  // order: not observable -- any declared lot decides the version
+  for (const auto& [id, sym] : _symbols)
+  {
+    anyLot = anyLot || sym.lotSize.raw() > 0;
+  }
+
   // Header
   write_u32(kSymbolRegistryMagic);
-  write_u32(kSymbolRegistryVersion);
+  write_u32(anyLot ? kSymbolRegistryVersionWithLots : kSymbolRegistryVersion);
   write_u32(static_cast<uint32_t>(_symbols.size()));
 
   // Symbols
@@ -1192,6 +1252,10 @@ std::vector<std::byte> SymbolRegistry::serialize() const
     {
       flags |= kFlagTickSizeKnown;
     }
+    if (sym.lotSize.raw() > 0)
+    {
+      flags |= kFlagLotSize;
+    }
     write_u8(flags);
 
     if (sym.strike.has_value())
@@ -1222,6 +1286,12 @@ std::vector<std::byte> SymbolRegistry::serialize() const
     // v4 per-symbol fixed-point scale.
     write_i64(sym.priceScale);
     write_i64(sym.qtyScale);
+
+    // v5 declared lot.
+    if (sym.lotSize.raw() > 0)
+    {
+      write_i64(sym.lotSize.raw());
+    }
   }
 
   return result;
@@ -1316,7 +1386,7 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
   }
 
   uint32_t version = read_u32();
-  if (version != 1 && version != 2 && version != 3 && version != 4)
+  if (version < 1 || version > kSymbolRegistryVersionWithLots)
   {
     return false;
   }
@@ -1375,6 +1445,12 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
     {
       info.priceScale = read_i64();
       info.qtyScale = read_i64();
+    }
+
+    // Before v5 the bit meant nothing and no bytes follow it.
+    if (version >= kSymbolRegistryVersionWithLots && (flags & kFlagLotSize) != 0)
+    {
+      info.lotSize = Quantity::fromRaw(read_i64());
     }
 
     std::string key = info.exchange + ":" + info.symbol;

@@ -27,10 +27,12 @@ btc = registry.add_symbol("binance", "BTCUSDT", tick_size=0.01)
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `add_symbol(exchange, symbol, tick_size=None)` | `Symbol` | Register a symbol and return its `Symbol` object |
+| `add_symbol(exchange, symbol, tick_size=None, lot_size=None)` | `Symbol` | Register a symbol and return its `Symbol` object |
 | `symbol_count()` | `int` | Number of registered symbols |
 
 `tick_size` is the venue's price increment, and a backtest rejects orders priced off it. Left out, the symbol's book uses 0.01 and order prices are not checked; `Symbol.tick_size` then reads 0.01.
+
+`lot_size` is the venue's quantity step, and a backtest rejects an order whose quantity is not a whole number of it (`reject_reason` `"quantity_off_lot"`). Left out, quantities are not checked and `Symbol.lot_size` is `None`. A `lot_size` that is not positive raises `ValueError`.
 
 ## Class: `lrvx.Strategy`
 
@@ -138,6 +140,8 @@ These methods use the first registered symbol when `symbol` is omitted. `symbol`
 `tif` accepts `"gtc"`, `"ioc"`, `"fok"`, `"gtd"`, `"post_only"`.
 
 In a backtest, `price`, `trigger`, `limit_price`, `offset` and `modify_order`'s `new_price` must be whole numbers of the symbol's tick when the symbol was registered with one. An order off the tick is rejected: `on_order_update` receives `status == "REJECTED"` and `reject_reason` `"price_off_tick"`, `"trigger_off_tick"` or `"trailing_offset_off_tick"` (a modify gets `"REPLACE_REJECTED"`). Round a computed price before sending it, for example `round(price / tick) * tick`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
+
+Quantities are checked the same way when the symbol was registered with a quantity step, `registry.add_symbol(exchange, name, tick_size=..., lot_size=...)`: an order whose `qty`, or a `modify_order` whose `new_qty`, is not a whole number of `lot_size` gets `"REJECTED"` (`"REPLACE_REJECTED"` for the modify) with `reject_reason` `"quantity_off_lot"`. Without `lot_size` quantities are not checked. The returned symbol carries it as `symbol.lot_size` (`None` when not given). See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-quantities-and-the-lot).
 
 ### Order Emission — Explicit (emit_* variants)
 

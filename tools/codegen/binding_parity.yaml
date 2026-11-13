@@ -1844,6 +1844,7 @@ allowlist_functions:
     lrvx_rate_limit_policy_load_profile: *cpp_direct
     lrvx_rate_limit_policy_set_ban: *cpp_direct
     lrvx_registry_add_symbol: *cpp_direct
+    lrvx_registry_add_symbol_with_lot: *cpp_direct
     lrvx_registry_create: *cpp_direct
     lrvx_registry_destroy: *cpp_direct
     lrvx_registry_get_symbol_id: *cpp_direct
@@ -2148,6 +2149,7 @@ allowlist_functions:
     lrvx_pool_tape_checkpoint_clmm: *no_napi_wrapper
     lrvx_position_raw: *no_napi_wrapper
     lrvx_registry_add_symbol: *no_napi_wrapper
+    lrvx_registry_add_symbol_with_lot: *no_napi_wrapper
     lrvx_registry_create: *no_napi_wrapper
     lrvx_registry_destroy: *no_napi_wrapper
     lrvx_registry_get_symbol_id: *no_napi_wrapper
@@ -2547,6 +2549,7 @@ allowlist_functions:
     lrvx_quantity_to_double: *quickjs_helper_only
     lrvx_rate_limit_policy_bucket_state: *no_quickjs_global
     lrvx_registry_add_symbol: *no_quickjs_global
+    lrvx_registry_add_symbol_with_lot: *no_quickjs_global
     lrvx_registry_create: *no_quickjs_global
     lrvx_registry_destroy: *no_quickjs_global
     lrvx_registry_get_symbol_id: *no_quickjs_global

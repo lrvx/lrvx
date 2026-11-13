@@ -10841,6 +10841,33 @@
     },
     {
       "group": "symbol_registry",
+      "name": "lrvx_registry_add_symbol_with_lot",
+      "params": [
+        {
+          "name": "registry",
+          "type": "LrvxRegistryHandle"
+        },
+        {
+          "name": "exchange",
+          "type": "const char *"
+        },
+        {
+          "name": "name",
+          "type": "const char *"
+        },
+        {
+          "name": "tick_size",
+          "type": "double"
+        },
+        {
+          "name": "lot_size",
+          "type": "double"
+        }
+      ],
+      "return_type": "uint32_t"
+    },
+    {
+      "group": "symbol_registry",
       "name": "lrvx_registry_create",
       "params": [],
       "return_type": "LrvxRegistryHandle"

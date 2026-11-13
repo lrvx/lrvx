@@ -236,6 +236,11 @@ void BybitOrderExecutorT<Policies>::sendSubmitOrder(const Order& order)
     publishRejection(order, offTick);
     return;
   }
+  if (const char* offLot = venue_price::offLotReason(order, *info))
+  {
+    publishRejection(order, offLot);
+    return;
+  }
 
   const bool isConditional = isConditionalOrder(order.type);
   const bool priceIsLimit =
@@ -437,6 +442,11 @@ void BybitOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldOrderId, const O
   if (venue_price::isOffTick(newOrder.price, *info))
   {
     publishReplaceRejected(target, newOrder, kRejectPriceOffTick);
+    return;
+  }
+  if (const char* offLot = venue_price::offLotReason(newOrder, *info))
+  {
+    publishReplaceRejected(target, newOrder, offLot);
     return;
   }
 

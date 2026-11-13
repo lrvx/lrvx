@@ -1536,3 +1536,39 @@ TEST(StrategyStateOwnership, BarRingSurvivesConcurrentReadsAndWrites)
   auto last = strategy->lastClosedBar(1, BarType::Time, 60);
   ASSERT_TRUE(last.has_value());
 }
+
+// Order ids are (subscriber id << 32) + n. A subscriber id of 2^32 or more
+// shifted out of the word: 2^32 + 5 issued the ids of subscriber 5.
+namespace
+{
+class IdProbeStrategy : public Strategy
+{
+ public:
+  using Strategy::Strategy;
+  OrderId buy(SymbolId sym)
+  {
+    return emitLimitBuy(sym, Price::fromDouble(1.0), Quantity::fromDouble(1.0));
+  }
+};
+}  // namespace
+
+TEST(StrategySubscriberId, AnIdThatCannotMakeOrderIdsIsRefused)
+{
+  SymbolRegistry registry;
+  populateRegistry(registry, {1});
+  const SymbolId sym = *registry.getSymbolId("TEST", "SYM1");
+  const SubscriberId wide = (SubscriberId{1} << 32) + 5;
+
+  EXPECT_THROW(IdProbeStrategy(wide, sym, registry), std::invalid_argument);
+  EXPECT_THROW(IdProbeStrategy(SubscriberId{1} << 32, sym, registry), std::invalid_argument);
+
+  IdProbeStrategy widest(0xFFFF'FFFEULL, sym, registry);
+  EXPECT_EQ(widest.buy(sym), (OrderId{0xFFFF'FFFEULL} << 32) + 1);
+
+  IdProbeStrategy strategy(7, sym, registry);
+  EXPECT_THROW(strategy.setSubscriberId(wide), std::invalid_argument);
+  EXPECT_EQ(strategy.id(), 7u);
+  EXPECT_EQ(strategy.buy(sym), (OrderId{7} << 32) + 1);
+  strategy.setSubscriberId(9);
+  EXPECT_EQ(strategy.buy(sym), (OrderId{9} << 32) + 2);
+}

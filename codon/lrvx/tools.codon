@@ -907,10 +907,16 @@ def bootstrap_ci(data: List[float], confidence: float = 0.95,
 
 
 def validate_segment(path: str) -> bool:
+    """False for a segment that fails its checks and for a file that could
+    not be read; last_error() is empty for the first and says why for the
+    second."""
+    lrvx_clear_last_error()
     return lrvx_segment_validate(path.c_str()) != u8(0)
 
 
 def merge_segments(input_dir: str, output_path: str) -> bool:
+    """False when no segment was merged; last_error() says why."""
+    lrvx_clear_last_error()
     return lrvx_segment_merge(input_dir.c_str(), output_path.c_str()) != u8(0)
 
 

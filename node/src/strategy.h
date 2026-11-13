@@ -72,6 +72,21 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
     si.symbol = sym;
     si.tickSize = lrvx::Price::fromDouble(tickSize);
     si.tickSizeKnown = hasTick;
+    // A lot passed here is the venue's quantity step, and a backtest refuses
+    // an order whose quantity is not a whole number of it. Left out,
+    // quantities are not checked.
+    const bool hasLot = info.Length() > 3 && info[3].IsNumber();
+    if (hasLot)
+    {
+      const double lotSize = info[3].As<Napi::Number>().DoubleValue();
+      si.lotSize = lrvx::Quantity::fromDouble(lotSize);
+      if (si.lotSize.raw() <= 0)
+      {
+        Napi::RangeError::New(env, "addSymbol: lotSize must be a positive quantity")
+            .ThrowAsJavaScriptException();
+        return env.Undefined();
+      }
+    }
     uint32_t id = static_cast<uint32_t>(_reg->registerSymbol(si));
 
     // Return a Symbol object: { id, exchange, name, tickSize, valueOf() → id }
@@ -81,6 +96,14 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
     obj.Set("exchange", Napi::String::New(env, ex));
     obj.Set("name", Napi::String::New(env, sym));
     obj.Set("tickSize", Napi::Number::New(env, tickSize));
+    if (hasLot)
+    {
+      obj.Set("lotSize", Napi::Number::New(env, si.lotSize.toDouble()));
+    }
+    else
+    {
+      obj.Set("lotSize", env.Null());
+    }
     obj.Set("valueOf", Napi::Function::New(env,
                                            [](const Napi::CallbackInfo& i) -> Napi::Value
                                            {

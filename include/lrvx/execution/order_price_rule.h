@@ -18,7 +18,8 @@
 namespace lrvx
 {
 
-// The rule a simulated venue applies to the prices on an order, in one place.
+// The rule a simulated venue applies to the prices and the quantity on an
+// order, in one place.
 //
 // A venue refuses an order whose limit price, trigger price or trailing
 // distance is not a whole number of ticks (Binance -1013 PRICE_FILTER, Bybit
@@ -34,6 +35,11 @@ namespace lrvx
 inline constexpr const char* kRejectPriceOffTick = "price_off_tick";
 inline constexpr const char* kRejectTriggerOffTick = "trigger_off_tick";
 inline constexpr const char* kRejectTrailingOffsetOffTick = "trailing_offset_off_tick";
+
+// An order quantity, or an iceberg's visible quantity, that is not a whole
+// number of the symbol's declared lot (Binance -1013 LOT_SIZE, Bybit
+// lotSizeFilter.qtyStep, the lrvx venue's LotSizeViolation).
+inline constexpr const char* kRejectQuantityOffLot = "quantity_off_lot";
 
 // Why a replace was refused, other than its prices.
 inline constexpr const char* kRejectUnknownOrder = "unknown_order";
@@ -60,6 +66,31 @@ inline int64_t orderTickRaw(const SymbolInfo& info) noexcept
     return 0;
   }
   return tick;
+}
+
+// The lot order quantities on this symbol are checked against, as a raw
+// quantity, or 0 when the symbol declares none. Unlike the tick there is no
+// default to tell apart: a lot is declared by being positive.
+inline int64_t orderLotRaw(const SymbolInfo& info) noexcept
+{
+  const int64_t lot = info.lotSize.raw();
+  return lot > 0 ? lot : 0;
+}
+
+// Why a venue with this lot would refuse the order's quantity, or nullptr
+// when it would not. Every order type carries a quantity, a market order
+// included.
+inline const char* offLotReason(const Order& order, int64_t lotRaw) noexcept
+{
+  if (lotRaw <= 0)
+  {
+    return nullptr;
+  }
+  if (order.quantity.raw() % lotRaw != 0 || order.visibleQuantity.raw() % lotRaw != 0)
+  {
+    return kRejectQuantityOffLot;
+  }
+  return nullptr;
 }
 
 // Snap a price onto the tick grid on the owner's worse side: a buy is moved up

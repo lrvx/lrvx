@@ -520,8 +520,32 @@ declare const lrvx: {
     winRate(pnl: number[]): number;
     bootstrapCI(data: number[], confidence?: number, samples?: number): { lower: number; median: number; upper: number };
     permutationTest(group1: number[], group2: number[], numPermutations?: number): number;
+    /** `false` for a segment that fails its checks and for a file that could
+     *  not be read; `lastError()` is `''` for the first and the reason for the
+     *  second. */
     validateSegment(path: string): boolean;
+    /** `false` when no segment was merged; `lastError()` says why. */
     mergeSegments(inputDir: string, outputPath: string): boolean;
+    mergeDir(inputDir: string, outputDir: string): {
+        success: boolean;
+        segmentsMerged: number;
+        eventsWritten: number;
+        bytesWritten: number;
+    };
+    /** `firstTimestamp` / `lastTimestamp` are nanoseconds. */
+    validateDataset(dataDir: string): {
+        valid: boolean;
+        totalSegments: number;
+        validSegments: number;
+        corruptedSegments: number;
+        totalEvents: number;
+        totalBytes: number;
+        firstTimestamp: bigint;
+        lastTimestamp: bigint;
+    };
+    /** Why the last call that reports failure through its return value
+     *  failed; `''` when it did not. */
+    lastError(): string;
     /** Read an OHLCV CSV. A ts column in s / ms / us / ns is scaled to ns. */
     loadCsv(path: string): Bar[];
 

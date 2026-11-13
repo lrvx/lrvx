@@ -2959,7 +2959,7 @@ class SimulatedExecutor:
         ...
     def set_symbol_registry(self, registry: typing.Any) -> None:
         """
-        Read each symbol's tick from this registry. An order priced off a known tick is rejected (reason price_off_tick, trigger_off_tick or trailing_offset_off_tick), and slipped fills are snapped onto the tick against the order's owner. Pass None to stop checking.
+        Read each symbol's tick and lot from this registry. An order priced off a known tick is rejected (reason price_off_tick, trigger_off_tick or trailing_offset_off_tick), one sized off a declared lot is rejected (quantity_off_lot), and slipped fills are snapped onto the tick against the order's owner. Pass None to stop checking.
         """
     def set_symbol_slippage(self, symbol: typing.SupportsInt | typing.SupportsIndex, model: str, ticks: typing.SupportsInt | typing.SupportsIndex = 0, tick_size: typing.SupportsFloat | typing.SupportsIndex = 0.0, bps: typing.SupportsFloat | typing.SupportsIndex = 0.0, impact_coeff: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:
         """
@@ -3268,6 +3268,11 @@ class Symbol:
     def id(self) -> int:
         ...
     @property
+    def lot_size(self) -> float | None:
+        """
+        The quantity step the symbol was registered with, or None.
+        """
+    @property
     def name(self) -> str:
         ...
     @property
@@ -3342,8 +3347,10 @@ class SymbolContext:
 class SymbolRegistry:
     def __init__(self) -> None:
         ...
-    def add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol:
-        ...
+    def add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None, lot_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol:
+        """
+        Register a symbol. tick_size is the venue's price increment and lot_size its quantity step; a backtest rejects an order priced off a given tick (price_off_tick) or sized off a given lot (quantity_off_lot). Left out, that side of the order is not checked.
+        """
     def symbol_count(self) -> int:
         ...
 class TEMA:

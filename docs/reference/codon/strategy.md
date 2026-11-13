@@ -17,8 +17,11 @@ Strategy(symbols: List[int], strategy_id: int = -1, registry: cobj = cobj())
   strategy holds id `1` until it is added to a `Runner`, which moves it to the lowest id from 1
   that no strategy on that runner holds: default-constructed strategies on one runner get 1, 2,
   3, ... in the order added. Given, the id is kept, and a runner that already holds it refuses
-  the strategy. A `BacktestRunner` has one strategy and leaves its id alone. `2097151` is
-  refused everywhere: runners take their own order ids from that block
+  the strategy. The id the first `Runner` gives is kept the same way: a second `Runner` does not
+  renumber the strategy, and refuses it with the duplicate-id `ValueError` when it already holds
+  that id. A `BacktestRunner` has one strategy and leaves its id alone. `2097151` is
+  refused everywhere: runners take their own order ids from that block. An id of 2^32 or more
+  raises `ValueError` from the constructor
 - `registry` -- Symbol-registry handle. When omitted, the underlying handle is created empty and
   `Runner.add_strategy` rebuilds it once a registry is present. Pass the strategy into a `Runner` to
   give it an event source; on its own it has none.
@@ -137,6 +140,13 @@ registered with (`lrvx_registry_add_symbol(reg, exchange, name, tick)` with `tic
 the tick is rejected: `on_order_update` receives `REJECTED` with `ev.reject_reason` set to
 `price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`. A symbol registered with a tick of
 0 is not checked. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
+
+Quantities are checked against the quantity step the symbol was registered with through
+`lrvx_registry_add_symbol_with_lot(reg, exchange, name, tick, lot)` (importable from `lrvx.runner`)
+with `lot > 0`: an order whose quantity is not a whole number of the lot is rejected with
+`ev.reject_reason` `quantity_off_lot`. A lot of 0, and `lrvx_registry_add_symbol`, declare none and
+quantities are not checked. See
+[SimulatedExecutor](../api/backtest/simulated_executor.md#order-quantities-and-the-lot).
 
 #### `emit_market_buy(symbol, qty) -> int`
 

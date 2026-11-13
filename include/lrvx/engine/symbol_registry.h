@@ -48,6 +48,13 @@ struct SymbolInfo
   // it to have an explicit 0.01 checked. saveToFile and serialize keep it; data
   // written before they did loads with it clear.
   bool tickSizeKnown{false};
+  // The venue's order-quantity increment; zero when it is not declared, which
+  // is the default. A simulated venue refuses an order whose quantity is not
+  // a whole number of a declared lot (see execution/order_price_rule.h). It
+  // is the step, not the smallest order the venue takes: a minimum size is a
+  // separate venue rule and has no field here. saveToFile and serialize keep
+  // it; data written before they did loads with it zero.
+  Quantity lotSize{};
   ExchangeId exchangeId{InvalidExchangeId};
 
   std::optional<Price> strike;
@@ -122,12 +129,25 @@ struct VenueTickResult
   Price heldTick{};
 };
 
+// What SymbolRegistry::applyVenueLot did, in applyVenueTick's terms:
+// InvalidTick is a venue lot that is not positive.
+struct VenueLotResult
+{
+  VenueTickOutcome outcome{VenueTickOutcome::UnknownSymbol};
+  // The lot the entry holds after the call (zero when it holds none).
+  Quantity heldLot{};
+};
+
 // The venue ticks applyVenueTick wrote into existing entries, for whoever
 // copied an entry before the venue's tick was known. A Strategy sizes each
 // symbol's book on the tick it read in its constructor, usually before any
 // connector has started; it holds this log, not the registry, so the registry
 // does not have to outlive it, and on its next event for a symbol it re-sizes
 // that book when the revision moved.
+//
+// The lots applyVenueLot wrote are kept beside them. Nothing sizes itself on
+// a lot, so they do not move the revision; the registry reads them back to
+// tell a lot the venue wrote from one the caller declared.
 class VenueTickLog
 {
  public:
@@ -147,6 +167,18 @@ class VenueTickLog
     return it->second;
   }
 
+  // The venue lot applied to this symbol, if one was.
+  std::optional<Quantity> lotFor(SymbolId id) const
+  {
+    std::lock_guard lock(_mutex);
+    auto it = _lots.find(id);
+    if (it == _lots.end())
+    {
+      return std::nullopt;
+    }
+    return it->second;
+  }
+
  private:
   friend class SymbolRegistry;
 
@@ -159,11 +191,18 @@ class VenueTickLog
     _revision.fetch_add(1, std::memory_order_release);
   }
 
+  void recordLot(SymbolId id, Quantity lot)
+  {
+    std::lock_guard lock(_mutex);
+    _lots[id] = lot;
+  }
+
   void reset()
   {
     {
       std::lock_guard lock(_mutex);
       _ticks.clear();
+      _lots.clear();
     }
     _revision.fetch_add(1, std::memory_order_release);
   }
@@ -171,6 +210,7 @@ class VenueTickLog
   std::atomic<uint64_t> _revision{0};
   mutable std::mutex _mutex;
   std::unordered_map<SymbolId, Price> _ticks;
+  std::unordered_map<SymbolId, Quantity> _lots;
 };
 
 class SymbolRegistry : public ISubsystem
@@ -233,6 +273,13 @@ class SymbolRegistry : public ISubsystem
   // Atomic with respect to every other registry call; an applied tick is
   // recorded in venueTickLog().
   VenueTickResult applyVenueTick(SymbolId id, Price venueTick);
+
+  // The same for the venue's quantity step: writes it into an entry that
+  // declares no lot (lotSize zero), or whose lot an earlier call applied, and
+  // records it in venueTickLog(). A lot the caller declared is never
+  // overwritten: a different venue lot is reported as Conflict and the entry
+  // keeps the caller's. Only lotSize can change.
+  VenueLotResult applyVenueLot(SymbolId id, Quantity venueLot);
 
   // Shared, so a holder may outlive the registry.
   std::shared_ptr<const VenueTickLog> venueTickLog() const noexcept { return _venueTicks; }

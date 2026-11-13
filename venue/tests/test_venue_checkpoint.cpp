@@ -928,8 +928,13 @@ TEST(VenueCheckpoint, PerpPositionAndMarginRestored)
 // segments reproduce the exact final state.
 TEST(VenueCheckpoint, TornSnapshotFallsBackToPreviousGeneration)
 {
-  const std::string base = pidPath("checkpoint_torn") + ".bin";
-  cleanFiles(base);
+  // A directory of its own: every shard start lists the journal's directory
+  // for generations, and the loop below starts one shard per snapshot byte.
+  namespace fs = std::filesystem;
+  const fs::path dir = pidPath("checkpoint_torn_dir");
+  fs::remove_all(dir);
+  fs::create_directories(dir);
+  const std::string base = (dir / "torn.bin").string();
 
   venue::SymbolConfig c = cfg();
   Ledger led1;
@@ -972,9 +977,11 @@ TEST(VenueCheckpoint, TornSnapshotFallsBackToPreviousGeneration)
     }
     Ledger led2;
     auto t2 = clockState(9'000'000 + static_cast<int64_t>(len) * 10'000);
-    // Heap-allocated: a shard embeds its 64k EventBus rings (~27 MB).
-    auto s2 = std::make_unique<SequencedShard<>>(c, base, MatchingBook{}, Journal::Sync::Off,
-                                                 clockOf(t2));
+    // Recovery does not depend on the ring capacity, and constructing,
+    // stopping and destroying a ring walks every slot of it: the default 64k
+    // rings made this loop most of the suite's time under a sanitizer.
+    auto s2 = std::make_unique<SequencedShard<MatchingBook, 1u << 10, 1u << 10>>(
+        c, base, MatchingBook{}, Journal::Sync::Off, clockOf(t2));
     s2->engine().setLedger(&led2, VENUE_ACCT);
     s2->start();
     // Fallback still recovers THROUGH a snapshot (generation A), not a bare
@@ -1000,7 +1007,7 @@ TEST(VenueCheckpoint, TornSnapshotFallsBackToPreviousGeneration)
     EXPECT_EQ(s2->engine().stateHash(), liveHash);
     s2->stop();
   }
-  cleanFiles(base);
+  fs::remove_all(dir);
 }
 
 // A snapshot in a format version this build does not read is one more

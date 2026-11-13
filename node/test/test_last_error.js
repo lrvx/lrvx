@@ -3,9 +3,9 @@
  * node/test/test_last_error.js -- lastError() says why a call that returns
  * false or 0 failed.
  *
- * FundingSchedule.loadTape, recompress, extractSymbols and extractTimeRange
- * report failure through their return value, and 0 is also what an extract
- * that matches nothing returns.
+ * FundingSchedule.loadTape, recompress, extractSymbols, extractTimeRange,
+ * validateSegment, validate and mergeSegments report failure through their
+ * return value, and 0 is also what an extract that matches nothing returns.
  *
  * Run from repo root:
  *   cd node && node test/test_last_error.js
@@ -44,6 +44,22 @@ console.log('=== a failure leaves its reason ===');
 
   check(lrvx.extractTimeRange(missing, out, 0n, 1000000000n) === 0, 'extractTimeRange returns 0');
   check(lrvx.lastError().includes(missing), 'and lastError() names the input');
+
+  check(lrvx.validateSegment(missing) === false, 'validateSegment returns false for a missing file');
+  check(lrvx.lastError().includes(missing) && lrvx.lastError().includes('lrvx_segment_validate'),
+        `and lastError() names the file and the function: ${lrvx.lastError()}`);
+
+  check(lrvx.validate(missing).valid === false, 'validate reports a missing file as not valid');
+  check(lrvx.lastError().includes(missing), 'and lastError() names it');
+
+  check(lrvx.mergeSegments(missing, path.join(root, 'merged')) === false,
+        'mergeSegments returns false when there is nothing to merge');
+  check(lrvx.lastError().includes(missing), `and lastError() says where: ${lrvx.lastError()}`);
+
+  const garbage = path.join(root, 'garbage.lrvx');
+  fs.writeFileSync(garbage, 'x'.repeat(256));
+  check(lrvx.validateSegment(garbage) === false, 'a file that is not a segment is not valid');
+  check(lrvx.lastError() === '', `and that is an answer, not an error: '${lrvx.lastError()}'`);
 }
 
 console.log('=== a call that did not fail leaves none ===');

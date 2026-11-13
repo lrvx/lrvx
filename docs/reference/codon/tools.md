@@ -396,3 +396,9 @@ also importable from `lrvx.tools`) then returns the reason: a string that opens 
 function's name and names the file. Each of the three clears it on entry, so `""` means the call
 did not fail; an extract that matched nothing returns `0` with `""`.
 `FundingSchedule.load_tape(path)` reports a file it could not open the same way.
+
+`validate_segment` and `merge_segments` clear it on entry as well. `validate_segment` returns
+`False` both for a segment that fails its checks and for a file that could not be read; only the
+unreadable file leaves a reason, so `""` after a `False` means the segment was read and is not
+valid. `merge_segments` returns `False` when no segment was merged, and `last_error()` says why
+(the directory has no segments, or none could be opened).

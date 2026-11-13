@@ -2730,6 +2730,11 @@
         {
           "group": "symbol_registry",
           "kind": "function",
+          "name": "lrvx_registry_add_symbol_with_lot"
+        },
+        {
+          "group": "symbol_registry",
+          "kind": "function",
           "name": "lrvx_registry_create"
         },
         {
@@ -10958,6 +10963,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_registry_add_symbol_with_lot"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_registry_create"
         },
         {
@@ -14194,6 +14203,11 @@
           "header": "include/lrvx/exchange/venue_behavior.h",
           "kind": "type",
           "name": "VenueBehavior"
+        },
+        {
+          "header": "include/lrvx/engine/symbol_registry.h",
+          "kind": "type",
+          "name": "VenueLotResult"
         },
         {
           "header": "include/lrvx/backtest/venue_stack.h",
@@ -25287,6 +25301,11 @@
         },
         {
           "kind": "method",
+          "name": "orderLotRaw",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "orderTickRaw",
           "parent": "SimulatedExecutor"
         },
@@ -26062,6 +26081,11 @@
         },
         {
           "kind": "method",
+          "name": "orderIdSubscriber",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "position",
           "parent": "Strategy"
         },
@@ -26264,6 +26288,11 @@
           "kind": "method",
           "name": "unrealizedPnl",
           "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
+          "name": "applyVenueLot",
+          "parent": "SymbolRegistry"
         },
         {
           "kind": "method",
@@ -27252,7 +27281,17 @@
         },
         {
           "kind": "method",
+          "name": "lotFor",
+          "parent": "VenueTickLog"
+        },
+        {
+          "kind": "method",
           "name": "record",
+          "parent": "VenueTickLog"
+        },
+        {
+          "kind": "method",
+          "name": "recordLot",
           "parent": "VenueTickLog"
         },
         {
@@ -33772,6 +33811,11 @@
         },
         {
           "kind": "method",
+          "name": "lotSize",
+          "parent": "Symbol"
+        },
+        {
+          "kind": "method",
           "name": "name",
           "parent": "Symbol"
         },
@@ -39798,6 +39842,11 @@
         },
         {
           "kind": "method",
+          "name": "lot_size",
+          "parent": "Symbol"
+        },
+        {
+          "kind": "method",
           "name": "name",
           "parent": "Symbol"
         },
@@ -45671,6 +45720,7 @@
     "symbol_registry": {
       "capi_functions": [
         "lrvx_registry_add_symbol",
+        "lrvx_registry_add_symbol_with_lot",
         "lrvx_registry_create",
         "lrvx_registry_destroy",
         "lrvx_registry_get_symbol_id",

@@ -403,37 +403,65 @@ SymbolId registerVenueSymbol(SymbolRegistry& registry, SymbolInfo info, Instrume
   {
     if (spec)
     {
-      const auto r = registry.applyVenueTick(*existing, spec->tickSize);
-      if (r.outcome != VenueTickOutcome::Conflict)
+      const auto report = [&](const std::string& msg)
       {
-        specs.clearConflict(info.symbol);
-      }
-      else
-      {
-        specs.setConflict(info.symbol, "the registry declares tick " + r.heldTick.toString() +
-                                           ", the venue uses " + spec->tickSize.toString() +
-                                           "; the declared tick is kept");
-        const std::string msg =
-            "[" + info.exchange + "] " + info.symbol + " was registered with tick " +
-            r.heldTick.toString() + " and the venue uses " + spec->tickSize.toString() +
-            ". The declared tick is kept: orders on it are checked against " +
-            r.heldTick.toString() + " and the venue may refuse prices that pass.";
         if (logger)
         {
           logger->error(msg);
         }
         LRVX_LOG_ERROR(msg);
+      };
+      // One entry per symbol, so a tick and a lot that both disagree share it.
+      std::string conflict;
+      const auto r = registry.applyVenueTick(*existing, spec->tickSize);
+      if (r.outcome == VenueTickOutcome::Conflict)
+      {
+        conflict = "the registry declares tick " + r.heldTick.toString() + ", the venue uses " +
+                   spec->tickSize.toString() + "; the declared tick is kept";
+        report("[" + info.exchange + "] " + info.symbol + " was registered with tick " +
+               r.heldTick.toString() + " and the venue uses " + spec->tickSize.toString() +
+               ". The declared tick is kept: orders on it are checked against " +
+               r.heldTick.toString() + " and the venue may refuse prices that pass.");
+      }
+      if (spec->lotSize.raw() > 0)
+      {
+        const auto l = registry.applyVenueLot(*existing, spec->lotSize);
+        if (l.outcome == VenueTickOutcome::Conflict)
+        {
+          if (!conflict.empty())
+          {
+            conflict += "; ";
+          }
+          conflict += "the registry declares lot " + l.heldLot.toString() + ", the venue uses " +
+                      spec->lotSize.toString() + "; the declared lot is kept";
+          report("[" + info.exchange + "] " + info.symbol + " was registered with lot " +
+                 l.heldLot.toString() + " and the venue uses " + spec->lotSize.toString() +
+                 ". The declared lot is kept: order quantities on it are checked against " +
+                 l.heldLot.toString() + " and the venue may refuse quantities that pass.");
+        }
+      }
+      if (conflict.empty())
+      {
+        specs.clearConflict(info.symbol);
+      }
+      else
+      {
+        specs.setConflict(info.symbol, conflict);
       }
     }
     return *existing;
   }
   // Registered first and given the venue's tick through applyVenueTick, as a
   // symbol registered earlier is: the registry then knows the tick is the
-  // venue's, and lets the venue change it later.
+  // venue's, and lets the venue change it later. The lot likewise.
   const SymbolId id = registry.registerSymbol(info);
   if (spec)
   {
     registry.applyVenueTick(id, spec->tickSize);
+    if (spec->lotSize.raw() > 0)
+    {
+      registry.applyVenueLot(id, spec->lotSize);
+    }
   }
   return id;
 }

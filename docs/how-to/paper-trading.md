@@ -87,7 +87,7 @@ broker.set_symbol_slippage(int(sym), "fixed_bps", bps=10.0)
 
 ## What is routed
 
-Everything a backtest routes: market and limit orders (with their time in force and flags), stop and take-profit orders (market and limit), trailing stops (offset and percent), `close_position`, `modify_order`, `cancel_order`, `cancel_all_orders` and OCO. The registry's ticks apply: an order priced off a declared tick is rejected with `price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`, and a modify with `REPLACE_REJECTED`, exactly as in a backtest and as the live connectors refuse it.
+Everything a backtest routes: market and limit orders (with their time in force and flags), stop and take-profit orders (market and limit), trailing stops (offset and percent), `close_position`, `modify_order`, `cancel_order`, `cancel_all_orders` and OCO. The registry's ticks apply: an order priced off a declared tick is rejected with `price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`, and a modify with `REPLACE_REJECTED`, exactly as in a backtest and as the live connectors refuse it. A quantity off a lot the registry declares is rejected with `quantity_off_lot` the same way.
 
 `on_signal`, when given, receives each `lrvx.Signal` after the runner has routed it; an exception it raises is recorded in `broker.stats.error` rather than stopping the session.
 

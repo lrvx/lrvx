@@ -4745,6 +4745,7 @@ Six rules hold in every backtest, with or without a slippage profile or a queue 
 | A triggered stop or target cannot fill better than its trigger | It may fill worse — a sell stop armed at 95 on a bar that traded to 90 still books 90 — but a take-profit armed at 105 books 105, not the bar's high. |
 | A queue model fills on bars | A bar that trades strictly through a resting limit's price consumes that level's queue, per the configured model. A bar that only touches the price fills nothing. |
 | An order priced off the tick is rejected | A limit price, stop or take-profit trigger, or trailing distance that is not a whole number of the symbol's ticks is refused at submit with `REJECTED` and a reason (`price_off_tick`, `trigger_off_tick`, `trailing_offset_off_tick`), as a venue refuses it. A symbol registered without a tick is not checked. |
+| An order sized off the lot is rejected | When the symbol was registered with a quantity step (`lot_size` / `lotSize`), an order whose quantity is not a whole number of it is refused at submit with `REJECTED` and reason `quantity_off_lot`, and a modify with `REPLACE_REJECTED`. A symbol registered without a lot is not checked. |
 | Each run starts clean | A second `run()` / `run_bars()` on the same runner reports that run, not the sum of every run so far. Configuration survives; state does not. |
 
 A strategy that prices an exit from its fill, such as a take-profit at `entry * 1.005`, rounds the
@@ -11773,6 +11774,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 
 - *property* `exchange: str`
 - *property* `id: int`
+- *property* `lot_size: float | None`
 - *property* `name: str`
 - *property* `tick_size: float`
 
@@ -11816,7 +11818,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 
 **Members**
 
-- `add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol`
+- `add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None, lot_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol`
 - `symbol_count(self) -> int`
 
 ### `class TEMA`
@@ -12291,10 +12293,12 @@ btc = registry.add_symbol("binance", "BTCUSDT", tick_size=0.01)
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `add_symbol(exchange, symbol, tick_size=None)` | `Symbol` | Register a symbol and return its `Symbol` object |
+| `add_symbol(exchange, symbol, tick_size=None, lot_size=None)` | `Symbol` | Register a symbol and return its `Symbol` object |
 | `symbol_count()` | `int` | Number of registered symbols |
 
 `tick_size` is the venue's price increment, and a backtest rejects orders priced off it. Left out, the symbol's book uses 0.01 and order prices are not checked; `Symbol.tick_size` then reads 0.01.
+
+`lot_size` is the venue's quantity step, and a backtest rejects an order whose quantity is not a whole number of it (`reject_reason` `"quantity_off_lot"`). Left out, quantities are not checked and `Symbol.lot_size` is `None`. A `lot_size` that is not positive raises `ValueError`.
 
 ## Class: `lrvx.Strategy`
 
@@ -12402,6 +12406,8 @@ These methods use the first registered symbol when `symbol` is omitted. `symbol`
 `tif` accepts `"gtc"`, `"ioc"`, `"fok"`, `"gtd"`, `"post_only"`.
 
 In a backtest, `price`, `trigger`, `limit_price`, `offset` and `modify_order`'s `new_price` must be whole numbers of the symbol's tick when the symbol was registered with one. An order off the tick is rejected: `on_order_update` receives `status == "REJECTED"` and `reject_reason` `"price_off_tick"`, `"trigger_off_tick"` or `"trailing_offset_off_tick"` (a modify gets `"REPLACE_REJECTED"`). Round a computed price before sending it, for example `round(price / tick) * tick`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
+
+Quantities are checked the same way when the symbol was registered with a quantity step, `registry.add_symbol(exchange, name, tick_size=..., lot_size=...)`: an order whose `qty`, or a `modify_order` whose `new_qty`, is not a whole number of `lot_size` gets `"REJECTED"` (`"REPLACE_REJECTED"` for the modify) with `reject_reason` `"quantity_off_lot"`. Without `lot_size` quantities are not checked. The returned symbol carries it as `symbol.lot_size` (`None` when not given). See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-quantities-and-the-lot).
 
 ### Order Emission — Explicit (emit_* variants)
 
@@ -15393,7 +15399,7 @@ const registry = new lrvx.SymbolRegistry();
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `addSymbol(exchange, name, tickSize?)` | `Symbol` | Register a symbol. `tickSize` is the venue's price increment and a backtest rejects orders priced off it; left out, the book uses 0.01 and order prices are not checked |
+| `addSymbol(exchange, name, tickSize?, lotSize?)` | `Symbol` | Register a symbol. `tickSize` is the venue's price increment and a backtest rejects orders priced off it; left out, the book uses 0.01 and order prices are not checked. `lotSize` is the venue's quantity step and a backtest rejects an order whose quantity is not a whole number of it; left out, quantities are not checked |
 | `symbolCount()` | `number` | Number of registered symbols |
 
 ### Symbol
@@ -15406,6 +15412,7 @@ Returned by `addSymbol`. Coerces to a number wherever a symbol ID is expected.
 | `name` | `string` | Symbol name |
 | `exchange` | `string` | Exchange name |
 | `tickSize` | `number` | Tick size |
+| `lotSize` | `number \| null` | Quantity step the symbol was registered with, `null` when none was given |
 
 ```javascript
 const btc = registry.addSymbol('binance', 'BTCUSDT', 0.01);
@@ -15535,6 +15542,8 @@ onBar(ctx, bar, emit) {
 ```
 
 In a backtest, a `limitBuy` / `limitSell` price that is not a whole number of the symbol's `tickSize` is rejected: `onOrderUpdate` receives `status` `"REJECTED"` with `rejectReason` `"price_off_tick"`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
+
+A quantity is checked when the symbol was registered with a quantity step, the fourth argument of `registry.addSymbol(exchange, name, tickSize, lotSize)`: an order whose quantity is not a whole number of `lotSize` is rejected with `rejectReason` `"quantity_off_lot"`, and an `emit.modify` to such a quantity gets `"REPLACE_REJECTED"`. Without `lotSize` quantities are not checked. The returned symbol carries it as `lotSize` (`null` when not given); a `lotSize` that is not positive throws a `RangeError`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-quantities-and-the-lot).
 
 ---
 
@@ -16464,6 +16473,12 @@ with the C function's name and names the file. Each of the three clears it on en
 the call did not fail; an extract that matched nothing returns `0` with `''`.
 `FundingSchedule.loadTape(path)` reports a file it could not open the same way.
 
+`validateSegment(path)`, `validate(path)` and `mergeSegments(inputDir, outputPath)` clear it on
+entry as well. `validateSegment` returns `false`, and `validate` returns `valid: false`, both for a
+segment that fails its checks and for a file that could not be read; only the unreadable file
+leaves a reason, so `''` means the segment was read and is not valid. `mergeSegments` returns
+`false` when no segment was merged, and `lastError()` says why.
+
 ```javascript
 if (!lrvx.recompress('in.lrvx', 'out.lrvx', 'lz4')) {
   console.error(lrvx.lastError());
@@ -16568,8 +16583,11 @@ Strategy(symbols: List[int], strategy_id: int = -1, registry: cobj = cobj())
   strategy holds id `1` until it is added to a `Runner`, which moves it to the lowest id from 1
   that no strategy on that runner holds: default-constructed strategies on one runner get 1, 2,
   3, ... in the order added. Given, the id is kept, and a runner that already holds it refuses
-  the strategy. A `BacktestRunner` has one strategy and leaves its id alone. `2097151` is
-  refused everywhere: runners take their own order ids from that block
+  the strategy. The id the first `Runner` gives is kept the same way: a second `Runner` does not
+  renumber the strategy, and refuses it with the duplicate-id `ValueError` when it already holds
+  that id. A `BacktestRunner` has one strategy and leaves its id alone. `2097151` is
+  refused everywhere: runners take their own order ids from that block. An id of 2^32 or more
+  raises `ValueError` from the constructor
 - `registry` -- Symbol-registry handle. When omitted, the underlying handle is created empty and
   `Runner.add_strategy` rebuilds it once a registry is present. Pass the strategy into a `Runner` to
   give it an event source; on its own it has none.
@@ -16688,6 +16706,13 @@ registered with (`lrvx_registry_add_symbol(reg, exchange, name, tick)` with `tic
 the tick is rejected: `on_order_update` receives `REJECTED` with `ev.reject_reason` set to
 `price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`. A symbol registered with a tick of
 0 is not checked. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
+
+Quantities are checked against the quantity step the symbol was registered with through
+`lrvx_registry_add_symbol_with_lot(reg, exchange, name, tick, lot)` (importable from `lrvx.runner`)
+with `lot > 0`: an order whose quantity is not a whole number of the lot is rejected with
+`ev.reject_reason` `quantity_off_lot`. A lot of 0, and `lrvx_registry_add_symbol`, declare none and
+quantities are not checked. See
+[SimulatedExecutor](../api/backtest/simulated_executor.md#order-quantities-and-the-lot).
 
 #### `emit_market_buy(symbol, qty) -> int`
 
@@ -18183,6 +18208,12 @@ function's name and names the file. Each of the three clears it on entry, so `""
 did not fail; an extract that matched nothing returns `0` with `""`.
 `FundingSchedule.load_tape(path)` reports a file it could not open the same way.
 
+`validate_segment` and `merge_segments` clear it on entry as well. `validate_segment` returns
+`False` both for a segment that fails its checks and for a file that could not be read; only the
+unreadable file leaves a reason, so `""` after a `False` means the segment was read and is not
+valid. `merge_segments` returns `False` when no segment was merged, and `last_error()` says why
+(the directory has no segments, or none could be opened).
+
 ==============================================================================
 # Section: Reference: embedded JavaScript
 ==============================================================================
@@ -18377,6 +18408,11 @@ A QuickJS strategy's symbols are registered without a tick, so its order prices 
 against one. Other bindings register the venue's tick and a backtest rejects prices off it with
 `rejectReason` `price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`; see
 [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
+
+The same holds for quantities: the symbols declare no quantity step, so no order is rejected with
+`quantity_off_lot`. A host that registers the symbol itself before loading the script, with a tick
+or a lot, has both checked; see
+[SimulatedExecutor](../api/backtest/simulated_executor.md#order-quantities-and-the-lot).
 
 ### Order management
 
@@ -18676,15 +18712,15 @@ Extended operations:
 
 | Call | Description |
 |------|-------------|
-| `lrvx.mergeDir(inputDir, outputDir)` | Merge a directory into an output directory |
+| `lrvx.mergeDir(inputDir, outputDir)` | Merge a directory into an output directory. Returns `{ success, segmentsMerged, eventsWritten, bytesWritten }`, the object Node's `mergeDir` returns |
 | `lrvx.splitSegment(inputPath, outputDir, mode, timeIntervalNs, eventsPerFile)` | Split one segment into many |
 | `lrvx.exportSegment(inputPath, outputPath, format, fromNs, toNs, symbols)` | Export a range to another format |
 | `lrvx.validateSegmentFull(path, verifyCrc, verifyTimestamps)` | Full validation, optional CRC and timestamp checks |
-| `lrvx.validateDataset(dataDir)` | Validate every segment in a dataset directory |
+| `lrvx.validateDataset(dataDir)` | Validate every segment in a dataset directory. Returns `{ valid, totalSegments, validSegments, corruptedSegments, totalEvents, totalBytes, firstTimestamp, lastTimestamp }`; the two timestamps are nanoseconds as `BigInt` |
 | `lrvx.recompressSegment(inputPath, outputPath, level)` | Recompress at a different level |
 | `lrvx.extractSymbols(inputPath, outputDir, symbols)` | Extract selected symbols |
 | `lrvx.extractTimeRange(inputPath, outputPath, fromNs, toNs)` | Extract a time window |
-| `lrvx.lastError()` | Why the last `recompressSegment` returned `false` or the last `extractSymbols` / `extractTimeRange` returned `0`: a string that opens with the C function's name and names the file that could not be read or written. Each of the three clears it on entry, so `''` means the call did not fail; an extract that matched nothing returns `0` with `''` |
+| `lrvx.lastError()` | Why the last `recompressSegment` returned `false` or the last `extractSymbols` / `extractTimeRange` returned `0`: a string that opens with the C function's name and names the file that could not be read or written. Each of the three clears it on entry, so `''` means the call did not fail; an extract that matched nothing returns `0` with `''`. `validateSegment` and `mergeSegments` clear it too: `validateSegment` returns `false` for a segment that fails its checks (`''`) and for a file that could not be read (the reason), and `mergeSegments` returns `false` with the reason when no segment was merged |
 
 ---
 
@@ -19267,6 +19303,12 @@ void               lrvx_registry_destroy(LrvxRegistryHandle registry);
 uint32_t lrvx_registry_add_symbol(LrvxRegistryHandle registry,
                                   const char* exchange, const char* name,
                                   double tick_size);
+// The same with the venue's quantity step. lot_size > 0 is declared and a
+// backtest rejects an order whose quantity is not a whole number of it
+// ("quantity_off_lot"); 0 declares none.
+uint32_t lrvx_registry_add_symbol_with_lot(LrvxRegistryHandle registry,
+                                           const char* exchange, const char* name,
+                                           double tick_size, double lot_size);
 
 uint8_t  lrvx_registry_get_symbol_id(LrvxRegistryHandle registry,
                                      const char* exchange, const char* name,
@@ -20091,7 +20133,10 @@ void lrvx_binary_log_recorder_hook_stats_p(void* hook, void* out);
 ## Segment operations
 
 ```c
-// Quick validate/merge
+// Quick validate/merge. validate returns 0 for a segment that fails its
+// checks and for a file it could not read; only the second leaves a reason in
+// lrvx_last_error_message. merge returns 0 when no segment was merged, with
+// the reason there.
 uint8_t lrvx_segment_validate(const char* path);
 uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path);
 

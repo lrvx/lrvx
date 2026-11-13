@@ -114,7 +114,14 @@ class Strategy:
         added to a Runner, which gives it the lowest id from 1 that no
         strategy on that Runner holds, so default-constructed strategies on
         one Runner number their orders apart. Given, it is kept, and a Runner
-        that already holds that id refuses the strategy."""
+        that already holds that id refuses the strategy. The id the first
+        Runner gives stays as well: a second Runner that holds it refuses the
+        strategy. An id of 2^32 or more raises ValueError."""
+        if strategy_id > 0xFFFFFFFF:
+            raise ValueError(
+                "Strategy: strategy_id " + str(strategy_id) +
+                " does not fit an order id: order ids are (strategy_id << 32) + n, "
+                "so the id must be below 4294967296")
         self._symbols = symbols
         self._symbol_names = list[str]()
         self._symbol_map = dict[str, int]()
@@ -178,10 +185,12 @@ class Strategy:
 
     def _take_auto_id(self, taken: List[int]):
         """Called by a Runner before it attaches the strategy: a strategy
-        constructed without an id moves to the lowest id from 1 not in
-        `taken`. Its orders so far, if any, keep the ids they have."""
+        constructed without an id moves, once, to the lowest id from 1 not in
+        `taken`. From then on the id is the strategy's, as if it had been
+        given: a later Runner does not move it again."""
         if not self._auto_id:
             return
+        self._auto_id = False
         free = 1
         while free in taken:
             free += 1

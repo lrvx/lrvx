@@ -8,6 +8,9 @@
 #   * an explicit id is kept, and a default strategy steps around it
 #   * a second strategy with an explicit id the Runner holds is refused
 #   * a BacktestRunner still gives a default strategy id 1
+#   * the id a Runner gave a default strategy stays: a second Runner that
+#     already holds it refuses the strategy instead of renumbering it
+#   * a strategy_id of 2^32 or more is refused; it was truncated to 32 bits
 
 from C import lrvx_registry_create() -> cobj
 from C import lrvx_registry_destroy(cobj)
@@ -120,6 +123,37 @@ except ValueError as e:
     block_refused = True
 check(block_refused, "the id of the runner's own order-id block is refused")
 bt2.close()
+
+# A default strategy is numbered once. A second Runner that holds its id
+# refuses it; it used to give it another id, and the orders it had placed
+# under the first one were no longer its own.
+first = Runner(reg, on_signal)
+second = Runner(reg, on_signal)
+second.add_strategy(Quiet([sym], strategy_id=1))
+kept = Quiet([sym])
+first.add_strategy(kept)
+check((kept.emit_limit_buy(sym, 100.0, 1.0) >> 32) == 1, "the first Runner gives the strategy id 1")
+renumber_refused = False
+renumber_reason = ""
+try:
+    second.add_strategy(kept)
+except ValueError as e:
+    renumber_refused = True
+    renumber_reason = str(e)
+check(renumber_refused, "a second Runner that holds id 1 refuses it")
+check("subscriber id 1" in renumber_reason, "with the duplicate-id error: " + renumber_reason)
+check((kept.emit_limit_buy(sym, 100.0, 1.0) >> 32) == 1, "and the strategy keeps id 1")
+
+# strategy_id is 32 bits wide: 2^32 + 5 used to become 5.
+wide_refused = False
+wide_reason = ""
+try:
+    Quiet([sym], strategy_id=(1 << 32) + 5)
+except ValueError as e:
+    wide_refused = True
+    wide_reason = str(e)
+check(wide_refused, "a strategy_id of 2^32 or more is refused")
+check("4294967301" in wide_reason, "and the error names it: " + wide_reason)
 
 lrvx_registry_destroy(reg)
 

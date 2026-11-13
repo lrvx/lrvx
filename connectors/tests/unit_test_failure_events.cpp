@@ -315,6 +315,29 @@ TEST(FailureEventsBybit, AmendOffTheTickIsRefusedLocally)
   EXPECT_EQ(r.transport.bodies.size(), 1u) << "the amend must not be sent";
 }
 
+TEST(FailureEventsBybit, AnOrderOffTheLotIsRefusedLocally)
+{
+  BybitRig r;
+  r.registry.applyVenueLot(r.sym, Quantity::fromDouble(0.001));
+  Order off = limitBuy(1, r.sym, 60000.1);
+  off.quantity = Quantity::fromDouble(0.0015);
+  r.ex->submitOrder(off);
+  expectOne(r.drain(), OrderEventStatus::REJECTED, 1, "quantity_off_lot");
+  EXPECT_TRUE(r.transport.bodies.empty()) << "the order must not be sent";
+}
+
+TEST(FailureEventsBybit, AmendOffTheLotIsRefusedLocally)
+{
+  BybitRig r;
+  r.registry.applyVenueLot(r.sym, Quantity::fromDouble(0.001));
+  r.ex->submitOrder(limitBuy(1, r.sym, 60000.1));
+  Order amended = limitBuy(2, r.sym, 60010.2);
+  amended.quantity = Quantity::fromDouble(0.0105);
+  r.ex->replaceOrder(1, amended);
+  expectOne(r.drain(), OrderEventStatus::REPLACE_REJECTED, 1, "quantity_off_lot");
+  EXPECT_EQ(r.transport.bodies.size(), 1u) << "the amend must not be sent";
+}
+
 // A body the venue (or a proxy in front of it) did not shape as v5 used to
 // throw inside the response callback; the transport swallowed the exception
 // and the order was left with no event at all.
@@ -362,6 +385,29 @@ TEST(FailureEventsBitget, ReplaceRefusedByTheVenue)
   expectOne(evs, OrderEventStatus::REPLACE_REJECTED, 1, "Order does not exist");
   EXPECT_EQ(evs[0].newOrder.id, 2u);
   EXPECT_TRUE(r.tracker.isActive(1));
+}
+
+TEST(FailureEventsBitget, AnOrderOffTheLotIsRefusedLocally)
+{
+  BitgetRig r;
+  r.registry.applyVenueLot(r.sym, Quantity::fromDouble(0.001));
+  Order off = limitBuy(1, r.sym, 60000.1);
+  off.quantity = Quantity::fromDouble(0.0015);
+  r.ex->submitOrder(off);
+  expectOne(r.drain(), OrderEventStatus::REJECTED, 1, "quantity_off_lot");
+  EXPECT_TRUE(r.transport.bodies.empty()) << "the order must not be sent";
+}
+
+TEST(FailureEventsBitget, ReplaceOffTheLotIsRefusedLocally)
+{
+  BitgetRig r;
+  r.registry.applyVenueLot(r.sym, Quantity::fromDouble(0.001));
+  r.ex->submitOrder(limitBuy(1, r.sym, 60000.1));
+  Order amended = limitBuy(2, r.sym, 60010.2);
+  amended.quantity = Quantity::fromDouble(0.0105);
+  r.ex->replaceOrder(1, amended);
+  expectOne(r.drain(), OrderEventStatus::REPLACE_REJECTED, 1, "quantity_off_lot");
+  EXPECT_EQ(r.transport.bodies.size(), 1u) << "the replace must not be sent";
 }
 
 TEST(FailureEventsBitget, ReplaceTransportError)

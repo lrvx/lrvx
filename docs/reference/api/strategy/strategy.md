@@ -26,6 +26,13 @@ strategy's order ids, which number from 1 within each strategy. Two strategies
 built with the same id hand out the same order ids, and the executor, the order
 tracker and the `.lrvxrun` trace cannot tell their orders apart.
 
+An order id is `(subscriber id << 32) + n`, so the id has to fit 32 bits. The
+constructor and `setSubscriberId` throw `std::invalid_argument` for an id of
+2^32 or more, which would otherwise shift out of the word and issue the order
+ids of another subscriber. Id `2097151` constructs, and is refused when the
+strategy is attached to a runner, which takes its own order ids from that
+block.
+
 Numbering within the strategy rather than across the process is what makes a
 second run of the same tape in the same process reproducible. A grid search or
 a batch runner gets the same ids every time, so two traces of an identical run

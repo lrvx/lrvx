@@ -126,15 +126,15 @@ Extended operations:
 
 | Call | Description |
 |------|-------------|
-| `lrvx.mergeDir(inputDir, outputDir)` | Merge a directory into an output directory |
+| `lrvx.mergeDir(inputDir, outputDir)` | Merge a directory into an output directory. Returns `{ success, segmentsMerged, eventsWritten, bytesWritten }`, the object Node's `mergeDir` returns |
 | `lrvx.splitSegment(inputPath, outputDir, mode, timeIntervalNs, eventsPerFile)` | Split one segment into many |
 | `lrvx.exportSegment(inputPath, outputPath, format, fromNs, toNs, symbols)` | Export a range to another format |
 | `lrvx.validateSegmentFull(path, verifyCrc, verifyTimestamps)` | Full validation, optional CRC and timestamp checks |
-| `lrvx.validateDataset(dataDir)` | Validate every segment in a dataset directory |
+| `lrvx.validateDataset(dataDir)` | Validate every segment in a dataset directory. Returns `{ valid, totalSegments, validSegments, corruptedSegments, totalEvents, totalBytes, firstTimestamp, lastTimestamp }`; the two timestamps are nanoseconds as `BigInt` |
 | `lrvx.recompressSegment(inputPath, outputPath, level)` | Recompress at a different level |
 | `lrvx.extractSymbols(inputPath, outputDir, symbols)` | Extract selected symbols |
 | `lrvx.extractTimeRange(inputPath, outputPath, fromNs, toNs)` | Extract a time window |
-| `lrvx.lastError()` | Why the last `recompressSegment` returned `false` or the last `extractSymbols` / `extractTimeRange` returned `0`: a string that opens with the C function's name and names the file that could not be read or written. Each of the three clears it on entry, so `''` means the call did not fail; an extract that matched nothing returns `0` with `''` |
+| `lrvx.lastError()` | Why the last `recompressSegment` returned `false` or the last `extractSymbols` / `extractTimeRange` returned `0`: a string that opens with the C function's name and names the file that could not be read or written. Each of the three clears it on entry, so `''` means the call did not fail; an extract that matched nothing returns `0` with `''`. `validateSegment` and `mergeSegments` clear it too: `validateSegment` returns `false` for a segment that fails its checks (`''`) and for a file that could not be read (the reason), and `mergeSegments` returns `false` with the reason when no segment was merged |
 
 ---
 

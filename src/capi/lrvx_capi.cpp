@@ -427,6 +427,12 @@ void lrvx_registry_destroy(LrvxRegistryHandle registry)
 uint32_t lrvx_registry_add_symbol(LrvxRegistryHandle registry, const char* exchange,
                                   const char* name, double tick_size)
 {
+  return lrvx_registry_add_symbol_with_lot(registry, exchange, name, tick_size, 0.0);
+}
+
+uint32_t lrvx_registry_add_symbol_with_lot(LrvxRegistryHandle registry, const char* exchange,
+                                           const char* name, double tick_size, double lot_size)
+{
   LRVX_CAPI_ENTER(registry);
   LRVX_CAPI_REQUIRE(exchange);
   LRVX_CAPI_REQUIRE(name);
@@ -440,6 +446,16 @@ uint32_t lrvx_registry_add_symbol(LrvxRegistryHandle registry, const char* excha
   {
     info.tickSize = Price::fromDouble(tick_size);
     info.tickSizeKnown = true;
+  }
+  // A positive lot is declared and order quantities are checked against it.
+  if (lot_size > 0.0)
+  {
+    info.lotSize = Quantity::fromDouble(lot_size);
+    if (info.lotSize.raw() <= 0)
+    {
+      throw std::invalid_argument("lot_size " + std::to_string(lot_size) +
+                                  " is below the smallest quantity the engine represents");
+    }
   }
   return reg->registerSymbol(info);
   LRVX_CAPI_LEAVE;
@@ -4311,12 +4327,36 @@ void lrvx_stat_grid_neighborhood(const double* values, const size_t* shape, size
 // Segment operations
 // ============================================================
 
+// A segment that fails its checks is an answer; one that could not be read at
+// all is an error, and the reason goes to lrvx_last_error_message.
+static void noteUnreadableSegment(const char* fn, const char* path,
+                                  const replay::SegmentValidationResult& result)
+{
+  for (const auto& issue : result.issues)
+  {
+    if (issue.type != replay::IssueType::FileNotFound &&
+        issue.type != replay::IssueType::FileReadError)
+    {
+      continue;
+    }
+    std::string why = issue.message;
+    if (why.find(path) == std::string::npos)
+    {
+      why += ": ";
+      why += path;
+    }
+    lrvxCapiNoteException(fn, why.c_str());
+    return;
+  }
+}
+
 uint8_t lrvx_segment_validate(const char* path)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
   LRVX_CAPI_REQUIRE(path);
   replay::SegmentValidator validator;
   auto result = validator.validate(path);
+  noteUnreadableSegment(__func__, path, result);
   return result.valid ? 1 : 0;
   LRVX_CAPI_LEAVE;
 }
@@ -4329,6 +4369,16 @@ uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path)
   replay::MergeConfig cfg;
   cfg.output_dir = output_path;
   auto result = replay::SegmentOps::mergeDirectory(input_dir, cfg);
+  if (result.segments_merged == 0)
+  {
+    std::string why = result.errors.empty() ? "no segment was merged" : result.errors.front();
+    if (why.find(input_dir) == std::string::npos)
+    {
+      why += ": ";
+      why += input_dir;
+    }
+    lrvxCapiNoteException(__func__, why.c_str());
+  }
   return result.segments_merged > 0 ? 1 : 0;
   LRVX_CAPI_LEAVE;
 }
@@ -5452,6 +5502,7 @@ LrvxSegmentValidation lrvx_segment_validate_full(const char* path, uint8_t verif
   cfg.verify_timestamps = verify_timestamps != 0;
   replay::SegmentValidator validator(cfg);
   auto r = validator.validate(path);
+  noteUnreadableSegment(__func__, path, r);
   return {r.valid ? (uint8_t)1 : (uint8_t)0,
           r.header_valid ? (uint8_t)1 : (uint8_t)0,
           r.reported_event_count,

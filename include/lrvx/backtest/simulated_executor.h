@@ -80,6 +80,11 @@ class SimulatedExecutor : public IOrderExecutor
   // The tick orders on `symbol` are checked against, as a raw price; 0 when
   // none is known.
   int64_t orderTickRaw(SymbolId symbol) const;
+  // The lot order quantities on `symbol` are checked against, as a raw
+  // quantity; 0 when the symbol declares none. An order whose quantity (or
+  // iceberg visible quantity) is off a declared lot is rejected at submit
+  // and on replace like an off-tick price, with reason quantity_off_lot.
+  int64_t orderLotRaw(SymbolId symbol) const;
 
   // Apply slippage and queue-simulation settings from a BacktestConfig. May be
   // called after construction; existing orders keep their prior behavior.
@@ -582,6 +587,8 @@ class SimulatedExecutor : public IOrderExecutor
   // Per-symbol order tick, read from the registry on first use. -1 = not read.
   const SymbolRegistry* _registry{nullptr};
   mutable std::array<int64_t, kMaxSymbols> _orderTickFlat{};
+  // Per-symbol order lot, read the same way.
+  mutable std::array<int64_t, kMaxSymbols> _orderLotFlat{};
 
   // Seeds as configured, kept so reset() can put the generators back where a
   // fresh executor would have them.

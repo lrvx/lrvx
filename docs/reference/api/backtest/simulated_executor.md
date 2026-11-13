@@ -19,6 +19,7 @@ public:
   // Where each symbol's tick is read. Without a registry nothing is checked.
   void setSymbolRegistry(const SymbolRegistry* registry);
   int64_t orderTickRaw(SymbolId symbol) const;  // 0 when no tick is known
+  int64_t orderLotRaw(SymbolId symbol) const;   // 0 when no lot is declared
 
   // Apply slippage and queue-simulation settings from a BacktestConfig.
   void applyConfig(const BacktestConfig& config);
@@ -262,6 +263,35 @@ model (see [Slippage](./slippage.md#slippage-and-the-tick)) and the trigger of a
 stop (`trailingCallbackRate`). A volume-weighted fill over several book levels is an average, not a
 traded price, and is left as it is.
 
+### Order quantities and the lot
+
+A venue also refuses an order whose quantity is not a whole number of its quantity step. The
+simulator does the same for a symbol that declares one (`SymbolInfo::lotSize` greater than zero),
+read from the same registry as the tick:
+
+| Checked | Reject reason |
+|---------|---------------|
+| `quantity`, on every order type, `MARKET` included | `quantity_off_lot` |
+| `visibleQuantity` of an iceberg | `quantity_off_lot` |
+
+The check runs after the price check, so an order off both reports its price. A refused order
+emits `REJECTED` and never reaches the book; a replace whose new quantity is off the lot emits
+`REPLACE_REJECTED` and leaves the original as it was.
+
+| Symbol | Checked against |
+|--------|-----------------|
+| Registered with a lot (`lotSize` positive) | that lot |
+| Registered without one (`lotSize` zero, the default) | nothing |
+| No registry attached | nothing |
+
+There is no default lot and no flag: a lot is declared by being positive. It is set through
+`SymbolInfo::lotSize` in C++, `add_symbol(..., lot_size=)` in Python,
+`addSymbol(exchange, name, tickSize, lotSize)` in Node and
+`lrvx_registry_add_symbol_with_lot` in the C API (which Codon calls). A QuickJS strategy registers
+its symbols without a tick and without a lot. A lot is the step only; a venue's minimum order size
+is a separate rule the simulator does not model. Fills the simulator sizes itself (a partial fill
+against a book level, a queue model's share) are not snapped to the lot.
+
 ### Market orders
 
 A taker walks the visible ladder. `onBookUpdate` keeps every level it reports, not just the touch,
@@ -430,8 +460,8 @@ seeds, so a repeated run repeats. `BacktestRunner` calls it at the start of ever
 | `PARTIALLY_FILLED` | Partial execution (common with queue simulation) |
 | `CANCELED` | Order canceled |
 | `REPLACED` | Order modified |
-| `REJECTED` | Order refused; `rejectReason` says why (for example `price_off_tick`, `reduce_only`) |
-| `REPLACE_REJECTED` | Replace refused; the original order is unchanged. `rejectReason` says why (`price_off_tick`, `trigger_off_tick`, `unknown_order`, `replace_changes_order_type`, `late_replace_after_fill`, `late_replace_after_trigger`) |
+| `REJECTED` | Order refused; `rejectReason` says why (for example `price_off_tick`, `quantity_off_lot`, `reduce_only`) |
+| `REPLACE_REJECTED` | Replace refused; the original order is unchanged. `rejectReason` says why (`price_off_tick`, `trigger_off_tick`, `quantity_off_lot`, `unknown_order`, `replace_changes_order_type`, `late_replace_after_fill`, `late_replace_after_trigger`) |
 
 Trailing stop updates emit `TRAILING_UPDATED` events with the new trigger price.
 

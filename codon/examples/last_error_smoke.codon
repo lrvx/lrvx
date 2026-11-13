@@ -1,14 +1,16 @@
 # Smoke test: last_error() says why a call that returns False or 0 failed.
 #
-# FundingSchedule.load_tape, recompress_segment, extract_symbols and
-# extract_time_range report failure through their return value, and 0 is
-# also what an extract that matches nothing returns.
+# FundingSchedule.load_tape, recompress_segment, extract_symbols,
+# extract_time_range, validate_segment and merge_segments report failure
+# through their return value, and 0 is also what an extract that matches
+# nothing returns.
 #   * each failure leaves its reason, naming the path
 #   * a call that did not fail leaves ""
 
 from lrvx.abi import last_error
 from lrvx.funding_schedule import FundingSchedule
 from lrvx.tools import recompress_segment, extract_symbols, extract_time_range
+from lrvx.tools import validate_segment, merge_segments
 
 from C import getpid() -> i32
 
@@ -41,6 +43,17 @@ check(missing in last_error(), "and last_error() names the input")
 check(extract_time_range(missing, root + "-out.lrvx", 0, 1_000_000_000) == 0,
       "extract_time_range returns 0")
 check(missing in last_error(), "and last_error() names the input")
+
+check(not validate_segment(missing), "validate_segment returns False for a missing file")
+check(missing in last_error(), "and last_error() names it: " + last_error())
+check(not merge_segments(missing, root + "-merged"), "merge_segments returns False with nothing to merge")
+check(missing in last_error(), "and last_error() says where: " + last_error())
+
+garbage = root + "-garbage.lrvx"
+with open(garbage, "w") as f:
+    f.write("x" * 256)
+check(not validate_segment(garbage), "a file that is not a segment is not valid")
+check(last_error() == "", "and that is an answer, not an error: '" + last_error() + "'")
 
 tape = root + "-funding.csv"
 with open(tape, "w") as f:
