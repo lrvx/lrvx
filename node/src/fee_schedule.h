@@ -106,7 +106,7 @@ class FeeScheduleWrap : public Napi::ObjectWrap<FeeScheduleWrap>
       lrvx_fee_schedule_bind_account(_h, nullptr);
       return;
     }
-    auto* w = Napi::ObjectWrap<AccountWrap>::Unwrap(argObject(info[0], "bindAccount: argument 1"));
+    auto* w = argInstance<AccountWrap>(info[0], "bindAccount: argument 1");
     lrvx_fee_schedule_bind_account(_h, w->handle());
   }
   void ClearAccountBinding(const Napi::CallbackInfo&)

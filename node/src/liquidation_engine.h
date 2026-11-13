@@ -234,8 +234,7 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
       lrvx_liquidation_engine_set_executor(_h, nullptr);
       return;
     }
-    auto* w = Napi::ObjectWrap<SimulatedExecutorWrap>::Unwrap(
-        argObject(info[0], "setExecutor: argument 1"));
+    auto* w = argInstance<SimulatedExecutorWrap>(info[0], "setExecutor: argument 1");
     lrvx_liquidation_engine_set_executor(_h, w->handle());
   }
   Napi::Value DeficitsPaidByFund(const Napi::CallbackInfo& info)
@@ -361,7 +360,7 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
     {
       return;
     }
-    auto* w = Napi::ObjectWrap<AccountWrap>::Unwrap(argObject(info[0], "attachAccount: argument 1"));
+    auto* w = argInstance<AccountWrap>(info[0], "attachAccount: argument 1");
     lrvx_liquidation_engine_attach_account(_h, w->handle());
   }
   void DetachAccount(const Napi::CallbackInfo& info)

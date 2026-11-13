@@ -239,15 +239,21 @@ inline Napi::Object statsObj(Napi::Env env, const BacktestStats& s)
 class SignalBuilderWrap : public Napi::ObjectWrap<SignalBuilderWrap>
 {
  public:
+  static Napi::FunctionReference& Ctor()
+  {
+    static Napi::FunctionReference ref;
+    return ref;
+  }
+
   static Napi::Function Init(Napi::Env env)
   {
-    return DefineClass(env, "SignalBuilder",
-                       {InstanceMethod("buy", &SignalBuilderWrap::Buy),
-                        InstanceMethod("sell", &SignalBuilderWrap::Sell),
-                        InstanceMethod("limitBuy", &SignalBuilderWrap::LimitBuy),
-                        InstanceMethod("limitSell", &SignalBuilderWrap::LimitSell),
-                        InstanceAccessor("length", &SignalBuilderWrap::Length, nullptr),
-                        InstanceMethod("clear", &SignalBuilderWrap::Clear)});
+    return keepCtor(Ctor(), DefineClass(env, "SignalBuilder",
+                                        {InstanceMethod("buy", &SignalBuilderWrap::Buy),
+                                         InstanceMethod("sell", &SignalBuilderWrap::Sell),
+                                         InstanceMethod("limitBuy", &SignalBuilderWrap::LimitBuy),
+                                         InstanceMethod("limitSell", &SignalBuilderWrap::LimitSell),
+                                         InstanceAccessor("length", &SignalBuilderWrap::Length, nullptr),
+                                         InstanceMethod("clear", &SignalBuilderWrap::Clear)}));
   }
 
   SignalBuilderWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<SignalBuilderWrap>(info) {}
@@ -436,7 +442,7 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
 
   Napi::Value Run(const Napi::CallbackInfo& info)
   {
-    auto* builder = Napi::ObjectWrap<SignalBuilderWrap>::Unwrap(argObject(info[0], "run: argument 1"));
+    auto* builder = argInstance<SignalBuilderWrap>(info[0], "run: argument 1");
     auto sigs = builder->signals();
     const auto& names = builder->symbolNames();
 

@@ -222,6 +222,41 @@ inline Napi::BigInt argBigInt(const Napi::Value& v, const char* what)
   return v.As<Napi::BigInt>();
 }
 
+// The constructor a wrap class keeps so that argInstance can tell its
+// instances apart: `return keepCtor(Ctor(), DefineClass(...));` in Init.
+inline Napi::Function keepCtor(Napi::FunctionReference& ref, Napi::Function fn)
+{
+  ref = Napi::Persistent(fn);
+  ref.SuppressDestruct();
+  return fn;
+}
+
+// The native object behind `v`, which must be an instance of the class T
+// registers in T::Ctor(). ObjectWrap<T>::Unwrap() alone takes any wrapped
+// object: a plain one threw a bare "Invalid argument" and an instance of
+// another lrvx class was read as a T.
+template <typename T>
+inline T* argInstance(const Napi::Value& v, const char* what)
+{
+  Napi::FunctionReference& ctor = T::Ctor();
+  if (!ctor.IsEmpty() && v.IsObject() && v.As<Napi::Object>().InstanceOf(ctor.Value()))
+  {
+    return Napi::ObjectWrap<T>::Unwrap(v.As<Napi::Object>());
+  }
+  std::string cls = "instance of its class";
+  if (!ctor.IsEmpty())
+  {
+    Napi::Value name = ctor.Value().Get("name");
+    if (name.IsString())
+    {
+      cls = name.As<Napi::String>().Utf8Value();
+    }
+  }
+  const bool vowel = std::string("AEIOUaeiou").find(cls[0]) != std::string::npos;
+  throw Napi::TypeError::New(v.Env(),
+                             std::string(what) + " must be " + (vowel ? "an " : "a ") + cls);
+}
+
 // A typed array of exactly the element type the native side reads. As<>()
 // does not look: a Float32Array taken for a Float64Array hands back a
 // pointer to 4-byte elements with a count of them, and the native loop reads

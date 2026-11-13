@@ -49,15 +49,21 @@ inline std::vector<uint8_t> readBytes(const Napi::Value& v)
 class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
 {
  public:
+  static Napi::FunctionReference& Ctor()
+  {
+    static Napi::FunctionReference ref;
+    return ref;
+  }
+
   static Napi::Function Init(Napi::Env env)
   {
-    return DefineClass(env, "TraceRecorder",
-                       {InstanceMethod("addTapeRef", &TraceRecorderWrap::AddTapeRef),
-                        InstanceMethod("setRunEndedNs", &TraceRecorderWrap::SetRunEndedNs),
-                        InstanceMethod("writeSignal", &TraceRecorderWrap::WriteSignal),
-                        InstanceMethod("writeOrderEvent", &TraceRecorderWrap::WriteOrderEvent),
-                        InstanceMethod("writeFill", &TraceRecorderWrap::WriteFill),
-                        InstanceMethod("close", &TraceRecorderWrap::Close)});
+    return keepCtor(Ctor(), DefineClass(env, "TraceRecorder",
+                                        {InstanceMethod("addTapeRef", &TraceRecorderWrap::AddTapeRef),
+                                         InstanceMethod("setRunEndedNs", &TraceRecorderWrap::SetRunEndedNs),
+                                         InstanceMethod("writeSignal", &TraceRecorderWrap::WriteSignal),
+                                         InstanceMethod("writeOrderEvent", &TraceRecorderWrap::WriteOrderEvent),
+                                         InstanceMethod("writeFill", &TraceRecorderWrap::WriteFill),
+                                         InstanceMethod("close", &TraceRecorderWrap::Close)}));
   }
 
   TraceRecorderWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<TraceRecorderWrap>(info)

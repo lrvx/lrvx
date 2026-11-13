@@ -19,18 +19,24 @@ namespace node_lrvx
 class RateLimitPolicyWrap : public Napi::ObjectWrap<RateLimitPolicyWrap>
 {
  public:
+  static Napi::FunctionReference& Ctor()
+  {
+    static Napi::FunctionReference ref;
+    return ref;
+  }
+
   static Napi::Function Init(Napi::Env env)
   {
-    return DefineClass(
-        env, "RateLimitPolicy",
-        {InstanceMethod("addBucket", &RateLimitPolicyWrap::AddBucket),
-         InstanceMethod("addFamilyBucket", &RateLimitPolicyWrap::AddFamilyBucket),
-         InstanceMethod("setBan", &RateLimitPolicyWrap::SetBan),
-         InstanceMethod("loadProfile", &RateLimitPolicyWrap::LoadProfile),
-         InstanceMethod("banUntilNs", &RateLimitPolicyWrap::BanUntilNs),
-         InstanceMethod("consecutiveRejects",
-                        &RateLimitPolicyWrap::ConsecutiveRejects),
-         InstanceMethod("bucketStates", &RateLimitPolicyWrap::BucketStates)});
+    return keepCtor(Ctor(), DefineClass(
+                                env, "RateLimitPolicy",
+                                {InstanceMethod("addBucket", &RateLimitPolicyWrap::AddBucket),
+                                 InstanceMethod("addFamilyBucket", &RateLimitPolicyWrap::AddFamilyBucket),
+                                 InstanceMethod("setBan", &RateLimitPolicyWrap::SetBan),
+                                 InstanceMethod("loadProfile", &RateLimitPolicyWrap::LoadProfile),
+                                 InstanceMethod("banUntilNs", &RateLimitPolicyWrap::BanUntilNs),
+                                 InstanceMethod("consecutiveRejects",
+                                                &RateLimitPolicyWrap::ConsecutiveRejects),
+                                 InstanceMethod("bucketStates", &RateLimitPolicyWrap::BucketStates)}));
   }
 
   RateLimitPolicyWrap(const Napi::CallbackInfo& info)

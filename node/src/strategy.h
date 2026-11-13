@@ -56,21 +56,12 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
                                         InstanceMethod("tickSizeDeclared", &SymbolRegistryNode::tickSizeDeclared),
                                         InstanceMethod("lotSize", &SymbolRegistryNode::lotSize),
                                     });
-    Ctor() = Napi::Persistent(fn);
-    Ctor().SuppressDestruct();
-    return fn;
+    return keepCtor(Ctor(), fn);
   }
 
-  // The registry behind `v`. Unwrap() alone takes any wrapped object: a plain
-  // one threw a bare "Invalid argument" and another class's instance was read
-  // as a registry.
   static SymbolRegistry* of(const Napi::Value& v, const char* what)
   {
-    if (!v.IsObject() || Ctor().IsEmpty() || !v.As<Napi::Object>().InstanceOf(Ctor().Value()))
-    {
-      throw Napi::TypeError::New(v.Env(), std::string(what) + " must be a SymbolRegistry");
-    }
-    return Unwrap(v.As<Napi::Object>())->get();
+    return argInstance<SymbolRegistryNode>(v, what)->get();
   }
 
   SymbolRegistryNode(const Napi::CallbackInfo& info)
@@ -1769,18 +1760,9 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
   Napi::Value addJourneyTracer(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
-    if (info.Length() == 0 || !info[0].IsObject())
-    {
-      Napi::TypeError::New(env,
-                           "BacktestRunner.addJourneyTracer(tracer): expected an "
-                           "OrderJourneyTracer")
-          .ThrowAsJavaScriptException();
-      return env.Undefined();
-    }
-    auto obj = argObject(info[0], "addJourneyTracer: argument 1");
-    auto* tracer = Napi::ObjectWrap<OrderJourneyTracerWrap>::Unwrap(obj);
+    auto* tracer = argInstance<OrderJourneyTracerWrap>(info[0], "addJourneyTracer: argument 1");
     lrvx_backtest_runner_add_journey_tracer(_handle, tracer->handle());
-    _tracers.push_back(Napi::Persistent(obj));
+    _tracers.push_back(Napi::Persistent(info[0].As<Napi::Object>()));
     return env.Undefined();
   }
 
@@ -2659,7 +2641,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       lrvx_runner_attach_trace_recorder(_runner, nullptr);
       return env.Undefined();
     }
-    auto* tr = Napi::ObjectWrap<TraceRecorderWrap>::Unwrap(argObject(info[0], "attachTraceRecorder: argument 1"));
+    auto* tr = argInstance<TraceRecorderWrap>(info[0], "attachTraceRecorder: argument 1");
     lrvx_runner_attach_trace_recorder(_runner, tr->handle());
     return env.Undefined();
   }

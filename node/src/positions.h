@@ -128,23 +128,29 @@ class OrderTrackerWrap : public Napi::ObjectWrap<OrderTrackerWrap>
 class OrderJourneyTracerWrap : public Napi::ObjectWrap<OrderJourneyTracerWrap>
 {
  public:
+  static Napi::FunctionReference& Ctor()
+  {
+    static Napi::FunctionReference ref;
+    return ref;
+  }
+
   static Napi::Function Init(Napi::Env env)
   {
-    return DefineClass(
-        env, "OrderJourneyTracer",
-        {InstanceMethod("orderCount", &OrderJourneyTracerWrap::OrderCount),
-         InstanceMethod("recordCount", &OrderJourneyTracerWrap::RecordCount),
-         InstanceMethod("medianAckLatencyNs",
-                        &OrderJourneyTracerWrap::MedianAckLatencyNs),
-         InstanceMethod("medianTimeToFirstFillNs",
-                        &OrderJourneyTracerWrap::MedianTimeToFirstFillNs),
-         InstanceMethod("makerFillRatio",
-                        &OrderJourneyTracerWrap::MakerFillRatio),
-         InstanceMethod("cancelRaceLossRate",
-                        &OrderJourneyTracerWrap::CancelRaceLossRate),
-         InstanceMethod("result", &OrderJourneyTracerWrap::Result),
-         InstanceMethod("journey", &OrderJourneyTracerWrap::Journey),
-         InstanceMethod("clear", &OrderJourneyTracerWrap::Clear)});
+    return keepCtor(Ctor(), DefineClass(
+                                env, "OrderJourneyTracer",
+                                {InstanceMethod("orderCount", &OrderJourneyTracerWrap::OrderCount),
+                                 InstanceMethod("recordCount", &OrderJourneyTracerWrap::RecordCount),
+                                 InstanceMethod("medianAckLatencyNs",
+                                                &OrderJourneyTracerWrap::MedianAckLatencyNs),
+                                 InstanceMethod("medianTimeToFirstFillNs",
+                                                &OrderJourneyTracerWrap::MedianTimeToFirstFillNs),
+                                 InstanceMethod("makerFillRatio",
+                                                &OrderJourneyTracerWrap::MakerFillRatio),
+                                 InstanceMethod("cancelRaceLossRate",
+                                                &OrderJourneyTracerWrap::CancelRaceLossRate),
+                                 InstanceMethod("result", &OrderJourneyTracerWrap::Result),
+                                 InstanceMethod("journey", &OrderJourneyTracerWrap::Journey),
+                                 InstanceMethod("clear", &OrderJourneyTracerWrap::Clear)}));
   }
 
   OrderJourneyTracerWrap(const Napi::CallbackInfo& info)
