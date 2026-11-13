@@ -187,7 +187,8 @@ class TraceExecutionListener : public IOrderExecutionListener
   }
   void onOrderPartiallyFilled(const Order& o, Quantity q) override
   {
-    writeFill(o, q);
+    // No fill price in this form either.
+    writeFill(o, q, o.price);
     if (_inner)
     {
       _inner->onOrderPartiallyFilled(o, q);
