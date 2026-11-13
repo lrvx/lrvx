@@ -30,6 +30,10 @@ struct WalkForwardCallContext
   lrvx::SymbolRegistry* reg;
   std::vector<std::unique_ptr<NodeStrategyHost>> hosts;
   uint32_t next_id{1};
+  // What the factory threw, or what was wrong with the strategy it returned.
+  // The run unwinds through the C API, which keeps only a message, so runCsv
+  // rethrows this one to keep its class.
+  Napi::ObjectReference error;
 };
 
 inline LrvxStrategyHandle walkForwardFactoryThunk(void* user_data,
@@ -37,29 +41,27 @@ inline LrvxStrategyHandle walkForwardFactoryThunk(void* user_data,
 {
   auto* ctx = static_cast<WalkForwardCallContext*>(user_data);
   Napi::HandleScope scope(ctx->env);
-  auto val = ctx->factory_fn.Call(
-      {Napi::Number::New(ctx->env, static_cast<double>(fold_index))});
-  if (!val.IsObject())
+  try
   {
-    return nullptr;
+    auto val = ctx->factory_fn.Call(
+        {Napi::Number::New(ctx->env, static_cast<double>(fold_index))});
+    auto obj = argObject(val, "setStrategyFactory: the strategy the factory returns");
+    auto host = std::make_unique<NodeStrategyHost>(
+        ctx->env, obj, ctx->reg, ctx->next_id++,
+        strategySymbols(obj, "setStrategyFactory: symbols"));
+    LrvxStrategyHandle handle =
+        static_cast<LrvxStrategyHandle>(host->bridge.get());
+    ctx->hosts.push_back(std::move(host));
+    return handle;
   }
-  auto obj = val.As<Napi::Object>();
-  std::vector<uint32_t> syms;
-  auto symsV = obj.Get("symbols");
-  if (symsV.IsArray())
+  catch (const Napi::Error& e)
   {
-    auto arr = symsV.As<Napi::Array>();
-    for (uint32_t i = 0; i < arr.Length(); ++i)
+    if (ctx->error.IsEmpty())
     {
-      syms.push_back(symId(arr.Get(i)));
+      ctx->error = Napi::Persistent(e.Value());
     }
+    throw;
   }
-  auto host = std::make_unique<NodeStrategyHost>(
-      ctx->env, obj, ctx->reg, ctx->next_id++, syms);
-  LrvxStrategyHandle handle =
-      static_cast<LrvxStrategyHandle>(host->bridge.get());
-  ctx->hosts.push_back(std::move(host));
-  return handle;
 }
 
 inline Napi::Object statsToJsObj(Napi::Env env, const LrvxBacktestStats& s)
@@ -104,24 +106,25 @@ class WalkForwardRunnerNode
       : Napi::ObjectWrap<WalkForwardRunnerNode>(info)
   {
     _reg = SymbolRegistryNode::of(info[0], "WalkForwardRunner: registry");
-    _fee = argNumber(info[1], "WalkForwardRunner: argument 2");
-    _cap = argNumber(info[2], "WalkForwardRunner: argument 3");
-    auto cfg = argObject(info[3], "WalkForwardRunner: argument 4");
-    std::string mode = cfg.Get("mode").IsString()
+    _fee = argNumber(info[1], "WalkForwardRunner: feeRate");
+    _cap = argNumber(info[2], "WalkForwardRunner: initialCapital");
+    auto cfg = argObject(info[3], "WalkForwardRunner: config");
+    std::string mode = given(cfg.Get("mode"))
                            ? argString(cfg.Get("mode"), "WalkForwardRunner: mode")
                            : "anchored";
+    if (mode != "anchored" && mode != "sliding")
+    {
+      throw Napi::TypeError::New(info.Env(),
+                                 "WalkForwardRunner: mode must be 'anchored' or 'sliding'; got '" +
+                                     mode + "'");
+    }
     _cfg.mode = (mode == "sliding") ? 1 : 0;
-    _cfg.train_size = cfg.Get("trainSize").IsNumber()
-                          ? argInteger(cfg.Get("trainSize"), "WalkForwardRunner: trainSize")
-                          : 0;
+    const auto count = [&](const char* key, const char* what)
+    { return given(cfg.Get(key)) ? argInteger(cfg.Get(key), what) : 0; };
+    _cfg.train_size = count("trainSize", "WalkForwardRunner: trainSize");
     _cfg.test_size = argInteger(cfg.Get("testSize"), "WalkForwardRunner: testSize");
-    _cfg.step = cfg.Get("step").IsNumber()
-                    ? argInteger(cfg.Get("step"), "WalkForwardRunner: step")
-                    : 0;
-    _cfg.min_train_size =
-        cfg.Get("minTrainSize").IsNumber()
-            ? argInteger(cfg.Get("minTrainSize"), "WalkForwardRunner: minTrainSize")
-            : 0;
+    _cfg.step = count("step", "WalkForwardRunner: step");
+    _cfg.min_train_size = count("minTrainSize", "WalkForwardRunner: minTrainSize");
   }
 
  private:
@@ -133,7 +136,7 @@ class WalkForwardRunnerNode
 
   Napi::Value setStrategyFactory(const Napi::CallbackInfo& info)
   {
-    _factory = Napi::Persistent(argFunction(info[0], "setStrategyFactory: argument 1"));
+    _factory = Napi::Persistent(argFunction(info[0], "setStrategyFactory: factory"));
     return info.Env().Undefined();
   }
 
@@ -148,8 +151,8 @@ class WalkForwardRunnerNode
             "E_RUN_001",
             "WalkForwardRunner.runCsv called before setStrategyFactory.");
       }
-      std::string path = argString(info[0], "runCsv: argument 1");
-      std::string symbol = argString(info[1], "runCsv: argument 2");
+      std::string path = argString(info[0], "runCsv: path");
+      std::string symbol = argString(info[1], "runCsv: symbol");
 
       WalkForwardCallContext ctx{env,
                                  Napi::FunctionReference(),
@@ -173,10 +176,20 @@ class WalkForwardRunnerNode
       std::vector<LrvxWalkForwardFold> folds(total);
       if (total > 0)
       {
-        lrvx_walk_forward_run_csv(
+        lrvx_clear_last_error();
+        const uint32_t ran = lrvx_walk_forward_run_csv(
             static_cast<LrvxRegistryHandle>(_reg), path.c_str(),
             symbol.c_str(), _fee, _cap, &_cfg,
             &walkForwardFactoryThunk, &ctx, folds.data(), total);
+        // A run that failed part way used to hand back `total` zeroed folds.
+        if (!ctx.error.IsEmpty())
+        {
+          throw Napi::Error(env, ctx.error.Value());
+        }
+        if (ran == 0 && lrvx_last_error_code() != 0)
+        {
+          throw lrvx::LrvxError("E_VAL_002", "WalkForwardRunner.runCsv: " + capiReason());
+        }
       }
       auto arr = Napi::Array::New(env, total);
       for (uint32_t i = 0; i < total; ++i)

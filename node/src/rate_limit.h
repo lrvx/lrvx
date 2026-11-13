@@ -19,18 +19,24 @@ namespace node_lrvx
 class RateLimitPolicyWrap : public Napi::ObjectWrap<RateLimitPolicyWrap>
 {
  public:
+  static Napi::FunctionReference& Ctor()
+  {
+    static Napi::FunctionReference ref;
+    return ref;
+  }
+
   static Napi::Function Init(Napi::Env env)
   {
-    return DefineClass(
-        env, "RateLimitPolicy",
-        {InstanceMethod("addBucket", &RateLimitPolicyWrap::AddBucket),
-         InstanceMethod("addFamilyBucket", &RateLimitPolicyWrap::AddFamilyBucket),
-         InstanceMethod("setBan", &RateLimitPolicyWrap::SetBan),
-         InstanceMethod("loadProfile", &RateLimitPolicyWrap::LoadProfile),
-         InstanceMethod("banUntilNs", &RateLimitPolicyWrap::BanUntilNs),
-         InstanceMethod("consecutiveRejects",
-                        &RateLimitPolicyWrap::ConsecutiveRejects),
-         InstanceMethod("bucketStates", &RateLimitPolicyWrap::BucketStates)});
+    return keepCtor(Ctor(), DefineClass(
+                                env, "RateLimitPolicy",
+                                {InstanceMethod("addBucket", &RateLimitPolicyWrap::AddBucket),
+                                 InstanceMethod("addFamilyBucket", &RateLimitPolicyWrap::AddFamilyBucket),
+                                 InstanceMethod("setBan", &RateLimitPolicyWrap::SetBan),
+                                 InstanceMethod("loadProfile", &RateLimitPolicyWrap::LoadProfile),
+                                 InstanceMethod("banUntilNs", &RateLimitPolicyWrap::BanUntilNs),
+                                 InstanceMethod("consecutiveRejects",
+                                                &RateLimitPolicyWrap::ConsecutiveRejects),
+                                 InstanceMethod("bucketStates", &RateLimitPolicyWrap::BucketStates)}));
   }
 
   RateLimitPolicyWrap(const Napi::CallbackInfo& info)
@@ -50,49 +56,34 @@ class RateLimitPolicyWrap : public Napi::ObjectWrap<RateLimitPolicyWrap>
  private:
   void AddBucket(const Napi::CallbackInfo& info)
   {
-    std::string name = argString(info[0], "addBucket: argument 1");
-    int64_t window_ns = argInteger(info[1], "addBucket: argument 2");
-    uint32_t capacity = argUint32(info[2], "addBucket: argument 3");
-    uint32_t sw = info.Length() > 3 ? argUint32(info[3], "addBucket: argument 4") : 1;
-    uint32_t cw = info.Length() > 4 ? argUint32(info[4], "addBucket: argument 5") : 1;
-    uint32_t rw = info.Length() > 5 ? argUint32(info[5], "addBucket: argument 6") : 2;
+    std::string name = argString(info[0], "addBucket: name");
+    int64_t window_ns = argInteger(info[1], "addBucket: windowNs");
+    uint32_t capacity = argUint32(info[2], "addBucket: capacity");
+    uint32_t sw = info.Length() > 3 ? argUint32(info[3], "addBucket: submitWeight") : 1;
+    uint32_t cw = info.Length() > 4 ? argUint32(info[4], "addBucket: cancelWeight") : 1;
+    uint32_t rw = info.Length() > 5 ? argUint32(info[5], "addBucket: replaceWeight") : 2;
     lrvx_rate_limit_policy_add_bucket(_h, name.c_str(), window_ns, capacity, sw, cw, rw);
   }
   void AddFamilyBucket(const Napi::CallbackInfo& info)
   {
     // (family, name, windowNs, capacity, queryWeight=1)
-    uint8_t family = 0;
-    if (info[0].IsString())
-    {
-      const std::string f = argString(info[0], "addFamilyBucket: argument 1");
-      if (f == "market_data")
-      {
-        family = 1;
-      }
-      else if (f == "account")
-      {
-        family = 2;
-      }
-    }
-    else if (info[0].IsNumber())
-    {
-      family = static_cast<uint8_t>(argUint32(info[0], "addFamilyBucket: argument 1"));
-    }
-    std::string name = argString(info[1], "addFamilyBucket: argument 2");
-    int64_t window_ns = argInteger(info[2], "addFamilyBucket: argument 3");
-    uint32_t capacity = argUint32(info[3], "addFamilyBucket: argument 4");
-    uint32_t qw = info.Length() > 4 ? argUint32(info[4], "addFamilyBucket: argument 5") : 1;
+    const uint8_t family = static_cast<uint8_t>(argNamedCode(
+        info[0], "addFamilyBucket: family", {"trading", "market_data", "account"}));
+    std::string name = argString(info[1], "addFamilyBucket: name");
+    int64_t window_ns = argInteger(info[2], "addFamilyBucket: windowNs");
+    uint32_t capacity = argUint32(info[3], "addFamilyBucket: capacity");
+    uint32_t qw = info.Length() > 4 ? argUint32(info[4], "addFamilyBucket: queryWeight") : 1;
     lrvx_rate_limit_policy_add_bucket_family(_h, name.c_str(), window_ns, capacity,
                                              1, 1, 2, family, qw);
   }
   void SetBan(const Napi::CallbackInfo& info)
   {
-    lrvx_rate_limit_policy_set_ban(_h, argUint32(info[0], "setBan: argument 1"),
-                                   argInteger(info[1], "setBan: argument 2"));
+    lrvx_rate_limit_policy_set_ban(_h, argUint32(info[0], "setBan: afterConsecutiveRejects"),
+                                   argInteger(info[1], "setBan: banDurationNs"));
   }
   void LoadProfile(const Napi::CallbackInfo& info)
   {
-    std::string name = argString(info[0], "loadProfile: argument 1");
+    std::string name = argString(info[0], "loadProfile: name");
     // A typo used to be a silent no-op, leaving default rate limit policy
     // values in place -- a zero-fee or unthrottled backtest that
     // looks perfectly healthy.
@@ -114,7 +105,7 @@ class RateLimitPolicyWrap : public Napi::ObjectWrap<RateLimitPolicyWrap>
   }
   Napi::Value BucketStates(const Napi::CallbackInfo& info)
   {
-    int64_t now_ns = toInt64Ns(info[0], "bucketStates: argument 1");
+    int64_t now_ns = toInt64Ns(info[0], "bucketStates: nowNs");
     uint32_t count = lrvx_rate_limit_policy_bucket_state(_h, now_ns, nullptr, 0);
     std::vector<int64_t> buf(count * 4, 0);
     lrvx_rate_limit_policy_bucket_state(_h, now_ns, buf.data(), count);

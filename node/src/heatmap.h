@@ -27,7 +27,7 @@ inline Napi::Value heatmapHtml(const Napi::CallbackInfo& info)
           "E_LEN_002",
           "heatmapHtml: first argument must be a 2D array of numbers.");
     }
-    auto outer = argArray(info[0], "heatmapHtml: argument 1");
+    auto outer = argArray(info[0], "report.heatmapHtml: z");
     const uint32_t rows = outer.Length();
     if (rows == 0)
     {
@@ -58,37 +58,27 @@ inline Napi::Value heatmapHtml(const Napi::CallbackInfo& info)
     auto getStringArr = [&](Napi::Object opts, const char* key,
                             std::vector<std::string>& out)
     {
-      if (opts.Has(key))
+      auto val = opts.Get(key);
+      if (given(val))
       {
-        auto val = opts.Get(key);
-        if (val.IsArray())
+        auto arr = argArray(val, (std::string("heatmapHtml: ") + key).c_str());
+        for (uint32_t i = 0; i < arr.Length(); ++i)
         {
-          auto arr = val.As<Napi::Array>();
-          for (uint32_t i = 0; i < arr.Length(); ++i)
-          {
-            out.push_back(argString(arr.Get(i), (std::string("heatmapHtml: an entry of ") + key).c_str()));
-          }
+          out.push_back(argString(arr.Get(i), (std::string("heatmapHtml: an entry of ") + key).c_str()));
         }
       }
     };
     auto getString = [&](Napi::Object opts, const char* key) -> std::string
     {
-      if (opts.Has(key))
-      {
-        auto val = opts.Get(key);
-        if (val.IsString())
-        {
-          return val.As<Napi::String>().Utf8Value();
-        }
-      }
-      return "";
+      auto val = opts.Get(key);
+      return given(val) ? argString(val, (std::string("heatmapHtml: ") + key).c_str()) : "";
     };
 
     std::vector<std::string> rowLabels, colLabels;
     std::string title, xAxis, yAxis, metric;
-    if (info.Length() > 1 && info[1].IsObject())
+    if (given(info[1]))
     {
-      auto opts = argObject(info[1], "heatmapHtml: argument 2");
+      auto opts = argObject(info[1], "report.heatmapHtml: opts");
       getStringArr(opts, "rowLabels", rowLabels);
       getStringArr(opts, "colLabels", colLabels);
       title = getString(opts, "title");

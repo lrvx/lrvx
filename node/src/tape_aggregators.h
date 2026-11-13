@@ -26,14 +26,18 @@ namespace node_lrvx
 namespace tape_agg_detail
 {
 
+// The eventFilter argument. A value of another type, or a number that is not
+// one of the filters, used to fall back to the default filter.
 inline LrvxAggregatorEventFilter readEventFilter(const Napi::CallbackInfo& info, size_t idx,
-                                                 LrvxAggregatorEventFilter default_value)
+                                                 LrvxAggregatorEventFilter default_value,
+                                                 const char* cls)
 {
-  if (info.Length() <= idx || !info[idx].IsNumber())
+  if (!given(info[idx]))
   {
     return default_value;
   }
-  int32_t raw = info[idx].As<Napi::Number>().Int32Value();
+  const std::string what = std::string(cls) + ": eventFilter";
+  int32_t raw = argInt32(info[idx], what.c_str());
   switch (raw)
   {
     case LRVX_AGG_FILTER_TRADES:
@@ -41,18 +45,23 @@ inline LrvxAggregatorEventFilter readEventFilter(const Napi::CallbackInfo& info,
     case LRVX_AGG_FILTER_BOTH:
       return static_cast<LrvxAggregatorEventFilter>(raw);
     default:
-      return default_value;
+      throw Napi::RangeError::New(info.Env(), what +
+                                                  " must be AggregatorEventFilter.Trades, "
+                                                  ".BooksOnly or .Both");
   }
 }
 
-inline std::vector<uint32_t> readSymbolFilter(const Napi::CallbackInfo& info, size_t idx)
+// The symbolFilter argument; a value that was not an array used to be taken as
+// no filter.
+inline std::vector<uint32_t> readSymbolFilter(const Napi::CallbackInfo& info, size_t idx,
+                                              const char* cls)
 {
   std::vector<uint32_t> out;
-  if (info.Length() <= idx || !info[idx].IsArray())
+  if (!given(info[idx]))
   {
     return out;
   }
-  auto arr = info[idx].As<Napi::Array>();
+  auto arr = argArray(info[idx], (std::string(cls) + ": symbolFilter").c_str());
   out.reserve(arr.Length());
   for (uint32_t i = 0; i < arr.Length(); ++i)
   {
@@ -116,8 +125,8 @@ class EventTypeStatsAggregatorWrap
   EventTypeStatsAggregatorWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<EventTypeStatsAggregatorWrap>(info)
   {
-    auto filter = tape_agg_detail::readEventFilter(info, 0, LRVX_AGG_FILTER_BOTH);
-    auto sf = tape_agg_detail::readSymbolFilter(info, 1);
+    auto filter = tape_agg_detail::readEventFilter(info, 0, LRVX_AGG_FILTER_BOTH, "EventTypeStatsAggregator");
+    auto sf = tape_agg_detail::readSymbolFilter(info, 1, "EventTypeStatsAggregator");
     _h = lrvx_event_type_stats_aggregator_create(filter, sf.empty() ? nullptr : sf.data(),
                                                  static_cast<uint32_t>(sf.size()));
   }
@@ -180,23 +189,11 @@ class BinCountAggregatorWrap : public Napi::ObjectWrap<BinCountAggregatorWrap>
   BinCountAggregatorWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<BinCountAggregatorWrap>(info)
   {
-    int64_t bucket_ns = 0;
-    if (info.Length() > 0)
-    {
-      if (info[0].IsBigInt())
-      {
-        bool lossless = false;
-        bucket_ns = argBigInt(info[0], "BinCountAggregator: argument 1").Int64Value(&lossless);
-      }
-      else if (info[0].IsNumber())
-      {
-        bucket_ns = argInteger(info[0], "BinCountAggregator: argument 1");
-      }
-    }
-    uint8_t by_side = info.Length() > 1 && info[1].IsBoolean() && argBool(info[1], "BinCountAggregator: argument 2");
-    uint8_t by_symbol = info.Length() > 2 && info[2].IsBoolean() && argBool(info[2], "BinCountAggregator: argument 3");
-    auto filter = tape_agg_detail::readEventFilter(info, 3, LRVX_AGG_FILTER_BOTH);
-    auto sf = tape_agg_detail::readSymbolFilter(info, 4);
+    const int64_t bucket_ns = argInteger(info[0], "BinCountAggregator: bucketNs");
+    uint8_t by_side = given(info[1]) && argBool(info[1], "BinCountAggregator: bySide");
+    uint8_t by_symbol = given(info[2]) && argBool(info[2], "BinCountAggregator: bySymbol");
+    auto filter = tape_agg_detail::readEventFilter(info, 3, LRVX_AGG_FILTER_BOTH, "BinCountAggregator");
+    auto sf = tape_agg_detail::readSymbolFilter(info, 4, "BinCountAggregator");
     _h = lrvx_bin_count_aggregator_create(bucket_ns, by_side, by_symbol, filter,
                                           sf.empty() ? nullptr : sf.data(),
                                           static_cast<uint32_t>(sf.size()));
@@ -260,23 +257,11 @@ class VolumeBinAggregatorWrap : public Napi::ObjectWrap<VolumeBinAggregatorWrap>
   VolumeBinAggregatorWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<VolumeBinAggregatorWrap>(info)
   {
-    int64_t bucket_ns = 0;
-    if (info.Length() > 0)
-    {
-      if (info[0].IsBigInt())
-      {
-        bool lossless = false;
-        bucket_ns = argBigInt(info[0], "VolumeBinAggregator: argument 1").Int64Value(&lossless);
-      }
-      else if (info[0].IsNumber())
-      {
-        bucket_ns = argInteger(info[0], "VolumeBinAggregator: argument 1");
-      }
-    }
-    uint8_t by_side = info.Length() > 1 && info[1].IsBoolean() && argBool(info[1], "VolumeBinAggregator: argument 2");
-    uint8_t by_symbol = info.Length() > 2 && info[2].IsBoolean() && argBool(info[2], "VolumeBinAggregator: argument 3");
-    auto filter = tape_agg_detail::readEventFilter(info, 3, LRVX_AGG_FILTER_TRADES);
-    auto sf = tape_agg_detail::readSymbolFilter(info, 4);
+    const int64_t bucket_ns = argInteger(info[0], "VolumeBinAggregator: bucketNs");
+    uint8_t by_side = given(info[1]) && argBool(info[1], "VolumeBinAggregator: bySide");
+    uint8_t by_symbol = given(info[2]) && argBool(info[2], "VolumeBinAggregator: bySymbol");
+    auto filter = tape_agg_detail::readEventFilter(info, 3, LRVX_AGG_FILTER_TRADES, "VolumeBinAggregator");
+    auto sf = tape_agg_detail::readSymbolFilter(info, 4, "VolumeBinAggregator");
     _h = lrvx_volume_bin_aggregator_create(bucket_ns, by_side, by_symbol, filter,
                                            sf.empty() ? nullptr : sf.data(),
                                            static_cast<uint32_t>(sf.size()));
@@ -340,22 +325,10 @@ class OHLCBinAggregatorWrap : public Napi::ObjectWrap<OHLCBinAggregatorWrap>
   OHLCBinAggregatorWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<OHLCBinAggregatorWrap>(info)
   {
-    int64_t bucket_ns = 0;
-    if (info.Length() > 0)
-    {
-      if (info[0].IsBigInt())
-      {
-        bool lossless = false;
-        bucket_ns = argBigInt(info[0], "OHLCBinAggregator: argument 1").Int64Value(&lossless);
-      }
-      else if (info[0].IsNumber())
-      {
-        bucket_ns = argInteger(info[0], "OHLCBinAggregator: argument 1");
-      }
-    }
-    uint8_t by_symbol = info.Length() > 1 && info[1].IsBoolean() && argBool(info[1], "OHLCBinAggregator: argument 2");
-    auto filter = tape_agg_detail::readEventFilter(info, 2, LRVX_AGG_FILTER_TRADES);
-    auto sf = tape_agg_detail::readSymbolFilter(info, 3);
+    const int64_t bucket_ns = argInteger(info[0], "OHLCBinAggregator: bucketNs");
+    uint8_t by_symbol = given(info[1]) && argBool(info[1], "OHLCBinAggregator: bySymbol");
+    auto filter = tape_agg_detail::readEventFilter(info, 2, LRVX_AGG_FILTER_TRADES, "OHLCBinAggregator");
+    auto sf = tape_agg_detail::readSymbolFilter(info, 3, "OHLCBinAggregator");
     _h = lrvx_ohlc_bin_aggregator_create(bucket_ns, by_symbol, filter,
                                          sf.empty() ? nullptr : sf.data(),
                                          static_cast<uint32_t>(sf.size()));
@@ -421,17 +394,17 @@ class PeakAggregatorWrap : public Napi::ObjectWrap<PeakAggregatorWrap>
       : Napi::ObjectWrap<PeakAggregatorWrap>(info)
   {
     std::vector<int64_t> windows;
-    if (info.Length() > 0 && info[0].IsArray())
+    if (given(info[0]))
     {
-      windows = tape_agg_detail::readInt64Array(argArray(info[0], "PeakAggregator: argument 1"));
+      windows = tape_agg_detail::readInt64Array(argArray(info[0], "PeakAggregator: windowNsList"));
     }
     uint32_t top_n =
-        info.Length() > 1 && info[1].IsNumber() ? argUint32(info[1], "PeakAggregator: argument 2") : 10;
-    uint32_t oversample = info.Length() > 2 && info[2].IsNumber()
-                              ? argUint32(info[2], "PeakAggregator: argument 3")
+        given(info[1]) ? argUint32(info[1], "PeakAggregator: topN") : 10;
+    uint32_t oversample = given(info[2])
+                              ? argUint32(info[2], "PeakAggregator: oversampleFactor")
                               : 100;
-    auto filter = tape_agg_detail::readEventFilter(info, 3, LRVX_AGG_FILTER_TRADES);
-    auto sf = tape_agg_detail::readSymbolFilter(info, 4);
+    auto filter = tape_agg_detail::readEventFilter(info, 3, LRVX_AGG_FILTER_TRADES, "PeakAggregator");
+    auto sf = tape_agg_detail::readSymbolFilter(info, 4, "PeakAggregator");
     _h = lrvx_peak_aggregator_create(windows.empty() ? nullptr : windows.data(),
                                      static_cast<uint32_t>(windows.size()), top_n,
                                      oversample, filter,
@@ -520,17 +493,17 @@ class QuantileAggregatorWrap : public Napi::ObjectWrap<QuantileAggregatorWrap>
       : Napi::ObjectWrap<QuantileAggregatorWrap>(info)
   {
     std::vector<int64_t> windows;
-    if (info.Length() > 0 && info[0].IsArray())
+    if (given(info[0]))
     {
-      windows = tape_agg_detail::readInt64Array(argArray(info[0], "QuantileAggregator: argument 1"));
+      windows = tape_agg_detail::readInt64Array(argArray(info[0], "QuantileAggregator: windowNsList"));
     }
     std::vector<double> quantiles;
-    if (info.Length() > 1 && info[1].IsArray())
+    if (given(info[1]))
     {
-      quantiles = tape_agg_detail::readDoubleArray(argArray(info[1], "QuantileAggregator: argument 2"));
+      quantiles = tape_agg_detail::readDoubleArray(argArray(info[1], "QuantileAggregator: quantiles"));
     }
-    auto filter = tape_agg_detail::readEventFilter(info, 2, LRVX_AGG_FILTER_TRADES);
-    auto sf = tape_agg_detail::readSymbolFilter(info, 3);
+    auto filter = tape_agg_detail::readEventFilter(info, 2, LRVX_AGG_FILTER_TRADES, "QuantileAggregator");
+    auto sf = tape_agg_detail::readSymbolFilter(info, 3, "QuantileAggregator");
     _h = lrvx_quantile_aggregator_create(
         windows.empty() ? nullptr : windows.data(), static_cast<uint32_t>(windows.size()),
         quantiles.empty() ? nullptr : quantiles.data(),
@@ -620,26 +593,14 @@ class BookSnapshotBinAggregatorWrap
   BookSnapshotBinAggregatorWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<BookSnapshotBinAggregatorWrap>(info)
   {
-    int64_t bucket_ns = 0;
-    if (info.Length() > 0)
-    {
-      if (info[0].IsBigInt())
-      {
-        bool lossless = false;
-        bucket_ns = argBigInt(info[0], "BookSnapshotBinAggregator: argument 1").Int64Value(&lossless);
-      }
-      else if (info[0].IsNumber())
-      {
-        bucket_ns = argInteger(info[0], "BookSnapshotBinAggregator: argument 1");
-      }
-    }
+    const int64_t bucket_ns = argInteger(info[0], "BookSnapshotBinAggregator: bucketNs");
     uint16_t levels = 20;
-    if (info.Length() > 1 && info[1].IsNumber())
+    if (given(info[1]))
     {
-      levels = static_cast<uint16_t>(argUint32(info[1], "BookSnapshotBinAggregator: argument 2"));
+      levels = static_cast<uint16_t>(argUint32(info[1], "BookSnapshotBinAggregator: levels"));
     }
-    auto filter = tape_agg_detail::readEventFilter(info, 2, LRVX_AGG_FILTER_BOOKS_ONLY);
-    auto sf = tape_agg_detail::readSymbolFilter(info, 3);
+    auto filter = tape_agg_detail::readEventFilter(info, 2, LRVX_AGG_FILTER_BOOKS_ONLY, "BookSnapshotBinAggregator");
+    auto sf = tape_agg_detail::readSymbolFilter(info, 3, "BookSnapshotBinAggregator");
     _h = lrvx_book_snapshot_bin_aggregator_create(
         bucket_ns, levels, filter, sf.empty() ? nullptr : sf.data(),
         static_cast<uint32_t>(sf.size()));

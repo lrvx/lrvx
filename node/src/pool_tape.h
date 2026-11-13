@@ -49,37 +49,37 @@ inline Napi::Value poolTapeCreate(const Napi::CallbackInfo& info)
 inline Napi::Value poolTapeDescriptorConstantProduct(const Napi::CallbackInfo& info)
 {
   lrvx_pool_tape_descriptor_constant_product(
-      detail_tape::tapeOf(info[0]), argInteger(info[1], "poolTapeDescriptorConstantProduct: argument 2"),
-      argInteger(info[2], "poolTapeDescriptorConstantProduct: argument 3"), argUint32(info[3], "poolTapeDescriptorConstantProduct: argument 4"),
-      argUint32(info[4], "poolTapeDescriptorConstantProduct: argument 5"));
+      detail_tape::tapeOf(info[0]), argInteger(info[1], "poolTapeDescriptorConstantProduct: feeNum"),
+      argInteger(info[2], "poolTapeDescriptorConstantProduct: feeDen"), argUint32(info[3], "poolTapeDescriptorConstantProduct: baseDec"),
+      argUint32(info[4], "poolTapeDescriptorConstantProduct: quoteDec"));
   return info.Env().Undefined();
 }
 
 inline Napi::Value poolTapeDescriptorRaydiumCp(const Napi::CallbackInfo& info)
 {
   lrvx_pool_tape_descriptor_raydium_cp(
-      detail_tape::tapeOf(info[0]), argInteger(info[1], "poolTapeDescriptorRaydiumCp: argument 2"),
-      argInteger(info[2], "poolTapeDescriptorRaydiumCp: argument 3"), argBool(info[3], "poolTapeDescriptorRaydiumCp: argument 4") ? 1 : 0,
-      argUint32(info[4], "poolTapeDescriptorRaydiumCp: argument 5"), argUint32(info[5], "poolTapeDescriptorRaydiumCp: argument 6"));
+      detail_tape::tapeOf(info[0]), argInteger(info[1], "poolTapeDescriptorRaydiumCp: tradeFeeRate"),
+      argInteger(info[2], "poolTapeDescriptorRaydiumCp: creatorFeeRate"), argBool(info[3], "poolTapeDescriptorRaydiumCp: creatorFeeOnInput") ? 1 : 0,
+      argUint32(info[4], "poolTapeDescriptorRaydiumCp: baseDec"), argUint32(info[5], "poolTapeDescriptorRaydiumCp: quoteDec"));
   return info.Env().Undefined();
 }
 
 inline Napi::Value poolTapeDescriptorClmm(const Napi::CallbackInfo& info)
 {
   lrvx_pool_tape_descriptor_clmm(
-      detail_tape::tapeOf(info[0]), argUint32(info[1], "poolTapeDescriptorClmm: argument 2"),
-      argUint32(info[2], "poolTapeDescriptorClmm: argument 3"), argUint32(info[3], "poolTapeDescriptorClmm: argument 4"),
-      argUint32(info[4], "poolTapeDescriptorClmm: argument 5"));
+      detail_tape::tapeOf(info[0]), argUint32(info[1], "poolTapeDescriptorClmm: venue"),
+      argUint32(info[2], "poolTapeDescriptorClmm: feePips"), argUint32(info[3], "poolTapeDescriptorClmm: baseDec"),
+      argUint32(info[4], "poolTapeDescriptorClmm: quoteDec"));
   return info.Env().Undefined();
 }
 
 inline Napi::Value poolTapeCheckpoint(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  const std::string r0 = detail_curve::bigintToDecimal(env, argBigInt(info[2], "poolTapeCheckpoint: argument 3"));
-  const std::string r1 = detail_curve::bigintToDecimal(env, argBigInt(info[3], "poolTapeCheckpoint: argument 4"));
+  const std::string r0 = detail_curve::bigintToDecimal(env, argBigInt(info[2], "poolTapeCheckpoint: reserve0"));
+  const std::string r1 = detail_curve::bigintToDecimal(env, argBigInt(info[3], "poolTapeCheckpoint: reserve1"));
   if (!lrvx_pool_tape_checkpoint(detail_tape::tapeOf(info[0]),
-                                 toInt64Ns(info[1], "poolTapeCheckpoint: argument 2"), r0.c_str(), r1.c_str()))
+                                 toInt64Ns(info[1], "poolTapeCheckpoint: tsNs"), r0.c_str(), r1.c_str()))
   {
     throw Napi::Error::New(env, "poolTapeCheckpoint: bad reserve");
   }
@@ -89,9 +89,9 @@ inline Napi::Value poolTapeCheckpoint(const Napi::CallbackInfo& info)
 inline Napi::Value poolTapeSwap(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  const std::string amt = detail_curve::bigintToDecimal(env, argBigInt(info[3], "poolTapeSwap: argument 4"));
-  if (!lrvx_pool_tape_swap(detail_tape::tapeOf(info[0]), toInt64Ns(info[1], "poolTapeSwap: argument 2"),
-                           argBool(info[2], "poolTapeSwap: argument 3") ? 1 : 0, amt.c_str()))
+  const std::string amt = detail_curve::bigintToDecimal(env, argBigInt(info[3], "poolTapeSwap: amountIn"));
+  if (!lrvx_pool_tape_swap(detail_tape::tapeOf(info[0]), toInt64Ns(info[1], "poolTapeSwap: tsNs"),
+                           argBool(info[2], "poolTapeSwap: baseForQuote") ? 1 : 0, amt.c_str()))
   {
     throw Napi::Error::New(env, "poolTapeSwap: bad amount");
   }
@@ -102,9 +102,9 @@ inline Napi::Value poolTapeReplay(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   LrvxPoolReplayHandle r = lrvx_pool_tape_replay(
-      detail_tape::tapeOf(info[0]), argUint32(info[1], "poolTapeReplay: argument 2"),
-      argUint32(info[2], "poolTapeReplay: argument 3"), argUint32(info[3], "poolTapeReplay: argument 4"),
-      argUint32(info[4], "poolTapeReplay: argument 5"));
+      detail_tape::tapeOf(info[0]), argUint32(info[1], "poolTapeReplay: baseIdx"),
+      argUint32(info[2], "poolTapeReplay: quoteIdx"), argUint32(info[3], "poolTapeReplay: baseDec"),
+      argUint32(info[4], "poolTapeReplay: quoteDec"));
   return detail_tape::wrapReplay(env, r);
 }
 

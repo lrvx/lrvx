@@ -66,9 +66,9 @@ class DeltaBookEncoderWrap : public Napi::ObjectWrap<DeltaBookEncoderWrap>
       : Napi::ObjectWrap<DeltaBookEncoderWrap>(info)
   {
     uint32_t anchor_every = 100;
-    if (info.Length() > 0 && info[0].IsObject())
+    if (given(info[0]))
     {
-      auto opts = argObject(info[0], "DeltaBookEncoder: argument 1");
+      auto opts = argObject(info[0], "DeltaBookEncoder: opts");
       if (opts.Has("anchorEvery"))
       {
         anchor_every = argUint32(opts.Get("anchorEvery"), "DeltaBookEncoder: anchorEvery");
@@ -100,9 +100,9 @@ class DeltaBookEncoderWrap : public Napi::ObjectWrap<DeltaBookEncoderWrap>
       Napi::TypeError::New(env, "encode(symbolId, bids, asks)").ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    uint32_t sym = argUint32(info[0], "encode: argument 1");
-    auto bids = detail_db::readLevels(argArray(info[1], "encode: argument 2"));
-    auto asks = detail_db::readLevels(argArray(info[2], "encode: argument 3"));
+    uint32_t sym = argUint32(info[0], "encode: symbolId");
+    auto bids = detail_db::readLevels(argArray(info[1], "encode: bids"));
+    auto asks = detail_db::readLevels(argArray(info[2], "encode: asks"));
     uint8_t is_delta = 0;
     uint64_t bcnt = 0, acnt = 0;
     lrvx_delta_book_encoder_encode(_h, sym,
@@ -128,7 +128,7 @@ class DeltaBookEncoderWrap : public Napi::ObjectWrap<DeltaBookEncoderWrap>
 
   void Reset(const Napi::CallbackInfo& info)
   {
-    lrvx_delta_book_encoder_reset(_h, argUint32(info[0], "reset: argument 1"));
+    lrvx_delta_book_encoder_reset(_h, argUint32(info[0], "reset: symbolId"));
   }
 
   void ResetAll(const Napi::CallbackInfo&)
@@ -172,10 +172,10 @@ class DeltaBookReplayerWrap : public Napi::ObjectWrap<DeltaBookReplayerWrap>
       Napi::TypeError::New(env, "apply(type, symbolId, bids, asks)").ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    uint8_t type = static_cast<uint8_t>(argUint32(info[0], "apply: argument 1"));
-    uint32_t sym = argUint32(info[1], "apply: argument 2");
-    auto bids = detail_db::readLevels(argArray(info[2], "apply: argument 3"));
-    auto asks = detail_db::readLevels(argArray(info[3], "apply: argument 4"));
+    uint8_t type = static_cast<uint8_t>(argUint32(info[0], "apply: type"));
+    uint32_t sym = argUint32(info[1], "apply: symbolId");
+    auto bids = detail_db::readLevels(argArray(info[2], "apply: bids"));
+    auto asks = detail_db::readLevels(argArray(info[3], "apply: asks"));
     uint64_t bcnt = 0, acnt = 0;
     lrvx_delta_book_replayer_apply(_h, type, sym,
                                    bids.empty() ? nullptr : bids.data(), bids.size(),
@@ -199,7 +199,7 @@ class DeltaBookReplayerWrap : public Napi::ObjectWrap<DeltaBookReplayerWrap>
 
   void Reset(const Napi::CallbackInfo& info)
   {
-    lrvx_delta_book_replayer_reset(_h, argUint32(info[0], "reset: argument 1"));
+    lrvx_delta_book_replayer_reset(_h, argUint32(info[0], "reset: symbolId"));
   }
 
   void ResetAll(const Napi::CallbackInfo&)

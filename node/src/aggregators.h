@@ -105,7 +105,7 @@ inline TradeArrays extractTrades(const Napi::CallbackInfo& info)
 inline Napi::Value agg_time_bars(const Napi::CallbackInfo& info)
 {
   auto t = extractTrades(info);
-  double interval = argNumber(info[4], "agg_time_bars: argument 5");
+  double interval = argNumber(info[4], "aggregateTimeBars: intervalSeconds");
   uint32_t maxBars = t.n;
   std::vector<LrvxBar> bars(maxBars);
   uint32_t count = lrvx_aggregate_time_bars(t.ts.data(), t.px, t.qty, t.ib, t.n, interval, bars.data(), maxBars);
@@ -115,7 +115,7 @@ inline Napi::Value agg_time_bars(const Napi::CallbackInfo& info)
 inline Napi::Value agg_tick_bars(const Napi::CallbackInfo& info)
 {
   auto t = extractTrades(info);
-  uint32_t tickCount = argUint32(info[4], "agg_tick_bars: argument 5");
+  uint32_t tickCount = argUint32(info[4], "aggregateTickBars: tickCount");
   uint32_t maxBars = t.n / tickCount + 1;
   std::vector<LrvxBar> bars(maxBars);
   uint32_t count = lrvx_aggregate_tick_bars(t.ts.data(), t.px, t.qty, t.ib, t.n, tickCount, bars.data(), maxBars);
@@ -125,7 +125,7 @@ inline Napi::Value agg_tick_bars(const Napi::CallbackInfo& info)
 inline Napi::Value agg_volume_bars(const Napi::CallbackInfo& info)
 {
   auto t = extractTrades(info);
-  double threshold = argNumber(info[4], "agg_volume_bars: argument 5");
+  double threshold = argNumber(info[4], "aggregateVolumeBars: threshold");
   uint32_t maxBars = t.n;
   std::vector<LrvxBar> bars(maxBars);
   uint32_t count = lrvx_aggregate_volume_bars(t.ts.data(), t.px, t.qty, t.ib, t.n, threshold, bars.data(), maxBars);
@@ -135,7 +135,7 @@ inline Napi::Value agg_volume_bars(const Napi::CallbackInfo& info)
 inline Napi::Value agg_range_bars(const Napi::CallbackInfo& info)
 {
   auto t = extractTrades(info);
-  double range = argNumber(info[4], "agg_range_bars: argument 5");
+  double range = argNumber(info[4], "aggregateRangeBars: rangeSize");
   uint32_t maxBars = t.n;
   std::vector<LrvxBar> bars(maxBars);
   uint32_t count = lrvx_aggregate_range_bars(t.ts.data(), t.px, t.qty, t.ib, t.n, range, bars.data(), maxBars);
@@ -145,7 +145,7 @@ inline Napi::Value agg_range_bars(const Napi::CallbackInfo& info)
 inline Napi::Value agg_renko_bars(const Napi::CallbackInfo& info)
 {
   auto t = extractTrades(info);
-  double brick = argNumber(info[4], "agg_renko_bars: argument 5");
+  double brick = argNumber(info[4], "aggregateRenkoBars: brickSize");
   // Every other aggregator in this file closes at most one bar per input
   // trade, so `maxBars = t.n` is always enough room. Renko is the
   // exception: a trade that gaps past more than one brick width closes the
@@ -171,7 +171,7 @@ inline Napi::Value agg_renko_bars(const Napi::CallbackInfo& info)
 inline Napi::Value agg_heikin_ashi_bars(const Napi::CallbackInfo& info)
 {
   auto t = extractTrades(info);
-  double interval = argNumber(info[4], "agg_heikin_ashi_bars: argument 5");
+  double interval = argNumber(info[4], "aggregateHeikinAshiBars: intervalSeconds");
   uint32_t maxBars = t.n;
   std::vector<LrvxBar> bars(maxBars);
   uint32_t count = lrvx_aggregate_heikin_ashi_bars(t.ts.data(), t.px, t.qty, t.ib, t.n, interval, bars.data(), maxBars);

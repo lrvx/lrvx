@@ -52,8 +52,8 @@ class IndicatorGraphWrap : public Napi::ObjectWrap<IndicatorGraphWrap>
   Napi::Value SetBars(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
-    uint32_t symbol = argUint32(info[0], "setBars: argument 1");
-    auto close = argFloat64Array(info[1], "setBars: argument 2");
+    uint32_t symbol = argUint32(info[0], "setBars: symbol");
+    auto close = argFloat64Array(info[1], "setBars: close");
     size_t n = close.ElementLength();
 
     auto fetch = [&](size_t idx) -> const double*
@@ -95,9 +95,9 @@ class IndicatorGraphWrap : public Napi::ObjectWrap<IndicatorGraphWrap>
   Napi::Value AddNode(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
-    std::string name = argString(info[0], "addNode: argument 1");
+    std::string name = argString(info[0], "addNode: name");
 
-    auto depsArr = argArray(info[1], "addNode: argument 2");
+    auto depsArr = argArray(info[1], "addNode: dependencies");
     std::vector<std::string> deps;
     deps.reserve(depsArr.Length());
     for (uint32_t i = 0; i < depsArr.Length(); ++i)
@@ -106,7 +106,7 @@ class IndicatorGraphWrap : public Napi::ObjectWrap<IndicatorGraphWrap>
     }
 
     auto fnRef = std::make_shared<Napi::FunctionReference>(
-        Napi::Persistent(argFunction(info[2], "addNode: argument 3")));
+        Napi::Persistent(argFunction(info[2], "addNode: compute")));
     auto thisRef = std::make_shared<Napi::ObjectReference>(Napi::Persistent(info.This().As<Napi::Object>()));
     Napi::Env fnEnv = env;
 
@@ -126,8 +126,8 @@ class IndicatorGraphWrap : public Napi::ObjectWrap<IndicatorGraphWrap>
 
   Napi::Value Require(const Napi::CallbackInfo& info)
   {
-    uint32_t symbol = argUint32(info[0], "require: argument 1");
-    std::string name = argString(info[1], "require: argument 2");
+    uint32_t symbol = argUint32(info[0], "require: symbol");
+    std::string name = argString(info[1], "require: name");
     try
     {
       const auto& v = _graph.require(static_cast<lrvx::SymbolId>(symbol), name);
@@ -142,8 +142,8 @@ class IndicatorGraphWrap : public Napi::ObjectWrap<IndicatorGraphWrap>
 
   Napi::Value Get(const Napi::CallbackInfo& info)
   {
-    uint32_t symbol = argUint32(info[0], "get: argument 1");
-    std::string name = argString(info[1], "get: argument 2");
+    uint32_t symbol = argUint32(info[0], "get: symbol");
+    std::string name = argString(info[1], "get: name");
     const auto* v = _graph.get(static_cast<lrvx::SymbolId>(symbol), name);
     if (!v)
     {
@@ -154,27 +154,27 @@ class IndicatorGraphWrap : public Napi::ObjectWrap<IndicatorGraphWrap>
 
   Napi::Value Close(const Napi::CallbackInfo& info)
   {
-    uint32_t s = argUint32(info[0], "close: argument 1");
+    uint32_t s = argUint32(info[0], "close: symbol");
     return vec2arr(info.Env(), _graph.close(static_cast<lrvx::SymbolId>(s)));
   }
   Napi::Value High(const Napi::CallbackInfo& info)
   {
-    uint32_t s = argUint32(info[0], "high: argument 1");
+    uint32_t s = argUint32(info[0], "high: symbol");
     return vec2arr(info.Env(), _graph.high(static_cast<lrvx::SymbolId>(s)));
   }
   Napi::Value Low(const Napi::CallbackInfo& info)
   {
-    uint32_t s = argUint32(info[0], "low: argument 1");
+    uint32_t s = argUint32(info[0], "low: symbol");
     return vec2arr(info.Env(), _graph.low(static_cast<lrvx::SymbolId>(s)));
   }
   Napi::Value Volume(const Napi::CallbackInfo& info)
   {
-    uint32_t s = argUint32(info[0], "volume: argument 1");
+    uint32_t s = argUint32(info[0], "volume: symbol");
     return vec2arr(info.Env(), _graph.volume(static_cast<lrvx::SymbolId>(s)));
   }
   Napi::Value Invalidate(const Napi::CallbackInfo& info)
   {
-    _graph.invalidate(static_cast<lrvx::SymbolId>(argUint32(info[0], "invalidate: argument 1")));
+    _graph.invalidate(static_cast<lrvx::SymbolId>(argUint32(info[0], "invalidate: symbol")));
     return info.Env().Undefined();
   }
   Napi::Value InvalidateAll(const Napi::CallbackInfo& info)
@@ -223,9 +223,9 @@ class StreamingIndicatorGraphWrap : public Napi::ObjectWrap<StreamingIndicatorGr
   Napi::Value AddNode(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
-    std::string name = argString(info[0], "addNode: argument 1");
+    std::string name = argString(info[0], "addNode: name");
 
-    auto depsArr = argArray(info[1], "addNode: argument 2");
+    auto depsArr = argArray(info[1], "addNode: dependencies");
     std::vector<std::string> deps;
     deps.reserve(depsArr.Length());
     for (uint32_t i = 0; i < depsArr.Length(); ++i)
@@ -234,7 +234,7 @@ class StreamingIndicatorGraphWrap : public Napi::ObjectWrap<StreamingIndicatorGr
     }
 
     auto fnRef = std::make_shared<Napi::FunctionReference>(
-        Napi::Persistent(argFunction(info[2], "addNode: argument 3")));
+        Napi::Persistent(argFunction(info[2], "addNode: compute")));
     auto thisRef = std::make_shared<Napi::ObjectReference>(
         Napi::Persistent(info.This().As<Napi::Object>()));
     Napi::Env fnEnv = env;
@@ -256,16 +256,16 @@ class StreamingIndicatorGraphWrap : public Napi::ObjectWrap<StreamingIndicatorGr
   Napi::Value Step(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
-    uint32_t symbol = argUint32(info[0], "step: argument 1");
-    double c = argNumber(info[1], "step: argument 2");
+    uint32_t symbol = argUint32(info[0], "step: symbol");
+    double c = argNumber(info[1], "step: close");
     double h = info.Length() > 2 && !info[2].IsUndefined() && !info[2].IsNull()
-                   ? argNumber(info[2], "step: argument 3")
+                   ? argNumber(info[2], "step: high")
                    : c;
     double l = info.Length() > 3 && !info[3].IsUndefined() && !info[3].IsNull()
-                   ? argNumber(info[3], "step: argument 4")
+                   ? argNumber(info[3], "step: low")
                    : c;
     double v = info.Length() > 4 && !info[4].IsUndefined() && !info[4].IsNull()
-                   ? argNumber(info[4], "step: argument 5")
+                   ? argNumber(info[4], "step: volume")
                    : 0.0;
     lrvx::Bar bar;
     bar.open = lrvx::Price::fromDouble(c);
@@ -279,22 +279,22 @@ class StreamingIndicatorGraphWrap : public Napi::ObjectWrap<StreamingIndicatorGr
 
   Napi::Value Current(const Napi::CallbackInfo& info)
   {
-    uint32_t symbol = argUint32(info[0], "current: argument 1");
-    std::string name = argString(info[1], "current: argument 2");
+    uint32_t symbol = argUint32(info[0], "current: symbol");
+    std::string name = argString(info[1], "current: name");
     return Napi::Number::New(info.Env(),
                              _sg.current(static_cast<lrvx::SymbolId>(symbol), name));
   }
 
   Napi::Value BarCount(const Napi::CallbackInfo& info)
   {
-    uint32_t symbol = argUint32(info[0], "barCount: argument 1");
+    uint32_t symbol = argUint32(info[0], "barCount: symbol");
     return Napi::Number::New(info.Env(),
                              static_cast<double>(_sg.barCount(static_cast<lrvx::SymbolId>(symbol))));
   }
 
   Napi::Value Reset(const Napi::CallbackInfo& info)
   {
-    _sg.reset(static_cast<lrvx::SymbolId>(argUint32(info[0], "reset: argument 1")));
+    _sg.reset(static_cast<lrvx::SymbolId>(argUint32(info[0], "reset: symbol")));
     return info.Env().Undefined();
   }
 
@@ -306,22 +306,22 @@ class StreamingIndicatorGraphWrap : public Napi::ObjectWrap<StreamingIndicatorGr
 
   Napi::Value Close(const Napi::CallbackInfo& info)
   {
-    uint32_t s = argUint32(info[0], "close: argument 1");
+    uint32_t s = argUint32(info[0], "close: symbol");
     return vec2arr(info.Env(), _sg.batchGraph().close(static_cast<lrvx::SymbolId>(s)));
   }
   Napi::Value High(const Napi::CallbackInfo& info)
   {
-    uint32_t s = argUint32(info[0], "high: argument 1");
+    uint32_t s = argUint32(info[0], "high: symbol");
     return vec2arr(info.Env(), _sg.batchGraph().high(static_cast<lrvx::SymbolId>(s)));
   }
   Napi::Value Low(const Napi::CallbackInfo& info)
   {
-    uint32_t s = argUint32(info[0], "low: argument 1");
+    uint32_t s = argUint32(info[0], "low: symbol");
     return vec2arr(info.Env(), _sg.batchGraph().low(static_cast<lrvx::SymbolId>(s)));
   }
   Napi::Value Volume(const Napi::CallbackInfo& info)
   {
-    uint32_t s = argUint32(info[0], "volume: argument 1");
+    uint32_t s = argUint32(info[0], "volume: symbol");
     return vec2arr(info.Env(), _sg.batchGraph().volume(static_cast<lrvx::SymbolId>(s)));
   }
 

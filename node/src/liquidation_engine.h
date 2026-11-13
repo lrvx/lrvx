@@ -88,13 +88,13 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
  private:
   void AddTier(const Napi::CallbackInfo& info)
   {
-    lrvx_liquidation_engine_add_tier(_h, argNumber(info[0], "addTier: argument 1"),
-                                     argNumber(info[1], "addTier: argument 2"));
+    lrvx_liquidation_engine_add_tier(_h, argNumber(info[0], "addTier: minNotional"),
+                                     argNumber(info[1], "addTier: mmFraction"));
   }
   void SetInsuranceFundCapital(const Napi::CallbackInfo& info)
   {
     lrvx_liquidation_engine_set_insurance_fund_capital(
-        _h, argNumber(info[0], "setInsuranceFundCapital: argument 1"));
+        _h, argNumber(info[0], "setInsuranceFundCapital: capital"));
   }
   Napi::Value InsuranceFundBalance(const Napi::CallbackInfo& info)
   {
@@ -103,31 +103,12 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
   void SetAdlEnabled(const Napi::CallbackInfo& info)
   {
     lrvx_liquidation_engine_set_adl_enabled(
-        _h, argBool(info[0], "setAdlEnabled: argument 1") ? 1 : 0);
+        _h, argBool(info[0], "setAdlEnabled: enabled") ? 1 : 0);
   }
   void SetAdlRanking(const Napi::CallbackInfo& info)
   {
-    uint8_t code = 0;
-    if (info.Length() >= 1 && info[0].IsString())
-    {
-      const std::string name = argString(info[0], "setAdlRanking: argument 1");
-      if (name == "binance")
-      {
-        code = 1;
-      }
-      else if (name == "bybit")
-      {
-        code = 2;
-      }
-      else if (name == "position_size")
-      {
-        code = 3;
-      }
-    }
-    else if (info.Length() >= 1 && info[0].IsNumber())
-    {
-      code = static_cast<uint8_t>(argUint32(info[0], "setAdlRanking: argument 1"));
-    }
+    const uint8_t code = static_cast<uint8_t>(argNamedCode(
+        info[0], "setAdlRanking: ranking", {"pnl_ratio", "binance", "bybit", "position_size"}));
     lrvx_liquidation_engine_set_adl_ranking(_h, code);
   }
   Napi::Value AdlRanking(const Napi::CallbackInfo& info)
@@ -154,34 +135,34 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
   void SetLiquidationSlippageBps(const Napi::CallbackInfo& info)
   {
     lrvx_liquidation_engine_set_liquidation_slippage_bps(
-        _h, argNumber(info[0], "setLiquidationSlippageBps: argument 1"));
+        _h, argNumber(info[0], "setLiquidationSlippageBps: bps"));
   }
   void OpenPosition(const Napi::CallbackInfo& info)
   {
     lrvx_liquidation_engine_open_position(
-        _h, argInteger(info[0], "openPosition: argument 1"),
-        argUint32(info[1], "openPosition: argument 2"),
-        argNumber(info[2], "openPosition: argument 3"),
-        argNumber(info[3], "openPosition: argument 4"),
-        argNumber(info[4], "openPosition: argument 5"));
+        _h, argInteger(info[0], "openPosition: accountId"),
+        argUint32(info[1], "openPosition: symbol"),
+        argNumber(info[2], "openPosition: quantity"),
+        argNumber(info[3], "openPosition: entryPrice"),
+        argNumber(info[4], "openPosition: equity"));
   }
   void ClosePosition(const Napi::CallbackInfo& info)
   {
     lrvx_liquidation_engine_close_position(
-        _h, argInteger(info[0], "closePosition: argument 1"),
-        argUint32(info[1], "closePosition: argument 2"));
+        _h, argInteger(info[0], "closePosition: accountId"),
+        argUint32(info[1], "closePosition: symbol"));
   }
   Napi::Value OnMark(const Napi::CallbackInfo& info)
   {
     const uint32_t n = lrvx_liquidation_engine_on_mark(
-        _h, argUint32(info[0], "onMark: argument 1"),
-        argNumber(info[1], "onMark: argument 2"));
+        _h, argUint32(info[0], "onMark: symbol"),
+        argNumber(info[1], "onMark: markPrice"));
     return Napi::Number::New(info.Env(), n);
   }
   Napi::Value OnMarks(const Napi::CallbackInfo& info)
   {
     // Expects (marks: Array<[symbol, price]>, tsNs?: number).
-    Napi::Array arr = argArray(info[0], "onMarks: argument 1");
+    Napi::Array arr = argArray(info[0], "onMarks: marks");
     const uint32_t n = arr.Length();
     std::vector<uint32_t> symbols(n);
     std::vector<double> prices(n);
@@ -191,8 +172,8 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
       symbols[i] = argUint32(pair.Get(uint32_t{0}), "a [symbol, price] pair's symbol");
       prices[i] = argNumber(pair.Get(uint32_t{1}), "a [symbol, price] pair's price");
     }
-    const int64_t tsNs = info.Length() >= 2 && (info[1].IsNumber() || info[1].IsBigInt())
-                             ? toInt64Ns(info[1], "onMarks: argument 2")
+    const int64_t tsNs = given(info[1])
+                             ? toInt64Ns(info[1], "onMarks: tsNs")
                              : 0;
     const uint32_t total = lrvx_liquidation_engine_on_marks(
         _h, n, symbols.data(), prices.data(), tsNs);
@@ -215,7 +196,7 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
   }
   void LoadProfile(const Napi::CallbackInfo& info)
   {
-    const std::string name = argString(info[0], "loadProfile: argument 1");
+    const std::string name = argString(info[0], "loadProfile: name");
     uint8_t p = 0;
     if (name == "bybit_linear")
     {
@@ -234,8 +215,7 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
       lrvx_liquidation_engine_set_executor(_h, nullptr);
       return;
     }
-    auto* w = Napi::ObjectWrap<SimulatedExecutorWrap>::Unwrap(
-        argObject(info[0], "setExecutor: argument 1"));
+    auto* w = argInstance<SimulatedExecutorWrap>(info[0], "setExecutor: executor");
     lrvx_liquidation_engine_set_executor(_h, w->handle());
   }
   Napi::Value DeficitsPaidByFund(const Napi::CallbackInfo& info)
@@ -298,27 +278,12 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
   }
   void SetMarkImpactModel(const Napi::CallbackInfo& info)
   {
-    uint8_t code = 0;
-    if (info.Length() >= 1 && info[0].IsString())
-    {
-      const std::string name = argString(info[0], "setMarkImpactModel: argument 1");
-      if (name == "book_anchored")
-      {
-        code = 1;
-      }
-      else if (name == "book_only")
-      {
-        code = 2;
-      }
-    }
-    else if (info.Length() >= 1 && info[0].IsNumber())
-    {
-      code = static_cast<uint8_t>(argUint32(info[0], "setMarkImpactModel: argument 1"));
-    }
+    const uint8_t code = static_cast<uint8_t>(argNamedCode(
+        info[0], "setMarkImpactModel: model", {"none", "book_anchored", "book_only"}));
     double weight = 0.3;
-    if (info.Length() >= 2 && info[1].IsNumber())
+    if (given(info[1]))
     {
-      weight = argNumber(info[1], "setMarkImpactModel: argument 2");
+      weight = argNumber(info[1], "setMarkImpactModel: weight");
     }
     lrvx_liquidation_engine_set_mark_impact_model(_h, code, weight);
   }
@@ -348,7 +313,7 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
   void SetMaxCascadeDepth(const Napi::CallbackInfo& info)
   {
     lrvx_liquidation_engine_set_max_cascade_depth(
-        _h, argUint32(info[0], "setMaxCascadeDepth: argument 1"));
+        _h, argUint32(info[0], "setMaxCascadeDepth: depth"));
   }
   Napi::Value MaxCascadeDepth(const Napi::CallbackInfo& info)
   {
@@ -361,13 +326,13 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
     {
       return;
     }
-    auto* w = Napi::ObjectWrap<AccountWrap>::Unwrap(argObject(info[0], "attachAccount: argument 1"));
+    auto* w = argInstance<AccountWrap>(info[0], "attachAccount: account");
     lrvx_liquidation_engine_attach_account(_h, w->handle());
   }
   void DetachAccount(const Napi::CallbackInfo& info)
   {
     lrvx_liquidation_engine_detach_account(
-        _h, argInteger(info[0], "detachAccount: argument 1"));
+        _h, argInteger(info[0], "detachAccount: accountId"));
   }
 
   LrvxLiquidationEngineHandle _h;

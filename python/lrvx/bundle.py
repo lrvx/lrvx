@@ -6,11 +6,13 @@ code, the captured tape it ran against, the engine version it was
 built with, and the expected output it should reproduce. Packing
 captures the run; validating replays it and compares the result with
 the expected output field by field (trade count, every fill's symbol,
-side, price and quantity, total filled quantity), along with the
-strategy and tape hashes, the engine version and, when the bundle
-ships an expected `.lrvxrun`, the trace: every signal, order-event and
-fill record field by field for a bundle whose manifest says its records
-are comparable (all but `run_ts_ns`, the wall clock), the record counts
+side, price and quantity, total filled quantity, and the number of
+orders cancelled and modified for a bundle packed since cancels and
+modifies are replayed), along with the strategy and tape hashes, the
+engine version and, when the bundle ships an expected `.lrvxrun`, the
+trace: every signal, order-event and fill record field by field for a
+bundle whose manifest says its records are comparable (all but
+`run_ts_ns`, the wall clock), the record counts
 for one packed before that, and the fill count alone for one packed
 before its trace recorded signals (see `_trace_holds_signals`).
 
@@ -70,6 +72,11 @@ _LEGACY_EXPECTED_RUN_DIR = "expected.floxrun"
 _LEGACY_VERSION_KEY = "flox_version"
 _SIGNALS_RECORDED_KEY = "lrvxrun_signals_recorded"
 _RECORDS_COMPARABLE_KEY = "lrvxrun_records_comparable"
+# Pack sent the strategy's cancels and modifies to the simulator and recorded
+# them. A bundle without the key was packed when they were dropped, and its
+# replay drops them too.
+_CANCELS_MODIFIES_KEY = "cancels_and_modifies_routed"
+_CANCEL_MODIFY_SIGNALS = frozenset({"cancel", "cancel_all", "modify"})
 _COMPARED_RECORDS = "signal, order event and fill records"
 _COMPARED_ALL = "signals, order events, fills"
 # The trace record fields two replays of one bundle need not agree on.
@@ -165,6 +172,7 @@ def _run_strategy_against_tape(
     slippage_model: str = "none",
     slippage_params: Optional[Dict[str, float]] = None,
     lrvxrun_out: Optional[Path] = None,
+    route_cancels_and_modifies: bool = True,
 ) -> Dict[str, Any]:
     """Replay the trades in ``tape_path`` through the strategy at
     ``strategy_path`` using a SimulatedExecutor with the given
@@ -174,7 +182,13 @@ def _run_strategy_against_tape(
 
     ``tick_size`` is declared on the symbol, so order prices off it are
     refused; ``None`` declares no tick and leaves prices unchecked, as a
-    symbol registered without one is."""
+    symbol registered without one is.
+
+    ``route_cancels_and_modifies`` sends the strategy's cancel, cancel-all
+    and modify signals to the simulator, traces them and counts them in the
+    returned dict. False drops them, as pack did before the bundle's manifest
+    had ``cancels_and_modifies_routed``, so such a bundle replays as it was
+    packed."""
     import lrvx
 
     mod = _load_strategy_module(strategy_path)
@@ -201,11 +215,11 @@ def _run_strategy_against_tape(
     # Optional .lrvxrun capture. When `lrvxrun_out` is set we mirror
     # every signal / order / fill into a TraceRecorder so the bundle
     # can ship the per-run trace alongside the legacy JSON summary.
+    from lrvx._lrvx import FillLiquidity, OrderEventKind, TraceRecorder
+
     rec: Any = None
     trace_errors: List[Exception] = []
     if lrvxrun_out is not None:
-        from lrvx._lrvx import FillLiquidity, OrderEventKind, TraceRecorder
-
         rec = TraceRecorder(
             path=str(lrvxrun_out),
             strategy_id=strategy_path.stem,
@@ -231,9 +245,68 @@ def _run_strategy_against_tape(
     _TRACE_ORDER_TYPE = {
         name: code for code, name in enumerate(_EXEC_ORDER_TYPES)
     }
+    # order id -> (side, order type, price, quantity) as last sent, for every
+    # order this run placed: what a cancel or modify record names.
+    sent: Dict[int, tuple] = {}
+    actions = {"cancel_count": 0, "modify_count": 0}
+
+    def write_action(sig_name: str, signal_id: int,
+                     events: List[tuple]) -> None:
+        """A cancel, cancel-all or modify signal and the order event of each
+        order it acted on, written like the run's submits."""
+        if rec is None or trace_errors:
+            return
+        try:
+            ts = time.time_ns()
+            rec.write_signal(
+                run_ts_ns=ts, feed_ts_ns=feed_ts[0], signal_id=signal_id,
+                name=sig_name, symbol_ids=[int(sym)],
+            )
+            for kind, oid, (side, order_type, price, qty) in events:
+                rec.write_order_event(
+                    run_ts_ns=ts, feed_ts_ns=feed_ts[0], order_id=oid,
+                    parent_signal_id=oid, symbol_id=int(sym),
+                    event_kind=kind,
+                    side=0 if side == "buy" else 1,
+                    order_type=_TRACE_ORDER_TYPE[order_type],
+                    price_raw=int(price * 1e8), qty_raw=int(qty * 1e8),
+                )
+        except Exception as e:
+            trace_errors.append(e)
+
+    def on_cancel_or_modify(sig: Any, order_type: str) -> None:
+        # Routed as BacktestRunner routes them to its simulator. An order
+        # counts as cancelled, and gets a CANCEL record, when the simulator
+        # still held it; as modified, with a MODIFY record, when the
+        # simulator took the replacement.
+        oid = int(getattr(sig, "order_id", 0) or 0)
+        if order_type == "cancel":
+            live = oid in sent and sim.order_is_live(oid)
+            sim.cancel_order(oid)
+            done = [(OrderEventKind.CANCEL, oid, sent[oid])] if live else []
+            actions["cancel_count"] += len(done)
+        elif order_type == "cancel_all":
+            live = [o for o in sent if sim.order_is_live(o)]
+            sim.cancel_all(int(sym))
+            done = [(OrderEventKind.CANCEL, o, sent[o]) for o in live]
+            actions["cancel_count"] += len(done)
+        else:
+            new_price = float(getattr(sig, "new_price", 0.0) or 0.0)
+            new_qty = float(getattr(sig, "new_quantity", 0.0) or 0.0)
+            taken = sim.modify_order(oid, new_price, new_qty, int(sym))
+            done = []
+            if taken and oid in sent:
+                side, kind = sent[oid][0], sent[oid][1]
+                sent[oid] = (side, kind, new_price, new_qty)
+                done = [(OrderEventKind.MODIFY, oid, sent[oid])]
+            actions["modify_count"] += len(done)
+        write_action(order_type, oid, done)
 
     def on_signal(sig: Any) -> None:
         order_type = (getattr(sig, "order_type", "") or "").lower()
+        if order_type in _CANCEL_MODIFY_SIGNALS and route_cancels_and_modifies:
+            on_cancel_or_modify(sig, order_type)
+            return
         if order_type not in _TRACE_ORDER_TYPE:
             return
         side = (getattr(sig, "side", "") or "").lower()
@@ -250,6 +323,7 @@ def _run_strategy_against_tape(
             trailing_offset=float(getattr(sig, "trailing_offset", 0.0) or 0.0),
             trailing_bps=int(getattr(sig, "trailing_bps", 0) or 0),
         )
+        sent[oid] = (side, order_type, price, qty)
         if rec is not None and not trace_errors:
             # The runner logs what a signal callback raises and carries on,
             # so a failed write is kept here and raised once the run is over.
@@ -354,7 +428,11 @@ def _run_strategy_against_tape(
     # The JSON summary identifies a fill by (symbol, side, price,
     # quantity), as it always has; order and fill ids are compared in the
     # trace of a bundle whose manifest has lrvxrun_records_comparable.
+    # The cancel and modify counts are only in the summary of a run that
+    # routed them: a bundle packed before has neither key.
+    summary = actions if route_cancels_and_modifies else {}
     return {
+        **summary,
         "trade_count": int(n),
         "fill_count": len(fills),
         "fills": [
@@ -439,6 +517,7 @@ def pack_bundle(
         # replay, so validate compares them one by one. A bundle without the
         # key is compared on its record counts.
         _RECORDS_COMPARABLE_KEY: True,
+        _CANCELS_MODIFIES_KEY: True,
         "slippage_model": slippage_model,
         "slippage_params": slippage_params,
     }
@@ -705,6 +784,7 @@ def replay_bundle(bundle_path: Path) -> BundleResult:
             slippage_model=manifest.get("slippage_model", "none"),
             slippage_params=manifest.get("slippage_params") or {},
             lrvxrun_out=actual_lrvxrun,
+            route_cancels_and_modifies=bool(manifest.get(_CANCELS_MODIFIES_KEY)),
         )
 
         # Integrity check: the manifest carries a hash of the strategy

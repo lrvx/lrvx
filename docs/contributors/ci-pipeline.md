@@ -66,6 +66,7 @@ Runs eight checks in sequence (each takes <5s):
 | `gen_indicator_docs.py` | Indicator reference matches `registry.def` | Run `python3 scripts/gen_indicator_docs.py` |
 | `gen_llms_txt.py --check` | `docs/llms.txt` + `llms-full.txt` match `docs/` | Run `python3 scripts/gen_llms_txt.py` |
 | `check_dts_exports.py` | `node/index.d.ts` matches NAPI exports | Edit `.d.ts` to add/remove the listed names |
+| `check_node_argument_names.py` | No checked read in `node/src` names its argument by position | Pass `"<method>: <parameter>"` with the parameter name from `node/index.d.ts` |
 | `check_binding_parity.py` | pybind11/NAPI/Codon/QuickJS coverage matches IDL | See [parity-gate.md](parity-gate.md) |
 | `check_error_codes.py` | Every error code has a doc page; pages aren't stale | Add the doc page or remove the unused code |
 | `check_test_gating.py` | Every `tests/*.cpp` is registered in CMake | Register the target — see [test-gating.md](test-gating.md) |

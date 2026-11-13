@@ -2879,6 +2879,10 @@ class SimulatedExecutor:
         """
         Remaining hidden quantity (raw fixed-point) for an iceberg order.
         """
+    def modify_order(self, order_id: typing.SupportsInt | typing.SupportsIndex, new_price: typing.SupportsFloat | typing.SupportsIndex, new_quantity: typing.SupportsFloat | typing.SupportsIndex, symbol: typing.SupportsInt | typing.SupportsIndex) -> bool:
+        """
+        Replace a working order with its new price and quantity, as a Modify signal does in BacktestRunner: the trigger of a stop_market, tp_market or trailing_stop order moves to new_price, the limit of any other; new_quantity is what is left to work. An off-tick replacement, or an id that is no longer working, is refused and the order is left as it was. symbol is used only when the simulator does not hold the order. Returns True when the replacement was taken, False when it was refused.
+        """
     def on_bar(self, symbol: typing.SupportsInt | typing.SupportsIndex, close_price: typing.SupportsFloat | typing.SupportsIndex) -> None:
         """
         Feed a bar close price for order matching
@@ -2906,6 +2910,10 @@ class SimulatedExecutor:
     def on_trade_qty(self, symbol: typing.SupportsInt | typing.SupportsIndex, price: typing.SupportsFloat | typing.SupportsIndex, quantity: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool) -> None:
         """
         Feed a trade with quantity (enables queue-fill simulation)
+        """
+    def order_is_live(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> bool:
+        """
+        Whether the simulator still holds the order: resting, waiting on its trigger, or held for the next bar. False once it is filled, cancelled, rejected or expired, and for an id it never saw.
         """
     def reset(self) -> None:
         """

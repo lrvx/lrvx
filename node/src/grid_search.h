@@ -110,7 +110,7 @@ class GridSearchNode : public Napi::ObjectWrap<GridSearchNode>
 
   Napi::Value addAxis(const Napi::CallbackInfo& info)
   {
-    auto arr = argArray(info[0], "addAxis: argument 1");
+    auto arr = argArray(info[0], "addAxis: values");
     std::vector<double> vals(arr.Length());
     for (uint32_t i = 0; i < arr.Length(); ++i)
     {
@@ -123,7 +123,7 @@ class GridSearchNode : public Napi::ObjectWrap<GridSearchNode>
 
   Napi::Value setFactory(const Napi::CallbackInfo& info)
   {
-    _factory = Napi::Persistent(argFunction(info[0], "setFactory: argument 1"));
+    _factory = Napi::Persistent(argFunction(info[0], "setFactory: factory"));
     return info.Env().Undefined();
   }
 
@@ -135,7 +135,7 @@ class GridSearchNode : public Napi::ObjectWrap<GridSearchNode>
 
   Napi::Value paramsForIndex(const Napi::CallbackInfo& info)
   {
-    uint64_t idx = static_cast<uint64_t>(argInteger(info[0], "paramsForIndex: argument 1"));
+    uint64_t idx = static_cast<uint64_t>(argInteger(info[0], "paramsForIndex: index"));
     uint32_t total = lrvx_grid_search_params_for_index(_handle, idx, nullptr, 0);
     std::vector<double> out(total);
     if (total > 0)

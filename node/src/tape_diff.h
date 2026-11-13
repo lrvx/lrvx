@@ -45,13 +45,13 @@ inline Napi::Value tapeDiff(const Napi::CallbackInfo& info)
       throw lrvx::LrvxError("E_VAL_002",
           "tapeDiff: first two arguments must be tape directory paths.");
     }
-    std::string left = argString(info[0], "tapeDiff: argument 1");
-    std::string right = argString(info[1], "tapeDiff: argument 2");
+    std::string left = argString(info[0], "tapeDiff: leftPath");
+    std::string right = argString(info[1], "tapeDiff: rightPath");
     uint32_t max_mismatches = 16;
     int64_t tolerance_ns = 0;
-    if (info.Length() >= 3 && info[2].IsObject())
+    if (given(info[2]))
     {
-      auto opts = argObject(info[2], "tapeDiff: argument 3");
+      auto opts = argObject(info[2], "tapeDiff: opts");
       if (opts.Has("maxMismatches"))
       {
         max_mismatches = argUint32(opts.Get("maxMismatches"), "tapeDiff: maxMismatches");

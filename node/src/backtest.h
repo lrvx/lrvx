@@ -16,17 +16,23 @@ namespace node_lrvx
 class LatencyDistributionWrap : public Napi::ObjectWrap<LatencyDistributionWrap>
 {
  public:
+  static Napi::FunctionReference& Ctor()
+  {
+    static Napi::FunctionReference ref;
+    return ref;
+  }
+
   static Napi::Function Init(Napi::Env env)
   {
-    return DefineClass(
-        env, "LatencyDistribution",
-        {InstanceMethod("setConstant", &LatencyDistributionWrap::SetConstant),
-         InstanceMethod("setUniform", &LatencyDistributionWrap::SetUniform),
-         InstanceMethod("setLognormal", &LatencyDistributionWrap::SetLognormal),
-         InstanceMethod("setEmpirical", &LatencyDistributionWrap::SetEmpirical),
-         InstanceMethod("setBurstCorrelation",
-                        &LatencyDistributionWrap::SetBurstCorrelation),
-         InstanceMethod("medianNs", &LatencyDistributionWrap::MedianNs)});
+    return keepCtor(Ctor(), DefineClass(
+                                env, "LatencyDistribution",
+                                {InstanceMethod("setConstant", &LatencyDistributionWrap::SetConstant),
+                                 InstanceMethod("setUniform", &LatencyDistributionWrap::SetUniform),
+                                 InstanceMethod("setLognormal", &LatencyDistributionWrap::SetLognormal),
+                                 InstanceMethod("setEmpirical", &LatencyDistributionWrap::SetEmpirical),
+                                 InstanceMethod("setBurstCorrelation",
+                                                &LatencyDistributionWrap::SetBurstCorrelation),
+                                 InstanceMethod("medianNs", &LatencyDistributionWrap::MedianNs)}));
   }
 
   LatencyDistributionWrap(const Napi::CallbackInfo& info)
@@ -46,22 +52,22 @@ class LatencyDistributionWrap : public Napi::ObjectWrap<LatencyDistributionWrap>
  private:
   void SetConstant(const Napi::CallbackInfo& info)
   {
-    lrvx_latency_distribution_set_constant(_h, argInteger(info[0], "setConstant: argument 1"));
+    lrvx_latency_distribution_set_constant(_h, argInteger(info[0], "setConstant: ns"));
   }
   void SetUniform(const Napi::CallbackInfo& info)
   {
-    lrvx_latency_distribution_set_uniform(_h, argInteger(info[0], "setUniform: argument 1"),
-                                          argInteger(info[1], "setUniform: argument 2"));
+    lrvx_latency_distribution_set_uniform(_h, argInteger(info[0], "setUniform: loNs"),
+                                          argInteger(info[1], "setUniform: hiNs"));
   }
   void SetLognormal(const Napi::CallbackInfo& info)
   {
     lrvx_latency_distribution_set_lognormal(_h,
-                                            argInteger(info[0], "setLognormal: argument 1"),
-                                            argNumber(info[1], "setLognormal: argument 2"));
+                                            argInteger(info[0], "setLognormal: medianNs"),
+                                            argNumber(info[1], "setLognormal: sigma"));
   }
   void SetEmpirical(const Napi::CallbackInfo& info)
   {
-    auto arr = argArray(info[0], "setEmpirical: argument 1");
+    auto arr = argArray(info[0], "setEmpirical: samplesNs");
     std::vector<int64_t> samples;
     samples.reserve(arr.Length());
     for (uint32_t i = 0; i < arr.Length(); ++i)
@@ -75,7 +81,7 @@ class LatencyDistributionWrap : public Napi::ObjectWrap<LatencyDistributionWrap>
   void SetBurstCorrelation(const Napi::CallbackInfo& info)
   {
     lrvx_latency_distribution_set_burst_correlation(
-        _h, argNumber(info[0], "setBurstCorrelation: argument 1"));
+        _h, argNumber(info[0], "setBurstCorrelation: rho"));
   }
   Napi::Value MedianNs(const Napi::CallbackInfo& info)
   {
@@ -89,70 +95,76 @@ class LatencyDistributionWrap : public Napi::ObjectWrap<LatencyDistributionWrap>
 class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
 {
  public:
+  static Napi::FunctionReference& Ctor()
+  {
+    static Napi::FunctionReference ref;
+    return ref;
+  }
+
   static Napi::Function Init(Napi::Env env)
   {
-    return DefineClass(env, "SimulatedExecutor",
-                       {InstanceMethod("submitOrder", &SimulatedExecutorWrap::SubmitOrder),
-                        InstanceMethod("cancelOrder", &SimulatedExecutorWrap::CancelOrder),
-                        InstanceMethod("cancelAll", &SimulatedExecutorWrap::CancelAll),
-                        InstanceMethod("onBar", &SimulatedExecutorWrap::OnBar),
-                        InstanceMethod("onBarOhlc", &SimulatedExecutorWrap::OnBarOhlc),
-                        InstanceMethod("beginBarCallbackWindow",
-                                       &SimulatedExecutorWrap::BeginBarCallbackWindow),
-                        InstanceMethod("endBarCallbackWindow",
-                                       &SimulatedExecutorWrap::EndBarCallbackWindow),
-                        InstanceMethod("reset", &SimulatedExecutorWrap::Reset),
-                        InstanceMethod("onTrade", &SimulatedExecutorWrap::OnTrade),
-                        InstanceMethod("onTopOfBook", &SimulatedExecutorWrap::OnTopOfBook),
-                        InstanceMethod("advanceClock", &SimulatedExecutorWrap::AdvanceClock),
-                        InstanceMethod("setDefaultSlippage", &SimulatedExecutorWrap::SetDefaultSlippage),
-                        InstanceMethod("setQueueModel", &SimulatedExecutorWrap::SetQueueModel),
-                        InstanceMethod("setQueueFifoTopN", &SimulatedExecutorWrap::SetQueueFifoTopN),
-                        InstanceMethod("setTopPriorityShare", &SimulatedExecutorWrap::SetTopPriorityShare),
-                        InstanceMethod("setLmmOrders", &SimulatedExecutorWrap::SetLmmOrders),
-                        InstanceMethod("setLmmBonusMultiplier", &SimulatedExecutorWrap::SetLmmBonusMultiplier),
-                        InstanceMethod("setOrderPriorityMultiplier", &SimulatedExecutorWrap::SetOrderPriorityMultiplier),
-                        InstanceMethod("setSubmitAckLatency", &SimulatedExecutorWrap::SetSubmitAck),
-                        InstanceMethod("setCancelAckLatency", &SimulatedExecutorWrap::SetCancelAck),
-                        InstanceMethod("setReplaceAckLatency", &SimulatedExecutorWrap::SetReplaceAck),
-                        InstanceMethod("setSubmitAckLatencyDistribution",
-                                       &SimulatedExecutorWrap::SetSubmitAckDist),
-                        InstanceMethod("setCancelAckLatencyDistribution",
-                                       &SimulatedExecutorWrap::SetCancelAckDist),
-                        InstanceMethod("setReplaceAckLatencyDistribution",
-                                       &SimulatedExecutorWrap::SetReplaceAckDist),
-                        InstanceMethod("applyLatencyProfile", &SimulatedExecutorWrap::ApplyLatencyProfile),
-                        InstanceMethod("setRateLimitPolicy",
-                                       &SimulatedExecutorWrap::SetRateLimitPolicy),
-                        InstanceMethod("clearRateLimitPolicy",
-                                       &SimulatedExecutorWrap::ClearRateLimitPolicy),
-                        InstanceMethod("setSTPMode", &SimulatedExecutorWrap::SetSTPMode),
-                        InstanceMethod("setSTPGroupMembership", &SimulatedExecutorWrap::SetStpGroupMembership),
-                        InstanceMethod("stpGroupFor", &SimulatedExecutorWrap::StpGroupFor),
-                        InstanceMethod("setFokMode", &SimulatedExecutorWrap::SetFokMode),
-                        InstanceMethod("fokMode", &SimulatedExecutorWrap::FokMode),
-                        InstanceMethod("setVenueAvailability",
-                                       &SimulatedExecutorWrap::SetVenueAvailability),
-                        InstanceMethod("submitBracket",
-                                       &SimulatedExecutorWrap::SubmitBracket),
-                        InstanceMethod("cancelBracket",
-                                       &SimulatedExecutorWrap::CancelBracket),
-                        InstanceMethod("bracketState",
-                                       &SimulatedExecutorWrap::BracketState),
-                        InstanceMethod("setBracketChildArmMode",
-                                       &SimulatedExecutorWrap::SetBracketChildArmMode),
-                        InstanceMethod("submitIceberg", &SimulatedExecutorWrap::SubmitIceberg),
-                        InstanceMethod("setIcebergRefreshLatency",
-                                       &SimulatedExecutorWrap::SetIcebergRefreshLatency),
-                        InstanceMethod("icebergHiddenRemainingRaw",
-                                       &SimulatedExecutorWrap::IcebergHiddenRemainingRaw),
-                        InstanceMethod("setIcebergSizeRandomisationPct",
-                                       &SimulatedExecutorWrap::SetIcebergSizeRandomisationPct),
-                        InstanceMethod("setIcebergPriorityMode",
-                                       &SimulatedExecutorWrap::SetIcebergPriorityMode),
-                        InstanceMethod("setIcebergJitterSeed",
-                                       &SimulatedExecutorWrap::SetIcebergJitterSeed),
-                        InstanceAccessor("fillCount", &SimulatedExecutorWrap::FillCount, nullptr)});
+    return keepCtor(Ctor(), DefineClass(env, "SimulatedExecutor",
+                                        {InstanceMethod("submitOrder", &SimulatedExecutorWrap::SubmitOrder),
+                                         InstanceMethod("cancelOrder", &SimulatedExecutorWrap::CancelOrder),
+                                         InstanceMethod("cancelAll", &SimulatedExecutorWrap::CancelAll),
+                                         InstanceMethod("onBar", &SimulatedExecutorWrap::OnBar),
+                                         InstanceMethod("onBarOhlc", &SimulatedExecutorWrap::OnBarOhlc),
+                                         InstanceMethod("beginBarCallbackWindow",
+                                                        &SimulatedExecutorWrap::BeginBarCallbackWindow),
+                                         InstanceMethod("endBarCallbackWindow",
+                                                        &SimulatedExecutorWrap::EndBarCallbackWindow),
+                                         InstanceMethod("reset", &SimulatedExecutorWrap::Reset),
+                                         InstanceMethod("onTrade", &SimulatedExecutorWrap::OnTrade),
+                                         InstanceMethod("onTopOfBook", &SimulatedExecutorWrap::OnTopOfBook),
+                                         InstanceMethod("advanceClock", &SimulatedExecutorWrap::AdvanceClock),
+                                         InstanceMethod("setDefaultSlippage", &SimulatedExecutorWrap::SetDefaultSlippage),
+                                         InstanceMethod("setQueueModel", &SimulatedExecutorWrap::SetQueueModel),
+                                         InstanceMethod("setQueueFifoTopN", &SimulatedExecutorWrap::SetQueueFifoTopN),
+                                         InstanceMethod("setTopPriorityShare", &SimulatedExecutorWrap::SetTopPriorityShare),
+                                         InstanceMethod("setLmmOrders", &SimulatedExecutorWrap::SetLmmOrders),
+                                         InstanceMethod("setLmmBonusMultiplier", &SimulatedExecutorWrap::SetLmmBonusMultiplier),
+                                         InstanceMethod("setOrderPriorityMultiplier", &SimulatedExecutorWrap::SetOrderPriorityMultiplier),
+                                         InstanceMethod("setSubmitAckLatency", &SimulatedExecutorWrap::SetSubmitAck),
+                                         InstanceMethod("setCancelAckLatency", &SimulatedExecutorWrap::SetCancelAck),
+                                         InstanceMethod("setReplaceAckLatency", &SimulatedExecutorWrap::SetReplaceAck),
+                                         InstanceMethod("setSubmitAckLatencyDistribution",
+                                                        &SimulatedExecutorWrap::SetSubmitAckDist),
+                                         InstanceMethod("setCancelAckLatencyDistribution",
+                                                        &SimulatedExecutorWrap::SetCancelAckDist),
+                                         InstanceMethod("setReplaceAckLatencyDistribution",
+                                                        &SimulatedExecutorWrap::SetReplaceAckDist),
+                                         InstanceMethod("applyLatencyProfile", &SimulatedExecutorWrap::ApplyLatencyProfile),
+                                         InstanceMethod("setRateLimitPolicy",
+                                                        &SimulatedExecutorWrap::SetRateLimitPolicy),
+                                         InstanceMethod("clearRateLimitPolicy",
+                                                        &SimulatedExecutorWrap::ClearRateLimitPolicy),
+                                         InstanceMethod("setSTPMode", &SimulatedExecutorWrap::SetSTPMode),
+                                         InstanceMethod("setSTPGroupMembership", &SimulatedExecutorWrap::SetStpGroupMembership),
+                                         InstanceMethod("stpGroupFor", &SimulatedExecutorWrap::StpGroupFor),
+                                         InstanceMethod("setFokMode", &SimulatedExecutorWrap::SetFokMode),
+                                         InstanceMethod("fokMode", &SimulatedExecutorWrap::FokMode),
+                                         InstanceMethod("setVenueAvailability",
+                                                        &SimulatedExecutorWrap::SetVenueAvailability),
+                                         InstanceMethod("submitBracket",
+                                                        &SimulatedExecutorWrap::SubmitBracket),
+                                         InstanceMethod("cancelBracket",
+                                                        &SimulatedExecutorWrap::CancelBracket),
+                                         InstanceMethod("bracketState",
+                                                        &SimulatedExecutorWrap::BracketState),
+                                         InstanceMethod("setBracketChildArmMode",
+                                                        &SimulatedExecutorWrap::SetBracketChildArmMode),
+                                         InstanceMethod("submitIceberg", &SimulatedExecutorWrap::SubmitIceberg),
+                                         InstanceMethod("setIcebergRefreshLatency",
+                                                        &SimulatedExecutorWrap::SetIcebergRefreshLatency),
+                                         InstanceMethod("icebergHiddenRemainingRaw",
+                                                        &SimulatedExecutorWrap::IcebergHiddenRemainingRaw),
+                                         InstanceMethod("setIcebergSizeRandomisationPct",
+                                                        &SimulatedExecutorWrap::SetIcebergSizeRandomisationPct),
+                                         InstanceMethod("setIcebergPriorityMode",
+                                                        &SimulatedExecutorWrap::SetIcebergPriorityMode),
+                                         InstanceMethod("setIcebergJitterSeed",
+                                                        &SimulatedExecutorWrap::SetIcebergJitterSeed),
+                                         InstanceAccessor("fillCount", &SimulatedExecutorWrap::FillCount, nullptr)}));
   }
 
   SimulatedExecutorWrap(const Napi::CallbackInfo& info)
@@ -169,12 +181,12 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
  private:
   void SubmitOrder(const Napi::CallbackInfo& info)
   {
-    uint64_t id = argInteger(info[0], "submitOrder: argument 1");
-    std::string side = argString(info[1], "submitOrder: argument 2");
-    double price = argNumber(info[2], "submitOrder: argument 3");
-    double qty = argNumber(info[3], "submitOrder: argument 4");
-    std::string type = info.Length() > 4 && info[4].IsString() ? argString(info[4], "submitOrder: argument 5") : "market";
-    uint32_t sym = info.Length() > 5 ? argUint32(info[5], "submitOrder: argument 6") : 1;
+    uint64_t id = argInteger(info[0], "submitOrder: id");
+    std::string side = argString(info[1], "submitOrder: side");
+    double price = argNumber(info[2], "submitOrder: price");
+    double qty = argNumber(info[3], "submitOrder: qty");
+    std::string type = given(info[4]) ? argString(info[4], "submitOrder: type") : "market";
+    uint32_t sym = info.Length() > 5 ? argUint32(info[5], "submitOrder: symbol") : 1;
     uint8_t s = side == "buy" ? 0 : 1;
     // lrvx_simulated_executor_submit_order takes an order_type in the
     // lrvx::OrderType space (LIMIT=0, MARKET=1, ...), NOT the
@@ -188,9 +200,9 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       return;
     }
     // Optional opts object as the 7th argument: { tif, reduceOnly, expiresAtNs }.
-    if (info.Length() > 6 && info[6].IsObject())
+    if (given(info[6]))
     {
-      auto opts = argObject(info[6], "submitOrder: argument 7");
+      auto opts = argObject(info[6], "submitOrder: opts");
       uint8_t tif = 0;
       bool reduceOnly = false;
       int64_t expiresAtNs = 0;
@@ -228,20 +240,20 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     }
     lrvx_simulated_executor_submit_order(_h, id, s, price, qty, t, sym);
   }
-  void CancelOrder(const Napi::CallbackInfo& info) { lrvx_simulated_executor_cancel_order(_h, argInteger(info[0], "cancelOrder: argument 1")); }
-  void CancelAll(const Napi::CallbackInfo& info) { lrvx_simulated_executor_cancel_all(_h, argUint32(info[0], "cancelAll: argument 1")); }
-  void OnBar(const Napi::CallbackInfo& info) { lrvx_simulated_executor_on_bar(_h, argUint32(info[0], "onBar: argument 1"), argNumber(info[1], "onBar: argument 2")); }
+  void CancelOrder(const Napi::CallbackInfo& info) { lrvx_simulated_executor_cancel_order(_h, argInteger(info[0], "cancelOrder: orderId")); }
+  void CancelAll(const Napi::CallbackInfo& info) { lrvx_simulated_executor_cancel_all(_h, argUint32(info[0], "cancelAll: symbol")); }
+  void OnBar(const Napi::CallbackInfo& info) { lrvx_simulated_executor_on_bar(_h, argUint32(info[0], "onBar: symbol"), argNumber(info[1], "onBar: closePrice")); }
   // Open-aware form: moves the market to the open (releasing any order held
   // from the previous bar's callback there), then walks low -> high -> close.
   // Needed to drive SimulatedExecutor by hand to the same fills
   // BacktestRunner.runBars produces, which uses this path internally.
   void OnBarOhlc(const Napi::CallbackInfo& info)
   {
-    lrvx_simulated_executor_on_bar_ohlc(_h, argUint32(info[0], "onBarOhlc: argument 1"),
-                                        argNumber(info[1], "onBarOhlc: argument 2"),
-                                        argNumber(info[2], "onBarOhlc: argument 3"),
-                                        argNumber(info[3], "onBarOhlc: argument 4"),
-                                        argNumber(info[4], "onBarOhlc: argument 5"));
+    lrvx_simulated_executor_on_bar_ohlc(_h, argUint32(info[0], "onBarOhlc: symbol"),
+                                        argNumber(info[1], "onBarOhlc: open"),
+                                        argNumber(info[2], "onBarOhlc: high"),
+                                        argNumber(info[3], "onBarOhlc: low"),
+                                        argNumber(info[4], "onBarOhlc: close"));
   }
   void BeginBarCallbackWindow(const Napi::CallbackInfo&)
   {
@@ -255,7 +267,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   // (slippage, queue model, latency, ...), so a second hand-driven run
   // reports that run and not the sum of every run.
   void Reset(const Napi::CallbackInfo&) { lrvx_simulated_executor_reset(_h); }
-  void OnTrade(const Napi::CallbackInfo& info) { lrvx_simulated_executor_on_trade(_h, argUint32(info[0], "onTrade: argument 1"), argNumber(info[1], "onTrade: argument 2"), argBool(info[2], "onTrade: argument 3") ? 1 : 0); }
+  void OnTrade(const Napi::CallbackInfo& info) { lrvx_simulated_executor_on_trade(_h, argUint32(info[0], "onTrade: symbol"), argNumber(info[1], "onTrade: price"), argBool(info[2], "onTrade: isBuy") ? 1 : 0); }
 
   // Touch-only frame. A side is `{ price, qty }` or null; null means that
   // side of the book is empty.
@@ -289,10 +301,10 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     {
       return;
     }
-    lrvx_simulated_executor_on_top_of_book(_h, argUint32(info[0], "onTopOfBook: argument 1"),
+    lrvx_simulated_executor_on_top_of_book(_h, argUint32(info[0], "onTopOfBook: symbol"),
                                            hasBid, bidPrice, bidQty, hasAsk, askPrice, askQty);
   }
-  void AdvanceClock(const Napi::CallbackInfo& info) { lrvx_simulated_executor_advance_clock(_h, toInt64Ns(info[0], "advanceClock: argument 1")); }
+  void AdvanceClock(const Napi::CallbackInfo& info) { lrvx_simulated_executor_advance_clock(_h, toInt64Ns(info[0], "advanceClock: timestampNs")); }
   void SetDefaultSlippage(const Napi::CallbackInfo& info)
   {
     // Accept either the string name or the exported SLIPPAGE_* constant.
@@ -300,9 +312,9 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     // made documented code throw at runtime. An unknown name or code throws
     // and leaves the previous profile in place.
     int32_t m = 0;
-    if (info.Length() > 0 && info[0].IsNumber())
+    if (info[0].IsNumber())
     {
-      m = argInt32(info[0], "setDefaultSlippage: argument 1");
+      m = argInt32(info[0], "setDefaultSlippage: model");
     }
     else
     {
@@ -319,10 +331,10 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       }
       m = static_cast<int32_t>(*parsed);
     }
-    int32_t ticks = info.Length() > 1 ? argInt32(info[1], "setDefaultSlippage: argument 2") : 0;
-    double tickSize = info.Length() > 2 ? argNumber(info[2], "setDefaultSlippage: argument 3") : 0.0;
-    double bps = info.Length() > 3 ? argNumber(info[3], "setDefaultSlippage: argument 4") : 0.0;
-    double impact = info.Length() > 4 ? argNumber(info[4], "setDefaultSlippage: argument 5") : 0.0;
+    int32_t ticks = info.Length() > 1 ? argInt32(info[1], "setDefaultSlippage: ticks") : 0;
+    double tickSize = info.Length() > 2 ? argNumber(info[2], "setDefaultSlippage: tickSize") : 0.0;
+    double bps = info.Length() > 3 ? argNumber(info[3], "setDefaultSlippage: bps") : 0.0;
+    double impact = info.Length() > 4 ? argNumber(info[4], "setDefaultSlippage: impactCoeff") : 0.0;
     lrvx_clear_last_error();
     lrvx_simulated_executor_set_default_slippage(_h, m, ticks, tickSize, bps, impact);
     if (lrvx_last_error_code() != 0)
@@ -337,9 +349,9 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     // Accept either the string name or the exported QUEUE_* constant. An
     // unknown one of either throws and leaves the model installed before.
     int32_t m = 0;
-    if (info.Length() > 0 && info[0].IsNumber())
+    if (info[0].IsNumber())
     {
-      m = argInt32(info[0], "setQueueModel: argument 1");
+      m = argInt32(info[0], "setQueueModel: model");
     }
     else
     {
@@ -355,7 +367,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       }
       m = static_cast<int32_t>(*parsed);
     }
-    uint32_t depth = info.Length() > 1 ? argUint32(info[1], "setQueueModel: argument 2") : 1;
+    uint32_t depth = info.Length() > 1 ? argUint32(info[1], "setQueueModel: depth") : 1;
     lrvx_clear_last_error();
     lrvx_simulated_executor_set_queue_model(_h, m, depth);
     if (lrvx_last_error_code() != 0)
@@ -366,17 +378,17 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   }
   void SetQueueFifoTopN(const Napi::CallbackInfo& info)
   {
-    uint32_t topN = argUint32(info[0], "setQueueFifoTopN: argument 1");
+    uint32_t topN = argUint32(info[0], "setQueueFifoTopN: topN");
     lrvx_simulated_executor_set_queue_fifo_top_n(_h, topN);
   }
   void SetTopPriorityShare(const Napi::CallbackInfo& info)
   {
     lrvx_simulated_executor_set_top_priority_share(
-        _h, argNumber(info[0], "setTopPriorityShare: argument 1"));
+        _h, argNumber(info[0], "setTopPriorityShare: share"));
   }
   void SetLmmOrders(const Napi::CallbackInfo& info)
   {
-    auto arr = argArray(info[0], "setLmmOrders: argument 1");
+    auto arr = argArray(info[0], "setLmmOrders: ids");
     std::vector<uint64_t> ids(arr.Length());
     for (uint32_t i = 0; i < arr.Length(); ++i)
     {
@@ -388,35 +400,35 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   void SetLmmBonusMultiplier(const Napi::CallbackInfo& info)
   {
     lrvx_simulated_executor_set_lmm_bonus_multiplier(
-        _h, argNumber(info[0], "setLmmBonusMultiplier: argument 1"));
+        _h, argNumber(info[0], "setLmmBonusMultiplier: multiplier"));
   }
   void SetOrderPriorityMultiplier(const Napi::CallbackInfo& info)
   {
     lrvx_simulated_executor_set_order_priority_multiplier(
-        _h, argInteger(info[0], "setOrderPriorityMultiplier: argument 1"),
-        argNumber(info[1], "setOrderPriorityMultiplier: argument 2"));
+        _h, argInteger(info[0], "setOrderPriorityMultiplier: orderId"),
+        argNumber(info[1], "setOrderPriorityMultiplier: multiplier"));
   }
   void SetSubmitAck(const Napi::CallbackInfo& info)
   {
-    int64_t latency = argInteger(info[0], "setSubmitAck: argument 1");
-    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setSubmitAck: argument 2") : 0;
+    int64_t latency = argInteger(info[0], "setSubmitAckLatency: latencyNs");
+    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setSubmitAckLatency: jitterNs") : 0;
     lrvx_simulated_executor_set_submit_ack_latency(_h, latency, jitter);
   }
   void SetCancelAck(const Napi::CallbackInfo& info)
   {
-    int64_t latency = argInteger(info[0], "setCancelAck: argument 1");
-    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setCancelAck: argument 2") : 0;
+    int64_t latency = argInteger(info[0], "setCancelAckLatency: latencyNs");
+    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setCancelAckLatency: jitterNs") : 0;
     lrvx_simulated_executor_set_cancel_ack_latency(_h, latency, jitter);
   }
   void SetReplaceAck(const Napi::CallbackInfo& info)
   {
-    int64_t latency = argInteger(info[0], "setReplaceAck: argument 1");
-    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setReplaceAck: argument 2") : 0;
+    int64_t latency = argInteger(info[0], "setReplaceAckLatency: latencyNs");
+    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setReplaceAckLatency: jitterNs") : 0;
     lrvx_simulated_executor_set_replace_ack_latency(_h, latency, jitter);
   }
   void ApplyLatencyProfile(const Napi::CallbackInfo& info)
   {
-    std::string name = argString(info[0], "applyLatencyProfile: argument 1");
+    std::string name = argString(info[0], "applyLatencyProfile: name");
     // A typo used to be a silent no-op, leaving default latency profile
     // values in place -- a zero-fee or unthrottled backtest that
     // looks perfectly healthy.
@@ -429,26 +441,22 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   }
   void SetSubmitAckDist(const Napi::CallbackInfo& info)
   {
-    auto* w = Napi::ObjectWrap<LatencyDistributionWrap>::Unwrap(
-        argObject(info[0], "setSubmitAckDist: argument 1"));
+    auto* w = argInstance<LatencyDistributionWrap>(info[0], "setSubmitAckLatencyDistribution: dist");
     lrvx_simulated_executor_set_submit_ack_latency_distribution(_h, w->handle());
   }
   void SetCancelAckDist(const Napi::CallbackInfo& info)
   {
-    auto* w = Napi::ObjectWrap<LatencyDistributionWrap>::Unwrap(
-        argObject(info[0], "setCancelAckDist: argument 1"));
+    auto* w = argInstance<LatencyDistributionWrap>(info[0], "setCancelAckLatencyDistribution: dist");
     lrvx_simulated_executor_set_cancel_ack_latency_distribution(_h, w->handle());
   }
   void SetReplaceAckDist(const Napi::CallbackInfo& info)
   {
-    auto* w = Napi::ObjectWrap<LatencyDistributionWrap>::Unwrap(
-        argObject(info[0], "setReplaceAckDist: argument 1"));
+    auto* w = argInstance<LatencyDistributionWrap>(info[0], "setReplaceAckLatencyDistribution: dist");
     lrvx_simulated_executor_set_replace_ack_latency_distribution(_h, w->handle());
   }
   void SetRateLimitPolicy(const Napi::CallbackInfo& info)
   {
-    auto* w = Napi::ObjectWrap<RateLimitPolicyWrap>::Unwrap(
-        argObject(info[0], "setRateLimitPolicy: argument 1"));
+    auto* w = argInstance<RateLimitPolicyWrap>(info[0], "setRateLimitPolicy: policy");
     lrvx_simulated_executor_set_rate_limit_policy(_h, w->handle());
   }
   void ClearRateLimitPolicy(const Napi::CallbackInfo&)
@@ -457,7 +465,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   }
   void SetSTPMode(const Napi::CallbackInfo& info)
   {
-    std::string mode = argString(info[0], "setSTPMode: argument 1");
+    std::string mode = argString(info[0], "setSTPMode: mode");
     uint8_t m = 0;
     if (mode == "cancel_newest")
     {
@@ -480,18 +488,18 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   void SetStpGroupMembership(const Napi::CallbackInfo& info)
   {
     lrvx_simulated_executor_set_stp_group_membership(
-        _h, argInteger(info[0], "setStpGroupMembership: argument 1"),
-        argInteger(info[1], "setStpGroupMembership: argument 2"));
+        _h, argInteger(info[0], "setSTPGroupMembership: accountId"),
+        argInteger(info[1], "setSTPGroupMembership: groupId"));
   }
   Napi::Value StpGroupFor(const Napi::CallbackInfo& info)
   {
     uint64_t v = lrvx_simulated_executor_stp_group_for(
-        _h, argInteger(info[0], "stpGroupFor: argument 1"));
+        _h, argInteger(info[0], "stpGroupFor: accountId"));
     return Napi::Number::New(info.Env(), static_cast<double>(v));
   }
   void SetFokMode(const Napi::CallbackInfo& info)
   {
-    std::string mode = argString(info[0], "setFokMode: argument 1");
+    std::string mode = argString(info[0], "setFokMode: mode");
     uint8_t m = 0;
     if (mode == "single_price")
     {
@@ -512,12 +520,12 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       lrvx_simulated_executor_set_venue_availability(_h, nullptr);
       return;
     }
-    auto* w = Napi::ObjectWrap<VenueAvailabilityWrap>::Unwrap(argObject(info[0], "setVenueAvailability: argument 1"));
+    auto* w = argInstance<VenueAvailabilityWrap>(info[0], "setVenueAvailability: availability");
     lrvx_simulated_executor_set_venue_availability(_h, w->handle());
   }
   void SubmitBracket(const Napi::CallbackInfo& info)
   {
-    auto opts = argObject(info[0], "submitBracket: argument 1");
+    auto opts = argObject(info[0], "submitBracket: opts");
     uint64_t bracketId = argInteger(opts.Get("bracketId"), "submitBracket: bracketId");
     uint32_t sym = opts.Has("symbol") ? argUint32(opts.Get("symbol"), "submitBracket: symbol") : 1;
     auto sideOf = [&](const std::string& key)
@@ -565,41 +573,41 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   }
   void CancelBracket(const Napi::CallbackInfo& info)
   {
-    lrvx_simulated_executor_cancel_bracket(_h, argInteger(info[0], "cancelBracket: argument 1"));
+    lrvx_simulated_executor_cancel_bracket(_h, argInteger(info[0], "cancelBracket: bracketId"));
   }
   Napi::Value BracketState(const Napi::CallbackInfo& info)
   {
     const uint8_t s = lrvx_simulated_executor_bracket_state(
-        _h, argInteger(info[0], "bracketState: argument 1"));
+        _h, argInteger(info[0], "bracketState: bracketId"));
     const char* names[] = {"pending_entry", "entry_filled", "tp_filled",
                            "stop_filled", "canceled"};
     return Napi::String::New(info.Env(), s < 5 ? names[s] : "pending_entry");
   }
   void SetBracketChildArmMode(const Napi::CallbackInfo& info)
   {
-    const std::string mode = argString(info[0], "setBracketChildArmMode: argument 1");
+    const std::string mode = argString(info[0], "setBracketChildArmMode: mode");
     lrvx_simulated_executor_set_bracket_child_arm_mode(
         _h, mode == "on_partial_fill" ? 1 : 0);
   }
   void SubmitIceberg(const Napi::CallbackInfo& info)
   {
-    uint64_t id = argInteger(info[0], "submitIceberg: argument 1");
-    std::string side = argString(info[1], "submitIceberg: argument 2");
-    double price = argNumber(info[2], "submitIceberg: argument 3");
-    double total = argNumber(info[3], "submitIceberg: argument 4");
-    double visible = argNumber(info[4], "submitIceberg: argument 5");
-    uint32_t sym = info.Length() > 5 ? argUint32(info[5], "submitIceberg: argument 6") : 1;
+    uint64_t id = argInteger(info[0], "submitIceberg: orderId");
+    std::string side = argString(info[1], "submitIceberg: side");
+    double price = argNumber(info[2], "submitIceberg: price");
+    double total = argNumber(info[3], "submitIceberg: totalQuantity");
+    double visible = argNumber(info[4], "submitIceberg: visibleQuantity");
+    uint32_t sym = info.Length() > 5 ? argUint32(info[5], "submitIceberg: symbol") : 1;
     uint8_t s = side == "buy" ? 0 : 1;
     lrvx_simulated_executor_submit_iceberg(_h, id, s, price, total, visible, sym);
   }
   void SetIcebergRefreshLatency(const Napi::CallbackInfo& info)
   {
     lrvx_simulated_executor_set_iceberg_refresh_latency(
-        _h, argInteger(info[0], "setIcebergRefreshLatency: argument 1"));
+        _h, argInteger(info[0], "setIcebergRefreshLatency: latencyNs"));
   }
   Napi::Value IcebergHiddenRemainingRaw(const Napi::CallbackInfo& info)
   {
-    int64_t id = argInteger(info[0], "icebergHiddenRemainingRaw: argument 1");
+    int64_t id = argInteger(info[0], "icebergHiddenRemainingRaw: orderId");
     return Napi::Number::New(info.Env(),
                              static_cast<double>(
                                  lrvx_simulated_executor_iceberg_hidden_remaining_raw(_h, id)));
@@ -607,17 +615,17 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   void SetIcebergSizeRandomisationPct(const Napi::CallbackInfo& info)
   {
     lrvx_simulated_executor_set_iceberg_size_randomisation_pct(
-        _h, argNumber(info[0], "setIcebergSizeRandomisationPct: argument 1"));
+        _h, argNumber(info[0], "setIcebergSizeRandomisationPct: pct"));
   }
   void SetIcebergPriorityMode(const Napi::CallbackInfo& info)
   {
-    const std::string mode = argString(info[0], "setIcebergPriorityMode: argument 1");
+    const std::string mode = argString(info[0], "setIcebergPriorityMode: mode");
     lrvx_simulated_executor_set_iceberg_priority_mode(_h, mode == "retain" ? 1 : 0);
   }
   void SetIcebergJitterSeed(const Napi::CallbackInfo& info)
   {
     lrvx_simulated_executor_set_iceberg_jitter_seed(
-        _h, static_cast<uint64_t>(argInteger(info[0], "setIcebergJitterSeed: argument 1")));
+        _h, static_cast<uint64_t>(argInteger(info[0], "setIcebergJitterSeed: seed")));
   }
   Napi::Value FillCount(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_simulated_executor_fill_count(_h)); }
   LrvxSimulatedExecutorHandle _h;
@@ -635,8 +643,8 @@ class BacktestResultWrap : public Napi::ObjectWrap<BacktestResultWrap>
   }
   BacktestResultWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<BacktestResultWrap>(info)
   {
-    double cap = info.Length() > 0 ? argNumber(info[0], "BacktestResult: argument 1") : 100000.0;
-    double fee = info.Length() > 1 ? argNumber(info[1], "BacktestResult: argument 2") : 0.0001;
+    double cap = info.Length() > 0 ? argNumber(info[0], "BacktestResult: initialCapital") : 100000.0;
+    double fee = info.Length() > 1 ? argNumber(info[1], "BacktestResult: feeRate") : 0.0001;
     _h = lrvx_backtest_result_create(cap, fee, 1, 0.0, 0.0, 252.0);
   }
   ~BacktestResultWrap()
@@ -651,16 +659,16 @@ class BacktestResultWrap : public Napi::ObjectWrap<BacktestResultWrap>
   void RecordFill(const Napi::CallbackInfo& info)
   {
     lrvx_backtest_result_record_fill(_h,
-                                     argInteger(info[0], "recordFill: argument 1"),
-                                     argUint32(info[1], "recordFill: argument 2"),
-                                     argString(info[2], "recordFill: argument 3") == "buy" ? 0 : 1,
-                                     argNumber(info[3], "recordFill: argument 4"),
-                                     argNumber(info[4], "recordFill: argument 5"),
-                                     toInt64Ns(info[5], "recordFill: argument 6"));
+                                     argInteger(info[0], "recordFill: orderId"),
+                                     argUint32(info[1], "recordFill: symbol"),
+                                     argString(info[2], "recordFill: side") == "buy" ? 0 : 1,
+                                     argNumber(info[3], "recordFill: price"),
+                                     argNumber(info[4], "recordFill: qty"),
+                                     toInt64Ns(info[5], "recordFill: timestampNs"));
   }
   void IngestExecutor(const Napi::CallbackInfo& info)
   {
-    auto* exec = Napi::ObjectWrap<SimulatedExecutorWrap>::Unwrap(argObject(info[0], "ingestExecutor: argument 1"));
+    auto* exec = argInstance<SimulatedExecutorWrap>(info[0], "ingestExecutor: executor");
     lrvx_backtest_result_ingest_executor(_h, exec->handle());
   }
   Napi::Value Stats(const Napi::CallbackInfo& info)

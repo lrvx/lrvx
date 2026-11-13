@@ -9,6 +9,7 @@
 #include "bindings_common.h"
 #include "lrvx/backtest/backtest_config.h"
 #include "lrvx/backtest/backtest_result.h"
+#include "lrvx/backtest/modified_order.h"
 #include "lrvx/backtest/runner_fill_settings.h"
 #include "lrvx/backtest/simulated_clock.h"
 #include "lrvx/backtest/simulated_executor.h"
@@ -195,6 +196,36 @@ class PySimulatedExecutor
 
   void cancelOrder(uint64_t id) { _executor.cancelOrder(id); }
   void cancelAll(uint32_t symbol) { _executor.cancelAllOrders(symbol); }
+
+  // The replacement BacktestRunner builds for a Modify on its built-in
+  // simulator: the live order with the new price and quantity applied. An id
+  // the simulator does not hold still goes to replaceOrder, under `symbol`,
+  // so the refusal is the simulator's. True when the simulator took the
+  // replacement: the order was working and afterwards either carries the new
+  // price and quantity or is gone, filled as the replacement. A refused
+  // replacement leaves the original working as it was.
+  bool modifyOrder(uint64_t id, double newPrice, double newQty, uint32_t symbol)
+  {
+    Order order{.id = id, .symbol = symbol};
+    const Order* live = _executor.findOrder(id);
+    const bool wasLive = live != nullptr;
+    if (wasLive)
+    {
+      order = *live;
+    }
+    applyModify(order, Price::fromDouble(newPrice), Quantity::fromDouble(newQty));
+    _executor.replaceOrder(id, order);
+    if (!wasLive)
+    {
+      return false;
+    }
+    const Order* now = _executor.findOrder(id);
+    return now == nullptr ||
+           (now->quantity == order.quantity && now->price == order.price &&
+            now->triggerPrice == order.triggerPrice);
+  }
+
+  bool orderIsLive(uint64_t id) const { return _executor.findOrder(id) != nullptr; }
 
   void submitBracket(uint64_t bracketId, uint32_t symbol,
                      const std::string& entrySide, const std::string& entryType,
@@ -697,6 +728,21 @@ inline void bindBacktest(py::module_& m)
            py::arg("account_id"))
       .def("cancel_order", &PySimulatedExecutor::cancelOrder, py::arg("order_id"))
       .def("cancel_all", &PySimulatedExecutor::cancelAll, py::arg("symbol"))
+      .def("modify_order", &PySimulatedExecutor::modifyOrder,
+           "Replace a working order with its new price and quantity, as a Modify signal does "
+           "in BacktestRunner: the trigger of a stop_market, tp_market or trailing_stop order "
+           "moves to new_price, the limit of any other; new_quantity is what is left to work. "
+           "An off-tick replacement, or an id that is no longer working, is refused and the "
+           "order is left as it was. symbol is used only when the simulator does not hold "
+           "the order. Returns True when the replacement was taken, False when it was "
+           "refused.",
+           py::arg("order_id"), py::arg("new_price"), py::arg("new_quantity"),
+           py::arg("symbol"))
+      .def("order_is_live", &PySimulatedExecutor::orderIsLive,
+           "Whether the simulator still holds the order: resting, waiting on its trigger, or "
+           "held for the next bar. False once it is filled, cancelled, rejected or expired, "
+           "and for an id it never saw.",
+           py::arg("order_id"))
       .def("submit_bracket", &PySimulatedExecutor::submitBracket,
            "Submit a native bracket order (entry + take-profit + stop). "
            "The simulator manages the state machine: first child to fill "

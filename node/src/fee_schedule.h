@@ -48,13 +48,13 @@ class FeeScheduleWrap : public Napi::ObjectWrap<FeeScheduleWrap>
  private:
   void AddTier(const Napi::CallbackInfo& info)
   {
-    lrvx_fee_schedule_add_tier(_h, argNumber(info[0], "addTier: argument 1"),
-                               argNumber(info[1], "addTier: argument 2"),
-                               argNumber(info[2], "addTier: argument 3"));
+    lrvx_fee_schedule_add_tier(_h, argNumber(info[0], "addTier: minNotional30d"),
+                               argNumber(info[1], "addTier: makerBps"),
+                               argNumber(info[2], "addTier: takerBps"));
   }
   void LoadProfile(const Napi::CallbackInfo& info)
   {
-    std::string name = argString(info[0], "loadProfile: argument 1");
+    std::string name = argString(info[0], "loadProfile: name");
     // A typo used to be a silent no-op, leaving default fee schedule
     // values in place -- a zero-fee or unthrottled backtest that
     // looks perfectly healthy.
@@ -67,16 +67,16 @@ class FeeScheduleWrap : public Napi::ObjectWrap<FeeScheduleWrap>
   }
   void RecordFill(const Napi::CallbackInfo& info)
   {
-    lrvx_fee_schedule_record_fill(_h, toInt64Ns(info[0], "recordFill: argument 1"),
-                                  argNumber(info[1], "recordFill: argument 2"));
+    lrvx_fee_schedule_record_fill(_h, toInt64Ns(info[0], "recordFill: tsNs"),
+                                  argNumber(info[1], "recordFill: notional"));
   }
   Napi::Value FeeFor(const Napi::CallbackInfo& info)
   {
     return Napi::Number::New(
         info.Env(), lrvx_fee_schedule_fee_for(
-                        _h, toInt64Ns(info[0], "feeFor: argument 1"),
-                        argNumber(info[1], "feeFor: argument 2"),
-                        argBool(info[2], "feeFor: argument 3") ? 1 : 0));
+                        _h, toInt64Ns(info[0], "feeFor: tsNs"),
+                        argNumber(info[1], "feeFor: notional"),
+                        argBool(info[2], "feeFor: isMaker") ? 1 : 0));
   }
   Napi::Value CurrentTier(const Napi::CallbackInfo& info)
   {
@@ -106,7 +106,7 @@ class FeeScheduleWrap : public Napi::ObjectWrap<FeeScheduleWrap>
       lrvx_fee_schedule_bind_account(_h, nullptr);
       return;
     }
-    auto* w = Napi::ObjectWrap<AccountWrap>::Unwrap(argObject(info[0], "bindAccount: argument 1"));
+    auto* w = argInstance<AccountWrap>(info[0], "bindAccount: account");
     lrvx_fee_schedule_bind_account(_h, w->handle());
   }
   void ClearAccountBinding(const Napi::CallbackInfo&)

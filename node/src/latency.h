@@ -30,14 +30,14 @@ inline Napi::Value sampleToObject(Napi::Env env, const LrvxLatencySample& s)
   return out;
 }
 
-inline std::vector<int64_t> readInt64Array(const Napi::Value& v)
+inline std::vector<int64_t> readInt64Array(const Napi::Value& v, const char* what)
 {
   std::vector<int64_t> out;
-  if (!v.IsArray())
+  if (!given(v))
   {
     return out;
   }
-  Napi::Array arr = v.As<Napi::Array>();
+  Napi::Array arr = argArray(v, what);
   out.reserve(arr.Length());
   for (uint32_t i = 0; i < arr.Length(); ++i)
   {
@@ -91,9 +91,9 @@ inline double getDouble(const Napi::Object& o, const char* key, double fallback)
   void Reset(const Napi::CallbackInfo& info)                                     \
   {                                                                              \
     uint64_t seed = 0;                                                           \
-    if (info.Length() > 0 && info[0].IsNumber())                                 \
+    if (given(info[0]))                                                          \
     {                                                                            \
-      seed = static_cast<uint64_t>(argInteger(info[0], "reset: argument 1"));    \
+      seed = static_cast<uint64_t>(argInteger(info[0], "reset: seed"));          \
     }                                                                            \
     lrvx_latency_reset(_h, seed);                                                \
   }                                                                              \
@@ -126,9 +126,9 @@ class ConstantLatencyWrap : public Napi::ObjectWrap<ConstantLatencyWrap>
       : Napi::ObjectWrap<ConstantLatencyWrap>(info)
   {
     int64_t feed = 0, order = 0, fill = 0;
-    if (info.Length() > 0 && info[0].IsObject())
+    if (given(info[0]))
     {
-      auto opts = argObject(info[0], "ConstantLatency: argument 1");
+      auto opts = argObject(info[0], "ConstantLatency: opts");
       feed = detail::getInt64(opts, "feedNs", 0);
       order = detail::getInt64(opts, "orderNs", 0);
       fill = detail::getInt64(opts, "fillNs", 0);
@@ -164,9 +164,9 @@ class GaussianLatencyWrap : public Napi::ObjectWrap<GaussianLatencyWrap>
   {
     double fm = 0, fs = 0, om = 0, os = 0, lm = 0, ls = 0;
     uint64_t seed = 0;
-    if (info.Length() > 0 && info[0].IsObject())
+    if (given(info[0]))
     {
-      auto opts = argObject(info[0], "GaussianLatency: argument 1");
+      auto opts = argObject(info[0], "GaussianLatency: opts");
       fm = detail::getDouble(opts, "feedMeanNs", 0.0);
       fs = detail::getDouble(opts, "feedStddevNs", 0.0);
       om = detail::getDouble(opts, "orderMeanNs", 0.0);
@@ -206,9 +206,9 @@ class ExponentialLatencyWrap : public Napi::ObjectWrap<ExponentialLatencyWrap>
   {
     double fm = 0, om = 0, lm = 0;
     uint64_t seed = 0;
-    if (info.Length() > 0 && info[0].IsObject())
+    if (given(info[0]))
     {
-      auto opts = argObject(info[0], "ExponentialLatency: argument 1");
+      auto opts = argObject(info[0], "ExponentialLatency: opts");
       fm = detail::getDouble(opts, "feedMeanNs", 0.0);
       om = detail::getDouble(opts, "orderMeanNs", 0.0);
       lm = detail::getDouble(opts, "fillMeanNs", 0.0);
@@ -245,20 +245,20 @@ class EmpiricalLatencyWrap : public Napi::ObjectWrap<EmpiricalLatencyWrap>
   {
     std::vector<int64_t> feed, order, fill;
     uint64_t seed = 0;
-    if (info.Length() > 0 && info[0].IsObject())
+    if (given(info[0]))
     {
-      auto opts = argObject(info[0], "EmpiricalLatency: argument 1");
+      auto opts = argObject(info[0], "EmpiricalLatency: opts");
       if (opts.Has("feedSamples"))
       {
-        feed = detail::readInt64Array(opts.Get("feedSamples"));
+        feed = detail::readInt64Array(opts.Get("feedSamples"), "EmpiricalLatency: feedSamples");
       }
       if (opts.Has("orderSamples"))
       {
-        order = detail::readInt64Array(opts.Get("orderSamples"));
+        order = detail::readInt64Array(opts.Get("orderSamples"), "EmpiricalLatency: orderSamples");
       }
       if (opts.Has("fillSamples"))
       {
-        fill = detail::readInt64Array(opts.Get("fillSamples"));
+        fill = detail::readInt64Array(opts.Get("fillSamples"), "EmpiricalLatency: fillSamples");
       }
       seed = static_cast<uint64_t>(detail::getInt64(opts, "seed", 0));
     }

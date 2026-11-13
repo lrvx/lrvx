@@ -47,13 +47,13 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
  private:
   void SetConstant(const Napi::CallbackInfo& info)
   {
-    lrvx_funding_schedule_set_constant(_h, argInteger(info[0], "setConstant: argument 1"),
-                                       argNumber(info[1], "setConstant: argument 2"));
+    lrvx_funding_schedule_set_constant(_h, argInteger(info[0], "setConstant: intervalNs"),
+                                       argNumber(info[1], "setConstant: rate"));
   }
   void SetTape(const Napi::CallbackInfo& info)
   {
-    auto tsArr = argArray(info[0], "setTape: argument 1");
-    auto rateArr = argArray(info[1], "setTape: argument 2");
+    auto tsArr = argArray(info[0], "setTape: timestampsNs");
+    auto rateArr = argArray(info[1], "setTape: rates");
     std::vector<int64_t> ts(tsArr.Length());
     std::vector<double> rates(rateArr.Length());
     for (uint32_t i = 0; i < tsArr.Length(); ++i)
@@ -70,9 +70,9 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
   void SetTapeBySymbol(const Napi::CallbackInfo& info)
   {
     // (timestampsNs[], symbols[], rates[])
-    auto tsArr = argArray(info[0], "setTapeBySymbol: argument 1");
-    auto symArr = argArray(info[1], "setTapeBySymbol: argument 2");
-    auto rateArr = argArray(info[2], "setTapeBySymbol: argument 3");
+    auto tsArr = argArray(info[0], "setTapeBySymbol: timestampsNs");
+    auto symArr = argArray(info[1], "setTapeBySymbol: symbols");
+    auto rateArr = argArray(info[2], "setTapeBySymbol: rates");
     const uint32_t n = tsArr.Length();
     std::vector<int64_t> ts(n);
     std::vector<uint32_t> sy(n);
@@ -87,14 +87,14 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
   }
   Napi::Value LoadTape(const Napi::CallbackInfo& info)
   {
-    std::string path = argString(info[0], "loadTape: argument 1");
+    std::string path = argString(info[0], "loadTape: path");
     lrvx_clear_last_error();
     const uint8_t ok = lrvx_funding_schedule_load_tape(_h, path.c_str());
     return Napi::Boolean::New(info.Env(), ok != 0);
   }
   void LoadProfile(const Napi::CallbackInfo& info)
   {
-    std::string name = argString(info[0], "loadProfile: argument 1");
+    std::string name = argString(info[0], "loadProfile: name");
     // A typo used to be a silent no-op, leaving default funding schedule
     // values in place -- a zero-fee or unthrottled backtest that
     // looks perfectly healthy.
@@ -107,16 +107,16 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
   }
   void SetConstantRate(const Napi::CallbackInfo& info)
   {
-    lrvx_funding_schedule_set_constant_rate(_h, argNumber(info[0], "setConstantRate: argument 1"));
+    lrvx_funding_schedule_set_constant_rate(_h, argNumber(info[0], "setConstantRate: rate"));
   }
   void Reset(const Napi::CallbackInfo&) { lrvx_funding_schedule_reset(_h); }
 
   Napi::Value Tick(const Napi::CallbackInfo& info)
   {
-    int64_t nowNs = toInt64Ns(info[0], "tick: argument 1");
-    auto symbols = argArray(info[1], "tick: argument 2");
-    auto positions = argArray(info[2], "tick: argument 3");
-    auto marks = argArray(info[3], "tick: argument 4");
+    int64_t nowNs = toInt64Ns(info[0], "tick: nowNs");
+    auto symbols = argArray(info[1], "tick: symbols");
+    auto positions = argArray(info[2], "tick: positions");
+    auto marks = argArray(info[3], "tick: markPrices");
     uint32_t n = symbols.Length();
     std::vector<uint32_t> sy(n);
     std::vector<double> ps(n);
