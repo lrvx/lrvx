@@ -31,6 +31,8 @@ struct FakeExecutor
 {
   std::vector<LrvxOrder> submitted;
   std::vector<uint64_t> cancelled;
+  std::vector<uint32_t> cancelledSymbols;
+  std::vector<uint64_t> replaced;
 
   static void submit(void* ud, const LrvxOrder* o)
   {
@@ -41,11 +43,22 @@ struct FakeExecutor
     static_cast<FakeExecutor*>(ud)->cancelled.push_back(id);
   }
 
+  static void cancelAll(void* ud, uint32_t symbol)
+  {
+    static_cast<FakeExecutor*>(ud)->cancelledSymbols.push_back(symbol);
+  }
+  static void replace(void* ud, uint64_t id, const LrvxOrder*)
+  {
+    static_cast<FakeExecutor*>(ud)->replaced.push_back(id);
+  }
+
   LrvxExecutorCallbacks callbacks()
   {
     LrvxExecutorCallbacks cb{};
     cb.submit = &FakeExecutor::submit;
     cb.cancel = &FakeExecutor::cancel;
+    cb.cancel_all = &FakeExecutor::cancelAll;
+    cb.replace = &FakeExecutor::replace;
     cb.user_data = this;
     return cb;
   }
@@ -138,6 +151,26 @@ class NoSignalCallback : public ::testing::TestWithParam<bool>
     lrvx_clear_last_error();
   }
 
+  void reportFill(uint64_t order, int64_t qty)
+  {
+    LrvxOrderEventData ev{};
+    ev.order_id = order;
+    ev.symbol_id = symbol;
+    ev.side = 0;
+    ev.order_type = static_cast<uint8_t>(lrvx::OrderType::MARKET);
+    ev.status = static_cast<uint8_t>(lrvx::OrderEventStatus::FILLED);
+    ev.fill_qty_raw = qty;
+    ev.fill_price_raw = kPrice;
+    if (engine != nullptr)
+    {
+      lrvx_live_engine_on_order_event(engine, &ev);
+    }
+    else
+    {
+      lrvx_runner_on_order_event(runner, &ev);
+    }
+  }
+
   FakeExecutor fake;
   Gates gates;
   LrvxRegistryHandle registry{nullptr};
@@ -172,6 +205,43 @@ TEST_P(NoSignalCallback, TheSignalIsStillGatedAndForwarded)
   const std::string why = lrvx_last_error_message();
   EXPECT_NE(why.find(std::to_string(dropped)), std::string::npos) << why;
   EXPECT_TRUE(endsWith(why, "[risk_manager]")) << why;
+}
+
+// The live gates were asked about everything, so a triggered kill switch held
+// a cancel back and a tightened limit held a strategy in its position; the
+// backtest runner let all four through.
+TEST_P(NoSignalCallback, ACancelAModifyAndAReduceOnlyOrderPassEveryGateUnasked)
+{
+  const uint64_t resting = lrvx_emit_limit_sell(strategy, symbol, kPrice, kQty);
+  const uint64_t entry = lrvx_emit_market_buy(strategy, symbol, kQty);
+  reportFill(entry, kQty);
+  ASSERT_EQ(lrvx_position_raw(strategy, symbol), kQty);
+  ASSERT_EQ(fake.submitted.size(), 2u);
+
+  gates.killSwitchAllows = false;
+  gates.validatorAllows = false;
+  gates.riskAllows = false;
+  gates.asked = 0;
+  lrvx_clear_last_error();
+
+  lrvx_emit_modify(strategy, resting, kPrice + 100000000LL, kQty);
+  EXPECT_EQ(fake.replaced, std::vector<uint64_t>{resting});
+  lrvx_emit_cancel(strategy, resting);
+  EXPECT_EQ(fake.cancelled, std::vector<uint64_t>{resting});
+  lrvx_emit_cancel_all(strategy, symbol);
+  EXPECT_EQ(fake.cancelledSymbols, std::vector<uint32_t>{symbol});
+  const uint64_t closing = lrvx_emit_close_position(strategy, symbol);
+  ASSERT_EQ(fake.submitted.size(), 3u) << "the reduce-only order reaches the executor";
+  EXPECT_EQ(fake.submitted.back().id, closing);
+  EXPECT_NE(fake.submitted.back().flags & 0x01, 0) << "it is reduce-only";
+
+  EXPECT_EQ(gates.asked, 0) << "no gate was asked about any of the four";
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lrvx_last_error_message();
+
+  // An order that adds exposure is still dropped.
+  lrvx_emit_market_buy(strategy, symbol, kQty);
+  EXPECT_EQ(fake.submitted.size(), 3u);
+  EXPECT_TRUE(endsWith(lrvx_last_error_message(), "[kill_switch]")) << lrvx_last_error_message();
 }
 
 INSTANTIATE_TEST_SUITE_P(RunnerAndLiveEngine, NoSignalCallback, ::testing::Bool());

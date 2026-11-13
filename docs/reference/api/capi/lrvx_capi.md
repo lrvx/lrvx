@@ -663,11 +663,11 @@ What is put to the gates depends on what runs the strategy:
 
 | | `lrvx_runner_*` and `lrvx_live_engine_*` | `lrvx_backtest_runner_*` |
 |---|---|---|
-| Signals asked | every signal: orders, cancel, cancel-all, modify, the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
-| Pass unasked | nothing | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
+| Signals asked | signals that create an order (market, limit, stop and take-profit, trailing stop, an OCO as one signal) and the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
+| Pass unasked | cancel, cancel-all, modify, and any reduce-only order (a `close_position`): the same rule as the backtest runner, so a triggered kill switch cannot hold back a cancel | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
 | A drop skips | `on_signal`, the executor and the PnL / storage observers | the simulator or the attached executor |
 | `<outcome>` | `it reached neither on_signal nor the executor` | `it reached no executor` |
-| Kill switch | asked again for every signal | stays triggered for the rest of the run once it said no |
+| Kill switch | asked again for every signal it is asked about | stays triggered for the rest of the run once it said no |
 
 `on_signal` is an observer: a runner created without one gates and forwards its signals the same way.
 

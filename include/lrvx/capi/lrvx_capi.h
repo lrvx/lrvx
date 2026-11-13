@@ -2522,23 +2522,28 @@ extern "C"
 
   // The gates of each runner, in one place.
   //
-  //   Runner and live engine. Every signal a strategy emits -- an order, a
-  //   Cancel, a CancelAll, a Modify, either liquidity signal, reduce-only or
-  //   not -- is put to the kill switch, the order validator and the risk
-  //   manager, in that order. The first that returns 0 drops it: on_signal,
-  //   the executor and the PnL / storage observers do not see it. A signal
-  //   that passes goes to on_signal, then to the executor, then to the
-  //   observers. on_signal is an observer too: with a NULL on_signal the
-  //   gates are asked and the executor is called exactly the same.
+  //   What is never asked, on any runner. A Cancel, a CancelAll and a Modify
+  //   pass unasked: they add no exposure, and a triggered kill switch must
+  //   not hold back a cancel. A reduce-only order passes unasked as well, so
+  //   that a tightened limit cannot hold a strategy in a position. The three
+  //   runners share the one rule (passesPreTradeGatesUnasked in
+  //   lrvx/strategy/signal.h).
   //
-  //   Backtest runner. Only a signal that creates an order is put to the
-  //   gates: Market, Limit, the Stop and TakeProfit pairs, TrailingStop, and
-  //   each of the two legs of an OCO (either leg refused drops the pair).
-  //   Cancel, CancelAll and Modify pass unasked: they add no exposure. A
-  //   reduce-only order passes unasked as well, so that a tightened limit
-  //   cannot hold a strategy in a position. The order is the same: kill
-  //   switch, order validator, risk manager. A kill switch that returned 0
-  //   stays triggered for the rest of the run.
+  //   Runner and live engine. Every other signal -- an order that is not
+  //   reduce-only, an OCO, either liquidity signal -- is put to the kill
+  //   switch, the order validator and the risk manager, in that order. The
+  //   first that returns 0 drops it: on_signal, the executor and the PnL /
+  //   storage observers do not see it. A signal that passes, asked or not,
+  //   goes to on_signal, then to the executor, then to the observers.
+  //   on_signal is an observer too: with a NULL on_signal the gates are
+  //   asked and the executor is called exactly the same.
+  //
+  //   Backtest runner. Every other signal that creates an order is put to
+  //   the gates: Market, Limit, the Stop and TakeProfit pairs, TrailingStop,
+  //   and each of the two legs of an OCO (either leg refused drops the
+  //   pair). The order is the same: kill switch, order validator, risk
+  //   manager. A kill switch that returned 0 stays triggered for the rest of
+  //   the run.
   //
   // What the emitter learns of a drop. The emit that produced the signal has
   // already returned an order id, so a drop by any of the three gates leaves

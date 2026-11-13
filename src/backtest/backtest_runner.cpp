@@ -1011,13 +1011,11 @@ BacktestResult BacktestRunner::extractResult()
 }
 
 // Pre-trade gate. Returns true if the order should pass through;
-// false if any gate rejected it. Reduce-only orders bypass — when
-// caps tighten you do not want to be stuck in a position; the live
-// runner is conventionally wired this way and `lookup_symbol`
-// surfaces a gotcha entry pointing at this contract.
+// false if any gate rejected it. Which signals are not asked about is the
+// rule the runner and the live engine share: passesPreTradeGatesUnasked.
 bool BacktestRunner::passesPreTradeGate(const Order& order, const Signal& signal)
 {
-  if (order.flags.reduceOnly)
+  if (passesPreTradeGatesUnasked(signal))
   {
     return true;
   }
@@ -1092,8 +1090,8 @@ void BacktestRunner::onSignal(const Signal& signal)
       break;
     }
     case SignalType::Cancel:
-      // Cancel / CancelAll / Modify do not add exposure — same
-      // pass-through semantics as the live runner.
+      // Cancel / CancelAll / Modify never reach the gate: see
+      // passesPreTradeGatesUnasked.
       _customOrders.erase(signal.orderId);
       exec.cancelOrder(signal.orderId);
       break;

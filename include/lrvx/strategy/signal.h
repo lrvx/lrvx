@@ -274,4 +274,21 @@ struct Signal
   }
 };
 
+// The one rule for which signals the pre-trade gates (kill switch, order
+// validator, risk manager) are not asked about, on every runner: a Cancel, a
+// CancelAll and a Modify add no exposure, and a reduce-only order must get
+// through so that a tightened limit cannot hold a strategy in a position.
+constexpr bool passesPreTradeGatesUnasked(const Signal& signal) noexcept
+{
+  switch (signal.type)
+  {
+    case SignalType::Cancel:
+    case SignalType::CancelAll:
+    case SignalType::Modify:
+      return true;
+    default:
+      return signal.reduceOnly;
+  }
+}
+
 }  // namespace lrvx

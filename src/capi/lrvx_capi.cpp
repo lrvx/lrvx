@@ -7447,7 +7447,8 @@ class RunnerSignalHandler : public ISignalHandler
     // Pre-trade gates, evaluated in order: KillSwitch → OrderValidator →
     // RiskManager. Each is optional; an unset hook or a NULL fn pointer
     // is a no-op (let the signal through). Returning 0 drops the signal
-    // and skips the remaining hooks.
+    // and skips the remaining hooks. A Cancel, a CancelAll, a Modify and a
+    // reduce-only order are not put to them, as in the backtest runner.
     // Each get() below returns a strong reference that outlives whatever
     // destroy() may do concurrently on another thread for the rest of this
     // scope -- see tracker_ownership.h.
@@ -7455,28 +7456,31 @@ class RunnerSignalHandler : public ISignalHandler
     // A drop is not silent: the emit that produced the signal returned an
     // order id, so the reason is left in the last error of this thread, which
     // is the thread that emitted.
-    if (auto ks = _kill.get(); ks && ks->cb.check != nullptr)
+    if (!passesPreTradeGatesUnasked(sig))
     {
-      if (ks->cb.check(ks->cb.user_data, &fs) == 0)
+      if (auto ks = _kill.get(); ks && ks->cb.check != nullptr)
       {
-        noteDropped(sig, "kill switch", kDroppedByKillSwitch);
-        return;
+        if (ks->cb.check(ks->cb.user_data, &fs) == 0)
+        {
+          noteDropped(sig, "kill switch", kDroppedByKillSwitch);
+          return;
+        }
       }
-    }
-    if (auto ov = _validator.get(); ov && ov->cb.validate != nullptr)
-    {
-      if (ov->cb.validate(ov->cb.user_data, &fs) == 0)
+      if (auto ov = _validator.get(); ov && ov->cb.validate != nullptr)
       {
-        noteDropped(sig, "order validator", kDroppedByOrderValidator);
-        return;
+        if (ov->cb.validate(ov->cb.user_data, &fs) == 0)
+        {
+          noteDropped(sig, "order validator", kDroppedByOrderValidator);
+          return;
+        }
       }
-    }
-    if (auto rm = _risk.get(); rm && rm->cb.allow != nullptr)
-    {
-      if (rm->cb.allow(rm->cb.user_data, &fs) == 0)
+      if (auto rm = _risk.get(); rm && rm->cb.allow != nullptr)
       {
-        noteDropped(sig, "risk manager", kDroppedByRiskManager);
-        return;
+        if (rm->cb.allow(rm->cb.user_data, &fs) == 0)
+        {
+          noteDropped(sig, "risk manager", kDroppedByRiskManager);
+          return;
+        }
       }
     }
 
