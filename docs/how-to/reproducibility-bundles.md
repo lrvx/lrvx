@@ -86,6 +86,19 @@ Pack now writes the signal with its whole 64-bit id (`signal_id64` on the record
 
 Each record of the trace pack writes carries the fields the [`.lrvxrun` spec](../spec/lrvxrun.md) gives it. `feed_ts_ns` is the tape event the record belongs to: for a signal and its order event the trade the strategy was handling, for a fill the simulator's time of the fill. `run_ts_ns` is the wall clock at the moment the record was produced, so a fill sorts between the order that caused it and whatever the strategy did next. `fill_id` numbers the run's fills 1, 2, 3, ... (the simulator issues no fill ids of its own), so two fills of one order are two ids. Before this, every fill was written after the run had ended, with one `run_ts_ns` for all of them, `feed_ts_ns` 0, and the order's id in `fill_id`.
 
+### Triggers of conditional orders
+
+An order event record has one price field, `price_raw`, and pack writes the order's limit price there, as the capture listener does: 0 for a `stop_market` or `tp_market`, the limit for a `stop_limit` or `tp_limit`. The record has no field for a trigger, so pack writes it into the payload of the order's submit signal, as compact JSON with sorted keys:
+
+| Order type | Payload |
+|---|---|
+| `stop_market`, `stop_limit`, `tp_market`, `tp_limit` | `{"trigger_price_raw": N}`, the trigger the simulator arms (the signal's price when it names no trigger), scale 1e8 |
+| `trailing_stop` | `{"trailing_bps": N, "trailing_offset_raw": N}`, the distance its trigger follows the market by |
+
+Any other order's signal has an empty payload. Validate compares payloads with the rest of the record, so a stop at another trigger is a diff on `lrvxrun_signals[i]`; before this a submit record of a `stop_market` carried `price_raw` 0 and no trigger, and two runs with their stops at different triggers wrote the same trace.
+
+The manifest of a bundle packed this way has `conditional_triggers_recorded: true`. A bundle without the key was packed when the trace held no trigger; its replay writes none, so it validates as it did.
+
 ### Record by record
 
 A bundle packed now records `lrvxrun_records_comparable: true` in its manifest, and validate reads every signal, order-event and fill record from both traces and compares them in order, field by field. A record that differs is one diff line naming the record and the fields, for example `lrvxrun_fills[1]: price_raw actual=10100000000 expected=10100000001`; a record that one side has and the other does not is named as missing. Before this the comparison was of the counts alone, so a fill at another price, an order on the other side or a signal under another name passed as long as the number of records agreed.
