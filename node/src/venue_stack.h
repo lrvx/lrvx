@@ -10,6 +10,8 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
+
 #include <string>
 
 #include "lrvx/capi/lrvx_capi.h"
@@ -241,7 +243,7 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
   }
   void FeesRecordFill(const Napi::CallbackInfo& info)
   {
-    lrvx_fee_schedule_record_fill(fees(), info[0].As<Napi::Number>().Int64Value(),
+    lrvx_fee_schedule_record_fill(fees(), toInt64Ns(info[0]),
                                   info[1].As<Napi::Number>().DoubleValue());
   }
   Napi::Value FeesCurrentTierIndex(const Napi::CallbackInfo& info)
@@ -253,7 +255,7 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
     return Napi::Number::New(
         info.Env(),
         lrvx_fee_schedule_fee_for(fees(),
-                                  info[0].As<Napi::Number>().Int64Value(),
+                                  toInt64Ns(info[0]),
                                   info[1].As<Napi::Number>().DoubleValue(),
                                   info[2].As<Napi::Boolean>().Value() ? 1 : 0));
   }

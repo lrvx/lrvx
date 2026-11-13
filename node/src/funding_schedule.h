@@ -4,6 +4,8 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
+
 #include <vector>
 
 #include "lrvx/capi/lrvx_capi.h"
@@ -56,7 +58,7 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
     std::vector<double> rates(rateArr.Length());
     for (uint32_t i = 0; i < tsArr.Length(); ++i)
     {
-      ts[i] = tsArr.Get(i).As<Napi::Number>().Int64Value();
+      ts[i] = toInt64Ns(tsArr.Get(i));
     }
     for (uint32_t i = 0; i < rateArr.Length(); ++i)
     {
@@ -77,7 +79,7 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
     std::vector<double> rates(n);
     for (uint32_t i = 0; i < n; ++i)
     {
-      ts[i] = tsArr.Get(i).As<Napi::Number>().Int64Value();
+      ts[i] = toInt64Ns(tsArr.Get(i));
       sy[i] = symArr.Get(i).As<Napi::Number>().Uint32Value();
       rates[i] = rateArr.Get(i).As<Napi::Number>().DoubleValue();
     }
@@ -110,7 +112,7 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
 
   Napi::Value Tick(const Napi::CallbackInfo& info)
   {
-    int64_t nowNs = info[0].As<Napi::Number>().Int64Value();
+    int64_t nowNs = toInt64Ns(info[0]);
     auto symbols = info[1].As<Napi::Array>();
     auto positions = info[2].As<Napi::Array>();
     auto marks = info[3].As<Napi::Array>();

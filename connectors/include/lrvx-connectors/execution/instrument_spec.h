@@ -87,19 +87,6 @@ Price hyperliquidPerpTick(int szDecimals);
 
 }  // namespace instrument_info
 
-// Write the venue's tick into a SymbolInfo about to be registered and mark it
-// known, so the executor and the simulator both check order prices against
-// it. An entry already registered is updated by
-// SymbolRegistry::applyVenueTick instead.
-inline void applyInstrumentSpec(SymbolInfo& info, const InstrumentSpec& spec)
-{
-  if (spec.tickSize.raw() > 0)
-  {
-    info.tickSize = spec.tickSize;
-    info.tickSizeKnown = true;
-  }
-}
-
 // The specs one connector loaded, shared between start() and the message
 // thread that registers symbols on first sight.
 class InstrumentSpecTable
@@ -160,9 +147,11 @@ class InstrumentSpecTable
 };
 
 // Registers a venue symbol, with the venue's tick when the table has one.
-// A symbol already in the registry keeps its id and entry, and the venue's
-// tick goes into it through SymbolRegistry::applyVenueTick: an entry whose
-// tick was not declared takes the venue's, marked known. An entry that
+// The tick goes into the entry through SymbolRegistry::applyVenueTick, for a
+// symbol registered here and for one already in the registry, which keeps
+// its id and entry: an entry whose tick was not declared takes the venue's,
+// marked known, and takes the venue's next one when the table's tick has
+// changed since (a connector calls again after the venue moved the tick). An entry that
 // declares a different tick keeps it -- the caller may know better (a
 // product the venue lists differently, a test of the refusal path) and a
 // declaration is not silently replaced -- and the disagreement is logged as

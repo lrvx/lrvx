@@ -816,9 +816,8 @@ class MergedTapeReaderWrap : public Napi::ObjectWrap<MergedTapeReaderWrap>
         static_cast<uint32_t>(filter.size()));
     if (!_h)
     {
-      Napi::Error::New(env,
-                       "MergedTapeReader: invalid paths or overlapping book streams")
-          .ThrowAsJavaScriptException();
+      // The reader's own errors already open with its name.
+      Napi::Error::New(env, capiReason()).ThrowAsJavaScriptException();
       return;
     }
   }

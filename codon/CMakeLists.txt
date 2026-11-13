@@ -156,6 +156,9 @@ add_codon_executable(codon_strategy_dispatch_smoke
 add_codon_executable(codon_modify_order_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/modify_order_smoke.codon)
 
+add_codon_executable(codon_base_strategy_callbacks_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/base_strategy_callbacks_smoke.codon)
+
 add_codon_executable(codon_backtest_runner_stats_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/backtest_runner_stats_smoke.codon)
 

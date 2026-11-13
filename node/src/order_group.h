@@ -8,6 +8,8 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
+
 #include "lrvx/capi/lrvx_capi.h"
 
 namespace node_lrvx
@@ -314,8 +316,8 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
   Napi::Value PairLatencyDecision(const Napi::CallbackInfo& info)
   {
     auto opts = info[0].As<Napi::Object>();
-    int64_t submit_ts = opts.Get("leaderSubmitTsNs").As<Napi::Number>().Int64Value();
-    int64_t ack_ts = opts.Get("leaderAckTsNs").As<Napi::Number>().Int64Value();
+    int64_t submit_ts = toInt64Ns(opts.Get("leaderSubmitTsNs"));
+    int64_t ack_ts = toInt64Ns(opts.Get("leaderAckTsNs"));
     bool ack_received = opts.Has("ackReceived")
                             ? opts.Get("ackReceived").As<Napi::Boolean>().Value()
                             : false;

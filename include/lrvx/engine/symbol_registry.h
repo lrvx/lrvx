@@ -101,7 +101,8 @@ inline std::expected<void, std::string> validateSymbolScale(const SymbolInfo& in
 // What SymbolRegistry::applyVenueTick did to an existing entry.
 enum class VenueTickOutcome : uint8_t
 {
-  // The entry's tick was not declared; it now holds the venue's, known.
+  // The entry's tick was not declared, or was one an earlier call applied;
+  // it now holds the venue's, known.
   Applied,
   // The entry already declares the venue's tick.
   Unchanged,
@@ -225,7 +226,10 @@ class SymbolRegistry : public ISubsystem
   // tickSizeKnown nor a value other than the 0.01 default). The id, names,
   // type, scales and everything else stay as registered, since consumers
   // index by them. A declared tick is never overwritten: a different venue
-  // tick is reported as Conflict and the entry keeps the caller's value.
+  // tick is reported as Conflict and the entry keeps the caller's value. A
+  // tick this call applied is not a declaration: the venue may change it
+  // again (a connector calls again when the venue moves a market's tick
+  // mid-session), and each change is recorded.
   // Atomic with respect to every other registry call; an applied tick is
   // recorded in venueTickLog().
   VenueTickResult applyVenueTick(SymbolId id, Price venueTick);

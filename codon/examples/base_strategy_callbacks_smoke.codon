@@ -1,0 +1,123 @@
+# Smoke test: one program that attaches the base Strategy as it is and a
+# subclass that overrides the order callbacks.
+#
+# The base class's on_fill / on_order_update / on_queue_position_change /
+# on_market_position_change took their event untyped. Attaching a plain
+# Strategy made the compiler settle the base callbacks for the event type;
+# an override in the same program then failed to typecheck.
+#   * the program compiles with a plain Strategy attached to a runner
+#   * a subclass in the same program receives its fills and order updates
+#   * ctx.position() inside on_fill is the position after that fill
+#
+# The plain Strategy run is compiled always and executed with --run-base.
+
+import sys
+
+from C import lrvx_registry_create() -> cobj
+from C import lrvx_registry_destroy(cobj)
+from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+
+from lrvx.runner import BacktestRunner
+from lrvx.strategy import Strategy, SymbolContext
+from lrvx.types import BarData, OrderEventData
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+class BuysOnce(Strategy):
+    seen: int
+    order_id: int
+    fill_ids: List[int]
+    fill_qtys: List[float]
+    fill_positions: List[float]
+    update_ids: List[int]
+    queue_events: int
+    market_events: int
+
+    def __init__(self, symbols: List[int]):
+        super().__init__(symbols)
+        self.seen = 0
+        self.order_id = 0
+        self.fill_ids = list[int]()
+        self.fill_qtys = list[float]()
+        self.fill_positions = list[float]()
+        self.update_ids = list[int]()
+        self.queue_events = 0
+        self.market_events = 0
+
+    def on_bar(self, ctx: SymbolContext, bar: BarData):
+        self.seen += 1
+        if self.seen == 1:
+            self.order_id = self.market_buy(1.0)
+
+    def on_fill(self, ctx: SymbolContext, ev: OrderEventData):
+        self.fill_ids.append(ev.order_id)
+        self.fill_qtys.append(ev.fill_qty)
+        self.fill_positions.append(ctx.position())
+
+    def on_order_update(self, ctx: SymbolContext, ev: OrderEventData):
+        self.update_ids.append(ev.order_id)
+
+    def on_queue_position_change(self, ctx: SymbolContext, ev: OrderEventData):
+        self.queue_events += 1
+
+    def on_market_position_change(self, ctx: SymbolContext, ev: OrderEventData):
+        self.market_events += 1
+
+
+MINUTE = 60_000_000_000
+T0 = 1_788_220_800_000_000_000
+N = 4
+
+
+def run_bars(bt: BacktestRunner):
+    bt.run_bars([T0 + MINUTE * i for i in range(N)], [T0 + MINUTE * (i + 1) for i in range(N)],
+                [100.0] * N, [100.5] * N, [99.5] * N, [100.0] * N, [10.0] * N, "BTCUSDT", 0,
+                MINUTE)
+
+
+reg = lrvx_registry_create()
+sym = int(lrvx_registry_add_symbol(reg, "test".c_str(), "BTCUSDT".c_str(), 0.5))
+
+def run_base(reg: cobj, sym: int):
+    plain = Strategy([sym])
+    bt = BacktestRunner(reg, 0.0, 10_000.0)
+    bt.set_strategy(plain)
+    run_bars(bt)
+    bt.close()
+    check(plain.position() == 0.0, "the base Strategy runs and trades nothing")
+
+
+if "--run-base" in sys.argv:
+    run_base(reg, sym)
+
+strat = BuysOnce([sym])
+bt2 = BacktestRunner(reg, 0.0, 10_000.0)
+bt2.set_strategy(strat)
+run_bars(bt2)
+bt2.close()
+check(strat.seen == N, "the subclass saw every bar")
+check(strat.order_id != 0, "the subclass sent its order")
+check(len(strat.fill_ids) == 1, "the subclass's on_fill override was called once")
+if len(strat.fill_ids) == 1:
+    check(strat.fill_ids[0] == strat.order_id, "with the order's id")
+    check(strat.fill_qtys[0] == 1.0, "and its quantity")
+    check(strat.fill_positions[0] == 1.0, "ctx.position() in on_fill counts the fill")
+check(len(strat.update_ids) > 0, "the subclass's on_order_update override was called")
+for update_id in strat.update_ids:
+    check(update_id == strat.order_id, "an order update carries the order's id")
+
+lrvx_registry_destroy(reg)
+
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")

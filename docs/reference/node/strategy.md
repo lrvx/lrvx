@@ -79,6 +79,11 @@ are the new touch.
 | `onQueuePositionChange(ctx, ev, emit)` | A resting limit order's queue position moved with no other lifecycle transition. `ev.queueAhead` / `ev.queueTotal` carry the snapshot. Backtest only |
 | `onMarketPositionChange(ctx, ev, emit)` | A resting limit order's categorical market position transitioned (best / behind_best / mid_spread / level_empty / crossed). Backtest only |
 
+`ctx.position` in `onFill` and `onOrderUpdate` already counts the fill being
+delivered: the runner's position tracker takes a fill before the strategy
+hears of it. After a buy of 1 from flat, `ctx.position` in that fill's
+`onFill` is 1.
+
 `ev` is an `OrderEventData`: `orderId`, `symbolId`, `side`, `orderType`,
 `status`, `fillQty`, `fillPrice`, `exchangeTsNs`, `rejectReason`,
 `queueAhead`, `queueTotal`, the per-stage timestamps `submittedAtNs` /
@@ -127,17 +132,28 @@ difference: `Number(ev.acceptedAtNs - ev.submittedAtNs)`.
 
 ### emit methods
 
-| Method | Description |
-|--------|-------------|
-| `emit.marketBuy(qty)` | Market buy |
-| `emit.marketSell(qty)` | Market sell |
-| `emit.limitBuy(price, qty)` | Limit buy |
-| `emit.limitSell(price, qty)` | Limit sell |
-| `emit.provideLiquidity(priceLower, priceUpper, liquidity)` | Provide AMM liquidity in a price range |
-| `emit.withdrawLiquidity(liquidity)` | Withdraw AMM liquidity |
-| `emit.cancel(orderId)` | Cancel order |
-| `emit.modify(orderId, newPrice, newQty)` | Change the price and quantity of a working order. It keeps its id, symbol, side and type; `newQty` is the quantity left to work. `newPrice` is the trigger of a stop-market, take-profit-market or trailing-stop order and the limit price of every other type. `orderId` is the `ev.orderId` of the order's events. A refused modify arrives in `onOrderUpdate` as `REPLACE_REJECTED` with `rejectReason` set |
-| `emit.closePosition()` | Close position (reduce-only) |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `emit.marketBuy(qty)` | `number` | Market buy |
+| `emit.marketSell(qty)` | `number` | Market sell |
+| `emit.limitBuy(price, qty)` | `number` | Limit buy |
+| `emit.limitSell(price, qty)` | `number` | Limit sell |
+| `emit.provideLiquidity(priceLower, priceUpper, liquidity)` | `number` | Provide AMM liquidity in a price range |
+| `emit.withdrawLiquidity(liquidity)` | `number` | Withdraw AMM liquidity |
+| `emit.cancel(orderId)` | `undefined` | Cancel order |
+| `emit.modify(orderId, newPrice, newQty)` | `undefined` | Change the price and quantity of a working order. It keeps its id, symbol, side and type; `newQty` is the quantity left to work. `newPrice` is the trigger of a stop-market, take-profit-market or trailing-stop order and the limit price of every other type. `orderId` is the id the emitting function returned, which is also the `ev.orderId` of the order's events. A refused modify arrives in `onOrderUpdate` as `REPLACE_REJECTED` with `rejectReason` set |
+| `emit.closePosition()` | `number` | Close position (reduce-only). `0` when flat: no order is sent |
+
+The functions that send an order return its id, as the Python, Codon and
+QuickJS ones do: the `orderId` the order's events carry, and what
+`emit.cancel` and `emit.modify` take.
+
+```javascript
+onBar(ctx, bar, emit) {
+  if (!this.orderId) this.orderId = emit.limitBuy(bar.close - 1, 1);
+  else emit.modify(this.orderId, bar.close - 0.5, 1);
+}
+```
 
 In a backtest, a `limitBuy` / `limitSell` price that is not a whole number of the symbol's `tickSize` is rejected: `onOrderUpdate` receives `status` `"REJECTED"` with `rejectReason` `"price_off_tick"`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
 

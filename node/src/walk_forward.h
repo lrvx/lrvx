@@ -160,11 +160,18 @@ class WalkForwardRunnerNode
                                  1};
       ctx.factory_fn = Napi::Persistent(_factory.Value());
 
-      // First call with NULL out_buf to get the count.
+      // First call with NULL out_buf to get the count. Zero is also what a
+      // file too short for one fold gives, so the error is what tells an
+      // unreadable file or an unknown symbol from that.
+      lrvx_clear_last_error();
       uint32_t total = lrvx_walk_forward_run_csv(
           static_cast<LrvxRegistryHandle>(_reg), path.c_str(),
           symbol.c_str(), _fee, _cap, &_cfg,
           &walkForwardFactoryThunk, &ctx, nullptr, 0);
+      if (total == 0 && lrvx_last_error_code() != 0)
+      {
+        throw lrvx::LrvxError("E_VAL_002", "WalkForwardRunner.runCsv: " + capiReason());
+      }
       std::vector<LrvxWalkForwardFold> folds(total);
       if (total > 0)
       {

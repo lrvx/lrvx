@@ -151,6 +151,28 @@ except ValueError as e:
     said = e.message
 check(bad_csv in said and "line 3" in said,
       "run_csv on a bad row names the file and the line: " + said)
+
+# A symbol name the registry does not hold is refused, not run as symbol 0.
+seen_before = idle.seen
+said = ""
+try:
+    bt.run_csv(bad_csv, "NOPE")
+except ValueError as e:
+    said = e.message
+check("'NOPE' is not registered" in said, "run_csv refuses an unknown symbol: " + said)
+said = ""
+try:
+    bt.run_ohlcv([T0, T0 + SEC], [100.0, 101.0], "NOPE")
+except ValueError as e:
+    said = e.message
+check("'NOPE' is not registered" in said, "run_ohlcv refuses an unknown symbol: " + said)
+said = ""
+try:
+    bt.run_bars([T0], [T0 + SEC], [100.0], [101.0], [99.0], [100.0], [1.0], "NOPE")
+except ValueError as e:
+    said = e.message
+check("'NOPE' is not registered" in said, "run_bars refuses an unknown symbol: " + said)
+check(idle.seen == seen_before, "the refused runs delivered nothing")
 bt.close()
 
 # volume_impact reads level sizes, which bars do not carry: the run is refused.

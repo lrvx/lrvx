@@ -142,8 +142,9 @@ class FakeCcxtExchange:
         self.calls.append(("cancel_order", (oid, sym), {}))
         return {"id": oid, "status": "canceled"}
 
-    async def edit_order(self, oid, sym, type_, side, qty, price=None):
-        self.calls.append(("edit_order", (oid, sym, type_, side, qty, price), {}))
+    async def edit_order(self, oid, sym, type_, side, qty, price=None, params=None):
+        self.calls.append(("edit_order", (oid, sym, type_, side, qty, price),
+                           {"params": params or {}}))
         return {"id": oid, "status": "open"}
 
     async def close(self):
@@ -578,6 +579,89 @@ class CcxtBrokerTests(unittest.TestCase):
         self.assertEqual(edit[1][3], "buy")
         self.assertEqual(edit[1][4], 0.4)
         self.assertEqual(edit[1][5], 98.0)
+
+    def _strategy_orders(self, place, then):
+        """Runs a real strategy: `place` sends its order, `then` acts on the id.
+
+        The signals are the ones the strategy emits, not hand-built: a
+        Modify or Cancel signal names an order id and nothing else.
+        """
+        fake = FakeCcxtExchange()
+        errors = []
+        broker = CcxtBroker("binance", exchange=fake,
+                            on_error=lambda sym, e: errors.append((sym, e)))
+
+        async def go():
+            await broker.add_symbol("ETH/USDT")
+            btc = await broker.add_symbol("BTC/USDT")
+            strat = lrvx.Strategy([btc])
+            broker.add_strategy(strat)
+            fake.init_queues()
+            run_task = asyncio.create_task(broker.run(streams=(), reconcile=False))
+            await asyncio.sleep(0)
+            order_id = place(strat)
+            await asyncio.sleep(0.02)
+            then(strat, order_id)
+            await asyncio.sleep(0.02)
+            await broker.stop()
+            try:
+                await run_task
+            except (asyncio.CancelledError, ValueError):
+                pass
+
+        asyncio.run(go())
+        return fake, errors
+
+    def test_strategy_modify_edits_the_order_it_names(self):
+        cases = [
+            (lambda s: s.limit_sell(101.0, 0.5), "limit", "sell", 102.0),
+            (lambda s: s.limit_buy(99.0, 0.5), "limit", "buy", 98.0),
+            (lambda s: s.stop_limit("sell", 99.0, 98.9, 0.5), "stop_limit", "sell", 98.8),
+        ]
+        for place, type_, side, new_price in cases:
+            with self.subTest(type=type_, side=side):
+                fake, errors = self._strategy_orders(
+                    place, lambda s, oid: s.modify_order(oid, new_price, 0.4))
+                self.assertEqual(errors, [])
+                edits = [c for c in fake.calls if c[0] == "edit_order"]
+                self.assertEqual(len(edits), 1, fake.calls)
+                oid, sym, edit_type, edit_side, qty, price = edits[0][1]
+                self.assertEqual(oid, "1")
+                self.assertEqual(sym, "BTC/USDT")
+                self.assertEqual(edit_type, type_)
+                self.assertEqual(edit_side, side)
+                self.assertEqual(qty, 0.4)
+                self.assertEqual(price, new_price)
+                want_params = {"stopPrice": 99.0} if type_ == "stop_limit" else {}
+                self.assertEqual(edits[0][2]["params"], want_params)
+
+    def test_strategy_modify_moves_the_trigger_of_a_stop_market(self):
+        fake, errors = self._strategy_orders(
+            lambda s: s.stop_market("sell", 99.0, 0.5),
+            lambda s, oid: s.modify_order(oid, 99.5, 0.4))
+        self.assertEqual(errors, [])
+        edits = [c for c in fake.calls if c[0] == "edit_order"]
+        self.assertEqual(len(edits), 1, fake.calls)
+        self.assertEqual(edits[0][1], ("1", "BTC/USDT", "stop_market", "sell", 0.4, None))
+        self.assertEqual(edits[0][2]["params"], {"stopPrice": 99.5})
+
+    def test_strategy_cancel_names_the_orders_symbol(self):
+        fake, errors = self._strategy_orders(
+            lambda s: s.limit_sell(101.0, 0.5), lambda s, oid: s.cancel_order(oid))
+        self.assertEqual(errors, [])
+        cancels = [c for c in fake.calls if c[0] == "cancel_order"]
+        self.assertEqual(len(cancels), 1, fake.calls)
+        self.assertEqual(cancels[0][1], ("1", "BTC/USDT"))
+
+    def test_modify_after_cancel_is_reported(self):
+        def then(s, oid):
+            s.cancel_order(oid)
+            s.modify_order(oid, 102.0, 0.4)
+
+        fake, errors = self._strategy_orders(lambda s: s.limit_sell(101.0, 0.5), then)
+        self.assertEqual([c for c in fake.calls if c[0] == "edit_order"], [])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("MODIFY", str(errors[0][1]))
 
     # ── reconciliation ───────────────────────────────────────────────
     def test_reconciliation_dispatches_initial_position(self):

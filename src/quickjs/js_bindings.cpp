@@ -3926,7 +3926,7 @@ static JSValue js_run_recorder_create(JSContext* ctx, JSValueConst, int argc, JS
   auto h = lrvx_run_recorder_create(path.c_str(), sid.c_str(), shash.c_str(), started);
   if (!h)
   {
-    return JS_ThrowTypeError(ctx, "TraceRecorder: construction failed");
+    return JS_ThrowTypeError(ctx, "TraceRecorder: %s", lrvx_last_error_message());
   }
   return createHandleObject(ctx, h, lrvx_run_recorder_destroy);
 }
@@ -4170,7 +4170,7 @@ static JSValue js_run_reader_open(JSContext* ctx, JSValueConst, int argc, JSValu
   auto h = lrvx_run_reader_open(path ? path : "");
   if (!h)
   {
-    return JS_ThrowTypeError(ctx, "TraceReader: cannot open path");
+    return JS_ThrowTypeError(ctx, "TraceReader: %s", lrvx_last_error_message());
   }
   return createHandleObject(ctx, h, lrvx_run_reader_close);
 }
@@ -4856,7 +4856,7 @@ static JSValue js_tape_diff(JSContext* ctx, JSValueConst, int argc, JSValueConst
   std::string rightStr = right.str();
   if (!h)
   {
-    return JS_ThrowTypeError(ctx, "tapeDiff: failed to read tape directory(ies)");
+    return JS_ThrowTypeError(ctx, "tapeDiff: %s", lrvx_last_error_message());
   }
 
   JSValue out = JS_NewObject(ctx);
@@ -6597,6 +6597,10 @@ static JSValue js_mtr_create(JSContext* c, JSValueConst, int argc, JSValueConst*
       path_cstrs.empty() ? nullptr : path_cstrs.data(),
       static_cast<uint32_t>(path_cstrs.size()), from_ns, to_ns,
       syms.empty() ? nullptr : syms.data(), static_cast<uint32_t>(syms.size()));
+  if (!handle)
+  {
+    return JS_ThrowTypeError(c, "%s", lrvx_last_error_message());
+  }
 
   return createHandleObject(c, handle, lrvx_merged_tape_reader_destroy);
 }

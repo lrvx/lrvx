@@ -423,11 +423,15 @@ SymbolId registerVenueSymbol(SymbolRegistry& registry, SymbolInfo info, Instrume
     }
     return *existing;
   }
+  // Registered first and given the venue's tick through applyVenueTick, as a
+  // symbol registered earlier is: the registry then knows the tick is the
+  // venue's, and lets the venue change it later.
+  const SymbolId id = registry.registerSymbol(info);
   if (spec)
   {
-    applyInstrumentSpec(info, *spec);
+    registry.applyVenueTick(id, spec->tickSize);
   }
-  return registry.registerSymbol(info);
+  return id;
 }
 
 void reportInstrumentLoad(const InstrumentSpecTable& specs, std::string_view venue, ILogger* logger)

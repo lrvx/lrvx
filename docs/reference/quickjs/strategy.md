@@ -47,7 +47,7 @@ super({ symbols: ['Binance:BTCUSDT', 'Bybit:ETHUSDT'] })
 |---|---|---|
 | `ctx.symbol` | `string` | Symbol name |
 | `ctx.symbolId` | `number` | Numeric symbol ID |
-| `ctx.position` | `number` | Current position size |
+| `ctx.position` | `number` | Current position size. In `onFill` and `onOrderUpdate` it already counts the fill being delivered, as `this.position()` does |
 | `ctx.avgEntryPrice` | `number` | Average entry price, `NaN` when the position manager reports none |
 | `ctx.book.bidPrice` | `number \| null` | Best bid; `null` when the bid side has no level (`0` is a price) |
 | `ctx.book.askPrice` | `number \| null` | Best ask; `null` when the ask side has no level |

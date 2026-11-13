@@ -150,8 +150,9 @@ In Python / Node.js / Codon `symbol` defaults to the first registered symbol whe
 Two exits that look alike are not. `market_sell(qty)` is a plain sell of `qty`: it reduces a long by that much and goes short past it. `close_position()` sells exactly the open position as a reduce-only order, and submits nothing when flat.
 
 The Node `emit` object carries only `marketBuy`, `marketSell`,
-`limitBuy`, `limitSell`, `cancel`, `closePosition`,
-`provideLiquidity`, and `withdrawLiquidity`. `cancelAll(symbol)` is a
+`limitBuy`, `limitSell`, `cancel`, `modify`, `closePosition`,
+`provideLiquidity`, and `withdrawLiquidity`. The ones that send an order
+return its id, as in the other bindings. `cancelAll(symbol)` is a
 `SimulatedExecutor` method, not an emit helper. `tif` is not
 reachable from Node's `limitBuy` / `limitSell`.
 

@@ -77,7 +77,7 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     _h = lrvx_run_recorder_create(path.c_str(), sid.c_str(), shash.c_str(), started);
     if (!_h)
     {
-      auto err = Napi::Error::New(env, "TraceRecorder: construction failed");
+      auto err = Napi::Error::New(env, "TraceRecorder: " + capiReason());
       err.Value().Set("code", Napi::String::New(env, "E_VAL_002"));
       err.Value().Set("name", Napi::String::New(env, "LrvxError"));
       throw err;
@@ -208,7 +208,7 @@ class TraceReaderWrap : public Napi::ObjectWrap<TraceReaderWrap>
     _h = lrvx_run_reader_open(path.c_str());
     if (!_h)
     {
-      auto err = Napi::Error::New(env, "TraceReader: cannot open " + path);
+      auto err = Napi::Error::New(env, "TraceReader: " + capiReason());
       err.Value().Set("code", Napi::String::New(env, "E_VAL_001"));
       err.Value().Set("name", Napi::String::New(env, "LrvxError"));
       throw err;

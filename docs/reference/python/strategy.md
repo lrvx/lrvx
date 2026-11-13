@@ -85,6 +85,12 @@ def on_bar(self, ctx, bar):
 Called on every fill this strategy's own orders produce (status
 `PARTIALLY_FILLED` or `FILLED`).
 
+`ctx.position` in `on_fill` and `on_order_update` already counts the fill
+being delivered: the runner's position tracker takes a fill before the
+strategy hears of it, so `ctx.position` and `position()` agree there, in a
+backtest and in paper mode. After a buy of 1 from flat, `ctx.position` in
+that fill's `on_fill` is 1.
+
 #### `on_order_update(ctx: SymbolContext, event: OrderEventData)`
 
 Called on every order-lifecycle status change: `NEW`, `ACCEPTED`, `CANCELED`,

@@ -12,6 +12,7 @@
 # pulls it in, so no entry point into the binding skips it.
 from lrvx.abi import check_abi_version
 
+from C import lrvx_last_error_message() -> cobj
 from C import lrvx_tape_diff_create(cobj, cobj, u32, int) -> cobj
 from C import lrvx_tape_diff_destroy(cobj)
 from C import lrvx_tape_diff_left_count(cobj) -> int
@@ -38,7 +39,7 @@ def diff_tapes(left: str, right: str,
     h = lrvx_tape_diff_create(left.c_str(), right.c_str(),
                               u32(max_mismatches), field_tolerance_ns)
     if not h:
-        raise ValueError("tape_diff: failed to read tape directory(ies)")
+        raise ValueError("tape_diff: " + str.from_ptr(lrvx_last_error_message()))
 
     lc = lrvx_tape_diff_left_count(h)
     rc = lrvx_tape_diff_right_count(h)

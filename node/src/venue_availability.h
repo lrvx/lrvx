@@ -8,6 +8,8 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
+
 #include <string>
 
 #include "lrvx/capi/lrvx_capi.h"
@@ -92,7 +94,7 @@ class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
  private:
   void ScheduleOutage(const Napi::CallbackInfo& info)
   {
-    int64_t start = info[0].As<Napi::Number>().Int64Value();
+    int64_t start = toInt64Ns(info[0]);
     int64_t duration = info[1].As<Napi::Number>().Int64Value();
     std::string policy = info.Length() > 2 && info[2].IsString()
                              ? info[2].As<Napi::String>().Utf8Value()
@@ -114,12 +116,12 @@ class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
   }
   Napi::Value IsUp(const Napi::CallbackInfo& info)
   {
-    int64_t nowNs = info[0].As<Napi::Number>().Int64Value();
+    int64_t nowNs = toInt64Ns(info[0]);
     return Napi::Boolean::New(info.Env(), lrvx_venue_availability_is_up(_h, nowNs) != 0);
   }
   void ScheduleOutageEx(const Napi::CallbackInfo& info)
   {
-    int64_t start = info[0].As<Napi::Number>().Int64Value();
+    int64_t start = toInt64Ns(info[0]);
     int64_t duration = info[1].As<Napi::Number>().Int64Value();
     std::string outageType = info.Length() > 2 && info[2].IsString()
                                  ? info[2].As<Napi::String>().Utf8Value()
@@ -136,31 +138,31 @@ class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
   }
   Napi::Value SubmitsAllowed(const Napi::CallbackInfo& info)
   {
-    int64_t nowNs = info[0].As<Napi::Number>().Int64Value();
+    int64_t nowNs = toInt64Ns(info[0]);
     return Napi::Boolean::New(
         info.Env(), lrvx_venue_availability_submits_allowed(_h, nowNs) != 0);
   }
   Napi::Value CancelsAllowed(const Napi::CallbackInfo& info)
   {
-    int64_t nowNs = info[0].As<Napi::Number>().Int64Value();
+    int64_t nowNs = toInt64Ns(info[0]);
     return Napi::Boolean::New(
         info.Env(), lrvx_venue_availability_cancels_allowed(_h, nowNs) != 0);
   }
   Napi::Value BookUpdatesAllowed(const Napi::CallbackInfo& info)
   {
-    int64_t nowNs = info[0].As<Napi::Number>().Int64Value();
+    int64_t nowNs = toInt64Ns(info[0]);
     return Napi::Boolean::New(
         info.Env(), lrvx_venue_availability_book_updates_allowed(_h, nowNs) != 0);
   }
   Napi::Value TradesAllowed(const Napi::CallbackInfo& info)
   {
-    int64_t nowNs = info[0].As<Napi::Number>().Int64Value();
+    int64_t nowNs = toInt64Ns(info[0]);
     return Napi::Boolean::New(
         info.Env(), lrvx_venue_availability_trades_allowed(_h, nowNs) != 0);
   }
   Napi::Value LatencyMultiplier(const Napi::CallbackInfo& info)
   {
-    int64_t nowNs = info[0].As<Napi::Number>().Int64Value();
+    int64_t nowNs = toInt64Ns(info[0]);
     return Napi::Number::New(info.Env(),
                              lrvx_venue_availability_latency_multiplier(_h, nowNs));
   }

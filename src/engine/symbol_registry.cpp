@@ -422,7 +422,13 @@ VenueTickResult SymbolRegistry::applyVenueTick(SymbolId id, Price venueTick)
   }
   if (declared != 0)
   {
-    return {VenueTickOutcome::Conflict, info.tickSize};
+    // A tick the venue wrote here is the venue's to change again; any other
+    // was declared by the caller.
+    const auto applied = _venueTicks->tickFor(id);
+    if (!applied || applied->raw() != info.tickSize.raw())
+    {
+      return {VenueTickOutcome::Conflict, info.tickSize};
+    }
   }
   info.tickSize = venueTick;
   info.tickSizeKnown = true;

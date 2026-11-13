@@ -369,8 +369,7 @@ struct NodeStrategyHost : TsfnHost
         double qty = i[0].As<Napi::Number>().DoubleValue();
         uint32_t sym = i.Length() > 1 ? symId(i[1])
                                        : (h->syms.empty() ? 0u : h->syms[0]);
-        h->bridge->publicEmitMarketBuy(sym, Quantity::fromDouble(qty));
-        return i.Env().Undefined(); }, "marketBuy", this));
+        return orderIdToJs(i.Env(), h->bridge->publicEmitMarketBuy(sym, Quantity::fromDouble(qty))); }, "marketBuy", this));
 
     em.Set("marketSell", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                              {
@@ -378,8 +377,7 @@ struct NodeStrategyHost : TsfnHost
         double qty = i[0].As<Napi::Number>().DoubleValue();
         uint32_t sym = i.Length() > 1 ? symId(i[1])
                                        : (h->syms.empty() ? 0u : h->syms[0]);
-        h->bridge->publicEmitMarketSell(sym, Quantity::fromDouble(qty));
-        return i.Env().Undefined(); }, "marketSell", this));
+        return orderIdToJs(i.Env(), h->bridge->publicEmitMarketSell(sym, Quantity::fromDouble(qty))); }, "marketSell", this));
 
     em.Set("limitBuy", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                            {
@@ -388,8 +386,7 @@ struct NodeStrategyHost : TsfnHost
         double qty   = i[1].As<Napi::Number>().DoubleValue();
         uint32_t sym = i.Length() > 2 ? symId(i[2])
                                        : (h->syms.empty() ? 0u : h->syms[0]);
-        h->bridge->publicEmitLimitBuy(sym, Price::fromDouble(price), Quantity::fromDouble(qty));
-        return i.Env().Undefined(); }, "limitBuy", this));
+        return orderIdToJs(i.Env(), h->bridge->publicEmitLimitBuy(sym, Price::fromDouble(price), Quantity::fromDouble(qty))); }, "limitBuy", this));
 
     em.Set("limitSell", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                             {
@@ -398,8 +395,7 @@ struct NodeStrategyHost : TsfnHost
         double qty   = i[1].As<Napi::Number>().DoubleValue();
         uint32_t sym = i.Length() > 2 ? symId(i[2])
                                        : (h->syms.empty() ? 0u : h->syms[0]);
-        h->bridge->publicEmitLimitSell(sym, Price::fromDouble(price), Quantity::fromDouble(qty));
-        return i.Env().Undefined(); }, "limitSell", this));
+        return orderIdToJs(i.Env(), h->bridge->publicEmitLimitSell(sym, Price::fromDouble(price), Quantity::fromDouble(qty))); }, "limitSell", this));
 
     em.Set("provideLiquidity", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                                    {
@@ -409,9 +405,8 @@ struct NodeStrategyHost : TsfnHost
         double liq = i[2].As<Napi::Number>().DoubleValue();
         uint32_t sym = i.Length() > 3 ? symId(i[3])
                                        : (h->syms.empty() ? 0u : h->syms[0]);
-        h->bridge->publicEmitProvideLiquidity(sym, Price::fromDouble(lo), Price::fromDouble(hi),
-                                              Quantity::fromDouble(liq));
-        return i.Env().Undefined(); }, "provideLiquidity", this));
+        return orderIdToJs(i.Env(), h->bridge->publicEmitProvideLiquidity(sym, Price::fromDouble(lo), Price::fromDouble(hi),
+                                              Quantity::fromDouble(liq))); }, "provideLiquidity", this));
 
     em.Set("withdrawLiquidity", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                                     {
@@ -419,8 +414,7 @@ struct NodeStrategyHost : TsfnHost
         double liq = i[0].As<Napi::Number>().DoubleValue();
         uint32_t sym = i.Length() > 1 ? symId(i[1])
                                        : (h->syms.empty() ? 0u : h->syms[0]);
-        h->bridge->publicEmitWithdrawLiquidity(sym, Quantity::fromDouble(liq));
-        return i.Env().Undefined(); }, "withdrawLiquidity", this));
+        return orderIdToJs(i.Env(), h->bridge->publicEmitWithdrawLiquidity(sym, Quantity::fromDouble(liq))); }, "withdrawLiquidity", this));
 
     em.Set("cancel", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                          {
@@ -449,8 +443,7 @@ struct NodeStrategyHost : TsfnHost
         auto* h  = static_cast<NodeStrategyHost*>(i.Data());
         uint32_t sym = i.Length() > 0 ? symId(i[0])
                                        : (h->syms.empty() ? 0u : h->syms[0]);
-        h->bridge->publicEmitClosePosition(sym);
-        return i.Env().Undefined(); }, "closePosition", this));
+        return orderIdToJs(i.Env(), h->bridge->publicEmitClosePosition(sym)); }, "closePosition", this));
 
     // Multi-TF alignment helpers: read the per-(symbol, timeframe)
     // ring of the most recent closed bars without bookkeeping in

@@ -9,14 +9,14 @@
 from lrvx.tape_diff import diff_tapes
 
 # Bad path raises through C ABI returning NULL.
-threw = False
+said = ""
 try:
     diff_tapes("/tmp/does-not-exist-xyz-codon", "/tmp/also-no")
-except ValueError:
-    threw = True
-if threw:
-    print("ok  bad path raises ValueError")
+except ValueError as e:
+    said = e.message
+if "/tmp/does-not-exist-xyz-codon" in said:
+    print("ok  bad path raises ValueError naming it: " + said)
 else:
-    print("FAIL bad path did not raise")
+    print("FAIL bad path did not raise with its name: " + said)
 
 print("done")

@@ -60,6 +60,8 @@ class PolymarketExchangeConnector : public IExchangeConnector
   // which it keeps (see registerVenueSymbol). Empty means that, by the time
   // start() returns, every configured symbol -- including one registered
   // before start() with no tick declared -- holds the venue's tick, known.
+  // The venue moves a market's tick while connected (tick_size_change): the
+  // entry follows, and a declared tick that then differs is reported here.
   std::string instrumentInfoError() const { return _specs.error(); }
 
   // Public so protocol behaviour (snapshot vs incremental price_change) is
@@ -80,6 +82,9 @@ class PolymarketExchangeConnector : public IExchangeConnector
   // forward-only regardless of where "timestamp" sits in the payload).
   void processBookSnapshot(simdjson::ondemand::object obj, uint64_t recvNs, UnixNanos exchangeTs);
   void processPriceChanges(simdjson::ondemand::object obj, uint64_t recvNs, UnixNanos exchangeTs);
+  // The venue changed one market's tick. Takes the raw frame: the fields are
+  // few and their order is not fixed.
+  void processTickSizeChange(std::string_view payload);
   void sendSubscribe(const std::vector<std::string>& tokenIds, const std::string& operation);
 
   PolymarketConfig _config;

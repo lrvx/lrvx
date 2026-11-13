@@ -4,6 +4,8 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
+
 #include <string>
 
 #include "account.h"
@@ -189,8 +191,8 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
       symbols[i] = pair.Get(uint32_t{0}).As<Napi::Number>().Uint32Value();
       prices[i] = pair.Get(uint32_t{1}).As<Napi::Number>().DoubleValue();
     }
-    const int64_t tsNs = info.Length() >= 2 && info[1].IsNumber()
-                             ? info[1].As<Napi::Number>().Int64Value()
+    const int64_t tsNs = info.Length() >= 2 && (info[1].IsNumber() || info[1].IsBigInt())
+                             ? toInt64Ns(info[1])
                              : 0;
     const uint32_t total = lrvx_liquidation_engine_on_marks(
         _h, n, symbols.data(), prices.data(), tsNs);
