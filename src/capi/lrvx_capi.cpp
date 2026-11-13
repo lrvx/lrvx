@@ -4425,13 +4425,20 @@ uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path)
   }
   else if (!result.errors.empty())
   {
-    // Still a merge, and still 1: the segments that opened were merged. The
-    // ones that did not are named here, each as the merge reported it.
+    // Not a success, as MergeResult::success says: the output is short. The
+    // segments that opened were written; the ones that did not are named
+    // here, each as the merge reported it.
     const std::string why = "merged " + std::to_string(result.segments_merged) +
                             " segment(s); skipped: " + joinErrors(result.errors, "; ");
     lrvxCapiNoteException(__func__, why.c_str());
   }
-  return result.segments_merged > 0 ? 1 : 0;
+  else if (!result.success)
+  {
+    const std::string why = "merged " + std::to_string(result.segments_merged) +
+                            " segment(s) that hold no event: " + input_dir;
+    lrvxCapiNoteException(__func__, why.c_str());
+  }
+  return result.success ? 1 : 0;
   LRVX_CAPI_LEAVE;
 }
 

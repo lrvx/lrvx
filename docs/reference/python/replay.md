@@ -313,6 +313,9 @@ writer = lrvx.DataWriter(
 )
 ```
 
+`max_segment_mb=0` is the 256 MB default, for `DataWriter` and `BinaryLogRecorderHook` alike. It
+used to be a bound of zero bytes, which gave every event a segment of its own.
+
 ### Methods
 
 #### `write_trade(exchange_ts_ns, recv_ts_ns, price, qty, trade_id, symbol_id, side) -> bool`

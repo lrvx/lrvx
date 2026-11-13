@@ -400,5 +400,11 @@ did not fail; an extract that matched nothing returns `0` with `""`.
 `validate_segment` and `merge_segments` clear it on entry as well. `validate_segment` returns
 `False` both for a segment that fails its checks and for a file that could not be read; only the
 unreadable file leaves a reason, so `""` after a `False` means the segment was read and is not
-valid. `merge_segments` returns `False` when no segment was merged, and `last_error()` says why
-(the directory has no segments, or none could be opened).
+valid. `merge_segments` returns `True` only when every input was merged and at least one event
+was written, the rule `merge_dir`'s `success` follows. It returns `False` when no segment was
+merged (the directory has no segments, or none could be opened), and `False` when some inputs
+could not be opened while the others were merged: the output is then written from the inputs that
+opened and `last_error()` reads `merged N segment(s); skipped: Cannot open: <path>; ...`. It
+returned `True` for such a merge.
+
+`DataWriter` and `BinaryLogRecorderHook` read a `max_segment_mb` of 0 as the 256 MB default.

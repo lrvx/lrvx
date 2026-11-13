@@ -21,6 +21,10 @@ namespace lrvx::replay
 
 BinaryLogWriter::BinaryLogWriter(WriterConfig config) : _config(std::move(config))
 {
+  if (_config.max_segment_bytes == 0)
+  {
+    _config.max_segment_bytes = kDefaultMaxSegmentBytes;
+  }
   _buffer.reserve(_config.buffer_size);
   // Reserve for typical max book payload: header + 2 * max_depth * sizeof(BookLevel)
   // Uses buffer_size as a reasonable upper bound for any single event payload

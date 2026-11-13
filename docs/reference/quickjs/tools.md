@@ -21,6 +21,19 @@ l3.removeOrder(1);
 l3.bestBid();
 ```
 
+An argument that is left out takes its default; a `0` that is written is passed
+on as `0`. That holds wherever the default is not zero: `getBids(0)` and
+`getAsks(0)` return no level (20 when left out), `new lrvx.DeltaBookEncoder({
+anchorEvery: 0 })` writes a snapshot for every event (an anchor every 100 when
+left out), `Partitioner.byTime(0)` returns no partition (2 when left out), and
+the same for the `symbol` of `SimulatedExecutor.submitOrder` / `submitBracket`
+/ `submitIceberg` (1), the `depth` of `setQueueModel` (1), the `seed` of
+`VenueAvailability.autoRandomOutages`, the `annualizationFactor` of
+`BacktestResult` (252), the tick of `VolumeProfile` / `FootprintBar` /
+`MarketProfile` (0.01) and its `periodMinutes` (30), and `maxOrders` /
+`maxRecordsPerOrder` of `OrderJourneyTracer`. Each of these replaced a written
+`0` with its default.
+
 The tick size defaults to 0.01 when the argument is omitted. An explicit value
 must be positive; `new OrderBook(0)` throws a `RangeError`. The smallest
 representable tick is `1e-8`, since prices are fixed-point with a scale of 1e8.
@@ -134,7 +147,7 @@ Extended operations:
 | `lrvx.recompressSegment(inputPath, outputPath, level)` | Recompress at a different level |
 | `lrvx.extractSymbols(inputPath, outputDir, symbols)` | Extract selected symbols |
 | `lrvx.extractTimeRange(inputPath, outputPath, fromNs, toNs)` | Extract a time window |
-| `lrvx.lastError()` | Why the last `recompressSegment` returned `false` or the last `extractSymbols` / `extractTimeRange` returned `0`: a string that opens with the C function's name and names the file that could not be read or written. Each of the three clears it on entry, so `''` means the call did not fail; an extract that matched nothing returns `0` with `''`. `validateSegment` and `mergeSegments` clear it too: `validateSegment` returns `false` for a segment that fails its checks (`''`) and for a file that could not be read (the reason), and `mergeSegments` returns `false` with the reason when no segment was merged |
+| `lrvx.lastError()` | Why the last `recompressSegment` returned `false` or the last `extractSymbols` / `extractTimeRange` returned `0`: a string that opens with the C function's name and names the file that could not be read or written. Each of the three clears it on entry, so `''` means the call did not fail; an extract that matched nothing returns `0` with `''`. `validateSegment` and `mergeSegments` clear it too: `validateSegment` returns `false` for a segment that fails its checks (`''`) and for a file that could not be read (the reason), and `mergeSegments` returns `true` only when every input was merged and at least one event was written, as `mergeDir`'s `success` does: it returns `false` with the reason when no segment was merged, and `false` with `merged N segment(s); skipped: Cannot open: <path>; ...` when some inputs could not be opened (the output is still written from the ones that opened; this case used to return `true`) |
 
 ---
 

@@ -27,3 +27,15 @@ def test_ci_runs_the_gate_tests():
     have to run somewhere other than a developer's laptop."""
     assert "scripts/tests" in CI.read_text(), \
         "add a step running `pytest scripts/tests -q`"
+
+
+def test_the_typecheck_ci_runs_covers_the_quickjs_typings():
+    """quickjs/types/lrvx.d.ts was checked by nothing: a typing could name a
+    method the runtime does not have and no job would say so."""
+    import json
+
+    scripts = json.loads((REPO / "node" / "package.json").read_text())["scripts"]
+    assert "../quickjs/types/tsconfig.json" in scripts["typecheck"]
+    assert "npm run typecheck" in CI.read_text()
+    config = json.loads((REPO / "quickjs" / "types" / "tsconfig.json").read_text())
+    assert "lrvx.d.ts" in config["include"]

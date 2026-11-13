@@ -2664,7 +2664,11 @@ export function validate(
 ): SegmentValidationResult;
 /** Recursive dataset validation across all segments under `dir`. */
 export function validateDataset(dir: string): DatasetValidationResult;
-/** Concatenate one or more input segments into a single output. */
+/** Merge the segments under `inputPath` into one output. `true` only when
+ *  every input was merged and at least one event was written, as
+ *  `mergeDir`'s `success` is; `false` when none was merged and when some
+ *  could not be opened while the others were written. `lastError()` says
+ *  which. */
 export function mergeSegments(inputPath: string, outputPath: string): boolean;
 /** Merge every segment under a directory into one output. */
 export function mergeDir(dir: string, outputPath: string): MergeDirResult;

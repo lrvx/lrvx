@@ -1398,6 +1398,8 @@ extern "C"
   // Data Writer
   // ============================================================
 
+  // max_segment_mb 0 is the 256 MB default, here and in
+  // lrvx_binary_log_recorder_hook_create(_ex).
   LrvxDataWriterHandle lrvx_data_writer_create(const char* output_dir, uint64_t max_segment_mb,
                                                uint8_t exchange_id);
   void lrvx_data_writer_destroy(LrvxDataWriterHandle writer);
@@ -2511,11 +2513,13 @@ extern "C"
 
   // validate returns 0 for a segment that fails its checks and for a file it
   // could not read; only the unreadable file leaves a reason in
-  // lrvx_last_error_message. merge returns 0 when no segment was merged, with
-  // the reason there. When it merged some segments and could not open others
-  // it still returns 1, and the last error names each one it skipped
-  // ("merged N segment(s); skipped: Cannot open: <path>; ..."). Call
-  // lrvx_clear_last_error first to tell the cases apart.
+  // lrvx_last_error_message. merge returns 1 only when every input was merged
+  // and at least one event was written, the rule every merge call follows
+  // (LrvxMergeResult.success, lrvx_segment_merge_dir_report). It returns 0
+  // when no segment was merged, with the reason in the last error, and 0 when
+  // it merged some segments and could not open others: the segments that
+  // opened are still written to the output, and the last error names each one
+  // it skipped ("merged N segment(s); skipped: Cannot open: <path>; ...").
   uint8_t lrvx_segment_validate(const char* path);
   uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path);
   /* input_paths is one buffer holding num_paths consecutive NUL-terminated

@@ -916,7 +916,9 @@ def validate_segment(path: str) -> bool:
 
 
 def merge_segments(input_dir: str, output_path: str) -> bool:
-    """False when no segment was merged; last_error() says why."""
+    """True only when every input was merged and at least one event was
+    written. False when no segment was merged and when some inputs were
+    skipped while the others were written; last_error() says which."""
     lrvx_clear_last_error()
     return lrvx_segment_merge(input_dir.c_str(), output_path.c_str()) != u8(0)
 

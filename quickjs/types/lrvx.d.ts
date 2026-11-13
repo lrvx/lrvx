@@ -513,7 +513,136 @@ interface AggregatedBar extends Bar {
     readonly trades: number;
 }
 
+// ---- .lrvxrun strategy trace ----
+
+interface TraceRecorderOpts {
+    /** The `.lrvxrun` directory to write. */
+    path: string;
+    strategyId?: string;
+    strategyHash?: string;
+    runStartedNs?: number | bigint;
+}
+
+interface TraceTapeRefOpts {
+    path: string;
+    contentHash?: string;
+    firstEventNs?: number | bigint;
+    lastEventNs?: number | bigint;
+}
+
+interface TraceSignalOpts {
+    runTsNs: number | bigint;
+    feedTsNs?: number | bigint;
+    /** The whole 64-bit id is written; a BigInt keeps one above 2^53 exact. */
+    signalId?: number | bigint;
+    /** 1 enter, 2 exit, 4 rebalance. */
+    flags?: number;
+    strengthRaw?: number | bigint;
+    name?: string;
+    symbolIds?: number[];
+    payload?: string;
+}
+
+interface TraceOrderEventOpts {
+    runTsNs: number | bigint;
+    feedTsNs?: number | bigint;
+    orderId?: number | bigint;
+    parentSignalId?: number | bigint;
+    priceRaw?: number | bigint;
+    qtyRaw?: number | bigint;
+    symbolId?: number;
+    /** 1 submit (the default), 2 cancel, 3 modify, 4 ack, 5 reject, 6 expire. */
+    eventKind?: number;
+    side?: number;
+    orderType?: number;
+    /** 1 post-only, 2 reduce-only, 4 IOC. */
+    flags?: number;
+    reason?: string;
+}
+
+interface TraceFillOpts {
+    runTsNs: number | bigint;
+    feedTsNs?: number | bigint;
+    orderId?: number | bigint;
+    fillId?: number | bigint;
+    priceRaw?: number | bigint;
+    qtyRaw?: number | bigint;
+    feeRaw?: number | bigint;
+    symbolId?: number;
+    side?: number;
+    /** 0 unknown, 1 maker, 2 taker. */
+    liquidity?: number;
+}
+
+interface TraceSignalRecord {
+    runTsNs: bigint;
+    feedTsNs: bigint;
+    /** The low 32 bits of the signal's id. */
+    signalId: number;
+    /** The whole id. For a signal a runner captured it is the order id the
+     *  signal asks for. A Number, as `orderId` on an order event is. */
+    signalId64: number;
+    flags: number;
+    strengthRaw: number;
+    name: string;
+    symbolIds: number[];
+    payload: string;
+}
+
+interface TraceOrderEventRecord {
+    runTsNs: bigint;
+    feedTsNs: bigint;
+    orderId: number;
+    parentSignalId: number;
+    priceRaw: number;
+    qtyRaw: number;
+    symbolId: number;
+    eventKind: number;
+    side: number;
+    orderType: number;
+    flags: number;
+    reason: string;
+}
+
+interface TraceFillRecord {
+    runTsNs: bigint;
+    feedTsNs: bigint;
+    orderId: number;
+    fillId: number;
+    priceRaw: number;
+    qtyRaw: number;
+    feeRaw: number;
+    symbolId: number;
+    side: number;
+    liquidity: number;
+}
+
+/** Writes signals, order events and fills into a `.lrvxrun` directory. */
+interface TraceRecorder {
+    addTapeRef(opts: TraceTapeRefOpts): void;
+    setRunEndedNs(ns: number | bigint): void;
+    writeSignal(opts: TraceSignalOpts): void;
+    writeOrderEvent(opts: TraceOrderEventOpts): void;
+    writeFill(opts: TraceFillOpts): void;
+    /** Finish the segment files and the manifest. */
+    close(): void;
+    destroy(): void;
+}
+
+/** Reads back a `.lrvxrun` directory. Throws when it cannot be opened. */
+interface TraceReader {
+    strategyId(): string;
+    runStartedNs(): bigint;
+    runEndedNs(): bigint;
+    readAllSignals(): TraceSignalRecord[];
+    readAllOrderEvents(): TraceOrderEventRecord[];
+    readAllFills(): TraceFillRecord[];
+    destroy(): void;
+}
+
 declare const lrvx: {
+    TraceRecorder: new (opts: TraceRecorderOpts) => TraceRecorder;
+    TraceReader: new (path: string) => TraceReader;
     register(strategy: Strategy): void;
     correlation(x: number[], y: number[]): number;
     profitFactor(pnl: number[]): number;
@@ -524,7 +653,10 @@ declare const lrvx: {
      *  not be read; `lastError()` is `''` for the first and the reason for the
      *  second. */
     validateSegment(path: string): boolean;
-    /** `false` when no segment was merged; `lastError()` says why. */
+    /** `true` only when every input was merged and at least one event was
+     *  written. `false` when no segment was merged, and when some inputs
+     *  could not be opened while the others were written; `lastError()` says
+     *  which. */
     mergeSegments(inputDir: string, outputPath: string): boolean;
     /** `outputPath` is the segment that was written (`''` when none was).
      *  `errors` has one entry for everything that went wrong, among them

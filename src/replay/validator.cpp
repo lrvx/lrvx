@@ -886,7 +886,7 @@ RepairResult SegmentRepairer::repair(const std::filesystem::path& segment_path,
 
   if (!std::filesystem::exists(segment_path))
   {
-    result.errors.push_back("File not found");
+    result.errors.push_back("File not found: " + segment_path.string());
     return result;
   }
 

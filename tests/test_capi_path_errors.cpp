@@ -552,10 +552,11 @@ std::string writeGarbageSegment(const std::filesystem::path& dir, const std::str
 
 }  // namespace
 
-// lrvx_segment_merge returned 1 with nothing said when some of the inputs
-// could not be opened: the caller had a merged tape and no way to learn it
-// was short. It still returns 1; the inputs it skipped are in the last error.
-TEST_F(CapiPathErrors, MergeNamesTheInputsItCouldNotOpen)
+// A merge that wrote the segments it could open and skipped the rest is not a
+// success, for lrvx_segment_merge as for the result of every other merge
+// call: the output is short. The inputs it skipped are in the last error.
+// lrvx_segment_merge used to return 1 here while merge_dir said success = 0.
+TEST_F(CapiPathErrors, APartialMergeIsNotASuccessAndNamesWhatItSkipped)
 {
   const auto dir = _root / "tape";
   const auto segments = writeTape(dir);
@@ -565,13 +566,78 @@ TEST_F(CapiPathErrors, MergeNamesTheInputsItCouldNotOpen)
   const std::string bad2 = writeGarbageSegment(dir, "zz_bad_two" + ext);
   lrvx_clear_last_error();
 
-  EXPECT_EQ(lrvx_segment_merge(dir.string().c_str(), (_root / "merged").string().c_str()), 1)
-      << "the segments that opened are still merged";
+  const auto out = _root / "merged";
+  EXPECT_EQ(lrvx_segment_merge(dir.string().c_str(), out.string().c_str()), 0);
   expectReason("lrvx_segment_merge");
+  expectReason("merged " + std::to_string(segments.size()) + " segment(s)");
   expectReason(bad1);
   expectReason(bad2);
   EXPECT_EQ(lastError().find(segments.front()), std::string::npos)
       << "a segment that was merged is not listed: " << lastError();
+  EXPECT_TRUE(std::filesystem::exists(out) && !std::filesystem::is_empty(out))
+      << "the segments that opened are still written";
+
+  // The struct-returning calls and the report say the same.
+  lrvx_clear_last_error();
+  const LrvxMergeResult plain =
+      lrvx_segment_merge_dir(dir.string().c_str(), (_root / "merged2").string().c_str());
+  EXPECT_EQ(plain.success, 0);
+  EXPECT_EQ(plain.segments_merged, segments.size());
+  EXPECT_EQ(plain.events_written, 5u);
+  expectReason(bad1);
+
+  LrvxMergeResult reported{};
+  EXPECT_EQ(lrvx_segment_merge_dir_report(dir.string().c_str(),
+                                          (_root / "merged3").string().c_str(), &reported,
+                                          nullptr, 0, nullptr, 0),
+            0);
+  EXPECT_EQ(reported.success, 0);
+  EXPECT_EQ(reported.events_written, 5u);
+}
+
+// An explicit 0 MB was passed on as a bound of 0 bytes: one segment per event.
+TEST_F(CapiPathErrors, ADataWriterWithZeroSegmentSizeUsesTheDefault)
+{
+  const auto dir = _root / "zero";
+  LrvxDataWriterHandle w = lrvx_data_writer_create(dir.string().c_str(), 0, 1);
+  ASSERT_NE(w, nullptr) << lastError();
+  for (int i = 0; i < 5; ++i)
+  {
+    lrvx_data_writer_write_trade(w, (10 + i) * kSec, (10 + i) * kSec, 100.0 + i, 1.0,
+                                 static_cast<uint64_t>(i + 1), 1, 0);
+  }
+  lrvx_data_writer_close(w);
+  lrvx_data_writer_destroy(w);
+
+  const LrvxDatasetValidation v = lrvx_dataset_validate(dir.string().c_str());
+  EXPECT_EQ(v.total_segments, 1u);
+  EXPECT_EQ(v.total_events, 5u);
+}
+
+TEST_F(CapiPathErrors, ARecorderHookWithZeroSegmentSizeUsesTheDefault)
+{
+  const auto dir = _root / "hook_zero";
+  LrvxBinaryLogRecorderHookHandle hook =
+      lrvx_binary_log_recorder_hook_create(dir.string().c_str(), 0, 1, 0);
+  ASSERT_NE(hook, nullptr) << lastError();
+  LrvxMarketDataRecorderHandle recorder = lrvx_binary_log_recorder_hook_as_recorder(hook);
+  ASSERT_NE(recorder, nullptr);
+  LrvxRunnerHandle runner = lrvx_runner_create(
+      _registry, [](void*, const LrvxSignal*) {}, nullptr);
+  lrvx_runner_set_market_data_recorder(runner, recorder);
+  lrvx_runner_start(runner);
+  for (int i = 0; i < 5; ++i)
+  {
+    lrvx_runner_on_trade(runner, _symbol, 100.0 + i, 1.0, 1, (10 + i) * kSec);
+  }
+  lrvx_runner_stop(runner);
+  lrvx_runner_destroy(runner);
+  lrvx_binary_log_recorder_hook_flush(hook);
+  lrvx_binary_log_recorder_hook_destroy(hook);
+
+  const LrvxDatasetValidation v = lrvx_dataset_validate(dir.string().c_str());
+  EXPECT_EQ(v.total_segments, 1u);
+  EXPECT_EQ(v.total_events, 5u);
 }
 
 // The path and the errors, which LrvxMergeResult has no room for.

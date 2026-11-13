@@ -1282,9 +1282,12 @@ void lrvx_binary_log_recorder_hook_stats_p(void* hook, void* out);
 ```c
 // Quick validate/merge. validate returns 0 for a segment that fails its
 // checks and for a file it could not read; only the second leaves a reason in
-// lrvx_last_error_message. merge returns 0 when no segment was merged, with
-// the reason there; when it merged some segments and could not open others it
-// returns 1 and the last error lists the ones it skipped.
+// lrvx_last_error_message. merge returns 1 only when every input was merged
+// and at least one event was written, which is what LrvxMergeResult.success
+// and lrvx_segment_merge_dir_report say too. It returns 0 when no segment was
+// merged, with the reason in the last error, and 0 when it merged some
+// segments and could not open others: the output is written from the ones
+// that opened, and the last error lists the ones it skipped.
 uint8_t lrvx_segment_validate(const char* path);
 uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path);
 

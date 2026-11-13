@@ -138,6 +138,23 @@ inline py::dict partitionToDict(const Partition& p)
   return d;
 }
 
+// "type" is the IssueType value; the module's ISSUE_* constants name them.
+inline py::list issuesToList(const std::vector<ValidationIssue>& found)
+{
+  py::list issues;
+  for (const auto& issue : found)
+  {
+    py::dict id;
+    id["type"] = static_cast<int>(issue.type);
+    id["message"] = issue.message;
+    id["severity"] = static_cast<int>(issue.severity);
+    id["file_offset"] = issue.file_offset;
+    id["timestamp_ns"] = issue.timestamp_ns;
+    issues.append(id);
+  }
+  return issues;
+}
+
 inline py::dict segmentValidationToDict(const SegmentValidationResult& r)
 {
   py::dict d;
@@ -155,17 +172,7 @@ inline py::dict segmentValidationToDict(const SegmentValidationResult& r)
   d["has_errors"] = r.hasErrors();
   d["has_critical"] = r.hasCritical();
 
-  py::list issues;
-  for (const auto& issue : r.issues)
-  {
-    py::dict id;
-    id["message"] = issue.message;
-    id["severity"] = static_cast<int>(issue.severity);
-    id["file_offset"] = issue.file_offset;
-    id["timestamp_ns"] = issue.timestamp_ns;
-    issues.append(id);
-  }
-  d["issues"] = issues;
+  d["issues"] = issuesToList(r.issues);
   return d;
 }
 
@@ -193,17 +200,7 @@ inline py::dict datasetValidationToDict(const DatasetValidationResult& r)
 
   // Issues about the dataset rather than about one segment: a directory that
   // is not there or cannot be listed, segments that overlap in time.
-  py::list issues;
-  for (const auto& issue : r.issues)
-  {
-    py::dict id;
-    id["message"] = issue.message;
-    id["severity"] = static_cast<int>(issue.severity);
-    id["file_offset"] = issue.file_offset;
-    id["timestamp_ns"] = issue.timestamp_ns;
-    issues.append(id);
-  }
-  d["issues"] = issues;
+  d["issues"] = issuesToList(r.issues);
   return d;
 }
 
@@ -477,4 +474,32 @@ inline void bindSegmentOps(py::module_& m)
       .def("partition_per_symbol", &PyPartitioner::partitionPerSymbol)
       .def("partition_by_event_count", &PyPartitioner::partitionByEventCount,
            py::arg("num_partitions"));
+
+  // The values an issue's "type" takes, in IssueType order.
+  const auto issueType = [&m](const char* name, IssueType type)
+  {
+    m.attr(name) = py::int_(static_cast<int>(type));
+  };
+  issueType("ISSUE_INVALID_MAGIC", IssueType::InvalidMagic);
+  issueType("ISSUE_INVALID_VERSION", IssueType::InvalidVersion);
+  issueType("ISSUE_INVALID_FLAGS", IssueType::InvalidFlags);
+  issueType("ISSUE_HEADER_CORRUPTED", IssueType::HeaderCorrupted);
+  issueType("ISSUE_FRAME_CRC_MISMATCH", IssueType::FrameCrcMismatch);
+  issueType("ISSUE_FRAME_SIZE_TOO_LARGE", IssueType::FrameSizeTooLarge);
+  issueType("ISSUE_FRAME_TYPE_UNKNOWN", IssueType::FrameTypeUnknown);
+  issueType("ISSUE_FRAME_TRUNCATED", IssueType::FrameTruncated);
+  issueType("ISSUE_BLOCK_MAGIC_INVALID", IssueType::BlockMagicInvalid);
+  issueType("ISSUE_BLOCK_DECOMPRESSION_FAILED", IssueType::BlockDecompressionFailed);
+  issueType("ISSUE_BLOCK_SIZE_MISMATCH", IssueType::BlockSizeMismatch);
+  issueType("ISSUE_INDEX_CRC_MISMATCH", IssueType::IndexCrcMismatch);
+  issueType("ISSUE_INDEX_MAGIC_INVALID", IssueType::IndexMagicInvalid);
+  issueType("ISSUE_INDEX_OUT_OF_BOUNDS", IssueType::IndexOutOfBounds);
+  issueType("ISSUE_INDEX_NOT_SORTED", IssueType::IndexNotSorted);
+  issueType("ISSUE_TIMESTAMP_OUT_OF_ORDER", IssueType::TimestampOutOfOrder);
+  issueType("ISSUE_TIMESTAMP_JUMP_TOO_LARGE", IssueType::TimestampJumpTooLarge);
+  issueType("ISSUE_EVENT_COUNT_MISMATCH", IssueType::EventCountMismatch);
+  issueType("ISSUE_FILE_TRUNCATED", IssueType::FileTruncated);
+  issueType("ISSUE_FILE_NOT_FOUND", IssueType::FileNotFound);
+  issueType("ISSUE_FILE_READ_ERROR", IssueType::FileReadError);
+  issueType("ISSUE_SEGMENT_RANGE_OVERLAP", IssueType::SegmentRangeOverlap);
 }
