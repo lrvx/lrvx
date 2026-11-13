@@ -122,3 +122,51 @@ TEST(ValidatorMessages, RepairNamesTheFileItCannotFind)
   EXPECT_EQ(given.errors.front(), "File not found: " + missing.string());
   std::filesystem::remove_all(dir);
 }
+
+// The repair's other errors named nothing: "Cannot read header" for one
+// segment of a directory left the caller to guess which.
+TEST(ValidatorMessages, RepairNamesTheFileInEveryError)
+{
+  const auto dir = std::filesystem::temp_directory_path() / "lrvx_repair_names_the_file";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+
+  // A count to fix makes the repair open the file and read its header.
+  SegmentValidationResult validation;
+  validation.reported_event_count = 1;
+  validation.actual_event_count = 2;
+
+  const auto expectOneErrorNaming =
+      [](const RepairResult& r, const std::string& what, const std::filesystem::path& file)
+  {
+    ASSERT_EQ(r.errors.size(), 1u);
+    EXPECT_EQ(r.errors.front().rfind(what, 0), 0u) << r.errors.front();
+    EXPECT_NE(r.errors.front().find(file.string()), std::string::npos) << r.errors.front();
+  };
+
+  RepairConfig inPlace;
+  inPlace.backup_before_repair = false;
+
+  // Too short to hold a header.
+  const auto empty = dir / "empty.lrvx";
+  std::ofstream(empty, std::ios::binary).close();
+  expectOneErrorNaming(SegmentRepairer(inPlace).repair(empty, validation), "Cannot read header",
+                       empty);
+
+  // Not something that opens for writing.
+  const auto notAFile = dir / "directory.lrvx";
+  std::filesystem::create_directories(notAFile);
+  expectOneErrorNaming(SegmentRepairer(inPlace).repair(notAFile, validation),
+                       "Cannot open file for writing", notAFile);
+
+  // The backup's name is taken by a directory.
+  const auto segment = dir / "segment.lrvx";
+  std::ofstream(segment, std::ios::binary) << "not a segment";
+  std::filesystem::create_directories(dir / "segment.lrvx.backup");
+  const RepairResult backedUp = SegmentRepairer().repair(segment, validation);
+  expectOneErrorNaming(backedUp, "Failed to create backup", segment);
+  EXPECT_NE(backedUp.errors.front().find("segment.lrvx.backup"), std::string::npos)
+      << backedUp.errors.front();
+
+  std::filesystem::remove_all(dir);
+}

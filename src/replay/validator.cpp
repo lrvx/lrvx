@@ -936,7 +936,8 @@ bool SegmentRepairer::createBackup(const std::filesystem::path& path, RepairResu
 
   if (ec)
   {
-    result.errors.push_back("Failed to create backup: " + ec.message());
+    result.errors.push_back("Failed to create backup " + result.backup_path.string() + " of " +
+                            path.string() + ": " + ec.message());
     return false;
   }
 
@@ -951,7 +952,7 @@ bool SegmentRepairer::fixHeaderTimestamps(const std::filesystem::path& path,
   std::FILE* file = std::fopen(path.string().c_str(), "r+b");
   if (!file)
   {
-    result.errors.push_back("Cannot open file for writing");
+    result.errors.push_back("Cannot open file for writing: " + path.string());
     return false;
   }
 
@@ -960,7 +961,7 @@ bool SegmentRepairer::fixHeaderTimestamps(const std::filesystem::path& path,
   if (std::fread(&header, sizeof(header), 1, file) != 1)
   {
     std::fclose(file);
-    result.errors.push_back("Cannot read header");
+    result.errors.push_back("Cannot read header: " + path.string());
     return false;
   }
 
@@ -973,7 +974,7 @@ bool SegmentRepairer::fixHeaderTimestamps(const std::filesystem::path& path,
   if (std::fwrite(&header, sizeof(header), 1, file) != 1)
   {
     std::fclose(file);
-    result.errors.push_back("Cannot write header");
+    result.errors.push_back("Cannot write header: " + path.string());
     return false;
   }
 
@@ -988,7 +989,7 @@ bool SegmentRepairer::fixEventCount(const std::filesystem::path& path,
   std::FILE* file = std::fopen(path.string().c_str(), "r+b");
   if (!file)
   {
-    result.errors.push_back("Cannot open file for writing");
+    result.errors.push_back("Cannot open file for writing: " + path.string());
     return false;
   }
 
@@ -997,7 +998,7 @@ bool SegmentRepairer::fixEventCount(const std::filesystem::path& path,
   if (std::fread(&header, sizeof(header), 1, file) != 1)
   {
     std::fclose(file);
-    result.errors.push_back("Cannot read header");
+    result.errors.push_back("Cannot read header: " + path.string());
     return false;
   }
 
@@ -1009,7 +1010,7 @@ bool SegmentRepairer::fixEventCount(const std::filesystem::path& path,
   if (std::fwrite(&header, sizeof(header), 1, file) != 1)
   {
     std::fclose(file);
-    result.errors.push_back("Cannot write header");
+    result.errors.push_back("Cannot write header: " + path.string());
     return false;
   }
 
