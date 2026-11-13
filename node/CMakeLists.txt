@@ -40,8 +40,12 @@ find_library(LRVX_LIB lrvx HINTS
 # build/Release/lrvx.lib rather than build/lrvx.lib. Demanding
 # CMAKE_BUILD_TYPE from those generators broke the Windows leg of
 # node-publish.yml and blocked a release.
+# A foreach variable is restored when the loop ends, so the directory found is
+# kept in _lrvx_core_cache_dir for the lz4 check further down.
+set(_lrvx_core_cache_dir "")
 foreach(_lrvx_core_dir "${CMAKE_SOURCE_DIR}/../build" "${CMAKE_SOURCE_DIR}/../build/Release")
   if(EXISTS "${_lrvx_core_dir}/CMakeCache.txt")
+    set(_lrvx_core_cache_dir "${_lrvx_core_dir}")
     file(STRINGS "${_lrvx_core_dir}/CMakeCache.txt" _lrvx_core_build_type
          REGEX "^CMAKE_BUILD_TYPE:STRING=")
     string(REPLACE "CMAKE_BUILD_TYPE:STRING=" "" _lrvx_core_build_type "${_lrvx_core_build_type}")
@@ -188,15 +192,15 @@ set(LRVX_NODE_LZ4_FOUND OFF)
 # archive; linking a system lz4 as well would put a second copy, and a
 # runtime dependency, into the addon. Only the header is needed then.
 set(_lrvx_core_vendor_lz4 "")
-if(EXISTS "${_lrvx_core_dir}/CMakeCache.txt")
-  file(STRINGS "${_lrvx_core_dir}/CMakeCache.txt" _lrvx_core_vendor_lz4
+if(EXISTS "${_lrvx_core_cache_dir}/CMakeCache.txt")
+  file(STRINGS "${_lrvx_core_cache_dir}/CMakeCache.txt" _lrvx_core_vendor_lz4
        REGEX "^LRVX_VENDOR_LZ4:BOOL=(ON|TRUE|1)$")
 endif()
 if(_lrvx_core_vendor_lz4)
-  if(NOT EXISTS "${_lrvx_core_dir}/_deps/lz4_src-src/lib/lz4.h")
-    message(FATAL_ERROR "lrvx_node: the core build vendors lz4 but ${_lrvx_core_dir}/_deps/lz4_src-src/lib/lz4.h is missing")
+  if(NOT EXISTS "${_lrvx_core_cache_dir}/_deps/lz4_src-src/lib/lz4.h")
+    message(FATAL_ERROR "lrvx_node: the core build vendors lz4 but ${_lrvx_core_cache_dir}/_deps/lz4_src-src/lib/lz4.h is missing")
   endif()
-  target_include_directories(lrvx_node PRIVATE "${_lrvx_core_dir}/_deps/lz4_src-src/lib")
+  target_include_directories(lrvx_node PRIVATE "${_lrvx_core_cache_dir}/_deps/lz4_src-src/lib")
   set(LRVX_NODE_LZ4_FOUND ON)
   message(STATUS "lrvx_node: LZ4 compiled into the core archive")
 else()
