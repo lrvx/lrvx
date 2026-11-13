@@ -4,6 +4,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "bindings_common.h"
 
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/replay/ops/partitioner.h"
@@ -23,62 +24,37 @@ using namespace lrvx::replay;
 
 inline CompressionType parseCompression(const std::string& s)
 {
-  if (s == "lz4")
-  {
-    return CompressionType::LZ4;
-  }
-  return CompressionType::None;
+  // An empty string is the same request as "none", as the writers read it.
+  return parseChoice<CompressionType>("compression", s.empty() ? std::string("none") : s,
+                                      {{"none", CompressionType::None},
+                                       {"lz4", CompressionType::LZ4}});
 }
 
 inline SplitMode parseSplitMode(const std::string& s)
 {
-  if (s == "event_count")
-  {
-    return SplitMode::ByEventCount;
-  }
-  if (s == "size")
-  {
-    return SplitMode::BySize;
-  }
-  if (s == "symbol")
-  {
-    return SplitMode::BySymbol;
-  }
-  return SplitMode::ByTime;
+  return parseChoice<SplitMode>("split mode", s,
+                                {{"time", SplitMode::ByTime},
+                                 {"event_count", SplitMode::ByEventCount},
+                                 {"size", SplitMode::BySize},
+                                 {"symbol", SplitMode::BySymbol}});
 }
 
 inline ExportFormat parseExportFormat(const std::string& s)
 {
-  if (s == "json")
-  {
-    return ExportFormat::JSON;
-  }
-  if (s == "jsonlines")
-  {
-    return ExportFormat::JSONLines;
-  }
-  if (s == "binary")
-  {
-    return ExportFormat::Binary;
-  }
-  return ExportFormat::CSV;
+  return parseChoice<ExportFormat>("export format", s,
+                                   {{"csv", ExportFormat::CSV},
+                                    {"json", ExportFormat::JSON},
+                                    {"jsonlines", ExportFormat::JSONLines},
+                                    {"binary", ExportFormat::Binary}});
 }
 
 inline Partitioner::CalendarUnit parseCalendarUnit(const std::string& s)
 {
-  if (s == "day")
-  {
-    return Partitioner::CalendarUnit::Day;
-  }
-  if (s == "week")
-  {
-    return Partitioner::CalendarUnit::Week;
-  }
-  if (s == "month")
-  {
-    return Partitioner::CalendarUnit::Month;
-  }
-  return Partitioner::CalendarUnit::Hour;
+  return parseChoice<Partitioner::CalendarUnit>("calendar unit", s,
+                                                {{"hour", Partitioner::CalendarUnit::Hour},
+                                                 {"day", Partitioner::CalendarUnit::Day},
+                                                 {"week", Partitioner::CalendarUnit::Week},
+                                                 {"month", Partitioner::CalendarUnit::Month}});
 }
 
 inline py::dict mergeResultToDict(const MergeResult& r)

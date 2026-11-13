@@ -39,6 +39,31 @@ executor.submit_order(id=1, side="buy", price=0.0, quantity=1.0,
 
 **Order types:** `"limit"`, `"market"`, `"stop_market"`, `"stop_limit"`, `"tp_market"`, `"tp_limit"`, `"trailing_stop"`, `"iceberg"` — the canonical set, also readable as `lrvx.ORDER_TYPE_NAMES`. Anything else raises `ValueError` naming the accepted set; it is never quietly turned into a market order.
 
+**`side` and `tif`** are read the same way: any `side` but `"buy"` or `"sell"` and any `tif` outside the five above raises `ValueError` naming the value. They used to fall back, `side` to a sell and `tif` to GTC, so `side="Buy"` sold and `tif="day"` rested until cancelled.
+
+#### Strings that name a choice
+
+Every string argument of the Python bindings that names one of a fixed set of values is read strictly and raises `ValueError` naming what it was given and what it accepts. Each of these used to fall back to one of its values:
+
+| Argument | Accepts | Used to fall back to |
+|----------|---------|----------------------|
+| `side` of `SimulatedExecutor.submit_order` / `submit_bracket` / `submit_iceberg`, the venue executor's `submit_order`, `BacktestResult.record_fill`, `L3Book.add_order` / `build_from_snapshot`, `PositionTracker.on_fill`, `PositionGroupTracker.open_position` | `"buy"`, `"sell"` | sell |
+| `tif` of `SimulatedExecutor.submit_order` and the venue executor's `submit_order` | `"gtc"`, `"ioc"`, `"fok"`, `"gtd"`, `"post_only"` | GTC |
+| `PositionTracker(cost_basis)` | `"fifo"`, `"lifo"`, `"average"` | FIFO |
+| `SimulatedExecutor.set_stp_mode(mode)` | `"none"`, `"cancel_newest"`, `"cancel_oldest"`, `"cancel_both"`, `"decrement"` | none |
+| `SimulatedExecutor.set_bracket_child_arm_mode(mode)` | `"on_full_fill"`, `"on_partial_fill"` | on full fill |
+| `RateLimitPolicy.try_consume(action, ...)` | `"submit"`, `"cancel"`, `"replace"`, `"query_account"`, `"query_market_data"` | submit |
+| `LiveQueuePositionEstimator.set_hidden_order_policy(policy)` | `"ignore"`, `"trust_trade_flag"`, `"infer_if_trade_exceeds_visible"` | ignore |
+| `VenueAvailability` outage type | `"total"`, `"submit_only_down"` (`"submit_only"`), `"cancel_only_down"` (`"cancel_only"`), `"slow_degradation"`, `"stale_book"`, `"wrong_side_recovery"` | total |
+| `VenueAvailability` open-order policy | `"cancel_all"`, `"hold"`, `"expire_gtc_after"` | cancel all |
+| `WalkForwardRunner(mode)` | `"anchored"`, `"sliding"` | anchored |
+| `OrderGroup.mark_action_dispatched(leg_index, kind)` | `"cancel"`, `"revert"` | revert |
+| `lrvx.merge` / `recompress` `compression` | `"none"` (or `""`), `"lz4"` | none |
+| `lrvx.split` `mode` | `"time"`, `"event_count"`, `"size"`, `"symbol"` | time |
+| `lrvx.export_data` `format` | `"csv"`, `"json"`, `"jsonlines"`, `"binary"` | CSV |
+| calendar partition `unit` | `"hour"`, `"day"`, `"week"`, `"month"` | hour |
+| a `ReplaySource` event's `type` | `"trade"`, `"book_snapshot"`, `"book_delta"` | a book delta |
+
 #### `cancel_order(order_id)`
 
 Cancel an order by ID.

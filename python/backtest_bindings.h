@@ -6,6 +6,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "bindings_common.h"
 #include "lrvx/backtest/backtest_config.h"
 #include "lrvx/backtest/backtest_result.h"
 #include "lrvx/backtest/runner_fill_settings.h"
@@ -147,12 +148,12 @@ class PySimulatedExecutor
   {
     Order order;
     order.id = id;
-    order.side = (sideStr == "buy") ? Side::BUY : Side::SELL;
+    order.side = parseSide(sideStr);
     order.price = Price::fromDouble(price);
     order.quantity = Quantity::fromDouble(qty);
     order.symbol = symbol;
     order.type = parseOrderType(typeStr);
-    order.timeInForce = parseTimeInForce(tifStr);
+    order.timeInForce = parseTimeInForceWithExpiry(tifStr);
     order.flags.reduceOnly = reduceOnly ? 1 : 0;
     order.accountId = accountId;
     if (expiresAtNs > 0)
@@ -192,27 +193,6 @@ class PySimulatedExecutor
     return _executor.stpGroupFor(account_id);
   }
 
-  static TimeInForce parseTimeInForce(const std::string& s)
-  {
-    if (s == "ioc")
-    {
-      return TimeInForce::IOC;
-    }
-    if (s == "fok")
-    {
-      return TimeInForce::FOK;
-    }
-    if (s == "gtd")
-    {
-      return TimeInForce::GTD;
-    }
-    if (s == "post_only")
-    {
-      return TimeInForce::POST_ONLY;
-    }
-    return TimeInForce::GTC;
-  }
-
   void cancelOrder(uint64_t id) { _executor.cancelOrder(id); }
   void cancelAll(uint32_t symbol) { _executor.cancelAllOrders(symbol); }
 
@@ -226,8 +206,6 @@ class PySimulatedExecutor
     BracketOrder b;
     b.bracketId = bracketId;
     b.symbol = symbol;
-    auto parseSide = [](const std::string& s)
-    { return s == "buy" ? Side::BUY : Side::SELL; };
     b.entry.side = parseSide(entrySide);
     b.entry.type = parseOrderType(entryType);
     b.entry.price = Price::fromDouble(entryPrice);
@@ -245,10 +223,10 @@ class PySimulatedExecutor
   void cancelBracket(uint64_t bracketId) { _executor.cancelBracket(bracketId); }
   void setBracketChildArmMode(const std::string& mode)
   {
-    _executor.setBracketChildArmMode(
-        mode == "on_partial_fill"
-            ? SimulatedExecutor::BracketArmMode::OnPartialFill
-            : SimulatedExecutor::BracketArmMode::OnFullFill);
+    _executor.setBracketChildArmMode(parseChoice<SimulatedExecutor::BracketArmMode>(
+        "bracket child arm mode", mode,
+        {{"on_full_fill", SimulatedExecutor::BracketArmMode::OnFullFill},
+         {"on_partial_fill", SimulatedExecutor::BracketArmMode::OnPartialFill}}));
   }
   std::string bracketState(uint64_t bracketId) const
   {
@@ -274,7 +252,7 @@ class PySimulatedExecutor
   {
     Order o;
     o.id = id;
-    o.side = (sideStr == "buy") ? Side::BUY : Side::SELL;
+    o.side = parseSide(sideStr);
     o.price = Price::fromDouble(price);
     o.quantity = Quantity::fromDouble(totalQty);
     o.visibleQuantity = Quantity::fromDouble(visibleQty);
@@ -457,23 +435,13 @@ class PySimulatedExecutor
   }
   void setSTPMode(const std::string& mode)
   {
-    lrvx::STPMode m = lrvx::STPMode::None;
-    if (mode == "cancel_newest")
-    {
-      m = lrvx::STPMode::CancelNewest;
-    }
-    else if (mode == "cancel_oldest")
-    {
-      m = lrvx::STPMode::CancelOldest;
-    }
-    else if (mode == "cancel_both")
-    {
-      m = lrvx::STPMode::CancelBoth;
-    }
-    else if (mode == "decrement")
-    {
-      m = lrvx::STPMode::Decrement;
-    }
+    const lrvx::STPMode m = parseChoice<lrvx::STPMode>(
+        "STP mode", mode,
+        {{"none", lrvx::STPMode::None},
+         {"cancel_newest", lrvx::STPMode::CancelNewest},
+         {"cancel_oldest", lrvx::STPMode::CancelOldest},
+         {"cancel_both", lrvx::STPMode::CancelBoth},
+         {"decrement", lrvx::STPMode::Decrement}});
     _executor.setSTPMode(m);
   }
   void setFokMode(const std::string& mode)
@@ -583,7 +551,7 @@ class PyBacktestResult
     Fill fill{};
     fill.orderId = orderId;
     fill.symbol = symbol;
-    fill.side = (sideStr == "buy") ? Side::BUY : Side::SELL;
+    fill.side = parseSide(sideStr);
     fill.price = Price::fromDouble(price);
     fill.quantity = Quantity::fromDouble(qty);
     fill.timestampNs = UnixNanos::fromRaw(timestampNs);

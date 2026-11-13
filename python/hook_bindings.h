@@ -26,6 +26,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "bindings_common.h"
 #include "callback_guard.h"
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/capi/order_type_names.hpp"
@@ -113,28 +114,12 @@ inline LrvxOrder cOrderFromPy(const PyOrder& po)
   o.symbol = po.symbol;
   o.strategy_id = po.strategy_id;
   o.order_tag = po.order_tag;
-  o.side = po.side == "buy" ? 0u : 1u;
-  lrvx::capi::orderTypeCodeFromName(po.order_type, &o.type);
-  if (po.time_in_force == "gtc")
+  o.side = parseSide(po.side) == lrvx::Side::BUY ? 0u : 1u;
+  if (!lrvx::capi::orderTypeCodeFromName(po.order_type, &o.type))
   {
-    o.time_in_force = 0;
+    throw pybind11::value_error(lrvx::capi::unknownOrderTypeMessage(po.order_type));
   }
-  else if (po.time_in_force == "ioc")
-  {
-    o.time_in_force = 1;
-  }
-  else if (po.time_in_force == "fok")
-  {
-    o.time_in_force = 2;
-  }
-  else if (po.time_in_force == "gtd")
-  {
-    o.time_in_force = 3;
-  }
-  else if (po.time_in_force == "post_only")
-  {
-    o.time_in_force = 4;
-  }
+  o.time_in_force = static_cast<uint8_t>(parseTimeInForceWithExpiry(po.time_in_force));
   uint8_t flags = 0;
   if (po.reduce_only)
   {
@@ -773,7 +758,8 @@ inline uint8_t replayNextBridge(void* ud, LrvxReplayEvent* out)
     }
     else
     {
-      out->type = (ev.type == "book_snapshot") ? 2 : 3;
+      out->type = parseChoice<uint8_t>("replay event type", ev.type,
+                                       {{"book_snapshot", 2}, {"book_delta", 3}});
       out->book_symbol = ev.book_symbol;
       buf.bids.clear();
       buf.asks.clear();
@@ -1206,59 +1192,14 @@ inline lrvx::Order pyOrderToLrvx(const PyOrder& po)
   o.symbol = po.symbol;
   o.strategyId = po.strategy_id;
   o.orderTag = po.order_tag;
-  o.side = (po.side == "buy") ? lrvx::Side::BUY : lrvx::Side::SELL;
-  if (po.order_type == "limit")
+  o.side = parseSide(po.side);
+  uint8_t typeCode = 0;
+  if (!lrvx::capi::orderTypeCodeFromName(po.order_type, &typeCode))
   {
-    o.type = lrvx::OrderType::LIMIT;
+    throw pybind11::value_error(lrvx::capi::unknownOrderTypeMessage(po.order_type));
   }
-  else if (po.order_type == "market")
-  {
-    o.type = lrvx::OrderType::MARKET;
-  }
-  else if (po.order_type == "stop_market")
-  {
-    o.type = lrvx::OrderType::STOP_MARKET;
-  }
-  else if (po.order_type == "stop_limit")
-  {
-    o.type = lrvx::OrderType::STOP_LIMIT;
-  }
-  else if (po.order_type == "tp_market")
-  {
-    o.type = lrvx::OrderType::TAKE_PROFIT_MARKET;
-  }
-  else if (po.order_type == "tp_limit")
-  {
-    o.type = lrvx::OrderType::TAKE_PROFIT_LIMIT;
-  }
-  else if (po.order_type == "trailing_stop")
-  {
-    o.type = lrvx::OrderType::TRAILING_STOP;
-  }
-  else if (po.order_type == "iceberg")
-  {
-    o.type = lrvx::OrderType::ICEBERG;
-  }
-  if (po.time_in_force == "ioc")
-  {
-    o.timeInForce = lrvx::TimeInForce::IOC;
-  }
-  else if (po.time_in_force == "fok")
-  {
-    o.timeInForce = lrvx::TimeInForce::FOK;
-  }
-  else if (po.time_in_force == "gtd")
-  {
-    o.timeInForce = lrvx::TimeInForce::GTD;
-  }
-  else if (po.time_in_force == "post_only")
-  {
-    o.timeInForce = lrvx::TimeInForce::POST_ONLY;
-  }
-  else
-  {
-    o.timeInForce = lrvx::TimeInForce::GTC;
-  }
+  o.type = static_cast<lrvx::OrderType>(typeCode);
+  o.timeInForce = parseTimeInForceWithExpiry(po.time_in_force);
   o.flags.reduceOnly = po.reduce_only ? 1 : 0;
   o.flags.closePosition = po.close_position ? 1 : 0;
   o.flags.postOnly = po.post_only ? 1 : 0;

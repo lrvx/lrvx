@@ -11,6 +11,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "bindings_common.h"
 
 #include "lrvx/execution/live_queue_position_estimator.h"
 
@@ -73,15 +74,12 @@ inline void bindLiveQueuePositionEstimator(py::module_& m)
           py::arg("is_hidden") = false)
       .def("set_hidden_order_policy", [](lrvx::LiveQueuePositionEstimator& e, const std::string& policy)
            {
-             lrvx::HiddenOrderPolicy p = lrvx::HiddenOrderPolicy::Ignore;
-             if (policy == "trust_trade_flag")
-             {
-               p = lrvx::HiddenOrderPolicy::TrustTradeFlag;
-             }
-             else if (policy == "infer_if_trade_exceeds_visible")
-             {
-               p = lrvx::HiddenOrderPolicy::InferIfTradeExceedsVisible;
-             }
+             const auto p = parseChoice<lrvx::HiddenOrderPolicy>(
+                 "hidden order policy", policy,
+                 {{"ignore", lrvx::HiddenOrderPolicy::Ignore},
+                  {"trust_trade_flag", lrvx::HiddenOrderPolicy::TrustTradeFlag},
+                  {"infer_if_trade_exceeds_visible",
+                   lrvx::HiddenOrderPolicy::InferIfTradeExceedsVisible}});
              e.setHiddenOrderPolicy(p); }, py::arg("policy"))
       .def("on_level_update", [](lrvx::LiveQueuePositionEstimator& e, uint32_t symbol, uint8_t side, double price, double new_qty, int64_t ts_ns)
            { e.onLevelUpdate(symbol, static_cast<lrvx::Side>(side),

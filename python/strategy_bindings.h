@@ -11,6 +11,7 @@
 #include <stdexcept>
 
 #include "backtest_bindings.h"
+#include "bindings_common.h"
 #include "callback_guard.h"
 #include "drop_reason.h"
 #include "hook_bindings.h"
@@ -171,49 +172,6 @@ struct PyOrderEventData
   int32_t distance_to_best_ticks{0};
 };
 
-// Anything but "buy" used to be a sell, and anything but "ioc", "fok" or
-// "post_only" a GTC order: a typo placed an order nobody asked for.
-inline Side parseSide(const std::string& s)
-{
-  if (s == "buy")
-  {
-    return Side::BUY;
-  }
-  if (s == "sell")
-  {
-    return Side::SELL;
-  }
-  throw py::value_error("unknown side '" + s + "'; expected 'buy' or 'sell'");
-}
-
-inline TimeInForce parseTimeInForce(const std::string& tif)
-{
-  if (tif == "gtc")
-  {
-    return TimeInForce::GTC;
-  }
-  if (tif == "ioc")
-  {
-    return TimeInForce::IOC;
-  }
-  if (tif == "fok")
-  {
-    return TimeInForce::FOK;
-  }
-  if (tif == "post_only")
-  {
-    return TimeInForce::POST_ONLY;
-  }
-  if (tif == "gtd")
-  {
-    throw py::value_error(
-        "tif 'gtd' needs an expiry time, which this method does not take; "
-        "expected 'gtc', 'ioc', 'fok' or 'post_only'");
-  }
-  throw py::value_error("unknown tif '" + tif +
-                        "'; expected 'gtc', 'ioc', 'fok' or 'post_only'");
-}
-
 class PyStrategyBase
 {
  public:
@@ -320,22 +278,28 @@ class PyStrategyBase
 
   uint64_t emit_stop_market(uint32_t symbol, const std::string& side, double trigger, double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitStopMarket(symbol, parseSide(side), Price::fromDouble(trigger),
+    return emitting()->publicEmitStopMarket(symbol, parsedSide, Price::fromDouble(trigger),
                                             Quantity::fromDouble(qty));
   }
 
   uint64_t emit_stop_limit(uint32_t symbol, const std::string& side, double trigger,
                            double limit_price, double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitStopLimit(symbol, parseSide(side), Price::fromDouble(trigger),
+    return emitting()->publicEmitStopLimit(symbol, parsedSide, Price::fromDouble(trigger),
                                            Price::fromDouble(limit_price),
                                            Quantity::fromDouble(qty));
   }
@@ -343,11 +307,14 @@ class PyStrategyBase
   uint64_t emit_take_profit_market(uint32_t symbol, const std::string& side, double trigger,
                                    double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitTakeProfitMarket(symbol, parseSide(side),
+    return emitting()->publicEmitTakeProfitMarket(symbol, parsedSide,
                                                   Price::fromDouble(trigger),
                                                   Quantity::fromDouble(qty));
   }
@@ -355,11 +322,14 @@ class PyStrategyBase
   uint64_t emit_take_profit_limit(uint32_t symbol, const std::string& side, double trigger,
                                   double limit_price, double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitTakeProfitLimit(symbol, parseSide(side),
+    return emitting()->publicEmitTakeProfitLimit(symbol, parsedSide,
                                                  Price::fromDouble(trigger),
                                                  Price::fromDouble(limit_price),
                                                  Quantity::fromDouble(qty));
@@ -367,43 +337,49 @@ class PyStrategyBase
 
   uint64_t emit_trailing_stop(uint32_t symbol, const std::string& side, double offset, double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitTrailingStop(symbol, parseSide(side), Price::fromDouble(offset),
+    return emitting()->publicEmitTrailingStop(symbol, parsedSide, Price::fromDouble(offset),
                                               Quantity::fromDouble(qty));
   }
 
   uint64_t emit_trailing_stop_percent(uint32_t symbol, const std::string& side,
                                       int32_t callback_bps, double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitTrailingStopPercent(symbol, parseSide(side), callback_bps,
+    return emitting()->publicEmitTrailingStopPercent(symbol, parsedSide, callback_bps,
                                                      Quantity::fromDouble(qty));
   }
 
   uint64_t emit_limit_buy_tif(uint32_t symbol, double price, double qty, const std::string& tif)
   {
+    const TimeInForce t = parseTimeInForce(tif);
     if (!_bridge)
     {
       return 0;
     }
-    const TimeInForce t = parseTimeInForce(tif);
     return emitting()->publicEmitLimitBuyTif(symbol, Price::fromDouble(price),
                                              Quantity::fromDouble(qty), t);
   }
 
   uint64_t emit_limit_sell_tif(uint32_t symbol, double price, double qty, const std::string& tif)
   {
+    const TimeInForce t = parseTimeInForce(tif);
     if (!_bridge)
     {
       return 0;
     }
-    const TimeInForce t = parseTimeInForce(tif);
     return emitting()->publicEmitLimitSellTif(symbol, Price::fromDouble(price),
                                               Quantity::fromDouble(qty), t);
   }

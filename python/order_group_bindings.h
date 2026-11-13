@@ -11,6 +11,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "bindings_common.h"
 
 #include "lrvx/execution/order_group.h"
 
@@ -80,8 +81,10 @@ inline void bindOrderGroup(py::module_& m)
             return py::none(); }, py::arg("order_id"))
       .def("mark_action_dispatched", [](lrvx::OrderGroup& g, size_t idx, const std::string& kind)
            {
-            auto k = (kind == "cancel") ? lrvx::OrderGroupAction::Kind::CancelLeg
-                                        : lrvx::OrderGroupAction::Kind::RevertLeg;
+            const auto k = parseChoice<lrvx::OrderGroupAction::Kind>(
+                "action kind", kind,
+                {{"cancel", lrvx::OrderGroupAction::Kind::CancelLeg},
+                 {"revert", lrvx::OrderGroupAction::Kind::RevertLeg}});
             g.markActionDispatched(idx, k); }, py::arg("leg_index"), py::arg("kind"))
       .def("auto_dispatch", [](lrvx::OrderGroup& g, py::object strategy)
            {

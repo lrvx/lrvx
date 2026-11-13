@@ -11,6 +11,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "bindings_common.h"
 
 #include "lrvx/backtest/venue_availability.h"
 
@@ -21,40 +22,24 @@ namespace lrvx
 
 inline lrvx::OnOutage parseOnOutage(const std::string& s)
 {
-  if (s == "hold")
-  {
-    return lrvx::OnOutage::HOLD;
-  }
-  if (s == "expire_gtc_after")
-  {
-    return lrvx::OnOutage::EXPIRE_GTC_AFTER;
-  }
-  return lrvx::OnOutage::CANCEL_ALL;
+  return parseChoice<lrvx::OnOutage>("open-order policy", s,
+                                     {{"cancel_all", lrvx::OnOutage::CANCEL_ALL},
+                                      {"hold", lrvx::OnOutage::HOLD},
+                                      {"expire_gtc_after", lrvx::OnOutage::EXPIRE_GTC_AFTER}});
 }
 
 inline lrvx::OutageType parseOutageType(const std::string& s)
 {
-  if (s == "submit_only_down" || s == "submit_only")
-  {
-    return lrvx::OutageType::SubmitOnlyDown;
-  }
-  if (s == "cancel_only_down" || s == "cancel_only")
-  {
-    return lrvx::OutageType::CancelOnlyDown;
-  }
-  if (s == "slow_degradation")
-  {
-    return lrvx::OutageType::SlowDegradation;
-  }
-  if (s == "stale_book")
-  {
-    return lrvx::OutageType::StaleBook;
-  }
-  if (s == "wrong_side_recovery")
-  {
-    return lrvx::OutageType::WrongSideRecovery;
-  }
-  return lrvx::OutageType::Total;
+  return parseChoice<lrvx::OutageType>("outage type", s,
+                                       {{"total", lrvx::OutageType::Total},
+                                        {"submit_only_down", lrvx::OutageType::SubmitOnlyDown},
+                                        {"submit_only", lrvx::OutageType::SubmitOnlyDown},
+                                        {"cancel_only_down", lrvx::OutageType::CancelOnlyDown},
+                                        {"cancel_only", lrvx::OutageType::CancelOnlyDown},
+                                        {"slow_degradation", lrvx::OutageType::SlowDegradation},
+                                        {"stale_book", lrvx::OutageType::StaleBook},
+                                        {"wrong_side_recovery",
+                                         lrvx::OutageType::WrongSideRecovery}});
 }
 
 inline void bindVenueAvailability(py::module_& m)
