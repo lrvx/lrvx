@@ -964,7 +964,9 @@ export class GridSearch {
   addAxis(values: number[]): void;
   /** The factory's return value is read key-by-key in the
    *  `BacktestRunner.run*` shape, so a `run*` result can be returned
-   *  directly. Missing keys read as 0. */
+   *  directly. Missing keys read as 0; a key of another type, a value that
+   *  is not an object, or an error the factory throws stops the run and
+   *  `run()` throws it. */
   setFactory(factory: (params: number[]) => RunnerStats): void;
   total(): number;
   paramsForIndex(index: number): number[];

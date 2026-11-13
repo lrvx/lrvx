@@ -4,6 +4,7 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
 #include "error_translator.h"
 #include "lrvx/capi/lrvx_capi.h"
 #include "walk_forward.h"  // for statsToJsObj
@@ -19,30 +20,22 @@ struct GridSearchCallContext
   Napi::Env env;
   Napi::FunctionReference factory_fn;
   std::vector<std::vector<double>> per_call_params;
+  // What the factory threw, or what was wrong with the stats it returned.
+  // The run unwinds through the C API, which keeps only a message, so run
+  // rethrows this one to keep its class.
+  Napi::ObjectReference error;
 };
 
-inline int gridSearchFactoryThunk(void* user_data, uint64_t param_index,
-                                  const double* params, uint32_t num_params,
-                                  LrvxBacktestStats* out_stats)
+// The stats the factory returned, read into the C struct. A key left out
+// reads 0; a key of the wrong type used to read 0 as well.
+inline void gridSearchReadStats(const Napi::Value& result, LrvxBacktestStats* out_stats)
 {
-  auto* ctx = static_cast<GridSearchCallContext*>(user_data);
-  Napi::HandleScope scope(ctx->env);
-  auto arr = Napi::Array::New(ctx->env, num_params);
-  for (uint32_t i = 0; i < num_params; ++i)
-  {
-    arr[i] = Napi::Number::New(ctx->env, params[i]);
-  }
-  auto result = ctx->factory_fn.Call({arr});
-  if (!result.IsObject())
-  {
-    return 0;
-  }
-  auto obj = result.As<Napi::Object>();
-  // Map snake_case keys (BacktestRunner.runCsv stats) into the C struct.
+  auto obj = argObject(result, "setFactory: the stats the factory returns");
   auto getNum = [&](const char* key) -> double
   {
     auto v = obj.Get(key);
-    return v.IsNumber() ? v.As<Napi::Number>().DoubleValue() : 0.0;
+    return given(v) ? argNumber(v, (std::string("setFactory: the stats' ") + key).c_str())
+                    : 0.0;
   };
   out_stats->totalTrades = static_cast<uint64_t>(getNum("totalTrades"));
   out_stats->winningTrades = static_cast<uint64_t>(getNum("winningTrades"));
@@ -50,13 +43,14 @@ inline int gridSearchFactoryThunk(void* user_data, uint64_t param_index,
   out_stats->initialCapital = getNum("initialCapital");
   out_stats->finalCapital = getNum("finalCapital");
   out_stats->totalPnl = getNum("netPnl");
-  out_stats->netPnl = getNum("netPnl");
+  out_stats->netPnl = out_stats->totalPnl;
   out_stats->totalFees = getNum("totalFees");
   out_stats->returnPct = getNum("returnPct");
   out_stats->maxDrawdown = getNum("maxDrawdown");
   out_stats->maxDrawdownPct = getNum("maxDrawdownPct");
   out_stats->sharpeRatio = getNum("sharpeRatio");
   out_stats->sortinoRatio = getNum("sortinoRatio");
+  out_stats->calmarRatio = getNum("calmarRatio");
   out_stats->winRate = getNum("winRate");
   out_stats->profitFactor = getNum("profitFactor");
   out_stats->avgTradeDurationNs = getNum("avgTradeDurationNs");
@@ -67,10 +61,35 @@ inline int gridSearchFactoryThunk(void* user_data, uint64_t param_index,
   auto getNs = [&](const char* key) -> int64_t
   {
     auto v = obj.Get(key);
-    return (v.IsBigInt() || v.IsNumber()) ? toInt64Ns(v, "timestamp") : 0;
+    return given(v) ? toInt64Ns(v, (std::string("setFactory: the stats' ") + key).c_str()) : 0;
   };
   out_stats->startTimeNs = getNs("startTimeNs");
   out_stats->endTimeNs = getNs("endTimeNs");
+}
+
+inline int gridSearchFactoryThunk(void* user_data, uint64_t param_index,
+                                  const double* params, uint32_t num_params,
+                                  LrvxBacktestStats* out_stats)
+{
+  auto* ctx = static_cast<GridSearchCallContext*>(user_data);
+  Napi::HandleScope scope(ctx->env);
+  try
+  {
+    auto arr = Napi::Array::New(ctx->env, num_params);
+    for (uint32_t i = 0; i < num_params; ++i)
+    {
+      arr[i] = Napi::Number::New(ctx->env, params[i]);
+    }
+    gridSearchReadStats(ctx->factory_fn.Call({arr}), out_stats);
+  }
+  catch (const Napi::Error& e)
+  {
+    if (ctx->error.IsEmpty())
+    {
+      ctx->error = Napi::Persistent(e.Value());
+    }
+    throw;
+  }
   (void)param_index;
   return 1;
 }
@@ -168,11 +187,22 @@ class GridSearchNode : public Napi::ObjectWrap<GridSearchNode>
             "E_RUN_002",
             "GridSearch.run called with no axes / empty axis.");
       }
-      GridSearchCallContext ctx{env, Napi::FunctionReference(), {}};
+      GridSearchCallContext ctx{env, Napi::FunctionReference(), {}, {}};
       ctx.factory_fn = Napi::Persistent(_factory.Value());
       std::vector<LrvxBacktestStats> stats(total);
-      lrvx_grid_search_run(_handle, &gridSearchFactoryThunk, &ctx,
-                           stats.data(), static_cast<uint32_t>(total));
+      lrvx_clear_last_error();
+      const uint64_t ran = lrvx_grid_search_run(_handle, &gridSearchFactoryThunk, &ctx,
+                                                stats.data(), static_cast<uint32_t>(total));
+      // A run that failed part way used to hand back zeroed stats for every
+      // combination from the failure on.
+      if (!ctx.error.IsEmpty())
+      {
+        throw Napi::Error(env, ctx.error.Value());
+      }
+      if (ran == 0 && lrvx_last_error_code() != 0)
+      {
+        throw lrvx::LrvxError("E_VAL_002", "GridSearch.run: " + capiReason());
+      }
       auto results = Napi::Array::New(env, total);
       for (uint64_t i = 0; i < total; ++i)
       {
