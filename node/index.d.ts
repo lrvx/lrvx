@@ -52,7 +52,9 @@ export function capiAbiVersion(): number;
  *  `false`, `extractSymbols` / `extractTimeRange` returning `0`. Each of them
  *  clears it on entry, so `''` after one means it did not fail (an extract
  *  that matched nothing returns `0` with `''`). The text opens with the name
- *  of the C function. */
+ *  of the C function. `emit.modify` clears it too, and a Runner that refuses
+ *  the modify (an id its executor record does not hold) leaves the reason
+ *  here, ending in `[unknown_order]`. */
 export function lastError(): string;
 
 // ── Common types ──────────────────────────────────────────────────────
@@ -608,6 +610,16 @@ export class SymbolRegistry {
    *  that is not positive throws a `RangeError`. */
   addSymbol(exchange: string, name: string, tickSize?: number, lotSize?: number): Symbol;
   symbolCount(): number;
+  /** The price tick the entry holds now: the one given to `addSymbol`, one a
+   *  connector read from the venue and applied since, or the 0.01 a symbol
+   *  registered without a tick gets for its book. Throws a `RangeError` for an
+   *  id that is not registered. */
+  tickSize(symbol: Symbol | number): number;
+  /** `true` when order prices on the symbol are checked against `tickSize`. */
+  tickSizeDeclared(symbol: Symbol | number): boolean;
+  /** The quantity step the entry holds now, or `null` when it declares none
+   *  and quantities are not checked. */
+  lotSize(symbol: Symbol | number): number | null;
 }
 
 // ── Runner ────────────────────────────────────────────────────────────
@@ -694,6 +706,17 @@ export class Runner {
   setMarketDataRecorder(recorder: MarketDataRecorderHook | BinaryLogRecorderHook | null): void;
   /** Sync only — Executor.capabilities() is read inline. Throws if `threaded`. */
   setExecutor(executor: Executor | null): void;
+  /** Tell the runner an order it sent to the executor has reached a terminal
+   *  state (filled, cancelled by the venue, rejected, expired). The runner
+   *  keeps every order that can rest so that `emit.modify` can be sent as
+   *  that order with its price and quantity changed, and nothing tells it of
+   *  a fill: call this from wherever the executor learns the order is
+   *  finished, and the entry is dropped. An id that is not on record is
+   *  ignored; market, IOC and FOK orders are never kept.
+   *
+   *  An `emit.modify` that names an id not on record is not sent to the
+   *  executor; `lastError()` then says why and ends in `[unknown_order]`. */
+  orderClosed(orderId: number | bigint): void;
 
   /** Every hook failure this Runner has seen, oldest first.
    *
@@ -2598,6 +2621,12 @@ export interface MergeDirResult {
   segmentsMerged: number;
   eventsWritten: number;
   bytesWritten: number;
+  /** The segment that was written; `""` when none was. */
+  outputPath: string;
+  /** Everything that went wrong, among them `"Cannot open: <path>"` for each
+   *  input that was skipped while the others were merged. `success` is
+   *  `false` whenever this is not empty. */
+  errors: string[];
 }
 
 /** Result of `split(inputPath, outputDir, ...)`. */
@@ -2625,8 +2654,14 @@ export type RecompressCodec = "lz4" | "none";
 
 /** Boolean header-only validity check. */
 export function validateSegment(path: string): boolean;
-/** Full validation: walks every record, checks CRC, indexes, ordering. */
-export function validate(path: string): SegmentValidationResult;
+/** Full validation: walks every record, checks CRC, indexes, ordering.
+ *  `verifyCrc` and `verifyTimestamps` are both on when left out; pass `false`
+ *  to turn one off. */
+export function validate(
+  path: string,
+  verifyCrc?: boolean,
+  verifyTimestamps?: boolean,
+): SegmentValidationResult;
 /** Recursive dataset validation across all segments under `dir`. */
 export function validateDataset(dir: string): DatasetValidationResult;
 /** Concatenate one or more input segments into a single output. */
@@ -3418,7 +3453,12 @@ export interface TraceFillInput {
 export interface TraceSignalRecord {
   runTsNs: bigint;
   feedTsNs: bigint;
+  /** The low 32 bits of the signal's id. */
   signalId: number;
+  /** The whole id. For a signal a runner captured it is the order id the
+   *  signal asks for, and equals `orderId` / `parentSignalId` on that order's
+   *  event records. A Number, as those are. */
+  signalId64: number;
   flags: number;
   strengthRaw: number;
   name: string;

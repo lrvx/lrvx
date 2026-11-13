@@ -115,10 +115,13 @@ std::string_view hlTifToken(NormalizedTif tif)
 // for; a price this connector computes (the limit of a market order or of a
 // market trigger, which only bounds the fill) is moved onto the grid on the
 // side worse for the order's owner. With szDecimals unknown only the
-// significant-figure half is checked. Sizes are truncated toward zero, never
-// up, so a reduce-only close cannot grow past what was asked; an order
-// whose size truncates to zero is rejected. SymbolInfo::tickSize is not used
-// here: the registry can hold one increment, and HL's depends on the price.
+// significant-figure half is checked. A size is never changed either: the
+// docs give 1.0001 at szDecimals 3 as a size that is not valid, so one that
+// is not a whole number of 10^-szDecimals is refused here with
+// quantity_off_lot, the reason the simulator gives for the same order
+// (execution/order_price_rule.h), and so is one off the lot the registry
+// entry declares. SymbolInfo::tickSize is not used here: the registry can
+// hold one increment, and HL's depends on the price.
 constexpr int kPerpMaxDecimals = 6;
 constexpr int kUnknownPrecisionDecimals = 8;
 constexpr int kMaxSigFigs = 5;
@@ -218,24 +221,33 @@ double roundPxSigFigs(double px)
 // venue's own form.
 std::string formatHlPx(Price px) { return venue_price::trimmedDecimal(px); }
 
-// Truncated on the fixed-point value itself, so no floating-point rounding
-// can carry a size up to the next step.
-std::string formatHlSz(Quantity qty, int szDecimals)
+constexpr int kQuantityScaleDecimals = 8;
+static_assert(Quantity::Scale == 100'000'000, "HL sizes assume 8 fixed-point decimals");
+
+// HL's size step for an asset, 10^-szDecimals, as a raw quantity. With
+// szDecimals unknown it is the smallest quantity there is, which every size
+// is a whole number of.
+int64_t hlSizeStepRaw(int szDecimals)
 {
-  constexpr int kScaleDecimals = 8;
-  static_assert(Quantity::Scale == 100'000'000, "formatHlSz assumes 8 fixed-point decimals");
-  const int decimals =
-      std::clamp(szDecimals >= 0 ? szDecimals : kUnknownPrecisionDecimals, 0, kScaleDecimals);
+  const int decimals = std::clamp(szDecimals >= 0 ? szDecimals : kUnknownPrecisionDecimals, 0,
+                                  kQuantityScaleDecimals);
   int64_t step = 1;
-  for (int i = decimals; i < kScaleDecimals; ++i)
+  for (int i = decimals; i < kQuantityScaleDecimals; ++i)
   {
     step *= 10;
   }
-  const int64_t raw = std::max<int64_t>(qty.raw(), 0);
-  const int64_t truncated = raw - raw % step;
+  return step;
+}
 
-  std::string out = std::to_string(truncated / Quantity::Scale);
-  int64_t frac = truncated % Quantity::Scale;
+// The exact decimal of the fixed-point value, trailing zeros removed. Only
+// called on a size already on HL's step.
+std::string formatHlSz(Quantity qty)
+{
+  constexpr int kScaleDecimals = kQuantityScaleDecimals;
+  const int64_t raw = std::max<int64_t>(qty.raw(), 0);
+
+  std::string out = std::to_string(raw / Quantity::Scale);
+  int64_t frac = raw % Quantity::Scale;
   if (frac != 0)
   {
     std::string digits = std::to_string(frac);
@@ -292,11 +304,30 @@ struct OrderWire
   std::string error;  // non-empty: the order has no valid HL wire, reject it
 };
 
-OrderWire buildOrderWire(const Order& order, int asset, int szDecimals, const std::string& cloid)
+OrderWire buildOrderWire(const Order& order, const SymbolInfo& info, int asset, int szDecimals,
+                         const std::string& cloid)
 {
   OrderWire out;
   std::string typeObj;
   Price limitPx = order.price;
+
+  if (order.quantity.raw() <= 0)
+  {
+    out.error = "order size is not positive";
+    return out;
+  }
+  // The registry's lot first (the caller's, or the venue's as applied at
+  // start()), then the venue's own step as this executor read it.
+  if (const char* offLot = venue_price::offLotReason(order, info))
+  {
+    out.error = offLot;
+    return out;
+  }
+  if (order.quantity.raw() % hlSizeStepRaw(szDecimals) != 0)
+  {
+    out.error = kRejectQuantityOffLot;
+    return out;
+  }
 
   if (isTriggerType(order.type))
   {
@@ -373,12 +404,7 @@ OrderWire buildOrderWire(const Order& order, int asset, int szDecimals, const st
     return out;
   }
 
-  const std::string sz = formatHlSz(order.quantity, szDecimals);
-  if (sz.empty() || sz == "0")
-  {
-    out.error = "order size rounds to zero at szDecimals=" + std::to_string(szDecimals);
-    return out;
-  }
+  const std::string sz = formatHlSz(order.quantity);
 
   out.wire.reserve(192);
   out.wire += "{\"a\":" + std::to_string(asset);
@@ -953,7 +979,7 @@ void HyperliquidOrderExecutorT<Policies>::sendSubmitOrder(const Order& order)
   }
 
   OrderLeg leg{order, {}, genCloid128()};
-  auto wire = buildOrderWire(order, asset, szDecimalsFor(info->symbol), leg.cloid);
+  auto wire = buildOrderWire(order, *info, asset, szDecimalsFor(info->symbol), leg.cloid);
   if (!wire.error.empty())
   {
     publishRejection(order, wire.error);
@@ -1334,7 +1360,7 @@ void HyperliquidOrderExecutorT<Policies>::sendPlacePosTpsl(SymbolId symbol, Side
 
   for (auto& leg : legs)
   {
-    auto wire = buildOrderWire(leg.order, asset, szDecimals, leg.cloid);
+    auto wire = buildOrderWire(leg.order, *info, asset, szDecimals, leg.cloid);
     if (!wire.error.empty())
     {
       rejectAll(wire.error);
@@ -1638,7 +1664,7 @@ void HyperliquidOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldLocalId, c
     return;
   }
 
-  auto wire = buildOrderWire(n, asset, szDecimalsFor(info->symbol), cloid);
+  auto wire = buildOrderWire(n, *info, asset, szDecimalsFor(info->symbol), cloid);
   if (!wire.error.empty())
   {
     publishReplaceRejected(current, n, wire.error);

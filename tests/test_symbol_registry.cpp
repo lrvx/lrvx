@@ -15,9 +15,12 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
+#include <string>
 #include <thread>
 #include <unordered_set>
 #include <vector>
@@ -1044,8 +1047,12 @@ TEST(SymbolRegistryVenueTick, AStrategyBuiltEarlierFollowsTheAppliedTick)
 
   trade(strategy, b);
   EXPECT_EQ(strategy.bookTick(b).raw(), kDefaultTickSize.raw());
-  // The construction-time copy stays as documented.
-  EXPECT_FALSE(strategy.symbolInfos()[0].tickSizeKnown);
+  // symbolInfos() follows the applied tick too; the other symbol's entry is
+  // as it was copied.
+  const auto infos = strategy.symbolInfos();
+  EXPECT_TRUE(infos[0].tickSizeKnown);
+  EXPECT_EQ(infos[0].tickSize.raw(), Price::fromDouble(0.0001).raw());
+  EXPECT_FALSE(infos[1].tickSizeKnown);
 }
 
 // The venue's second tick reaches the strategy the way its first did.
@@ -1215,4 +1222,198 @@ TEST(SymbolRegistryTest, LoadRebuildsTheSymbolToExchangeMapping)
     EXPECT_EQ(dst.getSymbolName(strayId), (std::pair<std::string, std::string>{"nowhere", "XYZ"}));
   }
   std::filesystem::remove(path);
+}
+
+namespace
+{
+
+SymbolRegistry* fillThreeSymbols(SymbolRegistry& reg)
+{
+  SymbolInfo a;
+  a.exchange = "bybit";
+  a.symbol = "BTCUSDT";
+  a.tickSize = Price::fromDouble(0.5);
+  a.lotSize = Quantity::fromDouble(0.001);
+  SymbolInfo b;
+  b.exchange = "bybit";
+  b.symbol = "ETH-28MAR-3000-C";
+  b.type = InstrumentType::Option;
+  b.strike = Price::fromDouble(3000.0);
+  b.optionType = OptionType::CALL;
+  b.settlementCcy = "USDC";
+  SymbolInfo c;
+  c.exchange = "bitget";
+  c.symbol = "SOLUSDT";
+  reg.registerSymbol(a);
+  reg.registerSymbol(b);
+  reg.registerSymbol(c);
+  return &reg;
+}
+
+std::string readWholeFile(const std::filesystem::path& path)
+{
+  std::string out;
+  std::FILE* f = std::fopen(path.string().c_str(), "rb");
+  if (f == nullptr)
+  {
+    return out;
+  }
+  char buf[4096];
+  for (size_t n = std::fread(buf, 1, sizeof buf, f); n > 0; n = std::fread(buf, 1, sizeof buf, f))
+  {
+    out.append(buf, n);
+  }
+  std::fclose(f);
+  return out;
+}
+
+}  // namespace
+
+// Every proper prefix of a blob is a truncated blob: it must not load, and it
+// must leave the registry empty rather than holding entries built from zeros.
+TEST(SymbolRegistryTest, DeserializeRefusesEveryTruncatedBlob)
+{
+  SymbolRegistry src;
+  const auto bytes = fillThreeSymbols(src)->serialize();
+  ASSERT_GT(bytes.size(), 12u);
+
+  for (size_t len = 0; len < bytes.size(); ++len)
+  {
+    SCOPED_TRACE("prefix of " + std::to_string(len) + " bytes");
+    SymbolRegistry dst;
+    dst.registerSymbol("held", "BEFORE");
+    EXPECT_FALSE(dst.deserialize(std::span<const std::byte>(bytes.data(), len)));
+    EXPECT_EQ(dst.size(), 0u);
+    EXPECT_FALSE(dst.getSymbolId("held", "BEFORE").has_value());
+  }
+
+  SymbolRegistry whole;
+  ASSERT_TRUE(whole.deserialize(bytes));
+  EXPECT_EQ(whole.size(), 3u);
+}
+
+// A count larger than the entries that follow is the same truncation.
+TEST(SymbolRegistryTest, DeserializeRefusesACountBeyondTheData)
+{
+  SymbolRegistry src;
+  auto bytes = fillThreeSymbols(src)->serialize();
+  bytes[8] = std::byte{200};
+  SymbolRegistry dst;
+  EXPECT_FALSE(dst.deserialize(bytes));
+  EXPECT_EQ(dst.size(), 0u);
+}
+
+TEST(SymbolRegistryTest, DeserializeRefusesAnInvalidScale)
+{
+  SymbolRegistry src;
+  SymbolInfo info;
+  info.exchange = "x";
+  info.symbol = "Y";
+  src.registerSymbol(info);
+  auto bytes = src.serialize();
+  // The entry ends with price_scale and qty_scale, eight bytes each.
+  ASSERT_GE(bytes.size(), 16u);
+  std::fill(bytes.end() - 16, bytes.end(), std::byte{0});
+  SymbolRegistry dst;
+  EXPECT_FALSE(dst.deserialize(bytes));
+  EXPECT_EQ(dst.size(), 0u);
+}
+
+// An entry without its id or names used to end the list quietly: the load
+// returned true with the entries before it and none of those after.
+TEST(SymbolRegistryTest, LoadRefusesAnEntryWithoutItsNames)
+{
+  const auto path = std::filesystem::temp_directory_path() / "test_registry_nameless_entry.json";
+  const char* bodies[] = {
+      // no "symbol"
+      "    {\"id\": 1, \"exchange\": \"bybit\", \"symbol\": \"BTCUSDT\", \"type\": 0},\n"
+      "    {\"id\": 2, \"exchange\": \"bybit\", \"type\": 0},\n"
+      "    {\"id\": 3, \"exchange\": \"bybit\", \"symbol\": \"ETHUSDT\", \"type\": 0}\n",
+      // no "exchange"
+      "    {\"id\": 1, \"symbol\": \"BTCUSDT\", \"type\": 0},\n"
+      "    {\"id\": 3, \"exchange\": \"bybit\", \"symbol\": \"ETHUSDT\", \"type\": 0}\n",
+      // no "id"
+      "    {\"id\": 1, \"exchange\": \"bybit\", \"symbol\": \"BTCUSDT\", \"type\": 0},\n"
+      "    {\"exchange\": \"bybit\", \"symbol\": \"ETHUSDT\", \"type\": 0}\n",
+  };
+  for (const char* body : bodies)
+  {
+    SCOPED_TRACE(body);
+    {
+      std::FILE* f = std::fopen(path.string().c_str(), "wb");
+      ASSERT_NE(f, nullptr);
+      std::fputs("{\n  \"version\": 1,\n  \"symbols\": [\n", f);
+      std::fputs(body, f);
+      std::fputs("  ]\n}\n", f);
+      std::fclose(f);
+    }
+    SymbolRegistry dst;
+    dst.registerSymbol("held", "BEFORE");
+    EXPECT_FALSE(dst.loadFromFile(path));
+    EXPECT_EQ(dst.size(), 0u);
+  }
+  std::filesystem::remove(path);
+}
+
+// The table is a hash map; what is written from it is in id order, so two
+// registries holding the same entries write the same bytes whatever order the
+// entries went in and whatever the map's bucket layout is.
+TEST(SymbolRegistryTest, SaveAndSerializeWriteInIdOrder)
+{
+  constexpr uint32_t kCount = 300;
+  const auto fill = [](SymbolRegistry& reg, bool reversed)
+  {
+    for (uint32_t n = 0; n < kCount; ++n)
+    {
+      const uint32_t i = reversed ? kCount - n : n + 1;
+      SymbolInfo info;
+      info.id = i;
+      info.exchange = "ex" + std::to_string(i % 7);
+      info.symbol = "SYM" + std::to_string(i);
+      info.tickSize = Price::fromRaw(static_cast<int64_t>(i) * 1000);
+      reg.registerSymbol(info);
+    }
+  };
+  SymbolRegistry forward;
+  SymbolRegistry backward;
+  fill(forward, false);
+  fill(backward, true);
+
+  const auto bytes = forward.serialize();
+  EXPECT_EQ(bytes, backward.serialize());
+
+  // Each entry starts with its id; they ascend through the blob.
+  size_t pos = 12;
+  for (uint32_t i = 1; i <= kCount; ++i)
+  {
+    ASSERT_LE(pos + 4, bytes.size());
+    uint32_t id = 0;
+    std::memcpy(&id, bytes.data() + pos, 4);
+    ASSERT_EQ(id, i) << "entry " << i << " of the blob";
+    const std::string ex = "ex" + std::to_string(i % 7);
+    const std::string sym = "SYM" + std::to_string(i);
+    // id, two length-prefixed names, type, tick, flags, v3 spec, v4 scales
+    pos += 4 + 2 + ex.size() + 2 + sym.size() + 1 + 8 + 1 + 8 + 1 + 1 + 16;
+  }
+  EXPECT_EQ(pos, bytes.size());
+
+  const auto dir = std::filesystem::temp_directory_path();
+  const auto pathA = dir / "test_registry_id_order_a.json";
+  const auto pathB = dir / "test_registry_id_order_b.json";
+  ASSERT_TRUE(forward.saveToFile(pathA));
+  ASSERT_TRUE(backward.saveToFile(pathB));
+  const std::string textA = readWholeFile(pathA);
+  const std::string textB = readWholeFile(pathB);
+  std::filesystem::remove(pathA);
+  std::filesystem::remove(pathB);
+  EXPECT_EQ(textA, textB);
+
+  size_t at = 0;
+  for (uint32_t i = 1; i <= kCount; ++i)
+  {
+    const std::string key = "{\"id\": " + std::to_string(i) + ",";
+    const size_t found = textA.find(key, at);
+    ASSERT_NE(found, std::string::npos) << "id " << i << " is not after id " << (i - 1);
+    at = found + key.size();
+  }
 }

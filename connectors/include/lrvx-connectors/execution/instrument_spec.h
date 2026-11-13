@@ -32,9 +32,8 @@ struct InstrumentSpec
   // The price increment. On Hyperliquid, which has no fixed tick, the finest
   // increment the venue accepts at any price (see hyperliquidPerpTick).
   Price tickSize{};
-  // The size increment; zero when the venue's response does not carry one
-  // (Polymarket's tick-size answer has no size field). It reaches the
-  // registry entry as SymbolInfo::lotSize the way the tick does.
+  // The size increment; zero when it is not known. It reaches the registry
+  // entry as SymbolInfo::lotSize the way the tick does.
   Quantity lotSize{};
 };
 
@@ -76,9 +75,17 @@ std::expected<InstrumentSpecs, std::string> parseBitgetSpot(std::string_view bod
 // 10^-szDecimals; tick is hyperliquidPerpTick(szDecimals).
 std::expected<InstrumentSpecs, std::string> parseHyperliquidMeta(std::string_view body);
 
+// Polymarket's share increment. No endpoint publishes it per market: the CLOB
+// documentation states it as a constant, two size decimals at every tick size
+// (docs.polymarket.com/developers/CLOB/orders/create-order, "Calculate the
+// Order Amounts": the Size decimals column reads 2 for ticks 0.1, 0.01,
+// 0.005, 0.0025, 0.001 and 0.0001). The smallest order a market takes is a
+// different rule (min_order_size on GET /book) and is not read here.
+inline constexpr Quantity kPolymarketSizeStep = Quantity::fromRaw(Quantity::Scale / 100);
+
 // Polymarket CLOB GET /tick-size?token_id=...: minimum_tick_size, a JSON
-// number read from its text so no binary rounding enters. Lot is left 0: the
-// CLOB states no share increment there.
+// number read from its text so no binary rounding enters. The response
+// states no share increment; the lot is kPolymarketSizeStep.
 std::expected<InstrumentSpec, std::string> parsePolymarketTickSize(std::string_view body);
 
 // The finest price increment Hyperliquid accepts on a perp with this

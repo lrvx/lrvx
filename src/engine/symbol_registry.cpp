@@ -867,6 +867,23 @@ void rebuildLoadedIndexes(std::unordered_map<SymbolId, SymbolInfo>& symbols,
   }
 }
 
+// The entries in ascending id order. The table is a hash map, and what is
+// written from it must not depend on the map's iteration order.
+std::vector<const SymbolInfo*> entriesById(const std::unordered_map<SymbolId, SymbolInfo>& symbols)
+{
+  std::vector<const SymbolInfo*> out;
+  out.reserve(symbols.size());
+  // order: not observable -- sorted below
+  for (const auto& [id, info] : symbols)
+  {
+    out.push_back(&info);
+  }
+  std::sort(out.begin(), out.end(),
+            [](const SymbolInfo* a, const SymbolInfo* b)
+            { return a->id < b->id; });
+  return out;
+}
+
 }  // namespace
 
 bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
@@ -887,8 +904,9 @@ bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
   std::fprintf(f, "{\n  \"version\": 1,\n  \"symbols\": [\n");
 
   size_t count = 0;
-  for (const auto& [id, sym] : _symbols)
+  for (const SymbolInfo* entry : entriesById(_symbols))
   {
+    const SymbolInfo& sym = *entry;
     std::fprintf(f,
                  "    {\"id\": %u, \"exchange\": %s, \"symbol\": %s, \"type\": %d, "
                  "\"tick_size\": %lld",
@@ -1029,8 +1047,9 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
       const std::string* symbol = field("symbol");
       if (id == nullptr || exchange == nullptr || symbol == nullptr)
       {
-        // As before: an entry without its names ends the list.
-        break;
+        // An entry without its id or names makes the file malformed. Ending
+        // the list here instead dropped every entry after it.
+        return fail();
       }
       SymbolInfo info;
       info.id = static_cast<SymbolId>(std::stoull(*id));
@@ -1223,8 +1242,9 @@ std::vector<std::byte> SymbolRegistry::serialize() const
   write_u32(static_cast<uint32_t>(_symbols.size()));
 
   // Symbols
-  for (const auto& [id, sym] : _symbols)
+  for (const SymbolInfo* entry : entriesById(_symbols))
   {
+    const SymbolInfo& sym = *entry;
     write_u32(sym.id);
     write_string(sym.exchange);
     write_string(sym.symbol);
@@ -1299,17 +1319,34 @@ std::vector<std::byte> SymbolRegistry::serialize() const
 
 bool SymbolRegistry::deserialize(std::span<const std::byte> data)
 {
+  // A blob that does not parse leaves the registry empty, as a file that does
+  // not parse does in loadFromFile.
+  const auto fail = [this]()
+  {
+    std::lock_guard lock(_mutex);
+    _venueTicks->reset();
+    _symbols.clear();
+    _map.clear();
+    _reverse.clear();
+    _symbolToExchange.clear();
+    return false;
+  };
+
   if (data.size() < 12)
   {
-    return false;  // Minimum header size
+    return fail();  // Minimum header size
   }
 
   size_t pos = 0;
+  // Set by a read that would run past the end. The read returns zero so the
+  // caller needs no check of its own; the load is then refused.
+  bool truncated = false;
 
-  auto read_u32 = [&data, &pos]() -> uint32_t
+  auto read_u32 = [&data, &pos, &truncated]() -> uint32_t
   {
-    if (pos + 4 > data.size())
+    if (data.size() - pos < 4)
     {
+      truncated = true;
       return 0;
     }
     uint32_t v = static_cast<uint32_t>(data[pos]) | (static_cast<uint32_t>(data[pos + 1]) << 8) |
@@ -1319,10 +1356,11 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
     return v;
   };
 
-  auto read_u16 = [&data, &pos]() -> uint16_t
+  auto read_u16 = [&data, &pos, &truncated]() -> uint16_t
   {
-    if (pos + 2 > data.size())
+    if (data.size() - pos < 2)
     {
+      truncated = true;
       return 0;
     }
     uint16_t v = static_cast<uint16_t>(data[pos]) | (static_cast<uint16_t>(data[pos + 1]) << 8);
@@ -1330,19 +1368,21 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
     return v;
   };
 
-  auto read_u8 = [&data, &pos]() -> uint8_t
+  auto read_u8 = [&data, &pos, &truncated]() -> uint8_t
   {
     if (pos >= data.size())
     {
+      truncated = true;
       return 0;
     }
     return static_cast<uint8_t>(data[pos++]);
   };
 
-  auto read_i64 = [&data, &pos]() -> int64_t
+  auto read_i64 = [&data, &pos, &truncated]() -> int64_t
   {
-    if (pos + 8 > data.size())
+    if (data.size() - pos < 8)
     {
+      truncated = true;
       return 0;
     }
     int64_t v = 0;
@@ -1362,11 +1402,12 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
     return d;
   };
 
-  auto read_string = [&data, &pos, &read_u16]() -> std::string
+  auto read_string = [&data, &pos, &truncated, &read_u16]() -> std::string
   {
     uint16_t len = read_u16();
-    if (pos + len > data.size())
+    if (data.size() - pos < len)
     {
+      truncated = true;
       return "";
     }
     std::string s(len, '\0');
@@ -1382,23 +1423,20 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
   uint32_t magic = read_u32();
   if (magic != kSymbolRegistryMagic)
   {
-    return false;
+    return fail();
   }
 
   uint32_t version = read_u32();
   if (version < 1 || version > kSymbolRegistryVersionWithLots)
   {
-    return false;
+    return fail();
   }
 
   uint32_t count = read_u32();
 
-  std::lock_guard lock(_mutex);
-  _venueTicks->reset();
-  _symbols.clear();
-  _map.clear();
-  _reverse.clear();
-
+  // Parsed into a local table first: the registry is replaced only by a blob
+  // that read to the end of its last entry.
+  std::unordered_map<SymbolId, SymbolInfo> loaded;
   for (uint32_t i = 0; i < count; ++i)
   {
     SymbolInfo info;
@@ -1453,10 +1491,24 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
       info.lotSize = Quantity::fromRaw(read_i64());
     }
 
-    std::string key = info.exchange + ":" + info.symbol;
-    _map[key] = info.id;
+    // A scale registerSymbol would refuse makes the blob malformed, as it
+    // does a file.
+    if (truncated || !validateSymbolScale(info))
+    {
+      return fail();
+    }
     const SymbolId sid = info.id;
-    _symbols[sid] = std::move(info);
+    loaded[sid] = std::move(info);
+  }
+
+  std::lock_guard lock(_mutex);
+  _venueTicks->reset();
+  _symbols = std::move(loaded);
+  _map.clear();
+  // order: not observable -- fills a keyed map
+  for (const auto& [sid, info] : _symbols)
+  {
+    _map[info.exchange + ":" + info.symbol] = sid;
   }
   rebuildLoadedIndexes(_symbols, _exchangeNameToId, _reverse, _symbolToExchange);
 

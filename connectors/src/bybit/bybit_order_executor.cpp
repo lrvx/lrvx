@@ -260,6 +260,14 @@ void BybitOrderExecutorT<Policies>::sendSubmitOrder(const Order& order)
   body.append("\"side\":\"").append(order.side == Side::BUY ? "Buy" : "Sell").append("\",");
   body.append("\"orderType\":\"").append(priceIsLimit ? "Limit" : "Market").append("\",");
   body.append("\"qty\":\"").append(order.quantity.toString()).append("\",");
+  // Bybit reads the qty of a spot market buy as quote currency unless told
+  // otherwise ("Spot: Market Buy order by value by default", v5 order/create).
+  // Order::quantity is base asset everywhere in the engine, and the lot check
+  // above is against the base step, so every spot market order names its unit.
+  if (!priceIsLimit && info->type == InstrumentType::Spot)
+  {
+    body.append("\"marketUnit\":\"baseCoin\",");
+  }
   if (priceIsLimit)
   {
     body.append("\"price\":\"").append(venue_price::wireDecimal(order.price)).append("\",");

@@ -4255,6 +4255,10 @@ static JSValue js_run_reader_signals(JSContext* ctx, JSValueConst, int, JSValueC
     JS_SetPropertyStr(ctx, rec, "runTsNs", JS_NewBigInt64(ctx, run_ts));
     JS_SetPropertyStr(ctx, rec, "feedTsNs", JS_NewBigInt64(ctx, feed_ts));
     JS_SetPropertyStr(ctx, rec, "signalId", JS_NewUint32(ctx, sid));
+    // A Number, as orderId and parentSignalId are on an order event record.
+    JS_SetPropertyStr(
+        ctx, rec, "signalId64",
+        JS_NewInt64(ctx, static_cast<int64_t>(lrvx_run_reader_signal_id64(h, i))));
     JS_SetPropertyStr(ctx, rec, "flags", JS_NewUint32(ctx, flags));
     JS_SetPropertyStr(ctx, rec, "strengthRaw", JS_NewInt64(ctx, strength));
     JS_SetPropertyStr(ctx, rec, "name", JS_NewStringLen(ctx, name.data(), name.size()));
@@ -5973,7 +5977,15 @@ static JSValue js_pg_prune(JSContext* c, JSValueConst, int, JSValueConst* a)
 static JSValue js_dw_create(JSContext* c, JSValueConst, int, JSValueConst* a)
 {
   LRVX_JS_CSTRING_OR_THROW(dir, c, a[0]);
-  uint64_t mb = (JS_IsUndefined(a[1]) || JS_IsNull(a[1])) ? 256 : static_cast<uint64_t>(toInt64(c, a[1]));
+  // Megabytes. Zero is not a size: a writer with a 0-byte limit rolls to a
+  // new segment before every event and leaves an empty first one, so 0 means
+  // the default the other bindings use, as leaving the argument out does.
+  constexpr uint64_t kDefaultSegmentMb = 256;
+  uint64_t mb = (JS_IsUndefined(a[1]) || JS_IsNull(a[1])) ? kDefaultSegmentMb : static_cast<uint64_t>(toInt64(c, a[1]));
+  if (mb == 0)
+  {
+    mb = kDefaultSegmentMb;
+  }
   uint8_t eid = (JS_IsUndefined(a[2]) || JS_IsNull(a[2])) ? 0 : static_cast<uint8_t>(toUint32(c, a[2]));
   JSValue ret = createHandleObject(c, lrvx_data_writer_create(dir, mb, eid), lrvx_data_writer_destroy);
   return ret;
@@ -7056,12 +7068,33 @@ static JSValue js_seg_merge_dir(JSContext* c, JSValueConst, int, JSValueConst* a
 {
   LRVX_JS_CSTRING_OR_THROW(in, c, a[0]);
   LRVX_JS_CSTRING_OR_THROW(out, c, a[1]);
-  LrvxMergeResult r = lrvx_segment_merge_dir(in, out);
+  LrvxMergeResult r{};
+  std::vector<char> path(4096);
+  std::vector<char> errors(65536);
+  lrvx_clear_last_error();
+  lrvx_segment_merge_dir_report(in, out, &r, path.data(), path.size(), errors.data(),
+                                errors.size());
   JSValue o = JS_NewObject(c);
   JS_SetPropertyStr(c, o, "success", JS_NewBool(c, r.success));
   JS_SetPropertyStr(c, o, "segmentsMerged", JS_NewInt64(c, static_cast<int64_t>(r.segments_merged)));
   JS_SetPropertyStr(c, o, "eventsWritten", JS_NewInt64(c, static_cast<int64_t>(r.events_written)));
   JS_SetPropertyStr(c, o, "bytesWritten", JS_NewInt64(c, static_cast<int64_t>(r.bytes_written)));
+  JS_SetPropertyStr(c, o, "outputPath", JS_NewString(c, path.data()));
+  // One entry per line of the report.
+  JSValue list = JS_NewArray(c);
+  uint32_t count = 0;
+  const std::string_view all(errors.data());
+  for (size_t start = 0; start < all.size();)
+  {
+    size_t end = all.find('\n', start);
+    if (end == std::string_view::npos)
+    {
+      end = all.size();
+    }
+    JS_SetPropertyUint32(c, list, count++, JS_NewStringLen(c, all.data() + start, end - start));
+    start = end + 1;
+  }
+  JS_SetPropertyStr(c, o, "errors", list);
   return o;
 }
 
@@ -7134,6 +7167,7 @@ static JSValue js_seg_validate_full(JSContext* c, JSValueConst, int argc, JSValu
 static JSValue js_dataset_validate(JSContext* c, JSValueConst, int, JSValueConst* a)
 {
   LRVX_JS_CSTRING_OR_THROW(dir, c, a[0]);
+  lrvx_clear_last_error();
   LrvxDatasetValidation r = lrvx_dataset_validate(dir);
   JSValue o = JS_NewObject(c);
   JS_SetPropertyStr(c, o, "valid", JS_NewBool(c, r.valid));

@@ -83,7 +83,7 @@ class TraceSignalHandler : public ISignalHandler
     SignalView view;
     view.run_ts_ns = nowNs();
     view.feed_ts_ns = _feed_ts_ns.load(std::memory_order_relaxed);
-    view.signal_id = static_cast<uint32_t>(signal.orderId);
+    view.signal_id = static_cast<uint64_t>(signal.orderId);
     view.flags = encodeFlags(signal);
     view.strength_raw = 0;
     view.symbol_ids = {static_cast<uint32_t>(signal.symbol)};
@@ -278,7 +278,10 @@ class TraceExecutionListener : public IOrderExecutionListener
     e.run_ts_ns = nowNs();
     e.feed_ts_ns = _feed_ts_ns.load(std::memory_order_relaxed);
     e.order_id = static_cast<uint64_t>(o.id);
-    e.parent_signal_id = 0;
+    // A captured signal's id is the id of the order it asks for, so the
+    // order's events join to it (and to a later cancel or modify of the same
+    // order) on this field.
+    e.parent_signal_id = static_cast<uint64_t>(o.id);
     e.price_raw = o.price.raw();
     e.qty_raw = o.quantity.raw();
     e.symbol_id = o.symbol;

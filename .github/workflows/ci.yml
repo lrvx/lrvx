@@ -614,6 +614,7 @@ jobs:
         ./build/src/quickjs/lrvx_js_runner quickjs/examples/funding_schedule_smoke.js
         ./build/src/quickjs/lrvx_js_runner quickjs/examples/last_error_smoke.js
         ./build/src/quickjs/lrvx_js_runner quickjs/examples/clock_readings_smoke.js
+        ./build/src/quickjs/lrvx_js_runner quickjs/examples/segment_ops_smoke.js
 
     # Every test_*.js, not a hand-listed subset (9 of 21 files were unrun).
     # byte_identical_fixture.js is a fixture helper, not a test, and is

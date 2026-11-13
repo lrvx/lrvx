@@ -208,6 +208,13 @@ for f in reader.read_all_fills():
     print(f["run_ts_ns"], f["order_id"], f["price_raw"], f["qty_raw"])
 ```
 
+A signal has two id fields. `signal_id` is the low 32 bits, as it has always read; `signal_id64`
+(`signalId64` in Node and QuickJS, `TraceReader.signal_id64(index)` in Codon,
+`lrvx_run_reader_signal_id64` in C) is the whole id. They are equal for an id you wrote yourself,
+which is 32 bits wide. A signal a runner captured carries the id of the order it asks for,
+`(subscriber id << 32) + n`: join it to that order's events on `signal_id64 == order_id`, and to
+the events the C++ capture listener writes on `parent_signal_id` as well.
+
 ## What is in a `.lrvxrun` directory
 
 ```

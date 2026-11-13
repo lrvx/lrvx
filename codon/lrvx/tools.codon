@@ -389,6 +389,7 @@ from C import lrvx_segment_recompress(cobj, cobj, u8) -> u8
 from C import lrvx_segment_extract_symbols(cobj, cobj, Ptr[u32], u32) -> u64
 from C import lrvx_segment_extract_time_range(cobj, cobj, i64, i64) -> u64
 from C import lrvx_segment_merge_dir_p(cobj, cobj, Ptr[byte])
+from C import lrvx_segment_merge_dir_report(cobj, cobj, Ptr[byte], Ptr[byte], int, Ptr[byte], int) -> u8
 from C import lrvx_segment_split_p(cobj, cobj, u8, i64, u64, Ptr[byte])
 from C import lrvx_segment_export_p(cobj, cobj, u8, i64, i64, Ptr[u32], u32, Ptr[byte])
 from C import lrvx_segment_validate_full_p(cobj, u8, u8, Ptr[byte])
@@ -1052,6 +1053,12 @@ class MergeResult:
     segments_merged: int
     events_written: int
     bytes_written: int
+    # The segment that was written; "" when none was.
+    output_path: str
+    # Everything that went wrong, among them "Cannot open: <path>" for each
+    # input that was skipped while the others were merged. success is False
+    # whenever this is not empty.
+    errors: List[str]
 
 
 @dataclass
@@ -1983,13 +1990,24 @@ def extract_time_range(input_path: str, output_path: str,
 def merge_dir(input_dir: str, output_dir: str) -> MergeResult:
     # LrvxMergeResult: u8 + pad7 + 3xu64 = 32 bytes
     buf = [byte(0)] * 32
-    lrvx_segment_merge_dir_p(input_dir.c_str(), output_dir.c_str(), buf.arr.ptr)
+    path_buf = [byte(0)] * 4096
+    err_buf = [byte(0)] * 65536
+    lrvx_clear_last_error()
+    lrvx_segment_merge_dir_report(input_dir.c_str(), output_dir.c_str(), buf.arr.ptr,
+                                  path_buf.arr.ptr, 4096, err_buf.arr.ptr, 65536)
     lp = Ptr[u64](buf.arr.ptr)
+    # One error per line of the report.
+    errors = List[str]()
+    errors_text = str.from_ptr(err_buf.arr.ptr)
+    if len(errors_text) > 0:
+        errors = errors_text.split("\n")
     return MergeResult(
         success=int(buf[0]) != 0,
         segments_merged=int(lp[1]),
         events_written=int(lp[2]),
-        bytes_written=int(lp[3])
+        bytes_written=int(lp[3]),
+        output_path=str.from_ptr(path_buf.arr.ptr),
+        errors=errors
     )
 
 
@@ -2079,6 +2097,9 @@ def validate_dataset(data_dir: str) -> DatasetValidation:
     #   i64 last_timestamp (40)
     #   total: 48 bytes
     buf = [byte(0)] * 48
+    # A directory that is missing or cannot be listed leaves its reason in
+    # last_error(); one whose segments fail their checks leaves "".
+    lrvx_clear_last_error()
     lrvx_dataset_validate_p(data_dir.c_str(), buf.arr.ptr)
     up = Ptr[u32](buf.arr.ptr)
     lp = Ptr[i64](buf.arr.ptr)

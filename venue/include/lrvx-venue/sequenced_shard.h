@@ -206,9 +206,11 @@ class SequencedShard
         cfg_(cfg),
         bookProto_(book),  // pristine (empty) copy: scratch snapshot validation clones it
         checkpointCfg_(checkpointCfg),
+        startGenerations_(scanGenerations(journalPath)),
         // Append to the newest journal segment when checkpoint generations
         // exist, else to the legacy single file (historical layout).
-        journal_(initialJournalPath(journalPath), journalSync, Journal::OpenMode::Append),
+        journal_(initialJournalPath(journalPath, *startGenerations_), journalSync,
+                 Journal::OpenMode::Append),
         consumer_(cfg, journal_, outbound_, std::move(book), clock, this),
         symbol_(cfg.id),
         sweepClock_(std::move(clock)),
@@ -800,9 +802,8 @@ class SequencedShard
 
   // ---- checkpoint machinery (consumer thread unless noted) ----
 
-  static std::string initialJournalPath(const std::string& base)
+  static std::string initialJournalPath(const std::string& base, const Generations& g)
   {
-    const Generations g = scanGenerations(base);
     return g.segments.empty() ? base : segmentPath(base, g.segments.back());
   }
 
@@ -812,7 +813,15 @@ class SequencedShard
   // single file, then all segments in order).
   uint64_t recoverAll()
   {
-    const Generations g = scanGenerations(journalPath_);
+    // The listing the constructor chose the journal segment from, taken once:
+    // the directory is the whole venue's, so a second scan here listed every
+    // shard's files again to learn what the first already had. Nothing writes
+    // a generation of this shard between construction and its first start. A
+    // later start() scans afresh, the checkpoints of the run before it having
+    // added to the directory.
+    const Generations g = startGenerations_ ? std::move(*startGenerations_)
+                                            : scanGenerations(journalPath_);
+    startGenerations_.reset();
     int64_t chosen = -1;
     for (auto it = g.snapshots.rbegin(); it != g.snapshots.rend(); ++it)
     {
@@ -1258,6 +1267,9 @@ class SequencedShard
   SymbolConfig cfg_;  // construction config (scratch validation engines)
   Book bookProto_;    // pristine copy of the ctor book, cloned per validation
   CheckpointConfig checkpointCfg_;
+  // The constructor's directory listing, kept for the first recoverAll().
+  // Declared before journal_, which is opened from it.
+  std::optional<Generations> startGenerations_;
   Journal journal_;
   OutboundBus outbound_;
   MatchingConsumer consumer_;

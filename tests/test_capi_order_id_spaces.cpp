@@ -315,8 +315,9 @@ TEST_F(OrderIdSpaces, LiveEngineModifyOfAnotherStrategysOrderCarriesTheOrder)
   // A cancel by either strategy forgets the order for both.
   lrvx_emit_cancel(manager, id);
   lrvx_emit_modify(placer, id, 9200000000LL, 200000000LL);
-  ASSERT_EQ(fake.replaced.size(), 3u);
-  EXPECT_EQ(fake.replaced[2].symbol, 0u);
+  EXPECT_EQ(fake.replaced.size(), 2u) << "nothing is sent for an order no longer on record";
+  EXPECT_NE(lastError().find("unknown_order"), std::string::npos) << lastError();
+  lrvx_clear_last_error();
 }
 
 // A strategy added after others have placed orders joins the record, it does
@@ -339,8 +340,9 @@ TEST_F(OrderIdSpaces, LiveEngineRecordSurvivesALaterStrategyAndEndsWithTheExecut
   LrvxExecutorHandle second = lrvx_executor_create(other.callbacks());
   lrvx_live_engine_set_executor(engine, second);
   lrvx_emit_modify(late, id, 10300000000LL, 300000000LL);
-  ASSERT_EQ(other.replaced.size(), 1u);
-  EXPECT_EQ(other.replaced[0].symbol, 0u) << "the new executor never held that order";
+  EXPECT_TRUE(other.replaced.empty()) << "the new executor never held that order";
+  EXPECT_NE(lastError().find("unknown_order"), std::string::npos) << lastError();
+  lrvx_clear_last_error();
   lrvx_live_engine_set_executor(engine, nullptr);
   lrvx_executor_destroy(second);
 }

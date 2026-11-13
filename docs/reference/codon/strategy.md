@@ -21,7 +21,8 @@ Strategy(symbols: List[int], strategy_id: int = -1, registry: cobj = cobj())
   renumber the strategy, and refuses it with the duplicate-id `ValueError` when it already holds
   that id. A `BacktestRunner` has one strategy and leaves its id alone. `2097151` is
   refused everywhere: runners take their own order ids from that block. An id of 2^32 or more
-  raises `ValueError` from the constructor
+  raises `ValueError` from the constructor, and so does 2^32 - 1 (`4294967295`), the block the
+  position tracker numbers its explicit fills from
 - `registry` -- Symbol-registry handle. When omitted, the underlying handle is created empty and
   `Runner.add_strategy` rebuilds it once a registry is present. Pass the strategy into a `Runner` to
   give it an event source; on its own it has none.
@@ -147,6 +148,11 @@ with `lot > 0`: an order whose quantity is not a whole number of the lot is reje
 `ev.reject_reason` `quantity_off_lot`. A lot of 0, and `lrvx_registry_add_symbol`, declare none and
 quantities are not checked. See
 [SimulatedExecutor](../api/backtest/simulated_executor.md#order-quantities-and-the-lot).
+
+`lrvx_registry_get_symbol_tick(reg, u32(sym), value, declared)` and
+`lrvx_registry_get_symbol_lot(reg, u32(sym), value, declared)` (both importable from `lrvx.runner`)
+read back what an entry holds: they return `u8(1)` for a registered id and fill a `Ptr[float]` with
+the value and a `Ptr[u8]` with whether orders are checked against it.
 
 #### `emit_market_buy(symbol, qty) -> int`
 

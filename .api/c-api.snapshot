@@ -370,6 +370,7 @@ lrvx_liquidation_engine_ticks_to_first_adl|uint64_t|LrvxLiquidationEngineHandle
 lrvx_live_engine_add_strategy|void|LrvxLiveEngineHandle|LrvxStrategyHandle|LrvxOnSignalCallback|void *
 lrvx_live_engine_create|LrvxLiveEngineHandle|LrvxRegistryHandle
 lrvx_live_engine_destroy|void|LrvxLiveEngineHandle
+lrvx_live_engine_order_closed|void|LrvxLiveEngineHandle|uint64_t
 lrvx_live_engine_publish_bar|void|LrvxLiveEngineHandle|uint32_t|uint8_t|uint64_t|double|double|double|double|double|double|int64_t|int64_t|uint8_t
 lrvx_live_engine_publish_book_snapshot|void|LrvxLiveEngineHandle|uint32_t|const double *|const double *|uint32_t|const double *|const double *|uint32_t|int64_t
 lrvx_live_engine_publish_book_top|void|LrvxLiveEngineHandle|uint32_t|uint8_t|double|double|uint8_t|double|double|int64_t
@@ -550,7 +551,9 @@ lrvx_registry_add_symbol_with_lot|uint32_t|LrvxRegistryHandle|const char *|const
 lrvx_registry_create|LrvxRegistryHandle
 lrvx_registry_destroy|void|LrvxRegistryHandle
 lrvx_registry_get_symbol_id|uint8_t|LrvxRegistryHandle|const char *|const char *|uint32_t *
+lrvx_registry_get_symbol_lot|uint8_t|LrvxRegistryHandle|uint32_t|double *|uint8_t *
 lrvx_registry_get_symbol_name|uint8_t|LrvxRegistryHandle|uint32_t|char *|size_t|char *|size_t
+lrvx_registry_get_symbol_tick|uint8_t|LrvxRegistryHandle|uint32_t|double *|uint8_t *
 lrvx_registry_symbol_count|uint32_t|LrvxRegistryHandle
 lrvx_render_heatmap_html|uint64_t|const LrvxHeatmapData *|char *|uint64_t
 lrvx_replay_source_create|LrvxReplaySourceHandle|LrvxReplaySourceCallbacks
@@ -571,6 +574,7 @@ lrvx_run_reader_run_ended_ns|int64_t|LrvxRunReaderHandle
 lrvx_run_reader_run_started_ns|int64_t|LrvxRunReaderHandle
 lrvx_run_reader_signal_count|uint64_t|LrvxRunReaderHandle
 lrvx_run_reader_signal_header|void|LrvxRunReaderHandle|uint64_t|int64_t *|int64_t *|uint32_t *|uint32_t *|int64_t *|uint64_t *|uint64_t *|uint64_t *
+lrvx_run_reader_signal_id64|uint64_t|LrvxRunReaderHandle|uint64_t
 lrvx_run_reader_signal_name|uint64_t|LrvxRunReaderHandle|uint64_t|char *|uint64_t
 lrvx_run_reader_signal_payload|uint64_t|LrvxRunReaderHandle|uint64_t|uint8_t *|uint64_t
 lrvx_run_reader_signal_symbol_ids|uint64_t|LrvxRunReaderHandle|uint64_t|uint32_t *|uint64_t
@@ -594,6 +598,7 @@ lrvx_runner_on_bar|void|LrvxRunnerHandle|uint32_t|uint8_t|uint64_t|double|double
 lrvx_runner_on_book_snapshot|void|LrvxRunnerHandle|uint32_t|const double *|const double *|uint32_t|const double *|const double *|uint32_t|int64_t
 lrvx_runner_on_book_top|void|LrvxRunnerHandle|uint32_t|uint8_t|double|double|uint8_t|double|double|int64_t
 lrvx_runner_on_trade|void|LrvxRunnerHandle|uint32_t|double|double|uint8_t|int64_t
+lrvx_runner_order_closed|void|LrvxRunnerHandle|uint64_t
 lrvx_runner_set_executor|void|LrvxRunnerHandle|LrvxExecutorHandle
 lrvx_runner_set_kill_switch|void|LrvxRunnerHandle|LrvxKillSwitchHandle
 lrvx_runner_set_market_data_recorder|void|LrvxRunnerHandle|LrvxMarketDataRecorderHandle
@@ -613,6 +618,7 @@ lrvx_segment_extract_time_range|uint64_t|const char *|const char *|int64_t|int64
 lrvx_segment_merge|uint8_t|const char *|const char *
 lrvx_segment_merge_dir|LrvxMergeResult|const char *|const char *
 lrvx_segment_merge_dir_p|void|const char *|const char *|void *
+lrvx_segment_merge_dir_report|uint8_t|const char *|const char *|LrvxMergeResult *|char *|size_t|char *|size_t
 lrvx_segment_merge_full|LrvxMergeResult|const char *|size_t|const char *|const char *|uint8_t
 lrvx_segment_merge_full_p|void|const char *|size_t|const char *|const char *|uint8_t|void *
 lrvx_segment_recompress|uint8_t|const char *|const char *|uint8_t

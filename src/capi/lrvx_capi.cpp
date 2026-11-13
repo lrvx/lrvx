@@ -30,6 +30,7 @@
 #include "lrvx/book/events/book_update_event.h"
 #include "lrvx/book/nlevel_order_book.h"
 #include "lrvx/execution/algos.h"
+#include "lrvx/execution/order_price_rule.h"
 #include "lrvx/replay/abstract_event_reader.h"
 #include "lrvx/replay/aggregator.h"
 #include "lrvx/replay/aggregators/bin_count.h"
@@ -509,6 +510,45 @@ uint8_t lrvx_registry_get_symbol_name(LrvxRegistryHandle registry, uint32_t symb
   LRVX_CAPI_LEAVE;
 }
 
+uint8_t lrvx_registry_get_symbol_tick(LrvxRegistryHandle registry, uint32_t symbol_id,
+                                      double* tick_size_out, uint8_t* declared_out)
+{
+  LRVX_CAPI_ENTER(registry);
+  LRVX_CAPI_REQUIRE(tick_size_out);
+  const auto info = toRegistry(registry)->getSymbolInfo(symbol_id);
+  if (!info.has_value())
+  {
+    return 0;
+  }
+  *tick_size_out = info->tickSize.toDouble();
+  if (declared_out != nullptr)
+  {
+    *declared_out = lrvx::orderTickRaw(*info) != 0 ? 1 : 0;
+  }
+  return 1;
+  LRVX_CAPI_LEAVE;
+}
+
+uint8_t lrvx_registry_get_symbol_lot(LrvxRegistryHandle registry, uint32_t symbol_id,
+                                     double* lot_size_out, uint8_t* declared_out)
+{
+  LRVX_CAPI_ENTER(registry);
+  LRVX_CAPI_REQUIRE(lot_size_out);
+  const auto info = toRegistry(registry)->getSymbolInfo(symbol_id);
+  if (!info.has_value())
+  {
+    return 0;
+  }
+  const int64_t lot = lrvx::orderLotRaw(*info);
+  *lot_size_out = Quantity::fromRaw(lot).toDouble();
+  if (declared_out != nullptr)
+  {
+    *declared_out = lot != 0 ? 1 : 0;
+  }
+  return 1;
+  LRVX_CAPI_LEAVE;
+}
+
 uint32_t lrvx_registry_symbol_count(LrvxRegistryHandle registry)
 {
   LRVX_CAPI_ENTER(registry);
@@ -530,22 +570,17 @@ LrvxStrategyHandle lrvx_strategy_create(uint32_t id, const uint32_t* symbols,
                                         LrvxStrategyCallbacks callbacks)
 {
   LRVX_CAPI_ENTER(registry);
-  try
+  if (num_symbols > 0)
   {
-    auto* reg = toRegistry(registry);
-    if (reg == nullptr || (num_symbols > 0 && symbols == nullptr))
-    {
-      return nullptr;
-    }
-    std::vector<SymbolId> syms(symbols, symbols + num_symbols);
-    auto* strat =
-        new BridgeStrategy(static_cast<SubscriberId>(id), std::move(syms), *reg, callbacks);
-    return static_cast<LrvxStrategyHandle>(strat);
+    LRVX_CAPI_REQUIRE(symbols);
   }
-  catch (const std::exception&)
-  {
-    return nullptr;
-  }
+  // A throw from the constructor (a symbol id the registry does not hold, a
+  // subscriber id that is reserved) leaves through the guard, which records
+  // why before returning NULL.
+  std::vector<SymbolId> syms(symbols, symbols + num_symbols);
+  auto* strat = new BridgeStrategy(static_cast<SubscriberId>(id), std::move(syms),
+                                   *toRegistry(registry), callbacks);
+  return static_cast<LrvxStrategyHandle>(strat);
   LRVX_CAPI_LEAVE;
 }
 
@@ -4328,24 +4363,18 @@ void lrvx_stat_grid_neighborhood(const double* values, const size_t* shape, size
 // ============================================================
 
 // A segment that fails its checks is an answer; one that could not be read at
-// all is an error, and the reason goes to lrvx_last_error_message.
-static void noteUnreadableSegment(const char* fn, const char* path,
-                                  const replay::SegmentValidationResult& result)
+// all is an error, and the reason goes to lrvx_last_error_message. The
+// validator's message names the file.
+static void noteUnreadable(const char* fn, const std::vector<replay::ValidationIssue>& issues)
 {
-  for (const auto& issue : result.issues)
+  for (const auto& issue : issues)
   {
     if (issue.type != replay::IssueType::FileNotFound &&
         issue.type != replay::IssueType::FileReadError)
     {
       continue;
     }
-    std::string why = issue.message;
-    if (why.find(path) == std::string::npos)
-    {
-      why += ": ";
-      why += path;
-    }
-    lrvxCapiNoteException(fn, why.c_str());
+    lrvxCapiNoteException(fn, issue.message.c_str());
     return;
   }
 }
@@ -4356,9 +4385,24 @@ uint8_t lrvx_segment_validate(const char* path)
   LRVX_CAPI_REQUIRE(path);
   replay::SegmentValidator validator;
   auto result = validator.validate(path);
-  noteUnreadableSegment(__func__, path, result);
+  noteUnreadable(__func__, result.issues);
   return result.valid ? 1 : 0;
   LRVX_CAPI_LEAVE;
+}
+
+// "a; b; c"
+static std::string joinErrors(const std::vector<std::string>& errors, std::string_view separator)
+{
+  std::string out;
+  for (const auto& e : errors)
+  {
+    if (!out.empty())
+    {
+      out += separator;
+    }
+    out += e;
+  }
+  return out;
 }
 
 uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path)
@@ -4377,6 +4421,14 @@ uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path)
       why += ": ";
       why += input_dir;
     }
+    lrvxCapiNoteException(__func__, why.c_str());
+  }
+  else if (!result.errors.empty())
+  {
+    // Still a merge, and still 1: the segments that opened were merged. The
+    // ones that did not are named here, each as the merge reported it.
+    const std::string why = "merged " + std::to_string(result.segments_merged) +
+                            " segment(s); skipped: " + joinErrors(result.errors, "; ");
     lrvxCapiNoteException(__func__, why.c_str());
   }
   return result.segments_merged > 0 ? 1 : 0;
@@ -5379,6 +5431,39 @@ LrvxMergeResult lrvx_segment_merge_dir(const char* input_dir, const char* output
   LRVX_CAPI_LEAVE;
 }
 
+// Copies `text` into a caller's buffer, truncated to fit and always
+// terminated. A NULL buffer or a zero length takes nothing.
+static void copyOut(const std::string& text, char* out, size_t out_len)
+{
+  if (out == nullptr || out_len == 0)
+  {
+    return;
+  }
+  const size_t n = std::min(text.size(), out_len - 1);
+  std::memcpy(out, text.data(), n);
+  out[n] = '\0';
+}
+
+uint8_t lrvx_segment_merge_dir_report(const char* input_dir, const char* output_dir,
+                                      LrvxMergeResult* result_out, char* output_path_out,
+                                      size_t output_path_len, char* errors_out, size_t errors_len)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  LRVX_CAPI_REQUIRE(input_dir);
+  LRVX_CAPI_REQUIRE(output_dir);
+  auto r = replay::quickMerge(input_dir, output_dir);
+  noteSegmentOpFailure(__func__, r);
+  if (result_out != nullptr)
+  {
+    *result_out = {r.success ? (uint8_t)1 : (uint8_t)0, r.segments_merged, r.events_written,
+                   r.bytes_written};
+  }
+  copyOut(r.output_path.string(), output_path_out, output_path_len);
+  copyOut(joinErrors(r.errors, "\n"), errors_out, errors_len);
+  return r.success ? 1 : 0;
+  LRVX_CAPI_LEAVE;
+}
+
 LrvxSplitResult lrvx_segment_split(const char* input_path, const char* output_dir, uint8_t mode,
                                    int64_t time_interval_ns, uint64_t events_per_file)
 {
@@ -5502,7 +5587,7 @@ LrvxSegmentValidation lrvx_segment_validate_full(const char* path, uint8_t verif
   cfg.verify_timestamps = verify_timestamps != 0;
   replay::SegmentValidator validator(cfg);
   auto r = validator.validate(path);
-  noteUnreadableSegment(__func__, path, r);
+  noteUnreadable(__func__, r.issues);
   return {r.valid ? (uint8_t)1 : (uint8_t)0,
           r.header_valid ? (uint8_t)1 : (uint8_t)0,
           r.reported_event_count,
@@ -5522,6 +5607,7 @@ LrvxDatasetValidation lrvx_dataset_validate(const char* data_dir)
   LRVX_CAPI_REQUIRE(data_dir);
   replay::DatasetValidator validator;
   auto r = validator.validate(data_dir);
+  noteUnreadable(__func__, r.issues);
   return {r.valid ? (uint8_t)1 : (uint8_t)0, r.total_segments, r.valid_segments,
           r.corrupted_segments, r.total_events, r.total_bytes,
           r.first_timestamp, r.last_timestamp};
@@ -7009,9 +7095,12 @@ inline LrvxOrder signalToLrvxOrder(const Signal& sig) noexcept
 // sent to it. One per executor path: a runner has one handler and one of
 // these, a live engine gives every strategy its own handler and all of them
 // this one record, because they share the executor and a strategy may modify
-// or cancel an order another one placed. Nothing here hears of a fill, so an
-// entry stays until its cancel or until the executor is swapped. Signals
-// arrive from more than one consumer thread, hence the lock.
+// or cancel an order another one placed. Only an order that can rest is
+// kept (see restsOnTheVenue), and an entry goes with its cancel, when the
+// host reports the order closed (lrvx_runner_order_closed /
+// lrvx_live_engine_order_closed: nothing here hears of a fill by itself) and
+// when the executor is swapped. Signals arrive from more than one consumer
+// thread, hence the lock.
 class ForwardedOrders
 {
  public:
@@ -7161,7 +7250,7 @@ class RunnerSignalHandler : public ISignalHandler
                            std::chrono::system_clock::now().time_since_epoch())
                            .count();
       view.feed_ts_ns = _traceFeedTsNs.load(std::memory_order_relaxed);
-      view.signal_id = static_cast<uint32_t>(sig.orderId);
+      view.signal_id = static_cast<uint64_t>(sig.orderId);
       view.flags = 0;
       switch (sig.type)
       {
@@ -7348,8 +7437,10 @@ class RunnerSignalHandler : public ISignalHandler
         case SignalType::TrailingStop:
         {
           const LrvxOrder fo = signalToLrvxOrder(sig);
-          // A market order never rests, so there is nothing of it to modify.
-          if (sig.type != SignalType::Market)
+          // An order that cannot rest has nothing left to modify or cancel
+          // once the venue has answered, and nothing would ever take it off
+          // the record.
+          if (restsOnTheVenue(sig))
           {
             _forwarded->put(fo);
           }
@@ -7379,10 +7470,24 @@ class RunnerSignalHandler : public ISignalHandler
         }
         case SignalType::Modify:
         {
-          const LrvxOrder fo = modifiedOrder(sig);
+          // A Modify names an id and its new price and quantity. Without the
+          // order on record there is no symbol, side or type to send: the
+          // request is refused here, not forwarded as a guess.
+          const std::optional<LrvxOrder> fo = modifiedOrder(sig);
+          if (!fo)
+          {
+            lrvxCapiNoteException(
+                "modify",
+                ("order " + std::to_string(sig.orderId) +
+                 " is not on record with this executor (never sent to it, not an order that "
+                 "rests, cancelled, or reported closed); nothing was sent [" +
+                 kRejectUnknownOrder + "]")
+                    .c_str());
+            break;
+          }
           if (exec->cb.replace != nullptr)
           {
-            exec->cb.replace(exec->cb.user_data, sig.orderId, &fo);
+            exec->cb.replace(exec->cb.user_data, sig.orderId, &*fo);
           }
           break;
         }
@@ -7429,12 +7534,18 @@ class RunnerSignalHandler : public ISignalHandler
   }
 
  private:
+  // Market orders and IOC / FOK orders are answered at once and never rest.
+  static bool restsOnTheVenue(const Signal& sig) noexcept
+  {
+    return sig.type != SignalType::Market && sig.timeInForce != TimeInForce::IOC &&
+           sig.timeInForce != TimeInForce::FOK;
+  }
+
   // A Modify signal names an order and its new price and quantity, nothing
   // else. This is that order as it was forwarded, with the two fields
-  // changed: same id, symbol, side and type. An id nothing on this executor
-  // path forwarded (or that has since been cancelled) still goes out under
-  // that id.
-  LrvxOrder modifiedOrder(const Signal& sig)
+  // changed: same id, symbol, side and type. nullopt for an id that is not
+  // on record.
+  std::optional<LrvxOrder> modifiedOrder(const Signal& sig)
   {
     // The one price a Modify carries is the price the order works at, as
     // in the backtest runner: the trigger of a stop, take-profit or trailing
@@ -7456,16 +7567,7 @@ class RunnerSignalHandler : public ISignalHandler
       // The replacement is a fresh order: newQuantity is what is left to work.
       fo.filled_quantity_raw = 0;
     };
-    if (const auto known = _forwarded->update(sig.orderId, apply))
-    {
-      return *known;
-    }
-    LrvxOrder fo{};
-    fo.id = sig.orderId;
-    fo.symbol = sig.symbol;
-    fo.type = static_cast<uint8_t>(OrderType::LIMIT);
-    apply(fo);
-    return fo;
+    return _forwarded->update(sig.orderId, apply);
   }
 
   LrvxOnSignalCallback _cb;
@@ -9211,6 +9313,13 @@ void lrvx_runner_set_executor(LrvxRunnerHandle runner, LrvxExecutorHandle execut
   LRVX_CAPI_LEAVE_VOID;
 }
 
+void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id)
+{
+  LRVX_CAPI_ENTER_VOID(runner);
+  toRunner(runner)->handler.forwarded().erase(order_id);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
 void lrvx_runner_set_market_data_recorder(LrvxRunnerHandle runner,
                                           LrvxMarketDataRecorderHandle recorder)
 {
@@ -9442,6 +9551,13 @@ void lrvx_live_engine_set_executor(LrvxLiveEngineHandle engine,
   LRVX_CAPI_ENTER_VOID(engine);
   toLiveEngine(engine)->setExecutor(
       static_cast<capi_impl::LrvxExecutorImpl*>(executor));
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_live_engine_order_closed(LrvxLiveEngineHandle engine, uint64_t order_id)
+{
+  LRVX_CAPI_ENTER_VOID(engine);
+  toLiveEngine(engine)->forwarded->erase(order_id);
   LRVX_CAPI_LEAVE_VOID;
 }
 
@@ -11467,6 +11583,18 @@ extern "C" uint64_t lrvx_run_reader_signal_symbol_ids(LrvxRunReaderHandle handle
     out[i] = ids[i];
   }
   return n;
+  LRVX_CAPI_LEAVE;
+}
+
+extern "C" uint64_t lrvx_run_reader_signal_id64(LrvxRunReaderHandle handle, uint64_t index)
+{
+  LRVX_CAPI_ENTER(handle);
+  auto* state = asReader(handle);
+  if (state == nullptr || index >= state->signals.size())
+  {
+    return 0;
+  }
+  return state->signals[index].signalId64();
   LRVX_CAPI_LEAVE;
 }
 

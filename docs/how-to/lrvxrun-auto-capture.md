@@ -40,6 +40,8 @@ The `feed_ts_ns` setter is the only piece the engine wiring still has to drive â
 | `onOrderExpired` | `OrderEventRecord` kind=expire |
 | `onOrderFilled` / `onOrderPartiallyFilled` | `FillRecord` (kind 12) |
 
+A captured signal's id is the id of the order it asks for, all 64 bits of it (`(subscriber id << 32) + n`; the record used to keep the low 32), and every order event the listener writes carries that order id in `parent_signal_id`. A signal and the events of its order therefore join on `signalId64() == parent_signal_id == order_id`, and a later cancel or modify signal for the same order carries the same id. See [the format](../spec/lrvxrun.md).
+
 A `nullptr` recorder pointer disables capture without removing the inner-handler delegation, so attaching the wrapper unconditionally during setup is safe.
 
 ## Phase status
@@ -90,11 +92,13 @@ runner.trace_fill(order_id=fill.order_id, fill_id=fill.fill_id,
 ```javascript
 // node â€” after the executor's on_canceled fires
 runner.traceOrderEvent({
-  orderId, parentSignalId: 0, symbolId,
+  orderId, parentSignalId: orderId, symbolId,
   eventKind: 2 /* Cancel */, side, orderType: 0,
   price: 0, qty: 0,
 });
 ```
+
+Pass the order's id as `parentSignalId` / `parent_signal_id`: it is the id of the signal the runner captured for that order (`signalId64` / `signal_id64` on the signal record), so the two join.
 
 Both methods are no-ops when no recorder is attached, so wiring them unconditionally during executor setup is safe. `eventKind` matches `OrderEventKind`: 1=Submit, 2=Cancel, 3=Modify, 4=Ack, 5=Reject, 6=Expire. `liquidity`: 0=Unknown, 1=Maker, 2=Taker.
 

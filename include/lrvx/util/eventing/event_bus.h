@@ -425,13 +425,11 @@ class EventBus : public ISubsystem
       : _cpuAffinity(performance::createCpuAffinity())
 #endif
   {
+    // _constructed is value-initialized to 0, which is its empty state; only
+    // _published has a non-zero one.
     for (auto& p : _published)
     {
       p.store(-1, std::memory_order_relaxed);
-    }
-    for (auto& c : _constructed)
-    {
-      c.store(0, std::memory_order_relaxed);
     }
   }
 
@@ -907,7 +905,20 @@ class EventBus : public ISubsystem
       }
     }
 
-    for (size_t i = 0; i < CapacityPow2; ++i)
+    // Only the slots this run claimed can hold an event or a published
+    // sequence. Every claim is at or below the sealed line (see
+    // sealSequenceLine), a slot is written only by the publish that owns its
+    // sequence, and a run starts on a ring this loop left empty: so a run
+    // that never wrapped touched slots [0, lastClaim] and nothing else, and
+    // the rest of a large ring is not walked for a bus that carried a few
+    // events.
+    const int64_t lastClaim = _runLastClaim.load(std::memory_order_relaxed);
+    const size_t touched =
+        lastClaim < 0 ? size_t{0}
+                      : (static_cast<uint64_t>(lastClaim) + 1 < CapacityPow2
+                             ? static_cast<size_t>(lastClaim) + 1
+                             : CapacityPow2);
+    for (size_t i = 0; i < touched; ++i)
     {
       if (_constructed[i].exchange(0, std::memory_order_acq_rel))
       {
@@ -1868,7 +1879,9 @@ class EventBus : public ISubsystem
   {
     std::byte data[sizeof(Event)];
   };
-  alignas(64) std::array<Storage, CapacityPow2> _storage{};
+  // Raw bytes, deliberately not zeroed: a slot is read only while
+  // _constructed says an event lives in it.
+  alignas(64) std::array<Storage, CapacityPow2> _storage;
   inline Event* slot_ptr(size_t idx) noexcept { return std::launder(reinterpret_cast<Event*>(_storage[idx].data)); }
   inline Event& slot_ref(size_t idx) noexcept { return *slot_ptr(idx); }
 

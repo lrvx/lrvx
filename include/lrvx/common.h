@@ -105,6 +105,12 @@ using ExchangeId = uint16_t;
 inline constexpr uint64_t kRunnerOrderIdSubscriber = 0x1F'FFFFULL;
 inline constexpr OrderId kRunnerOrderIdBase = kRunnerOrderIdSubscriber << 32;
 
+// The last subscriber id's block is where MultiModePositionTracker numbers the
+// fills it is handed without an order (its explicit fills). A Strategy
+// refuses that subscriber id: its orders would carry those ids.
+inline constexpr uint64_t kExplicitFillOrderIdSubscriber = 0xFFFF'FFFFULL;
+inline constexpr OrderId kExplicitFillOrderIdBase = kExplicitFillOrderIdSubscriber << 32;
+
 static constexpr ExchangeId InvalidExchangeId = 0xFFFF;
 
 enum class VenueType : uint8_t

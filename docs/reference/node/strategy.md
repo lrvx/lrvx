@@ -16,6 +16,11 @@ const registry = new lrvx.SymbolRegistry();
 |--------|---------|-------------|
 | `addSymbol(exchange, name, tickSize?, lotSize?)` | `Symbol` | Register a symbol. `tickSize` is the venue's price increment and a backtest rejects orders priced off it; left out, the book uses 0.01 and order prices are not checked. `lotSize` is the venue's quantity step and a backtest rejects an order whose quantity is not a whole number of it; left out, quantities are not checked |
 | `symbolCount()` | `number` | Number of registered symbols |
+| `tickSize(symbol)` | `number` | The price tick the entry holds now |
+| `tickSizeDeclared(symbol)` | `boolean` | Whether order prices on the symbol are checked against it |
+| `lotSize(symbol)` | `number \| null` | The quantity step the entry holds now, `null` when it declares none |
+
+The three getters take a `Symbol` or its numeric id and read the registry entry: `tickSize(symbol)` is 0.01 with `tickSizeDeclared(symbol)` `false` for a symbol registered without a tick, and both follow a tick or lot applied to the entry later. An id that is not registered throws a `RangeError`.
 
 ### Symbol
 
@@ -210,6 +215,11 @@ Each takes a plain JS object, or `null` to detach.
 | `setOrderValidator(ov)` | Attach an order validator. Sync only |
 | `setMarketDataRecorder(recorder)` | Attach a `MarketDataRecorderHook` or `BinaryLogRecorderHook` |
 | `setExecutor(executor)` | Replace the executor. Sync only — `capabilities()` is read inline |
+| `orderClosed(orderId)` | Tell the runner an order it sent to the executor is finished. `orderId` is a `number` or a `bigint` |
+
+With an executor attached the runner keeps every order that can rest, by id, so that `emit.modify` reaches `executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `orderClosed(orderId)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. `emit.cancel` drops the entry by itself, and market, IOC and FOK orders are never kept.
+
+An `emit.modify` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor. `emit.modify` clears `lrvx.lastError()` on entry, and after a refused one it reads `modify: order <id> is not on record with this executor ... [unknown_order]`.
 
 #### What a hook is handed
 

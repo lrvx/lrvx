@@ -480,7 +480,10 @@ static void polymarketCase(bool registeredFirst)
   PolymarketExchangeConnector connector(cfg, &buses.book, &buses.trade, &registry,
                                         makeLogger("pm_net.log"));
   connector.loadInstrumentSpecs();
-  expectVenueTick(connector, registry, "polymarket", token, decimalRaw(*tick), std::nullopt);
+  // The CLOB publishes no size step; the connector declares the documented
+  // two size decimals.
+  expectVenueTick(connector, registry, "polymarket", token, decimalRaw(*tick),
+                  instrument_info::kPolymarketSizeStep.raw());
   expectSameId(early, registry, "polymarket", token);
 }
 

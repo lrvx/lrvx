@@ -332,6 +332,9 @@ TEST(PolymarketTickSizeChange, ATickTheVenueSuppliesLaterClearsTheLoadFailure)
   const auto info = *registry.getSymbolInfo(*registry.getSymbolId("polymarket", kToken));
   EXPECT_TRUE(info.tickSizeKnown);
   EXPECT_EQ(info.tickSize.raw(), kMill);
+  // The token is first known here, so its documented size step arrives with
+  // the tick.
+  EXPECT_EQ(info.lotSize.raw(), instrument_info::kPolymarketSizeStep.raw());
   const std::string after = connector.instrumentInfoError();
   EXPECT_EQ(after.find(kToken), std::string::npos)
       << "the token's tick is known now, the report still says: " << after;

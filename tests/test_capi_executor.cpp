@@ -268,10 +268,16 @@ TEST(CapiExecutor, RunnerForwardsCancelAndCancelAll)
   EXPECT_EQ(s.cancel_all.load(), 1);
   EXPECT_EQ(s.last_cancel_all_symbol, ctx.symbol);
 
-  lrvx_emit_modify(ctx.strategy, /*order_id=*/7,
+  // A modify is forwarded as the order it names (see ModifyCtx below); one
+  // that names an id the runner never forwarded is not sent.
+  const uint64_t resting = lrvx_emit_limit_sell(ctx.strategy, ctx.symbol, 10100000000LL, 100000000LL);
+  lrvx_emit_modify(ctx.strategy, resting,
                    /*new_price_raw=*/10000000000LL, /*new_qty_raw=*/200000000LL);
   EXPECT_EQ(s.replace.load(), 1);
-  EXPECT_EQ(s.last_replace_old_id, 7u);
+  EXPECT_EQ(s.last_replace_old_id, resting);
+  lrvx_emit_modify(ctx.strategy, /*order_id=*/7, 10000000000LL, 200000000LL);
+  EXPECT_EQ(s.replace.load(), 1);
+  lrvx_clear_last_error();
 
   lrvx_runner_stop(ctx.runner);
   lrvx_executor_destroy(exec);
@@ -394,15 +400,17 @@ TEST(CapiExecutor, RunnerModifyAfterCancelNamesNoOrder)
   lrvx_emit_cancel(ctx.strategy, a);
   lrvx_emit_cancel_all(ctx.strategy, ctx.other);
 
-  // The request still reaches the executor under the id the strategy named;
-  // there is no order behind it any more, so no symbol or side to report.
+  // There is no order behind either id any more, so there is no symbol, side
+  // or type to send: neither request reaches the executor.
+  lrvx_clear_last_error();
   lrvx_emit_modify(ctx.strategy, a, 10200000000LL, 200000000LL);
-  EXPECT_EQ(ctx.state.last_replace_order.id, a);
-  EXPECT_EQ(ctx.state.last_replace_order.symbol, 0u);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("unknown_order"), std::string::npos)
+      << lrvx_last_error_message();
+  lrvx_clear_last_error();
   lrvx_emit_modify(ctx.strategy, b, 10200000000LL, 200000000LL);
-  EXPECT_EQ(ctx.state.last_replace_order.id, b);
-  EXPECT_EQ(ctx.state.last_replace_order.symbol, 0u);
-  EXPECT_EQ(ctx.state.replace.load(), 2);
+  EXPECT_NE(lrvx_last_error_code(), 0);
+  EXPECT_EQ(ctx.state.replace.load(), 0);
+  lrvx_clear_last_error();
 }
 
 namespace
@@ -470,8 +478,11 @@ TEST(CapiExecutor, RunnerModifyNamesOneOcoLeg)
   // Cancelling one leg forgets that leg only.
   lrvx_emit_cancel(ctx.strategy, secondId);
   lrvx_emit_modify(ctx.strategy, secondId, 9300000000LL, 50000000LL);
-  EXPECT_EQ(ctx.state.last_replace_order.symbol, 0u);
+  EXPECT_EQ(ctx.state.replace.load(), 2) << "the cancelled leg is not modified";
+  lrvx_clear_last_error();
   lrvx_emit_modify(ctx.strategy, id, 10700000000LL, 100000000LL);
+  ASSERT_EQ(ctx.state.replace.load(), 3);
+  EXPECT_EQ(ctx.state.last_replace_order.id, id);
   EXPECT_EQ(ctx.state.last_replace_order.symbol, ctx.symbol);
 }
 

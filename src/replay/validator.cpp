@@ -53,7 +53,7 @@ SegmentValidationResult SegmentValidator::validate(const std::filesystem::path& 
   if (!file)
   {
     addIssue(result, IssueType::FileReadError, IssueSeverity::Critical,
-             "Cannot open file for reading");
+             "Cannot open file for reading: " + segment_path.string());
     result.valid = false;
     return result;
   }
@@ -745,20 +745,42 @@ DatasetValidationResult DatasetValidator::validate(const std::filesystem::path& 
   DatasetValidationResult result;
   result.data_dir = data_dir;
 
-  if (!std::filesystem::exists(data_dir))
+  // A directory that is not there, or cannot be listed, is an issue about
+  // the dataset with the path in it; it used to be a bare valid == false, or
+  // an exception out of the directory iterator.
+  const auto unreadable = [&result](IssueType type, std::string message)
   {
+    ValidationIssue issue;
+    issue.type = type;
+    issue.severity = IssueSeverity::Critical;
+    issue.message = std::move(message);
+    result.issues.push_back(std::move(issue));
+    ++result.total_errors;
     result.valid = false;
     return result;
+  };
+
+  std::error_code ec;
+  if (!std::filesystem::exists(data_dir, ec))
+  {
+    return unreadable(IssueType::FileNotFound, "Directory not found: " + data_dir.string());
   }
 
   // Collect segment files
   std::vector<std::filesystem::path> segment_paths;
-  for (const auto& entry : std::filesystem::directory_iterator(data_dir))
+  std::filesystem::directory_iterator it(data_dir, ec);
+  for (; !ec && it != std::filesystem::directory_iterator(); it.increment(ec))
   {
+    const auto& entry = *it;
     if (entry.is_regular_file() && isSegmentExtension(entry.path().extension().string()))
     {
       segment_paths.push_back(entry.path());
     }
+  }
+  if (ec)
+  {
+    return unreadable(IssueType::FileReadError,
+                      "Cannot read directory: " + data_dir.string() + ": " + ec.message());
   }
 
   std::sort(segment_paths.begin(), segment_paths.end());

@@ -307,6 +307,9 @@ class TraceReaderWrap : public Napi::ObjectWrap<TraceReaderWrap>
       o.Set("runTsNs", Napi::BigInt::New(env, run_ts));
       o.Set("feedTsNs", Napi::BigInt::New(env, feed_ts));
       o.Set("signalId", Napi::Number::New(env, sid));
+      // A Number, as orderId and parentSignalId are on an order event record.
+      o.Set("signalId64", Napi::Number::New(
+                              env, static_cast<double>(lrvx_run_reader_signal_id64(_h, i))));
       o.Set("flags", Napi::Number::New(env, flags));
       o.Set("strengthRaw", Napi::Number::New(env, static_cast<double>(strength)));
       o.Set("name", Napi::String::New(env, name));

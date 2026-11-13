@@ -523,6 +523,7 @@ std::vector<OwnedSignal> TraceReader::readAllSignals()
     os.run_ts_ns = rec.run_ts_ns;
     os.feed_ts_ns = rec.feed_ts_ns;
     os.signal_id = rec.signal_id;
+    os.signal_id_hi = rec.signal_id_hi;
     os.flags = rec.flags;
     os.strength_raw = rec.strength_raw;
     size_t off = cursor + sizeof(rec);

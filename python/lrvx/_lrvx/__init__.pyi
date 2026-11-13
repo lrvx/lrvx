@@ -2628,6 +2628,10 @@ class Runner:
         """
     def on_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
         ...
+    def order_closed(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> None:
+        """
+        Tell the runner an order it sent to the executor has reached a terminal state (filled, cancelled by the venue, rejected, expired). With an executor attached the runner keeps every order that can rest so that a modify can be sent as that order with its price and quantity changed, and nothing tells it of a fill: call this from wherever the executor learns the order is finished and the entry is dropped. An id that is not on record is ignored; market, IOC and FOK orders are never kept. A modify that names an id not on record is not sent to the executor, and lrvx.last_error() then says why, ending in [unknown_order].
+        """
     def replace_strategy(self, index: typing.SupportsInt | typing.SupportsIndex, strategy: Strategy) -> None:
         """
         Atomically swap the strategy instance at `index` for a new one. The old strategy's on_stop fires, the bridge's internal state survives, the new strategy's on_start fires afterwards. WebSocket / gRPC connections are unaffected.
@@ -3351,8 +3355,20 @@ class SymbolRegistry:
         """
         Register a symbol. tick_size is the venue's price increment and lot_size its quantity step; a backtest rejects an order priced off a given tick (price_off_tick) or sized off a given lot (quantity_off_lot). Left out, that side of the order is not checked.
         """
+    def lot_size(self, symbol: typing.SupportsInt | typing.SupportsIndex) -> float | None:
+        """
+        The quantity step the entry holds now (given to add_symbol or applied from the venue), or None when it declares none and quantities are not checked.
+        """
     def symbol_count(self) -> int:
         ...
+    def tick_size(self, symbol: typing.SupportsInt | typing.SupportsIndex) -> float:
+        """
+        The price tick the entry holds now: the one given to add_symbol, one a connector read from the venue and applied since, or the 0.01 a symbol registered without a tick gets for its book. See tick_size_declared.
+        """
+    def tick_size_declared(self, symbol: typing.SupportsInt | typing.SupportsIndex) -> bool:
+        """
+        True when order prices on the symbol are checked against tick_size: a tick was given at registration or applied from the venue.
+        """
 class TEMA:
     def __init__(self, period: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
@@ -3958,7 +3974,10 @@ def last_error() -> str:
     returning False, extract_symbols / extract_time_range returning 0.
     Each clears it on entry, so '' after one means it did not fail (an
     extract that matched nothing returns 0 with ''). The text opens with
-    the name of the C function. Per thread.
+    the name of the C function. Strategy.modify_order clears it too, and
+    a live Runner that refuses the modify (an id its executor record does
+    not hold) leaves the reason here, ending in [unknown_order]. Per
+    thread.
     """
 def list_indicators() -> list:
     """

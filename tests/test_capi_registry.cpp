@@ -311,3 +311,67 @@ TEST(CapiRegistryTest, ALotBelowTheQuantityScaleIsRefused)
   EXPECT_EQ(lrvx_registry_symbol_count(reg), 0u);
   lrvx_registry_destroy(reg);
 }
+
+TEST(CapiRegistryTest, TickAndLotGettersReadWhatWasRegistered)
+{
+  LrvxRegistryHandle reg = lrvx_registry_create();
+  const uint32_t plain = lrvx_registry_add_symbol(reg, "test", "PLAIN", 0.0);
+  const uint32_t ticked = lrvx_registry_add_symbol(reg, "test", "TICKED", 0.5);
+  const uint32_t both = lrvx_registry_add_symbol_with_lot(reg, "test", "BOTH", 0.01, 0.001);
+
+  double tick = -1.0;
+  double lot = -1.0;
+  uint8_t declared = 7;
+
+  ASSERT_EQ(lrvx_registry_get_symbol_tick(reg, plain, &tick, &declared), 1);
+  EXPECT_DOUBLE_EQ(tick, 0.01) << "the book's default";
+  EXPECT_EQ(declared, 0);
+  ASSERT_EQ(lrvx_registry_get_symbol_lot(reg, plain, &lot, &declared), 1);
+  EXPECT_DOUBLE_EQ(lot, 0.0);
+  EXPECT_EQ(declared, 0);
+
+  ASSERT_EQ(lrvx_registry_get_symbol_tick(reg, ticked, &tick, &declared), 1);
+  EXPECT_DOUBLE_EQ(tick, 0.5);
+  EXPECT_EQ(declared, 1);
+  ASSERT_EQ(lrvx_registry_get_symbol_lot(reg, ticked, &lot, &declared), 1);
+  EXPECT_DOUBLE_EQ(lot, 0.0);
+  EXPECT_EQ(declared, 0);
+
+  // An explicit 0.01 is declared, though it equals the default.
+  ASSERT_EQ(lrvx_registry_get_symbol_tick(reg, both, &tick, &declared), 1);
+  EXPECT_DOUBLE_EQ(tick, 0.01);
+  EXPECT_EQ(declared, 1);
+  ASSERT_EQ(lrvx_registry_get_symbol_lot(reg, both, &lot, &declared), 1);
+  EXPECT_DOUBLE_EQ(lot, 0.001);
+  EXPECT_EQ(declared, 1);
+
+  // declared_out is optional.
+  tick = -1.0;
+  lot = -1.0;
+  EXPECT_EQ(lrvx_registry_get_symbol_tick(reg, both, &tick, nullptr), 1);
+  EXPECT_DOUBLE_EQ(tick, 0.01);
+  EXPECT_EQ(lrvx_registry_get_symbol_lot(reg, both, &lot, nullptr), 1);
+  EXPECT_DOUBLE_EQ(lot, 0.001);
+
+  lrvx_registry_destroy(reg);
+}
+
+TEST(CapiRegistryTest, TickAndLotGettersRefuseAnUnknownSymbol)
+{
+  LrvxRegistryHandle reg = lrvx_registry_create();
+  lrvx_registry_add_symbol(reg, "test", "BTC", 0.5);
+  double value = -1.0;
+  uint8_t declared = 7;
+  EXPECT_EQ(lrvx_registry_get_symbol_tick(reg, 9999, &value, &declared), 0);
+  EXPECT_EQ(lrvx_registry_get_symbol_lot(reg, 9999, &value, &declared), 0);
+  EXPECT_DOUBLE_EQ(value, -1.0) << "outputs are left alone";
+  EXPECT_EQ(declared, 7);
+
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_registry_get_symbol_tick(reg, 1, nullptr, &declared), 0);
+  EXPECT_NE(lrvx_last_error_code(), 0);
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_registry_get_symbol_lot(nullptr, 1, &value, &declared), 0);
+  EXPECT_NE(lrvx_last_error_code(), 0);
+  lrvx_registry_destroy(reg);
+}

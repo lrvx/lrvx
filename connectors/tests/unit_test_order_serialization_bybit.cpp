@@ -399,3 +399,66 @@ TEST(BybitOrderSerialization, ClientSideRateLimitedCancelDoesNotSilentlyVanish)
   }
   EXPECT_TRUE(sawRateLimited);
 }
+
+// Bybit takes the qty of a spot market buy as quote currency by default (v5
+// order/create: "Spot: Market Buy order by value by default, you can set
+// marketUnit field to choose order by value or qty for market orders").
+// Order::quantity is base asset, and the lot it is checked against is the
+// base step, so without marketUnit a buy of 0.5 BTC was sent as a buy of
+// 0.5 USDT worth.
+TEST(BybitOrderSerialization, SpotMarketOrdersAreSizedInBaseCoin)
+{
+  auto transport = std::make_unique<FakeTransport>();
+  auto* rawTransport = transport.get();
+  auto client = std::make_unique<AuthenticatedRestClient>("key", "secret", "https://api.bybit.com",
+                                                          rawTransport);
+
+  SymbolRegistry registry;
+  OrderTracker tracker;
+  SymbolInfo spotInfo;
+  spotInfo.exchange = "bybit";
+  spotInfo.symbol = "BTCUSDT";
+  spotInfo.type = InstrumentType::Spot;
+  spotInfo.lotSize = Quantity::fromDouble(0.000001);  // basePrecision
+  const SymbolId spot = registry.registerSymbol(spotInfo);
+  const SymbolId linear = registerLinear(registry, "ETHUSDT");
+
+  BybitOrderExecutorT<NoPolicies> executor(std::move(client), &registry, &tracker);
+
+  Order buy;
+  buy.id = 1;
+  buy.symbol = spot;
+  buy.side = Side::BUY;
+  buy.type = OrderType::MARKET;
+  buy.quantity = Quantity::fromDouble(0.5);
+  executor.submitOrder(buy);
+
+  Order sell = buy;
+  sell.id = 2;
+  sell.side = Side::SELL;
+  executor.submitOrder(sell);
+
+  Order limit = buy;
+  limit.id = 3;
+  limit.type = OrderType::LIMIT;
+  limit.price = Price::fromDouble(60000.0);
+  executor.submitOrder(limit);
+
+  Order perp = buy;
+  perp.id = 4;
+  perp.symbol = linear;
+  executor.submitOrder(perp);
+
+  ASSERT_EQ(rawTransport->calls.size(), 4u);
+  const std::string unit = R"("marketUnit":"baseCoin")";
+  EXPECT_NE(rawTransport->calls[0].body.find(unit), std::string::npos)
+      << rawTransport->calls[0].body;
+  EXPECT_NE(rawTransport->calls[0].body.find(R"("qty":"0.5)"), std::string::npos)
+      << rawTransport->calls[0].body;
+  EXPECT_NE(rawTransport->calls[1].body.find(unit), std::string::npos)
+      << rawTransport->calls[1].body;
+  EXPECT_EQ(rawTransport->calls[2].body.find("marketUnit"), std::string::npos)
+      << "a limit order's qty is base already: " << rawTransport->calls[2].body;
+  EXPECT_EQ(rawTransport->calls[3].body.find("marketUnit"), std::string::npos)
+      << "marketUnit is a spot field: " << rawTransport->calls[3].body;
+}

@@ -11,6 +11,7 @@
 
 #include <cassert>
 
+#include "lrvx/common.h"
 #include "lrvx/position/position_aggregation_mode.h"
 #include "lrvx/position/position_group.h"
 #include "lrvx/position/position_reconciler.h"
@@ -423,7 +424,7 @@ class MultiModePositionTracker : public IPositionManager
   }
 
  private:
-  static constexpr OrderId kExplicitFillBaseId = 0xFFFF'FFFF'0000'0000ULL;
+  static constexpr OrderId kExplicitFillBaseId = kExplicitFillOrderIdBase;
   OrderId _nextExplicitId{kExplicitFillBaseId};
 
   struct PrecomputedFill

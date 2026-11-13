@@ -1155,7 +1155,14 @@ inline Napi::Value seg_validate(const Napi::CallbackInfo& info)
 inline Napi::Value seg_validate_full(const Napi::CallbackInfo& info)
 {
   lrvx_clear_last_error();
-  auto r = lrvx_segment_validate_full(info[0].As<Napi::String>().Utf8Value().c_str(), 1, 1);
+  // A check that is not named is on; a boolean that is given is honoured.
+  const auto flag = [&info](size_t i) -> uint8_t
+  {
+    return (info.Length() > i && info[i].IsBoolean() && !info[i].As<Napi::Boolean>().Value()) ? 0
+                                                                                              : 1;
+  };
+  auto r = lrvx_segment_validate_full(info[0].As<Napi::String>().Utf8Value().c_str(), flag(1),
+                                      flag(2));
   auto o = Napi::Object::New(info.Env());
   o.Set("valid", (bool)r.valid);
   o.Set("headerValid", (bool)r.header_valid);
@@ -1172,6 +1179,7 @@ inline Napi::Value seg_validate_full(const Napi::CallbackInfo& info)
 
 inline Napi::Value seg_validate_dataset(const Napi::CallbackInfo& info)
 {
+  lrvx_clear_last_error();
   auto r = lrvx_dataset_validate(info[0].As<Napi::String>().Utf8Value().c_str());
   auto o = Napi::Object::New(info.Env());
   o.Set("valid", (bool)r.valid);
@@ -1195,13 +1203,35 @@ inline Napi::Value seg_merge(const Napi::CallbackInfo& info)
 
 inline Napi::Value seg_merge_dir(const Napi::CallbackInfo& info)
 {
-  auto r = lrvx_segment_merge_dir(info[0].As<Napi::String>().Utf8Value().c_str(),
-                                  info[1].As<Napi::String>().Utf8Value().c_str());
-  auto o = Napi::Object::New(info.Env());
+  LrvxMergeResult r{};
+  std::vector<char> path(4096);
+  std::vector<char> errors(65536);
+  lrvx_clear_last_error();
+  lrvx_segment_merge_dir_report(info[0].As<Napi::String>().Utf8Value().c_str(),
+                                info[1].As<Napi::String>().Utf8Value().c_str(), &r, path.data(),
+                                path.size(), errors.data(), errors.size());
+  auto env = info.Env();
+  auto o = Napi::Object::New(env);
   o.Set("success", (bool)r.success);
   o.Set("segmentsMerged", (double)r.segments_merged);
   o.Set("eventsWritten", (double)r.events_written);
   o.Set("bytesWritten", (double)r.bytes_written);
+  o.Set("outputPath", Napi::String::New(env, path.data()));
+  // One entry per line of the report.
+  auto list = Napi::Array::New(env);
+  uint32_t count = 0;
+  const std::string all(errors.data());
+  for (size_t start = 0; start < all.size();)
+  {
+    size_t end = all.find('\n', start);
+    if (end == std::string::npos)
+    {
+      end = all.size();
+    }
+    list.Set(count++, Napi::String::New(env, all.substr(start, end - start)));
+    start = end + 1;
+  }
+  o.Set("errors", list);
   return o;
 }
 

@@ -14,6 +14,7 @@
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/capi/order_type_names.hpp"
 #include "lrvx/engine/symbol_registry.h"
+#include "lrvx/execution/order_price_rule.h"
 #include "positions.h"
 #include "run_trace.h"
 #include "tsfn_util.h"
@@ -44,6 +45,9 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
                        {
                            InstanceMethod("addSymbol", &SymbolRegistryNode::addSymbol),
                            InstanceMethod("symbolCount", &SymbolRegistryNode::symbolCount),
+                           InstanceMethod("tickSize", &SymbolRegistryNode::tickSize),
+                           InstanceMethod("tickSizeDeclared", &SymbolRegistryNode::tickSizeDeclared),
+                           InstanceMethod("lotSize", &SymbolRegistryNode::lotSize),
                        });
   }
 
@@ -121,6 +125,71 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
   Napi::Value symbolCount(const Napi::CallbackInfo& info)
   {
     return Napi::Number::New(info.Env(), static_cast<double>(_reg->size()));
+  }
+
+  // The entry for a Symbol object or a numeric id; throws a RangeError and
+  // returns nullopt when the id is not registered.
+  std::optional<lrvx::SymbolInfo> entryFor(const Napi::CallbackInfo& info, const char* method)
+  {
+    auto env = info.Env();
+    uint32_t id = 0;
+    if (info.Length() > 0 && info[0].IsObject())
+    {
+      id = info[0].As<Napi::Object>().Get("id").ToNumber().Uint32Value();
+    }
+    else if (info.Length() > 0 && info[0].IsNumber())
+    {
+      id = info[0].As<Napi::Number>().Uint32Value();
+    }
+    else
+    {
+      Napi::TypeError::New(env, std::string(method) + ": expected a Symbol or a symbol id")
+          .ThrowAsJavaScriptException();
+      return std::nullopt;
+    }
+    auto entry = _reg->getSymbolInfo(id);
+    if (!entry)
+    {
+      Napi::RangeError::New(env, std::string(method) + ": symbol id " + std::to_string(id) +
+                                     " is not registered")
+          .ThrowAsJavaScriptException();
+    }
+    return entry;
+  }
+
+  Napi::Value tickSize(const Napi::CallbackInfo& info)
+  {
+    const auto entry = entryFor(info, "tickSize");
+    if (!entry)
+    {
+      return info.Env().Undefined();
+    }
+    return Napi::Number::New(info.Env(), entry->tickSize.toDouble());
+  }
+
+  Napi::Value tickSizeDeclared(const Napi::CallbackInfo& info)
+  {
+    const auto entry = entryFor(info, "tickSizeDeclared");
+    if (!entry)
+    {
+      return info.Env().Undefined();
+    }
+    return Napi::Boolean::New(info.Env(), lrvx::orderTickRaw(*entry) != 0);
+  }
+
+  Napi::Value lotSize(const Napi::CallbackInfo& info)
+  {
+    const auto entry = entryFor(info, "lotSize");
+    if (!entry)
+    {
+      return info.Env().Undefined();
+    }
+    const int64_t lot = lrvx::orderLotRaw(*entry);
+    if (lot == 0)
+    {
+      return info.Env().Null();
+    }
+    return Napi::Number::New(info.Env(), lrvx::Quantity::fromRaw(lot).toDouble());
   }
 };
 
@@ -456,6 +525,9 @@ struct NodeStrategyHost : TsfnHost
           return i.Env().Undefined();
         }
         uint64_t orderId = static_cast<uint64_t>(i[0].As<Napi::Number>().Int64Value());
+        // Cleared first, so lastError() after the call is '' unless a live
+        // runner refused the modify (an id its executor record does not hold).
+        lrvx_clear_last_error();
         lrvx_emit_modify(h->bridge.get(), orderId,
                          lrvx_price_from_double(i[1].As<Napi::Number>().DoubleValue()),
                          lrvx_quantity_from_double(i[2].As<Napi::Number>().DoubleValue()));
@@ -1696,6 +1768,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
             InstanceMethod("setOrderValidator", &RunnerNode::setOrderValidator),
             InstanceMethod("setMarketDataRecorder", &RunnerNode::setMarketDataRecorder),
             InstanceMethod("setExecutor", &RunnerNode::setExecutor),
+            InstanceMethod("orderClosed", &RunnerNode::orderClosed),
             InstanceMethod("hookErrors", &RunnerNode::hookErrors),
             InstanceMethod("attachTraceRecorder", &RunnerNode::attachTraceRecorder),
             InstanceMethod("setTraceFeedTsNs", &RunnerNode::setTraceFeedTsNs),
@@ -2343,6 +2416,28 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     else
     {
       lrvx_live_engine_set_executor(_engine, _executor_host->handle);
+    }
+    return env.Undefined();
+  }
+
+  // The host's word that an order sent through the executor is finished, so
+  // the runner drops it from the record a Modify is built from.
+  Napi::Value orderClosed(const Napi::CallbackInfo& info)
+  {
+    auto env = info.Env();
+    if (info.Length() < 1 || !(info[0].IsNumber() || info[0].IsBigInt()))
+    {
+      Napi::TypeError::New(env, "orderClosed(orderId) expected").ThrowAsJavaScriptException();
+      return env.Undefined();
+    }
+    const uint64_t orderId = static_cast<uint64_t>(toInt64Ns(info[0]));
+    if (_mode == Mode::Sync)
+    {
+      lrvx_runner_order_closed(_runner, orderId);
+    }
+    else
+    {
+      lrvx_live_engine_order_closed(_engine, orderId);
     }
     return env.Undefined();
   }

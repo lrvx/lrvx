@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 771 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
+**Surface:** 777 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
 
 ## Opaque handles
 
@@ -1161,7 +1161,9 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `void lrvx_executor_destroy(LrvxExecutorHandle executor)`
 - `void lrvx_executor_get_capabilities(LrvxExecutorHandle executor, LrvxExchangeCapabilities * caps_out)`
 - `void lrvx_live_engine_set_executor(LrvxLiveEngineHandle engine, LrvxExecutorHandle executor)`
+- `void lrvx_live_engine_order_closed(LrvxLiveEngineHandle engine, uint64_t order_id)`
 - `void lrvx_runner_set_executor(LrvxRunnerHandle runner, LrvxExecutorHandle executor)`
+- `void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id)`
 - `void lrvx_backtest_runner_add_execution_listener(LrvxBacktestRunnerHandle runner, LrvxExecutionListenerHandle listener)`
 - `void lrvx_backtest_runner_set_executor(LrvxBacktestRunnerHandle runner, LrvxExecutorHandle executor)`
 
@@ -1443,6 +1445,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `uint64_t lrvx_run_reader_order_event_count(LrvxRunReaderHandle handle)`
 - `uint64_t lrvx_run_reader_fill_count(LrvxRunReaderHandle handle)`
 - `void lrvx_run_reader_signal_header(LrvxRunReaderHandle handle, uint64_t index, int64_t * out_run_ts, int64_t * out_feed_ts, uint32_t * out_signal_id, uint32_t * out_flags, int64_t * out_strength_raw, uint64_t * out_name_len, uint64_t * out_symbol_count, uint64_t * out_payload_len)`
+- `uint64_t lrvx_run_reader_signal_id64(LrvxRunReaderHandle handle, uint64_t index)`
 - `uint64_t lrvx_run_reader_signal_name(LrvxRunReaderHandle handle, uint64_t index, char * out, uint64_t max_bytes)`
 - `uint64_t lrvx_run_reader_signal_symbol_ids(LrvxRunReaderHandle handle, uint64_t index, uint32_t * out, uint64_t max_entries)`
 - `uint64_t lrvx_run_reader_signal_payload(LrvxRunReaderHandle handle, uint64_t index, uint8_t * out, uint64_t max_bytes)`
@@ -1696,6 +1699,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `uint8_t lrvx_segment_merge(const char * input_dir, const char * output_path)`
 - `LrvxMergeResult lrvx_segment_merge_full(const char * input_paths, size_t num_paths, const char * output_dir, const char * output_name, uint8_t sort)`
 - `LrvxMergeResult lrvx_segment_merge_dir(const char * input_dir, const char * output_dir)`
+- `uint8_t lrvx_segment_merge_dir_report(const char * input_dir, const char * output_dir, LrvxMergeResult * result_out, char * output_path_out, size_t output_path_len, char * errors_out, size_t errors_len)`
 - `LrvxSplitResult lrvx_segment_split(const char * input_path, const char * output_dir, uint8_t mode, int64_t time_interval_ns, uint64_t events_per_file)`
 - `LrvxExportResult lrvx_segment_export(const char * input_path, const char * output_path, uint8_t format, int64_t from_ns, int64_t to_ns, const uint32_t * symbols, uint32_t num_symbols)`
 - `uint8_t lrvx_segment_recompress(const char * input_path, const char * output_path, uint8_t compression)`
@@ -1809,6 +1813,8 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `uint32_t lrvx_registry_add_symbol_with_lot(LrvxRegistryHandle registry, const char * exchange, const char * name, double tick_size, double lot_size)`
 - `uint8_t lrvx_registry_get_symbol_id(LrvxRegistryHandle registry, const char * exchange, const char * name, uint32_t * id_out)`
 - `uint8_t lrvx_registry_get_symbol_name(LrvxRegistryHandle registry, uint32_t symbol_id, char * exchange_out, size_t exchange_len, char * name_out, size_t name_len)`
+- `uint8_t lrvx_registry_get_symbol_tick(LrvxRegistryHandle registry, uint32_t symbol_id, double * tick_size_out, uint8_t * declared_out)`
+- `uint8_t lrvx_registry_get_symbol_lot(LrvxRegistryHandle registry, uint32_t symbol_id, double * lot_size_out, uint8_t * declared_out)`
 - `uint32_t lrvx_registry_symbol_count(LrvxRegistryHandle registry)`
 
 ### tape_aggregator

@@ -15,6 +15,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
@@ -326,4 +328,51 @@ TEST(RunTraceHostile, SegmentNameCannotEscapeTheBundle)
     EXPECT_THROW(reader.readAllSignals(), std::runtime_error);
   }
   std::filesystem::remove_all(climb.root);
+}
+
+// The 64-bit accessors over a record whose id does not fit 32 bits, and over
+// one that does.
+TEST(RunTrace, SignalIdsReadBackWhole)
+{
+  auto tmp = makeTmp("signal_id64");
+  const uint64_t wide = (uint64_t{0x1F'FFFE} << 32) + 9;
+  {
+    lrvx::run::TraceRecorderOptions opts;
+    opts.strategy_id = "id64";
+    lrvx::run::TraceRecorder rec(tmp.string(), std::move(opts));
+    lrvx::run::SignalView s;
+    s.run_ts_ns = 1;
+    s.name = "limit";
+    s.symbol_ids = {1};
+    s.signal_id = wide;
+    rec.writeSignal(s);
+    s.run_ts_ns = 2;
+    s.signal_id = 42;
+    rec.writeSignal(s);
+    rec.close();
+  }
+
+  {
+    lrvx::run::TraceReader reader(tmp.string());
+    const auto sigs = reader.readAllSignals();
+    ASSERT_EQ(sigs.size(), 2u);
+    EXPECT_EQ(sigs[0].signal_id, 9u);
+    EXPECT_EQ(sigs[0].signalId64(), wide);
+    EXPECT_EQ(sigs[1].signal_id, 42u);
+    EXPECT_EQ(sigs[1].signalId64(), 42u);
+  }
+
+  std::filesystem::remove_all(tmp);
+}
+
+// A record written before the high half existed has zeros there and reads
+// back as the id it always was.
+TEST(RunTrace, ARecordFromBeforeTheHighHalfReadsItsLowHalf)
+{
+  lrvx::run::SignalRecord rec{};
+  rec.signal_id = 77;
+  EXPECT_EQ(rec.signalId64(), 77u);
+  EXPECT_EQ(sizeof(lrvx::run::SignalRecord), 48u);
+  EXPECT_EQ(offsetof(lrvx::run::SignalRecord, signal_id), 16u);
+  EXPECT_EQ(offsetof(lrvx::run::SignalRecord, signal_id_hi), 40u);
 }

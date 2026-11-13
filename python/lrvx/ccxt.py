@@ -223,6 +223,9 @@ _CCXT_ORDER_TYPE = {
     "CLOSE_POSITION": "market",
 }
 
+# ccxt's unified statuses for an order that will not trade again.
+_TERMINAL_ORDER_STATUSES = frozenset({"closed", "canceled", "expired", "rejected"})
+
 # Types with a trigger and no limit price.
 _TRIGGER_AT_MARKET_TYPES = frozenset(
     {"stop_market", "take_profit_market", "trailing_stop_market"})
@@ -1013,6 +1016,8 @@ class CcxtBroker:
         status = str(o.get("status", ""))
         filled = float(o.get("filled") or 0.0)
         avg = float(o.get("average") or o.get("price") or 0.0)
+        if status in _TERMINAL_ORDER_STATUSES:
+            self._note_order_closed(o)
         for strat in self._strategies:
             fn = getattr(strat, "on_order_update", None)
             if callable(fn):
@@ -1021,6 +1026,25 @@ class CcxtBroker:
                 except BaseException as e:
                     if self.on_error:
                         self.on_error(ccxt_sym, e)
+
+
+    def _note_order_closed(self, o: Mapping[str, Any]) -> None:
+        """Pass a terminal status on to the runner, by lrvx order id.
+
+        The runner drops the order from the record it keeps for an attached
+        executor (``Runner.order_closed``). The broker's own maps are left as
+        they are: a CANCEL or MODIFY the strategy still sends for the order
+        goes to the exchange, which answers for itself.
+        """
+        if self._runner is None:
+            return
+        ccxt_id = o.get("id")
+        if ccxt_id is None:
+            return
+        ccxt_id = str(ccxt_id)
+        for lrvx_id, known in list(self._lrvx_to_ccxt_order.items()):
+            if known == ccxt_id:
+                self._runner.order_closed(lrvx_id)
 
 
 __all__ = ["CcxtBroker", "UnsupportedOrderType"]

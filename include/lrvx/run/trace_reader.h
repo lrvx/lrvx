@@ -47,7 +47,15 @@ struct OwnedSignal
 {
   int64_t run_ts_ns{0};
   int64_t feed_ts_ns{0};
+  // The low 32 bits of the id, as this field has always read. signalId64()
+  // is the whole id; the two differ for a captured signal, whose id is its
+  // order id.
   uint32_t signal_id{0};
+  uint32_t signal_id_hi{0};
+  uint64_t signalId64() const noexcept
+  {
+    return (static_cast<uint64_t>(signal_id_hi) << 32) | signal_id;
+  }
   uint32_t flags{0};
   int64_t strength_raw{0};
   std::string name;

@@ -106,13 +106,18 @@ The `FrameHeader` from `.lrvx` is reused exactly:
 |---:|---:|---|---|
 | 0  | 8 | `run_ts_ns` | Wall-clock nanoseconds when the strategy emitted the signal. |
 | 8  | 8 | `feed_ts_ns` | Timestamp of the tape event that triggered the decision; `0` if not applicable. |
-| 16 | 4 | `signal_id` | Numeric id from the strategy's signal registry. |
+| 16 | 4 | `signal_id` | Low 32 bits of the signal's id. |
 | 20 | 2 | `name_len` | Bytes of UTF-8 signal name in the payload. |
 | 22 | 2 | `symbol_count` | Number of `symbol_id` entries in the payload. |
 | 24 | 4 | `payload_len` | Bytes of caller-defined payload after the trailing fields. |
 | 28 | 4 | `flags` | Bit `0x01` = decision is "enter", `0x02` = "exit", `0x04` = "rebalance". |
 | 32 | 8 | `strength_raw` | Signal strength, fixed-point with scale `1e8`. |
-| 40 | 8 | `_reserved` | Zero. |
+| 40 | 4 | `signal_id_hi` | High 32 bits of the signal's id. |
+| 44 | 4 | `_reserved` | Zero. |
+
+The id is 64 bits wide: `(signal_id_hi << 32) | signal_id`. A signal a runner captures carries the id of the order it asks for, `(subscriber id << 32) + n`, so its high half is the strategy's subscriber id; a later cancel or modify of the same order carries the same id. Until `signal_id_hi` existed bytes 40 to 47 were all reserved and written as zero, and capture kept only the low half. The layout and the 48-byte size did not change: a record whose id is below 2^32 is byte for byte what it was, a reader that predates the field still reads the low half at offset 16, and a record written before it reads back with a zero high half.
+
+Readers report both: the 32-bit `signal_id` (C++ `OwnedSignal::signal_id`, C `lrvx_run_reader_signal_header`, `signal_id` / `signalId` in the bindings) is the low half, unchanged, and the whole id is C++ `OwnedSignal::signalId64()`, C `lrvx_run_reader_signal_id64`, Python `signal_id64`, Node and QuickJS `signalId64`, Codon `TraceReader.signal_id64(index)`.
 
 Followed in order by:
 
@@ -130,7 +135,7 @@ A single signal can carry several symbol ids because cross-symbol decisions are 
 | 0  | 8 | `run_ts_ns` | Wall-clock when the event was emitted. |
 | 8  | 8 | `feed_ts_ns` | Triggering tape event timestamp; `0` if not applicable. |
 | 16 | 8 | `order_id` | Numeric order id from the executor's registry. |
-| 24 | 8 | `parent_signal_id` | Signal that produced this event; `0` if unrooted. |
+| 24 | 8 | `parent_signal_id` | The 64-bit id of the signal that produced this event; `0` if unrooted. The capture listener (`TraceExecutionListener`) writes the order's id here, which is the id of the captured signal that asked for the order, so the two join on it. |
 | 32 | 8 | `price_raw` | Fixed-point price, scale `1e8`. `0` if not applicable. |
 | 40 | 8 | `qty_raw` | Fixed-point quantity, scale `1e8`. |
 | 48 | 4 | `symbol_id` | |

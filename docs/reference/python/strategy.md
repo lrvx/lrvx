@@ -29,8 +29,13 @@ btc = registry.add_symbol("binance", "BTCUSDT", tick_size=0.01)
 |--------|---------|-------------|
 | `add_symbol(exchange, symbol, tick_size=None, lot_size=None)` | `Symbol` | Register a symbol and return its `Symbol` object |
 | `symbol_count()` | `int` | Number of registered symbols |
+| `tick_size(symbol)` | `float` | The price tick the entry holds now |
+| `tick_size_declared(symbol)` | `bool` | Whether order prices on the symbol are checked against it |
+| `lot_size(symbol)` | `float \| None` | The quantity step the entry holds now, `None` when it declares none |
 
 `tick_size` is the venue's price increment, and a backtest rejects orders priced off it. Left out, the symbol's book uses 0.01 and order prices are not checked; `Symbol.tick_size` then reads 0.01.
+
+The three getters take a `Symbol` or its id and read the registry entry, where a `Symbol` only carries what `add_symbol` was given: `tick_size(symbol)` is 0.01 with `tick_size_declared(symbol)` `False` for a symbol registered without a tick, and both follow a tick or lot a connector applies to the entry later. An id that is not registered raises `ValueError`.
 
 `lot_size` is the venue's quantity step, and a backtest rejects an order whose quantity is not a whole number of it (`reject_reason` `"quantity_off_lot"`). Left out, quantities are not checked and `Symbol.lot_size` is `None`. A `lot_size` that is not positive raises `ValueError`.
 
@@ -279,6 +284,11 @@ runner.stop()
 | `set_order_validator(ov)` | Attach an `OrderValidator` |
 | `set_market_data_recorder(recorder)` | Attach a `MarketDataRecorderHook` or `BinaryLogRecorderHook` |
 | `set_executor(executor)` | Replace the executor |
+| `order_closed(order_id)` | Tell the runner an order it sent to the executor is finished |
+
+With an executor attached the runner keeps every order that can rest, by id, so that a strategy's `modify_order` reaches `Executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `order_closed(order_id)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. A `cancel_order` from the strategy drops the entry by itself, and market, IOC and FOK orders are never kept. `CcxtBroker` calls it for every terminal status its orders stream reports.
+
+A `modify_order` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor. `modify_order` clears `lrvx.last_error()` on entry, and after a refused one it reads `modify: order <id> is not on record with this executor ... [unknown_order]`, on the thread the strategy ran on.
 
 A `MarketDataRecorderHook` subclass overrides any of `on_trade(trade)`,
 `on_book_update(symbol, is_snapshot, bids, asks, ts_ns)`,

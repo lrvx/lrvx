@@ -381,9 +381,9 @@ merge_segments("input_dir", "output.bin")  # bool
 |----------|---------|-------------|
 | `validate_segment(path)` | `bool` | Quick validation |
 | `validate_segment_full(path, verify_crc=True, verify_timestamps=True)` | `SegmentValidation` | Full validation |
-| `validate_dataset(data_dir)` | `DatasetValidation` | Validate all segments in directory |
+| `validate_dataset(data_dir)` | `DatasetValidation` | Validate all segments in directory. Clears `last_error()` on entry; a directory that is missing or cannot be listed leaves the reason there |
 | `merge_segments(input_dir, output_path)` | `bool` | Merge directory into one file |
-| `merge_dir(input_dir, output_dir)` | `MergeResult` | Merge with result metadata |
+| `merge_dir(input_dir, output_dir)` | `MergeResult` | Merge with result metadata: the counts, `output_path` (the segment written, `""` when none was) and `errors` (a `List[str]`, `"Cannot open: <path>"` for each input that was skipped) |
 | `split_segment(input_path, output_dir, mode=0, time_interval_ns=0, events_per_file=0)` | `SplitResult` | Split segment |
 | `export_segment(input_path, output_path, format=0, from_ns=0, to_ns=0, symbols=[])` | `ExportResult` | Export to CSV or other format |
 | `recompress_segment(input_path, output_path, compression=1)` | `bool` | Recompress |

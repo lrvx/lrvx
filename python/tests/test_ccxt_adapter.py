@@ -663,6 +663,56 @@ class CcxtBrokerTests(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("MODIFY", str(errors[0][1]))
 
+    def test_a_terminal_order_update_is_passed_to_the_runner(self):
+        """The orders stream is where the broker learns an order is finished;
+        it tells the runner, by lrvx order id, so the runner's record of
+        forwarded orders does not keep it."""
+        fake = FakeCcxtExchange()
+        broker = CcxtBroker("binance", exchange=fake)
+        closed = []
+
+        class RunnerSpy:
+            def __init__(self, inner):
+                self._inner = inner
+
+            def order_closed(self, order_id):
+                closed.append(order_id)
+                self._inner.order_closed(order_id)
+
+            def __getattr__(self, name):
+                return getattr(self._inner, name)
+
+        async def go():
+            btc = await broker.add_symbol("BTC/USDT")
+            broker.add_strategy(lrvx.Strategy([btc]))
+            fake.init_queues()
+            run_task = asyncio.create_task(
+                broker.run(streams=("orders",), reconcile=False))
+            await asyncio.sleep(0)
+            broker._runner = RunnerSpy(broker._runner)
+            for lrvx_id in (42, 43, 44):
+                broker._on_signal(_make_signal(
+                    symbol_id=int(btc), order_type="LIMIT", side="buy",
+                    quantity=0.5, price=99.0, order_id=lrvx_id))
+            await asyncio.sleep(0.02)
+            ccxt_ids = dict(broker._lrvx_to_ccxt_order)
+            fake.feed_orders([
+                {"id": ccxt_ids[42], "symbol": "BTC/USDT", "status": "open", "filled": 0.1},
+                {"id": ccxt_ids[43], "symbol": "BTC/USDT", "status": "closed", "filled": 0.5},
+                {"id": ccxt_ids[44], "symbol": "BTC/USDT", "status": "canceled"},
+                {"id": "not-ours", "symbol": "BTC/USDT", "status": "closed"},
+                {"symbol": "BTC/USDT", "status": "expired"},
+            ])
+            await asyncio.sleep(0.05)
+            await broker.stop()
+            try:
+                await run_task
+            except (asyncio.CancelledError, ValueError):
+                pass
+
+        asyncio.run(go())
+        self.assertEqual(closed, [43, 44])
+
     # ── reconciliation ───────────────────────────────────────────────
     def test_reconciliation_dispatches_initial_position(self):
         fake = FakeCcxtExchange(positions=[

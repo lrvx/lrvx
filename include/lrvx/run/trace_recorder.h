@@ -41,7 +41,8 @@ struct SignalView
 {
   int64_t run_ts_ns{0};
   int64_t feed_ts_ns{0};
-  uint32_t signal_id{0};
+  // All 64 bits are written (see SignalRecord).
+  uint64_t signal_id{0};
   uint32_t flags{0};
   int64_t strength_raw{0};
   std::string_view name;
