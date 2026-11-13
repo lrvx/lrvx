@@ -311,6 +311,32 @@ inline void reportHookError(HookErrorSink* sink, const char* hook, const char* m
 // that were mid-signal, and surfaces at whatever JS frame was on the stack --
 // the strategy's own emit.marketBuy() call. It is caught here instead.
 
+// What a hook returned, for a report. Only a string, a number or a BigInt is
+// shown by value: converting anything else ran its toString, which throws
+// for a Symbol or an object whose toString throws, and that throw left the
+// bridge mid-report.
+inline std::string describeReturned(const Napi::Value& v)
+{
+  switch (v.Type())
+  {
+    case napi_undefined:
+      return "undefined";
+    case napi_null:
+      return "null";
+    case napi_string:
+      return "'" + v.As<Napi::String>().Utf8Value() + "'";
+    case napi_number:
+    case napi_bigint:
+      return v.ToString().Utf8Value();
+    case napi_symbol:
+      return "a symbol";
+    case napi_function:
+      return "a function";
+    default:
+      return "an object";
+  }
+}
+
 inline uint8_t callGate(Napi::FunctionReference& fn, Napi::Env env, const LrvxSignal* sig,
                         HookErrorSink* sink, const char* hook, const char* method)
 {
@@ -337,7 +363,7 @@ inline uint8_t callGate(Napi::FunctionReference& fn, Napi::Env env, const LrvxSi
   if (!result.IsBoolean())
   {
     reportHookError(sink, hook, method,
-                    std::string("returned a non-boolean (") + result.ToString().Utf8Value() +
+                    "returned a non-boolean (" + describeReturned(result) +
                         "); a gate must return a boolean");
     return 0;
   }
