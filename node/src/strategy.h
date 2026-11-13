@@ -40,11 +40,7 @@ using namespace lrvx;
 class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<SymbolRegistryNode>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
@@ -56,7 +52,7 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
                                         InstanceMethod("tickSizeDeclared", &SymbolRegistryNode::tickSizeDeclared),
                                         InstanceMethod("lotSize", &SymbolRegistryNode::lotSize),
                                     });
-    return keepCtor(Ctor(), fn);
+    return keepCtor(Ctor(env), fn);
   }
 
   static SymbolRegistry* of(const Napi::Value& v, const char* what)
@@ -2372,7 +2368,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     // Detect the built-in BinaryLogRecorderHook wrapper via the cached
     // constructor stored at module init.
     LrvxMarketDataRecorderHandle binlog_handle = nullptr;
-    auto& ctor = node_lrvx::BinaryLogRecorderHookWrap::Ctor();
+    auto& ctor = node_lrvx::BinaryLogRecorderHookWrap::Ctor(env);
     if (!ctor.IsEmpty() && obj.InstanceOf(ctor.Value()))
     {
       auto* hook = Napi::ObjectWrap<node_lrvx::BinaryLogRecorderHookWrap>::Unwrap(obj);

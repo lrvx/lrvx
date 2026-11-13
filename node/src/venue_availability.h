@@ -58,29 +58,25 @@ inline uint8_t parseOutageType(const std::string& s)
 class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<VenueAvailabilityWrap>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
-    return keepCtor(Ctor(), DefineClass(
-                                env, "VenueAvailability",
-                                {InstanceMethod("scheduleOutage", &VenueAvailabilityWrap::ScheduleOutage),
-                                 InstanceMethod("scheduleOutageEx", &VenueAvailabilityWrap::ScheduleOutageEx),
-                                 InstanceMethod("autoRandomOutages", &VenueAvailabilityWrap::AutoRandomOutages),
-                                 InstanceMethod("isUp", &VenueAvailabilityWrap::IsUp),
-                                 InstanceMethod("submitsAllowed", &VenueAvailabilityWrap::SubmitsAllowed),
-                                 InstanceMethod("cancelsAllowed", &VenueAvailabilityWrap::CancelsAllowed),
-                                 InstanceMethod("bookUpdatesAllowed",
-                                                &VenueAvailabilityWrap::BookUpdatesAllowed),
-                                 InstanceMethod("tradesAllowed", &VenueAvailabilityWrap::TradesAllowed),
-                                 InstanceMethod("latencyMultiplier",
-                                                &VenueAvailabilityWrap::LatencyMultiplier),
-                                 InstanceMethod("consumeWrongSideRecoveryBps",
-                                                &VenueAvailabilityWrap::ConsumeWrongSideRecoveryBps)}));
+    return keepCtor(Ctor(env), DefineClass(
+                                   env, "VenueAvailability",
+                                   {InstanceMethod("scheduleOutage", &VenueAvailabilityWrap::ScheduleOutage),
+                                    InstanceMethod("scheduleOutageEx", &VenueAvailabilityWrap::ScheduleOutageEx),
+                                    InstanceMethod("autoRandomOutages", &VenueAvailabilityWrap::AutoRandomOutages),
+                                    InstanceMethod("isUp", &VenueAvailabilityWrap::IsUp),
+                                    InstanceMethod("submitsAllowed", &VenueAvailabilityWrap::SubmitsAllowed),
+                                    InstanceMethod("cancelsAllowed", &VenueAvailabilityWrap::CancelsAllowed),
+                                    InstanceMethod("bookUpdatesAllowed",
+                                                   &VenueAvailabilityWrap::BookUpdatesAllowed),
+                                    InstanceMethod("tradesAllowed", &VenueAvailabilityWrap::TradesAllowed),
+                                    InstanceMethod("latencyMultiplier",
+                                                   &VenueAvailabilityWrap::LatencyMultiplier),
+                                    InstanceMethod("consumeWrongSideRecoveryBps",
+                                                   &VenueAvailabilityWrap::ConsumeWrongSideRecoveryBps)}));
   }
 
   VenueAvailabilityWrap(const Napi::CallbackInfo& info)

@@ -100,10 +100,9 @@ inline double getDouble(const Napi::Object& o, const char* key, double fallback)
   LrvxLatencyModelHandle handle() const { return _h; }                           \
   /* Cached at module init so a BacktestRunner can InstanceOf-check a model */   \
   /* before unwrapping it. */                                                    \
-  static Napi::FunctionReference& Ctor()                                         \
+  static Napi::FunctionReference& Ctor(Napi::Env env)                            \
   {                                                                              \
-    static Napi::FunctionReference ref;                                          \
-    return ref;                                                                  \
+    return ctorOf<Cls>(env);                                                     \
   }                                                                              \
   static Napi::Function InitClass(Napi::Env env, const char* name)               \
   {                                                                              \
@@ -114,9 +113,7 @@ inline double getDouble(const Napi::Object& o, const char* key, double fallback)
                      InstanceMethod("fillDelay", &Cls::FillDelay),               \
                      InstanceMethod("sample", &Cls::Sample),                     \
                      InstanceMethod("reset", &Cls::Reset)});                     \
-    Ctor() = Napi::Persistent(fn);                                               \
-    Ctor().SuppressDestruct();                                                   \
-    return fn;                                                                   \
+    return keepCtor(Ctor(env), fn);                                              \
   }
 
 class ConstantLatencyWrap : public Napi::ObjectWrap<ConstantLatencyWrap>
@@ -301,19 +298,19 @@ inline LrvxLatencyModelHandle latencyHandleOf(const Napi::Value& v)
     return nullptr;
   }
   auto obj = v.As<Napi::Object>();
-  if (obj.InstanceOf(ConstantLatencyWrap::Ctor().Value()))
+  if (obj.InstanceOf(ConstantLatencyWrap::Ctor(v.Env()).Value()))
   {
     return Napi::ObjectWrap<ConstantLatencyWrap>::Unwrap(obj)->handle();
   }
-  if (obj.InstanceOf(GaussianLatencyWrap::Ctor().Value()))
+  if (obj.InstanceOf(GaussianLatencyWrap::Ctor(v.Env()).Value()))
   {
     return Napi::ObjectWrap<GaussianLatencyWrap>::Unwrap(obj)->handle();
   }
-  if (obj.InstanceOf(ExponentialLatencyWrap::Ctor().Value()))
+  if (obj.InstanceOf(ExponentialLatencyWrap::Ctor(v.Env()).Value()))
   {
     return Napi::ObjectWrap<ExponentialLatencyWrap>::Unwrap(obj)->handle();
   }
-  if (obj.InstanceOf(EmpiricalLatencyWrap::Ctor().Value()))
+  if (obj.InstanceOf(EmpiricalLatencyWrap::Ctor(v.Env()).Value()))
   {
     return Napi::ObjectWrap<EmpiricalLatencyWrap>::Unwrap(obj)->handle();
   }

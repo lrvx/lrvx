@@ -107,19 +107,13 @@ class EventTypeStatsAggregatorWrap
     : public Napi::ObjectWrap<EventTypeStatsAggregatorWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<EventTypeStatsAggregatorWrap>(env); }
   static Napi::Function Init(Napi::Env env)
   {
     Napi::Function fn = DefineClass(
         env, "EventTypeStatsAggregator",
         {InstanceMethod("result", &EventTypeStatsAggregatorWrap::Result)});
-    Ctor() = Napi::Persistent(fn);
-    Ctor().SuppressDestruct();
-    return fn;
+    return keepCtor(Ctor(env), fn);
   }
 
   EventTypeStatsAggregatorWrap(const Napi::CallbackInfo& info)
@@ -172,18 +166,12 @@ class EventTypeStatsAggregatorWrap
 class BinCountAggregatorWrap : public Napi::ObjectWrap<BinCountAggregatorWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<BinCountAggregatorWrap>(env); }
   static Napi::Function Init(Napi::Env env)
   {
     Napi::Function fn = DefineClass(env, "BinCountAggregator",
                                     {InstanceMethod("result", &BinCountAggregatorWrap::Result)});
-    Ctor() = Napi::Persistent(fn);
-    Ctor().SuppressDestruct();
-    return fn;
+    return keepCtor(Ctor(env), fn);
   }
 
   BinCountAggregatorWrap(const Napi::CallbackInfo& info)
@@ -239,19 +227,13 @@ class BinCountAggregatorWrap : public Napi::ObjectWrap<BinCountAggregatorWrap>
 class VolumeBinAggregatorWrap : public Napi::ObjectWrap<VolumeBinAggregatorWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<VolumeBinAggregatorWrap>(env); }
   static Napi::Function Init(Napi::Env env)
   {
     Napi::Function fn = DefineClass(
         env, "VolumeBinAggregator",
         {InstanceMethod("result", &VolumeBinAggregatorWrap::Result)});
-    Ctor() = Napi::Persistent(fn);
-    Ctor().SuppressDestruct();
-    return fn;
+    return keepCtor(Ctor(env), fn);
   }
 
   VolumeBinAggregatorWrap(const Napi::CallbackInfo& info)
@@ -307,19 +289,13 @@ class VolumeBinAggregatorWrap : public Napi::ObjectWrap<VolumeBinAggregatorWrap>
 class OHLCBinAggregatorWrap : public Napi::ObjectWrap<OHLCBinAggregatorWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<OHLCBinAggregatorWrap>(env); }
   static Napi::Function Init(Napi::Env env)
   {
     Napi::Function fn = DefineClass(
         env, "OHLCBinAggregator",
         {InstanceMethod("result", &OHLCBinAggregatorWrap::Result)});
-    Ctor() = Napi::Persistent(fn);
-    Ctor().SuppressDestruct();
-    return fn;
+    return keepCtor(Ctor(env), fn);
   }
 
   OHLCBinAggregatorWrap(const Napi::CallbackInfo& info)
@@ -376,18 +352,12 @@ class OHLCBinAggregatorWrap : public Napi::ObjectWrap<OHLCBinAggregatorWrap>
 class PeakAggregatorWrap : public Napi::ObjectWrap<PeakAggregatorWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<PeakAggregatorWrap>(env); }
   static Napi::Function Init(Napi::Env env)
   {
     Napi::Function fn = DefineClass(env, "PeakAggregator",
                                     {InstanceMethod("result", &PeakAggregatorWrap::Result)});
-    Ctor() = Napi::Persistent(fn);
-    Ctor().SuppressDestruct();
-    return fn;
+    return keepCtor(Ctor(env), fn);
   }
 
   PeakAggregatorWrap(const Napi::CallbackInfo& info)
@@ -474,19 +444,13 @@ class PeakAggregatorWrap : public Napi::ObjectWrap<PeakAggregatorWrap>
 class QuantileAggregatorWrap : public Napi::ObjectWrap<QuantileAggregatorWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<QuantileAggregatorWrap>(env); }
   static Napi::Function Init(Napi::Env env)
   {
     Napi::Function fn = DefineClass(
         env, "QuantileAggregator",
         {InstanceMethod("result", &QuantileAggregatorWrap::Result)});
-    Ctor() = Napi::Persistent(fn);
-    Ctor().SuppressDestruct();
-    return fn;
+    return keepCtor(Ctor(env), fn);
   }
 
   QuantileAggregatorWrap(const Napi::CallbackInfo& info)
@@ -575,19 +539,13 @@ class BookSnapshotBinAggregatorWrap
     : public Napi::ObjectWrap<BookSnapshotBinAggregatorWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<BookSnapshotBinAggregatorWrap>(env); }
   static Napi::Function Init(Napi::Env env)
   {
     Napi::Function fn = DefineClass(
         env, "BookSnapshotBinAggregator",
         {InstanceMethod("result", &BookSnapshotBinAggregatorWrap::Result)});
-    Ctor() = Napi::Persistent(fn);
-    Ctor().SuppressDestruct();
-    return fn;
+    return keepCtor(Ctor(env), fn);
   }
 
   BookSnapshotBinAggregatorWrap(const Napi::CallbackInfo& info)
@@ -667,31 +625,31 @@ inline bool collectAggregatorHandles(Napi::Env env, Napi::Array js_aggregators,
     }
     auto obj = v.As<Napi::Object>();
     LrvxAggregatorHandle h = nullptr;
-    if (obj.InstanceOf(EventTypeStatsAggregatorWrap::Ctor().Value()))
+    if (obj.InstanceOf(EventTypeStatsAggregatorWrap::Ctor(env).Value()))
     {
       h = Napi::ObjectWrap<EventTypeStatsAggregatorWrap>::Unwrap(obj)->nativeHandle();
     }
-    else if (obj.InstanceOf(BinCountAggregatorWrap::Ctor().Value()))
+    else if (obj.InstanceOf(BinCountAggregatorWrap::Ctor(env).Value()))
     {
       h = Napi::ObjectWrap<BinCountAggregatorWrap>::Unwrap(obj)->nativeHandle();
     }
-    else if (obj.InstanceOf(VolumeBinAggregatorWrap::Ctor().Value()))
+    else if (obj.InstanceOf(VolumeBinAggregatorWrap::Ctor(env).Value()))
     {
       h = Napi::ObjectWrap<VolumeBinAggregatorWrap>::Unwrap(obj)->nativeHandle();
     }
-    else if (obj.InstanceOf(OHLCBinAggregatorWrap::Ctor().Value()))
+    else if (obj.InstanceOf(OHLCBinAggregatorWrap::Ctor(env).Value()))
     {
       h = Napi::ObjectWrap<OHLCBinAggregatorWrap>::Unwrap(obj)->nativeHandle();
     }
-    else if (obj.InstanceOf(PeakAggregatorWrap::Ctor().Value()))
+    else if (obj.InstanceOf(PeakAggregatorWrap::Ctor(env).Value()))
     {
       h = Napi::ObjectWrap<PeakAggregatorWrap>::Unwrap(obj)->nativeHandle();
     }
-    else if (obj.InstanceOf(QuantileAggregatorWrap::Ctor().Value()))
+    else if (obj.InstanceOf(QuantileAggregatorWrap::Ctor(env).Value()))
     {
       h = Napi::ObjectWrap<QuantileAggregatorWrap>::Unwrap(obj)->nativeHandle();
     }
-    else if (obj.InstanceOf(BookSnapshotBinAggregatorWrap::Ctor().Value()))
+    else if (obj.InstanceOf(BookSnapshotBinAggregatorWrap::Ctor(env).Value()))
     {
       h = Napi::ObjectWrap<BookSnapshotBinAggregatorWrap>::Unwrap(obj)->nativeHandle();
     }

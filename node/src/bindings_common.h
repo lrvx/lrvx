@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <string>
+#include <unordered_map>
 
 namespace node_lrvx
 {
@@ -262,23 +263,45 @@ inline uint32_t argNamedCode(const Napi::Value& v, const char* what,
                                           " or a code");
 }
 
+// The constructors one instance of this module registered. Node loads the
+// addon once per environment -- the main thread and each worker thread -- and
+// a constructor belongs to the environment that made it. Process-wide
+// statics held the constructor of whichever environment registered last, so
+// argInstance in any other compared against a foreign constructor.
+struct EnvConstructors
+{
+  std::unordered_map<const void*, Napi::FunctionReference> byClass;
+};
+
+template <typename T>
+inline constexpr char kClassKey = 0;
+
+// The constructor T registered in `env`: `static Napi::FunctionReference&
+// Ctor(Napi::Env env) { return ctorOf<T>(env); }` in each wrap class.
+template <typename T>
+inline Napi::FunctionReference& ctorOf(Napi::Env env)
+{
+  auto* data = env.GetInstanceData<EnvConstructors>();
+  if (data == nullptr)
+  {
+    data = new EnvConstructors;
+    env.SetInstanceData(data);
+  }
+  return data->byClass[&kClassKey<T>];
+}
+
 // The constructor a wrap class keeps so that argInstance can tell its
-// instances apart: `return keepCtor(Ctor(), DefineClass(...));` in Init.
+// instances apart: `return keepCtor(Ctor(env), DefineClass(...));` in Init.
 inline Napi::Function keepCtor(Napi::FunctionReference& ref, Napi::Function fn)
 {
   ref = Napi::Persistent(fn);
-  ref.SuppressDestruct();
   return fn;
 }
 
-// The native object behind `v`, which must be an instance of the class T
-// registers in T::Ctor(). ObjectWrap<T>::Unwrap() alone takes any wrapped
-// object: a plain one threw a bare "Invalid argument" and an instance of
-// another lrvx class was read as a T.
 template <typename T>
 inline T* argInstance(const Napi::Value& v, const char* what)
 {
-  Napi::FunctionReference& ctor = T::Ctor();
+  Napi::FunctionReference& ctor = T::Ctor(v.Env());
   if (!ctor.IsEmpty() && v.IsObject() && v.As<Napi::Object>().InstanceOf(ctor.Value()))
   {
     return Napi::ObjectWrap<T>::Unwrap(v.As<Napi::Object>());

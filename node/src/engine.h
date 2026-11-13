@@ -239,21 +239,17 @@ inline Napi::Object statsObj(Napi::Env env, const BacktestStats& s)
 class SignalBuilderWrap : public Napi::ObjectWrap<SignalBuilderWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<SignalBuilderWrap>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
-    return keepCtor(Ctor(), DefineClass(env, "SignalBuilder",
-                                        {InstanceMethod("buy", &SignalBuilderWrap::Buy),
-                                         InstanceMethod("sell", &SignalBuilderWrap::Sell),
-                                         InstanceMethod("limitBuy", &SignalBuilderWrap::LimitBuy),
-                                         InstanceMethod("limitSell", &SignalBuilderWrap::LimitSell),
-                                         InstanceAccessor("length", &SignalBuilderWrap::Length, nullptr),
-                                         InstanceMethod("clear", &SignalBuilderWrap::Clear)}));
+    return keepCtor(Ctor(env), DefineClass(env, "SignalBuilder",
+                                           {InstanceMethod("buy", &SignalBuilderWrap::Buy),
+                                            InstanceMethod("sell", &SignalBuilderWrap::Sell),
+                                            InstanceMethod("limitBuy", &SignalBuilderWrap::LimitBuy),
+                                            InstanceMethod("limitSell", &SignalBuilderWrap::LimitSell),
+                                            InstanceAccessor("length", &SignalBuilderWrap::Length, nullptr),
+                                            InstanceMethod("clear", &SignalBuilderWrap::Clear)}));
   }
 
   SignalBuilderWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<SignalBuilderWrap>(info) {}

@@ -620,20 +620,14 @@ class BinaryLogRecorderHookWrap : public Napi::ObjectWrap<BinaryLogRecorderHookW
  public:
   // Cached at module init; used by RunnerNode::setMarketDataRecorder for
   // an InstanceOf check before unwrapping.
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<BinaryLogRecorderHookWrap>(env); }
   static Napi::Function Init(Napi::Env env)
   {
     Napi::Function fn = DefineClass(env, "BinaryLogRecorderHook",
                                     {InstanceMethod("addSymbol", &BinaryLogRecorderHookWrap::AddSymbol),
                                      InstanceMethod("flush", &BinaryLogRecorderHookWrap::Flush),
                                      InstanceMethod("stats", &BinaryLogRecorderHookWrap::Stats)});
-    Ctor() = Napi::Persistent(fn);
-    Ctor().SuppressDestruct();
-    return fn;
+    return keepCtor(Ctor(env), fn);
   }
   BinaryLogRecorderHookWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<BinaryLogRecorderHookWrap>(info)
