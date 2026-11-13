@@ -24,7 +24,7 @@ inline std::vector<uint32_t> readU32Array(const Napi::Array& arr)
   out.reserve(arr.Length());
   for (uint32_t i = 0; i < arr.Length(); ++i)
   {
-    out.push_back(arr.Get(i).As<Napi::Number>().Uint32Value());
+    out.push_back(argUint32(arr.Get(i), "a symbol id"));
   }
   return out;
 }
@@ -69,11 +69,11 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
           .ThrowAsJavaScriptException();
       return;
     }
-    auto opts = info[0].As<Napi::Object>();
-    std::string path = opts.Get("path").As<Napi::String>().Utf8Value();
-    std::string sid = opts.Has("strategyId") ? opts.Get("strategyId").As<Napi::String>().Utf8Value() : "";
-    std::string shash = opts.Has("strategyHash") ? opts.Get("strategyHash").As<Napi::String>().Utf8Value() : "";
-    int64_t started = opts.Has("runStartedNs") ? toInt64Ns(opts.Get("runStartedNs")) : 0;
+    auto opts = argObject(info[0], "TraceRecorder: argument 1");
+    std::string path = argString(opts.Get("path"), "TraceRecorder: path");
+    std::string sid = opts.Has("strategyId") ? argString(opts.Get("strategyId"), "TraceRecorder: strategyId") : "";
+    std::string shash = opts.Has("strategyHash") ? argString(opts.Get("strategyHash"), "TraceRecorder: strategyHash") : "";
+    int64_t started = opts.Has("runStartedNs") ? toInt64Ns(opts.Get("runStartedNs"), "TraceRecorder: runStartedNs") : 0;
     _h = lrvx_run_recorder_create(path.c_str(), sid.c_str(), shash.c_str(), started);
     if (!_h)
     {
@@ -95,24 +95,24 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
  private:
   void AddTapeRef(const Napi::CallbackInfo& info)
   {
-    auto opts = info[0].As<Napi::Object>();
-    std::string path = opts.Get("path").As<Napi::String>().Utf8Value();
-    std::string ch = opts.Has("contentHash") ? opts.Get("contentHash").As<Napi::String>().Utf8Value() : "";
-    int64_t first = opts.Has("firstEventNs") ? toInt64Ns(opts.Get("firstEventNs")) : 0;
-    int64_t last = opts.Has("lastEventNs") ? toInt64Ns(opts.Get("lastEventNs")) : 0;
+    auto opts = argObject(info[0], "addTapeRef: argument 1");
+    std::string path = argString(opts.Get("path"), "addTapeRef: path");
+    std::string ch = opts.Has("contentHash") ? argString(opts.Get("contentHash"), "addTapeRef: contentHash") : "";
+    int64_t first = opts.Has("firstEventNs") ? toInt64Ns(opts.Get("firstEventNs"), "addTapeRef: firstEventNs") : 0;
+    int64_t last = opts.Has("lastEventNs") ? toInt64Ns(opts.Get("lastEventNs"), "addTapeRef: lastEventNs") : 0;
     lrvx_run_recorder_add_tape_ref(_h, path.c_str(), ch.c_str(), first, last);
   }
 
   void SetRunEndedNs(const Napi::CallbackInfo& info)
   {
-    lrvx_run_recorder_set_run_ended_ns(_h, toInt64Ns(info[0]));
+    lrvx_run_recorder_set_run_ended_ns(_h, toInt64Ns(info[0], "setRunEndedNs: argument 1"));
   }
 
   void WriteSignal(const Napi::CallbackInfo& info)
   {
     auto opts = argOptions(info, "writeSignal");
-    int64_t run_ts = toInt64Ns(opts.Get("runTsNs"));
-    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs")) : 0;
+    int64_t run_ts = toInt64Ns(opts.Get("runTsNs"), "writeSignal: runTsNs");
+    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs"), "writeSignal: feedTsNs") : 0;
     // A Number or a BigInt; the whole 64-bit id is written.
     uint64_t sid =
         opts.Has("signalId") ? argUint64(opts.Get("signalId"), "writeSignal: signalId") : 0;
@@ -120,11 +120,11 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     int64_t strength = opts.Has("strengthRaw")
                            ? argInt64(opts.Get("strengthRaw"), "writeSignal: strengthRaw")
                            : 0;
-    std::string name = opts.Has("name") ? opts.Get("name").As<Napi::String>().Utf8Value() : "";
+    std::string name = opts.Has("name") ? argString(opts.Get("name"), "writeSignal: name") : "";
     std::vector<uint32_t> sids;
     if (opts.Has("symbolIds"))
     {
-      sids = detail_runtrace::readU32Array(opts.Get("symbolIds").As<Napi::Array>());
+      sids = detail_runtrace::readU32Array(argArray(opts.Get("symbolIds"), "writeSignal: symbolIds"));
     }
     std::vector<uint8_t> payload;
     if (opts.Has("payload"))
@@ -144,8 +144,8 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     {
       return static_cast<uint8_t>(opts.Has(key) ? argUint32(opts.Get(key), what) : fallback);
     };
-    int64_t run_ts = toInt64Ns(opts.Get("runTsNs"));
-    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs")) : 0;
+    int64_t run_ts = toInt64Ns(opts.Get("runTsNs"), "writeOrderEvent: runTsNs");
+    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs"), "writeOrderEvent: feedTsNs") : 0;
     uint64_t oid =
         opts.Has("orderId") ? argUint64(opts.Get("orderId"), "writeOrderEvent: orderId") : 0;
     uint64_t pid = opts.Has("parentSignalId")
@@ -162,7 +162,7 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     uint8_t otype = u8("orderType", "writeOrderEvent: orderType", 0);
     uint32_t flags =
         opts.Has("flags") ? argUint32(opts.Get("flags"), "writeOrderEvent: flags") : 0;
-    std::string reason = opts.Has("reason") ? opts.Get("reason").As<Napi::String>().Utf8Value() : "";
+    std::string reason = opts.Has("reason") ? argString(opts.Get("reason"), "writeOrderEvent: reason") : "";
     lrvx_run_recorder_write_order_event(_h, run_ts, feed_ts, oid, pid, price, qty, symid, kind,
                                         side, otype, flags,
                                         reason.empty() ? nullptr : reason.data(), reason.size());
@@ -171,8 +171,8 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
   void WriteFill(const Napi::CallbackInfo& info)
   {
     auto opts = argOptions(info, "writeFill");
-    int64_t run_ts = toInt64Ns(opts.Get("runTsNs"));
-    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs")) : 0;
+    int64_t run_ts = toInt64Ns(opts.Get("runTsNs"), "writeFill: runTsNs");
+    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs"), "writeFill: feedTsNs") : 0;
     uint64_t oid = opts.Has("orderId") ? argUint64(opts.Get("orderId"), "writeFill: orderId") : 0;
     uint64_t fid = opts.Has("fillId") ? argUint64(opts.Get("fillId"), "writeFill: fillId") : 0;
     int64_t price =
@@ -223,7 +223,7 @@ class TraceReaderWrap : public Napi::ObjectWrap<TraceReaderWrap>
       Napi::TypeError::New(env, "TraceReader(path)").ThrowAsJavaScriptException();
       return;
     }
-    std::string path = info[0].As<Napi::String>().Utf8Value();
+    std::string path = argString(info[0], "TraceReader: argument 1");
     _h = lrvx_run_reader_open(path.c_str());
     if (!_h)
     {

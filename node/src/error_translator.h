@@ -21,6 +21,7 @@
 //
 // On LrvxError: a JS Error is thrown with `.code` and `.helpUrl` set,
 // and the lambda's nominal return value is replaced with `env.Undefined()`.
+// On Napi::Error (an argument check's TypeError or RangeError): rethrown as is.
 // On std::exception: a generic JS Error is thrown with the .what() text.
 // On success: the lambda's return value is returned unchanged.
 
@@ -50,6 +51,12 @@ inline Napi::Value tryLrvx(Napi::Env env, Fn fn)
     err.Value().Set("name", Napi::String::New(env, "LrvxError"));
     err.ThrowAsJavaScriptException();
     return env.Undefined();
+  }
+  catch (const Napi::Error&)
+  {
+    // An argument check's TypeError or RangeError keeps its class; caught as
+    // a std::exception below it became a plain Error.
+    throw;
   }
   catch (const std::exception& e)
   {

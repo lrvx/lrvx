@@ -103,26 +103,24 @@ class WalkForwardRunnerNode
   WalkForwardRunnerNode(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<WalkForwardRunnerNode>(info)
   {
-    _reg = Napi::ObjectWrap<SymbolRegistryNode>::Unwrap(
-               info[0].As<Napi::Object>())
-               ->get();
-    _fee = info[1].As<Napi::Number>().DoubleValue();
-    _cap = info[2].As<Napi::Number>().DoubleValue();
-    auto cfg = info[3].As<Napi::Object>();
+    _reg = SymbolRegistryNode::of(info[0], "WalkForwardRunner: registry");
+    _fee = argNumber(info[1], "WalkForwardRunner: argument 2");
+    _cap = argNumber(info[2], "WalkForwardRunner: argument 3");
+    auto cfg = argObject(info[3], "WalkForwardRunner: argument 4");
     std::string mode = cfg.Get("mode").IsString()
-                           ? cfg.Get("mode").As<Napi::String>().Utf8Value()
+                           ? argString(cfg.Get("mode"), "WalkForwardRunner: mode")
                            : "anchored";
     _cfg.mode = (mode == "sliding") ? 1 : 0;
     _cfg.train_size = cfg.Get("trainSize").IsNumber()
-                          ? cfg.Get("trainSize").As<Napi::Number>().Int64Value()
+                          ? argInteger(cfg.Get("trainSize"), "WalkForwardRunner: trainSize")
                           : 0;
-    _cfg.test_size = cfg.Get("testSize").As<Napi::Number>().Int64Value();
+    _cfg.test_size = argInteger(cfg.Get("testSize"), "WalkForwardRunner: testSize");
     _cfg.step = cfg.Get("step").IsNumber()
-                    ? cfg.Get("step").As<Napi::Number>().Int64Value()
+                    ? argInteger(cfg.Get("step"), "WalkForwardRunner: step")
                     : 0;
     _cfg.min_train_size =
         cfg.Get("minTrainSize").IsNumber()
-            ? cfg.Get("minTrainSize").As<Napi::Number>().Int64Value()
+            ? argInteger(cfg.Get("minTrainSize"), "WalkForwardRunner: minTrainSize")
             : 0;
   }
 
@@ -135,7 +133,7 @@ class WalkForwardRunnerNode
 
   Napi::Value setStrategyFactory(const Napi::CallbackInfo& info)
   {
-    _factory = Napi::Persistent(info[0].As<Napi::Function>());
+    _factory = Napi::Persistent(argFunction(info[0], "setStrategyFactory: argument 1"));
     return info.Env().Undefined();
   }
 
@@ -150,8 +148,8 @@ class WalkForwardRunnerNode
             "E_RUN_001",
             "WalkForwardRunner.runCsv called before setStrategyFactory.");
       }
-      std::string path = info[0].As<Napi::String>().Utf8Value();
-      std::string symbol = info[1].As<Napi::String>().Utf8Value();
+      std::string path = argString(info[0], "runCsv: argument 1");
+      std::string symbol = argString(info[1], "runCsv: argument 2");
 
       WalkForwardCallContext ctx{env,
                                  Napi::FunctionReference(),

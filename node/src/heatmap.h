@@ -27,13 +27,13 @@ inline Napi::Value heatmapHtml(const Napi::CallbackInfo& info)
           "E_LEN_002",
           "heatmapHtml: first argument must be a 2D array of numbers.");
     }
-    auto outer = info[0].As<Napi::Array>();
+    auto outer = argArray(info[0], "heatmapHtml: argument 1");
     const uint32_t rows = outer.Length();
     if (rows == 0)
     {
       throw lrvx::LrvxError("E_LEN_002", "heatmapHtml: z is empty.");
     }
-    auto firstRow = outer.Get(uint32_t(0)).As<Napi::Array>();
+    auto firstRow = argArray(outer.Get(uint32_t(0)), "heatmapHtml: a row of z");
     const uint32_t cols = firstRow.Length();
     if (cols == 0)
     {
@@ -42,7 +42,7 @@ inline Napi::Value heatmapHtml(const Napi::CallbackInfo& info)
     std::vector<double> z(rows * cols);
     for (uint32_t r = 0; r < rows; ++r)
     {
-      auto row = outer.Get(r).As<Napi::Array>();
+      auto row = argArray(outer.Get(r), "heatmapHtml: a row of z");
       if (row.Length() != cols)
       {
         throw lrvx::LrvxError(
@@ -51,8 +51,7 @@ inline Napi::Value heatmapHtml(const Napi::CallbackInfo& info)
       }
       for (uint32_t c = 0; c < cols; ++c)
       {
-        z[r * cols + c] =
-            row.Get(c).As<Napi::Number>().DoubleValue();
+        z[r * cols + c] = argNumber(row.Get(c), "heatmapHtml: a cell of z");
       }
     }
 
@@ -67,7 +66,7 @@ inline Napi::Value heatmapHtml(const Napi::CallbackInfo& info)
           auto arr = val.As<Napi::Array>();
           for (uint32_t i = 0; i < arr.Length(); ++i)
           {
-            out.push_back(arr.Get(i).As<Napi::String>().Utf8Value());
+            out.push_back(argString(arr.Get(i), (std::string("heatmapHtml: an entry of ") + key).c_str()));
           }
         }
       }
@@ -89,7 +88,7 @@ inline Napi::Value heatmapHtml(const Napi::CallbackInfo& info)
     std::string title, xAxis, yAxis, metric;
     if (info.Length() > 1 && info[1].IsObject())
     {
-      auto opts = info[1].As<Napi::Object>();
+      auto opts = argObject(info[1], "heatmapHtml: argument 2");
       getStringArr(opts, "rowLabels", rowLabels);
       getStringArr(opts, "colLabels", colLabels);
       title = getString(opts, "title");

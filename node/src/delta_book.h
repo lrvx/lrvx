@@ -27,10 +27,10 @@ inline std::vector<LrvxBookLevel> readLevels(const Napi::Array& arr)
   out.reserve(arr.Length());
   for (uint32_t i = 0; i < arr.Length(); ++i)
   {
-    auto entry = arr.Get(i).As<Napi::Object>();
+    auto entry = argObject(arr.Get(i), "a book level");
     LrvxBookLevel l{};
-    l.price_raw = entry.Get("priceRaw").As<Napi::Number>().Int64Value();
-    l.quantity_raw = entry.Get("qtyRaw").As<Napi::Number>().Int64Value();
+    l.price_raw = argInt64(entry.Get("priceRaw"), "a book level's priceRaw");
+    l.quantity_raw = argInt64(entry.Get("qtyRaw"), "a book level's qtyRaw");
     out.push_back(l);
   }
   return out;
@@ -68,10 +68,10 @@ class DeltaBookEncoderWrap : public Napi::ObjectWrap<DeltaBookEncoderWrap>
     uint32_t anchor_every = 100;
     if (info.Length() > 0 && info[0].IsObject())
     {
-      auto opts = info[0].As<Napi::Object>();
+      auto opts = argObject(info[0], "DeltaBookEncoder: argument 1");
       if (opts.Has("anchorEvery"))
       {
-        anchor_every = opts.Get("anchorEvery").As<Napi::Number>().Uint32Value();
+        anchor_every = argUint32(opts.Get("anchorEvery"), "DeltaBookEncoder: anchorEvery");
       }
     }
     _h = lrvx_delta_book_encoder_create(anchor_every);
@@ -100,9 +100,9 @@ class DeltaBookEncoderWrap : public Napi::ObjectWrap<DeltaBookEncoderWrap>
       Napi::TypeError::New(env, "encode(symbolId, bids, asks)").ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    uint32_t sym = info[0].As<Napi::Number>().Uint32Value();
-    auto bids = detail_db::readLevels(info[1].As<Napi::Array>());
-    auto asks = detail_db::readLevels(info[2].As<Napi::Array>());
+    uint32_t sym = argUint32(info[0], "encode: argument 1");
+    auto bids = detail_db::readLevels(argArray(info[1], "encode: argument 2"));
+    auto asks = detail_db::readLevels(argArray(info[2], "encode: argument 3"));
     uint8_t is_delta = 0;
     uint64_t bcnt = 0, acnt = 0;
     lrvx_delta_book_encoder_encode(_h, sym,
@@ -128,7 +128,7 @@ class DeltaBookEncoderWrap : public Napi::ObjectWrap<DeltaBookEncoderWrap>
 
   void Reset(const Napi::CallbackInfo& info)
   {
-    lrvx_delta_book_encoder_reset(_h, info[0].As<Napi::Number>().Uint32Value());
+    lrvx_delta_book_encoder_reset(_h, argUint32(info[0], "reset: argument 1"));
   }
 
   void ResetAll(const Napi::CallbackInfo&)
@@ -172,10 +172,10 @@ class DeltaBookReplayerWrap : public Napi::ObjectWrap<DeltaBookReplayerWrap>
       Napi::TypeError::New(env, "apply(type, symbolId, bids, asks)").ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    uint8_t type = static_cast<uint8_t>(info[0].As<Napi::Number>().Uint32Value());
-    uint32_t sym = info[1].As<Napi::Number>().Uint32Value();
-    auto bids = detail_db::readLevels(info[2].As<Napi::Array>());
-    auto asks = detail_db::readLevels(info[3].As<Napi::Array>());
+    uint8_t type = static_cast<uint8_t>(argUint32(info[0], "apply: argument 1"));
+    uint32_t sym = argUint32(info[1], "apply: argument 2");
+    auto bids = detail_db::readLevels(argArray(info[2], "apply: argument 3"));
+    auto asks = detail_db::readLevels(argArray(info[3], "apply: argument 4"));
     uint64_t bcnt = 0, acnt = 0;
     lrvx_delta_book_replayer_apply(_h, type, sym,
                                    bids.empty() ? nullptr : bids.data(), bids.size(),
@@ -199,7 +199,7 @@ class DeltaBookReplayerWrap : public Napi::ObjectWrap<DeltaBookReplayerWrap>
 
   void Reset(const Napi::CallbackInfo& info)
   {
-    lrvx_delta_book_replayer_reset(_h, info[0].As<Napi::Number>().Uint32Value());
+    lrvx_delta_book_replayer_reset(_h, argUint32(info[0], "reset: argument 1"));
   }
 
   void ResetAll(const Napi::CallbackInfo&)

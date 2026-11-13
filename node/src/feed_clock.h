@@ -37,19 +37,19 @@ class MultiFeedClockWrap : public Napi::ObjectWrap<MultiFeedClockWrap>
           .ThrowAsJavaScriptException();
       return;
     }
-    auto opts = info[0].As<Napi::Object>();
+    auto opts = argObject(info[0], "MultiFeedClock: argument 1");
     if (!opts.Has("symbols") || !opts.Get("symbols").IsArray())
     {
       Napi::TypeError::New(info.Env(), "options.symbols must be an array")
           .ThrowAsJavaScriptException();
       return;
     }
-    auto syms = opts.Get("symbols").As<Napi::Array>();
+    auto syms = argArray(opts.Get("symbols"), "MultiFeedClock: symbols");
     std::vector<uint32_t> symVec;
     symVec.reserve(syms.Length());
     for (uint32_t i = 0; i < syms.Length(); ++i)
     {
-      symVec.push_back(syms.Get(i).As<Napi::Number>().Uint32Value());
+      symVec.push_back(argUint32(syms.Get(i), "MultiFeedClock: a symbol id"));
     }
 
     uint8_t policy = 0;  // WaitForAll
@@ -83,18 +83,18 @@ class MultiFeedClockWrap : public Napi::ObjectWrap<MultiFeedClockWrap>
       }
       else
       {
-        policy = static_cast<uint8_t>(p.As<Napi::Number>().Uint32Value());
+        policy = static_cast<uint8_t>(argUint32(p, "MultiFeedClock: policy"));
       }
     }
 
     int64_t timeout = opts.Has("timeoutMs")
-                          ? opts.Get("timeoutMs").As<Napi::Number>().Int64Value()
+                          ? argInteger(opts.Get("timeoutMs"), "MultiFeedClock: timeoutMs")
                           : 200;
     uint32_t leader = opts.Has("leaderSymbol")
-                          ? opts.Get("leaderSymbol").As<Napi::Number>().Uint32Value()
+                          ? argUint32(opts.Get("leaderSymbol"), "MultiFeedClock: leaderSymbol")
                           : 0;
     int64_t budget = opts.Has("stalenessBudgetMs")
-                         ? opts.Get("stalenessBudgetMs").As<Napi::Number>().Int64Value()
+                         ? argInteger(opts.Get("stalenessBudgetMs"), "MultiFeedClock: stalenessBudgetMs")
                          : 200;
     _h = lrvx_feed_clock_create(symVec.data(), static_cast<uint32_t>(symVec.size()), policy,
                                 timeout, leader, budget);
@@ -114,8 +114,8 @@ class MultiFeedClockWrap : public Napi::ObjectWrap<MultiFeedClockWrap>
 
   Napi::Value Tick(const Napi::CallbackInfo& info)
   {
-    int64_t ts = toInt64Ns(info[0]);
-    uint32_t sym = info[1].As<Napi::Number>().Uint32Value();
+    int64_t ts = toInt64Ns(info[0], "tick: argument 1");
+    uint32_t sym = argUint32(info[1], "tick: argument 2");
     uint8_t fired = lrvx_feed_clock_tick(_h, ts, sym);
     Napi::Object out = Napi::Object::New(info.Env());
     out.Set("fired", Napi::Boolean::New(info.Env(), fired != 0));

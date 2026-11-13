@@ -83,11 +83,11 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
       : Napi::ObjectWrap<VenueStackWrap>(info)
   {
     const uint8_t venueCode =
-        info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 0;
+        info.Length() > 0 ? argUint32(info[0], "VenueStack: argument 1") : 0;
     const uint64_t accountId =
-        info.Length() > 1 ? info[1].As<Napi::Number>().Int64Value() : 0;
+        info.Length() > 1 ? argInteger(info[1], "VenueStack: argument 2") : 0;
     const double equity =
-        info.Length() > 2 ? info[2].As<Napi::Number>().DoubleValue() : 0.0;
+        info.Length() > 2 ? argNumber(info[2], "VenueStack: argument 3") : 0.0;
     _h = lrvx_venue_stack_create(venueCode, accountId, equity);
   }
   ~VenueStackWrap()
@@ -130,7 +130,7 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
   static Napi::Value FromVenue(const Napi::CallbackInfo& info)
   {
     const std::string name =
-        info[0].IsString() ? info[0].As<Napi::String>().Utf8Value() : "";
+        info[0].IsString() ? argString(info[0], "fromVenue: argument 1") : "";
     uint8_t code = 0;
     if (name == "bybit_linear" || name == "bybit")
     {
@@ -183,22 +183,22 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
   }
   void AccountSetEquity(const Napi::CallbackInfo& info)
   {
-    lrvx_account_set_equity(acct(), info[0].As<Napi::Number>().DoubleValue());
+    lrvx_account_set_equity(acct(), argNumber(info[0], "accountSetEquity: argument 1"));
   }
   void AccountAddEquity(const Napi::CallbackInfo& info)
   {
-    lrvx_account_add_equity(acct(), info[0].As<Napi::Number>().DoubleValue());
+    lrvx_account_add_equity(acct(), argNumber(info[0], "accountAddEquity: argument 1"));
   }
   void AccountOpenPosition(const Napi::CallbackInfo& info)
   {
-    lrvx_account_open_position(acct(), info[0].As<Napi::Number>().Uint32Value(),
-                               info[1].As<Napi::Number>().DoubleValue(),
-                               info[2].As<Napi::Number>().DoubleValue());
+    lrvx_account_open_position(acct(), argUint32(info[0], "accountOpenPosition: argument 1"),
+                               argNumber(info[1], "accountOpenPosition: argument 2"),
+                               argNumber(info[2], "accountOpenPosition: argument 3"));
   }
   void AccountClosePosition(const Napi::CallbackInfo& info)
   {
     lrvx_account_close_position(acct(),
-                                info[0].As<Napi::Number>().Uint32Value());
+                                argUint32(info[0], "accountClosePosition: argument 1"));
   }
   Napi::Value AccountPositionCount(const Napi::CallbackInfo& info)
   {
@@ -206,8 +206,8 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
   }
   void AccountSetMark(const Napi::CallbackInfo& info)
   {
-    lrvx_account_set_mark(acct(), info[0].As<Napi::Number>().Uint32Value(),
-                          info[1].As<Napi::Number>().DoubleValue());
+    lrvx_account_set_mark(acct(), argUint32(info[0], "accountSetMark: argument 1"),
+                          argNumber(info[1], "accountSetMark: argument 2"));
   }
   Napi::Value AccountTotalNotional(const Napi::CallbackInfo& info)
   {
@@ -226,8 +226,8 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
   Napi::Value LiquidationOnMark(const Napi::CallbackInfo& info)
   {
     const uint32_t n = lrvx_liquidation_engine_on_mark(
-        liq(), info[0].As<Napi::Number>().Uint32Value(),
-        info[1].As<Napi::Number>().DoubleValue());
+        liq(), argUint32(info[0], "liquidationOnMark: argument 1"),
+        argNumber(info[1], "liquidationOnMark: argument 2"));
     return Napi::Number::New(info.Env(), n);
   }
   Napi::Value LiquidationsCount(const Napi::CallbackInfo& info)
@@ -243,8 +243,8 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
   }
   void FeesRecordFill(const Napi::CallbackInfo& info)
   {
-    lrvx_fee_schedule_record_fill(fees(), toInt64Ns(info[0]),
-                                  info[1].As<Napi::Number>().DoubleValue());
+    lrvx_fee_schedule_record_fill(fees(), toInt64Ns(info[0], "feesRecordFill: argument 1"),
+                                  argNumber(info[1], "feesRecordFill: argument 2"));
   }
   Napi::Value FeesCurrentTierIndex(const Napi::CallbackInfo& info)
   {
@@ -255,9 +255,9 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
     return Napi::Number::New(
         info.Env(),
         lrvx_fee_schedule_fee_for(fees(),
-                                  toInt64Ns(info[0]),
-                                  info[1].As<Napi::Number>().DoubleValue(),
-                                  info[2].As<Napi::Boolean>().Value() ? 1 : 0));
+                                  toInt64Ns(info[0], "feesFor: argument 1"),
+                                  argNumber(info[1], "feesFor: argument 2"),
+                                  argBool(info[2], "feesFor: argument 3") ? 1 : 0));
   }
 
   LrvxVenueStackHandle _h{nullptr};

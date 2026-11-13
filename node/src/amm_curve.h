@@ -85,10 +85,10 @@ inline std::string opOut(Napi::Env env,
 inline Napi::Value ammCurveConstantProduct(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  const std::string r0 = detail_curve::bigintToDecimal(env, info[0].As<Napi::BigInt>());
-  const std::string r1 = detail_curve::bigintToDecimal(env, info[1].As<Napi::BigInt>());
-  const auto feeNum = info[2].As<Napi::Number>().Int64Value();
-  const auto feeDen = info[3].As<Napi::Number>().Int64Value();
+  const std::string r0 = detail_curve::bigintToDecimal(env, argBigInt(info[0], "ammCurveConstantProduct: argument 1"));
+  const std::string r1 = detail_curve::bigintToDecimal(env, argBigInt(info[1], "ammCurveConstantProduct: argument 2"));
+  const auto feeNum = argInteger(info[2], "ammCurveConstantProduct: argument 3");
+  const auto feeDen = argInteger(info[3], "ammCurveConstantProduct: argument 4");
   return detail_curve::wrapHandle(
       env, lrvx_curve_constant_product(r0.c_str(), r1.c_str(), static_cast<uint64_t>(feeNum),
                                        static_cast<uint64_t>(feeDen)));
@@ -97,11 +97,11 @@ inline Napi::Value ammCurveConstantProduct(const Napi::CallbackInfo& info)
 inline Napi::Value ammCurveRaydiumCp(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  const std::string r0 = detail_curve::bigintToDecimal(env, info[0].As<Napi::BigInt>());
-  const std::string r1 = detail_curve::bigintToDecimal(env, info[1].As<Napi::BigInt>());
-  const auto tradeFee = info[2].As<Napi::Number>().Int64Value();
-  const auto creatorFee = info.Length() > 3 ? info[3].As<Napi::Number>().Int64Value() : 0;
-  const bool onInput = info.Length() > 4 ? info[4].As<Napi::Boolean>().Value() : true;
+  const std::string r0 = detail_curve::bigintToDecimal(env, argBigInt(info[0], "ammCurveRaydiumCp: argument 1"));
+  const std::string r1 = detail_curve::bigintToDecimal(env, argBigInt(info[1], "ammCurveRaydiumCp: argument 2"));
+  const auto tradeFee = argInteger(info[2], "ammCurveRaydiumCp: argument 3");
+  const auto creatorFee = info.Length() > 3 ? argInteger(info[3], "ammCurveRaydiumCp: argument 4") : 0;
+  const bool onInput = info.Length() > 4 ? argBool(info[4], "ammCurveRaydiumCp: argument 5") : true;
   return detail_curve::wrapHandle(
       env, lrvx_curve_raydium_cp(r0.c_str(), r1.c_str(), static_cast<uint64_t>(tradeFee),
                                  static_cast<uint64_t>(creatorFee), onInput ? 1 : 0));
@@ -110,9 +110,9 @@ inline Napi::Value ammCurveRaydiumCp(const Napi::CallbackInfo& info)
 inline Napi::Value ammCurveUniswapV3(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  const std::string sqrtP = detail_curve::bigintToDecimal(env, info[0].As<Napi::BigInt>());
-  const std::string liq = detail_curve::bigintToDecimal(env, info[1].As<Napi::BigInt>());
-  const auto feePips = info[2].As<Napi::Number>().Uint32Value();
+  const std::string sqrtP = detail_curve::bigintToDecimal(env, argBigInt(info[0], "ammCurveUniswapV3: argument 1"));
+  const std::string liq = detail_curve::bigintToDecimal(env, argBigInt(info[1], "ammCurveUniswapV3: argument 2"));
+  const auto feePips = argUint32(info[2], "ammCurveUniswapV3: argument 3");
 
   // ticks: an array of [sqrtRatio: bigint, liquidityNet: bigint]; signed net rides in
   // i256, so its sign is the BigInt's sign.
@@ -120,15 +120,17 @@ inline Napi::Value ammCurveUniswapV3(const Napi::CallbackInfo& info)
   std::vector<std::string> netStore;
   if (info.Length() > 3 && info[3].IsArray())
   {
-    Napi::Array arr = info[3].As<Napi::Array>();
+    Napi::Array arr = argArray(info[3], "ammCurveUniswapV3: argument 4");
     for (uint32_t k = 0; k < arr.Length(); ++k)
     {
-      Napi::Array pair = arr.Get(k).As<Napi::Array>();
-      sqrtStore.push_back(detail_curve::bigintToDecimal(env, pair.Get(0u).As<Napi::BigInt>()));
+      Napi::Array pair = argArray(arr.Get(k), "a [sqrtPrice, liquidityNet] pair");
+      sqrtStore.push_back(detail_curve::bigintToDecimal(
+          env, argBigInt(pair.Get(0u), "a [sqrtPrice, liquidityNet] pair's sqrtPrice")));
       // liquidity net can be negative: format with sign from the limb words.
       uint64_t w[4];
       int sign = 0;
-      detail_dex::bigintToWords(pair.Get(1u).As<Napi::BigInt>(), w, &sign);
+      detail_dex::bigintToWords(
+          argBigInt(pair.Get(1u), "a [sqrtPrice, liquidityNet] pair's liquidityNet"), w, &sign);
       char mag[96] = {0};
       lrvx_u256_from_words(w, mag, sizeof(mag));
       netStore.push_back((sign != 0 && std::string(mag) != "0") ? std::string("-") + mag : mag);
@@ -160,9 +162,9 @@ inline Napi::Value ammCurveAmountOut(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   LrvxCurveHandle c = detail_curve::unwrapHandle(info[0]);
-  const size_t i = info[1].As<Napi::Number>().Uint32Value();
-  const size_t j = info[2].As<Napi::Number>().Uint32Value();
-  const std::string amt = detail_curve::bigintToDecimal(env, info[3].As<Napi::BigInt>());
+  const size_t i = argUint32(info[1], "ammCurveAmountOut: argument 2");
+  const size_t j = argUint32(info[2], "ammCurveAmountOut: argument 3");
+  const std::string amt = detail_curve::bigintToDecimal(env, argBigInt(info[3], "ammCurveAmountOut: argument 4"));
   return detail_curve::decimalToBigint(
       env, detail_curve::opOut(env, &lrvx_curve_amount_out, c, i, j, amt).c_str());
 }
@@ -171,9 +173,9 @@ inline Napi::Value ammCurveApplySwap(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   LrvxCurveHandle c = detail_curve::unwrapHandle(info[0]);
-  const size_t i = info[1].As<Napi::Number>().Uint32Value();
-  const size_t j = info[2].As<Napi::Number>().Uint32Value();
-  const std::string amt = detail_curve::bigintToDecimal(env, info[3].As<Napi::BigInt>());
+  const size_t i = argUint32(info[1], "ammCurveApplySwap: argument 2");
+  const size_t j = argUint32(info[2], "ammCurveApplySwap: argument 3");
+  const std::string amt = detail_curve::bigintToDecimal(env, argBigInt(info[3], "ammCurveApplySwap: argument 4"));
   return detail_curve::decimalToBigint(
       env, detail_curve::opOut(env, &lrvx_curve_apply_swap, c, i, j, amt).c_str());
 }
@@ -182,7 +184,7 @@ inline Napi::Value ammCurveBalance(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   LrvxCurveHandle c = detail_curve::unwrapHandle(info[0]);
-  const size_t i = info[1].As<Napi::Number>().Uint32Value();
+  const size_t i = argUint32(info[1], "ammCurveBalance: argument 2");
   char out[96] = {0};
   if (!lrvx_curve_balance(c, i, out, sizeof(out)))
   {

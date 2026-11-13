@@ -29,7 +29,7 @@ inline void readOptDouble(const Napi::Object& opts, const char* key,
   if (opts.Has(key) && !opts.Get(key).IsNull() && !opts.Get(key).IsUndefined())
   {
     has = 1;
-    val = opts.Get(key).As<Napi::Number>().DoubleValue();
+    val = argNumber(opts.Get(key), key);
   }
   else
   {
@@ -75,10 +75,10 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
     double initial_equity = 0.0;
     if (info.Length() > 0 && info[0].IsObject())
     {
-      auto opts = info[0].As<Napi::Object>();
+      auto opts = argObject(info[0], "PortfolioRisk: argument 1");
       if (opts.Has("rules") && opts.Get("rules").IsObject())
       {
-        auto r = opts.Get("rules").As<Napi::Object>();
+        auto r = argObject(opts.Get("rules"), "PortfolioRisk: rules");
         detail_pr::readOptDouble(r, "maxDrawdownPct",
                                  rules.has_max_drawdown_pct, rules.max_drawdown_pct);
         detail_pr::readOptDouble(r, "maxDailyLoss",
@@ -90,7 +90,7 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
       }
       if (opts.Has("initialEquity"))
       {
-        initial_equity = opts.Get("initialEquity").As<Napi::Number>().DoubleValue();
+        initial_equity = argNumber(opts.Get("initialEquity"), "PortfolioRisk: initialEquity");
       }
     }
     _h = lrvx_portfolio_risk_create(&rules, initial_equity);
@@ -120,15 +120,15 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
     {
       throw Napi::TypeError::New(info.Env(), "update(name, fields) expected");
     }
-    std::string name = info[0].As<Napi::String>().Utf8Value();
-    auto fields = info[1].As<Napi::Object>();
+    std::string name = argString(info[0], "update: argument 1");
+    auto fields = argObject(info[1], "update: argument 2");
     LrvxStrategyAccountFields f{};
     uint8_t mask = 0;
     auto putDouble = [&](const char* js_key, uint8_t bit, double& out)
     {
       if (fields.Has(js_key))
       {
-        out = fields.Get(js_key).As<Napi::Number>().DoubleValue();
+        out = argNumber(fields.Get(js_key), js_key);
         mask |= bit;
       }
     };
@@ -136,7 +136,7 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
     {
       if (fields.Has(js_key))
       {
-        out = static_cast<uint64_t>(fields.Get(js_key).As<Napi::Number>().Int64Value());
+        out = argUint64(fields.Get(js_key), js_key);
         mask |= bit;
       }
     };
@@ -151,7 +151,7 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
 
   void Remove(const Napi::CallbackInfo& info)
   {
-    std::string name = info[0].As<Napi::String>().Utf8Value();
+    std::string name = argString(info[0], "remove: argument 1");
     lrvx_portfolio_risk_remove(_h, name.c_str());
   }
 
@@ -162,9 +162,9 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
 
   Napi::Value CheckOrder(const Napi::CallbackInfo& info)
   {
-    std::string strategy = info[0].As<Napi::String>().Utf8Value();
-    double notional = info[1].As<Napi::Number>().DoubleValue();
-    std::string side = info[2].As<Napi::String>().Utf8Value();
+    std::string strategy = argString(info[0], "checkOrder: argument 1");
+    double notional = argNumber(info[1], "checkOrder: argument 2");
+    std::string side = argString(info[2], "checkOrder: argument 3");
     LrvxBreach b{};
     if (!lrvx_portfolio_risk_check_order(_h, strategy.c_str(), notional,
                                          side.c_str(), &b))

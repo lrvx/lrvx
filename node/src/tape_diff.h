@@ -45,20 +45,20 @@ inline Napi::Value tapeDiff(const Napi::CallbackInfo& info)
       throw lrvx::LrvxError("E_VAL_002",
           "tapeDiff: first two arguments must be tape directory paths.");
     }
-    std::string left = info[0].As<Napi::String>().Utf8Value();
-    std::string right = info[1].As<Napi::String>().Utf8Value();
+    std::string left = argString(info[0], "tapeDiff: argument 1");
+    std::string right = argString(info[1], "tapeDiff: argument 2");
     uint32_t max_mismatches = 16;
     int64_t tolerance_ns = 0;
     if (info.Length() >= 3 && info[2].IsObject())
     {
-      auto opts = info[2].As<Napi::Object>();
+      auto opts = argObject(info[2], "tapeDiff: argument 3");
       if (opts.Has("maxMismatches"))
       {
-        max_mismatches = opts.Get("maxMismatches").As<Napi::Number>().Uint32Value();
+        max_mismatches = argUint32(opts.Get("maxMismatches"), "tapeDiff: maxMismatches");
       }
       if (opts.Has("fieldToleranceNs"))
       {
-        tolerance_ns = opts.Get("fieldToleranceNs").As<Napi::Number>().Int64Value();
+        tolerance_ns = argInteger(opts.Get("fieldToleranceNs"), "tapeDiff: fieldToleranceNs");
       }
     }
 

@@ -356,6 +356,16 @@ most 2^53) or a BigInt below 2^64`). The same holds for `emit.lastClosedBar`,
 unchecked: the call threw a bare `A number was expected`, or went ahead with whatever the
 conversion produced.
 
+The same rule holds across the Node module. A clock reading or a count is a finite Number
+(truncated toward zero) or a BigInt; a BigInt that does not fit 64 signed bits is a `RangeError`
+(it used to wrap), and anything else is a `TypeError` naming the argument. `addSymbol` refuses an
+exchange or symbol that is not a string and a tick or lot that is not a number (a non-number tick
+was taken as "no tick"). The `BacktestRunner`, `Runner` and `WalkForwardRunner` constructors
+refuse a registry that is not a `SymbolRegistry` with a `TypeError` (a plain object threw a bare
+`Invalid argument`, and an instance of another class was read as a registry). A typed array of
+the wrong element type is a `TypeError`, and these errors keep their class when a method turns
+native errors into JS ones.
+
 ### Signal callback
 
 ```javascript
