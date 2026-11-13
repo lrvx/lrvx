@@ -279,3 +279,35 @@ TEST(TraceHandlers, CapturedOrderEventsNameTheirSignal)
   EXPECT_EQ(events[4].parent_signal_id, first);
   std::filesystem::remove_all(tmp);
 }
+
+// The trigger of a conditional order goes into its captured signal's
+// payload, with the keys a reproducibility bundle writes: an order event
+// has one price field, the limit price, and none for a trigger.
+TEST(TraceHandlers, ConditionalSignalsCarryTheirTrigger)
+{
+  using lrvx::Price;
+  using lrvx::Quantity;
+  using lrvx::Side;
+  using lrvx::Signal;
+  auto tmp = std::filesystem::temp_directory_path() / "lrvx_trace_handler_trigger";
+  auto rec = makeRec(tmp);
+  lrvx::run::TraceSignalHandler h(nullptr, &rec);
+  const auto q = Quantity::fromDouble(1.0);
+  h.onSignal(Signal::stopMarket(1, Side::SELL, Price::fromDouble(95.0), q, 1));
+  h.onSignal(
+      Signal::stopLimit(1, Side::SELL, Price::fromDouble(94.0), Price::fromDouble(93.5), q, 2));
+  h.onSignal(Signal::trailingStopPercent(1, Side::SELL, 150, q, 3));
+  h.onSignal(Signal::marketBuy(1, q, 4));
+  rec.close();
+
+  lrvx::run::TraceReader reader(tmp.string());
+  auto sigs = reader.readAllSignals();
+  ASSERT_EQ(sigs.size(), 4u);
+  const auto text = [&](size_t i)
+  { return std::string(sigs[i].payload.begin(), sigs[i].payload.end()); };
+  EXPECT_EQ(text(0), "{\"trigger_price_raw\":9500000000}");
+  EXPECT_EQ(text(1), "{\"trigger_price_raw\":9400000000}");
+  EXPECT_EQ(text(2), "{\"trailing_bps\":150,\"trailing_offset_raw\":0}");
+  EXPECT_EQ(text(3), "");
+  std::filesystem::remove_all(tmp);
+}

@@ -58,29 +58,25 @@ inline uint8_t parseOutageType(const std::string& s)
 class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<VenueAvailabilityWrap>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
-    return keepCtor(Ctor(), DefineClass(
-                                env, "VenueAvailability",
-                                {InstanceMethod("scheduleOutage", &VenueAvailabilityWrap::ScheduleOutage),
-                                 InstanceMethod("scheduleOutageEx", &VenueAvailabilityWrap::ScheduleOutageEx),
-                                 InstanceMethod("autoRandomOutages", &VenueAvailabilityWrap::AutoRandomOutages),
-                                 InstanceMethod("isUp", &VenueAvailabilityWrap::IsUp),
-                                 InstanceMethod("submitsAllowed", &VenueAvailabilityWrap::SubmitsAllowed),
-                                 InstanceMethod("cancelsAllowed", &VenueAvailabilityWrap::CancelsAllowed),
-                                 InstanceMethod("bookUpdatesAllowed",
-                                                &VenueAvailabilityWrap::BookUpdatesAllowed),
-                                 InstanceMethod("tradesAllowed", &VenueAvailabilityWrap::TradesAllowed),
-                                 InstanceMethod("latencyMultiplier",
-                                                &VenueAvailabilityWrap::LatencyMultiplier),
-                                 InstanceMethod("consumeWrongSideRecoveryBps",
-                                                &VenueAvailabilityWrap::ConsumeWrongSideRecoveryBps)}));
+    return keepCtor(Ctor(env), DefineClass(
+                                   env, "VenueAvailability",
+                                   {InstanceMethod("scheduleOutage", &VenueAvailabilityWrap::ScheduleOutage),
+                                    InstanceMethod("scheduleOutageEx", &VenueAvailabilityWrap::ScheduleOutageEx),
+                                    InstanceMethod("autoRandomOutages", &VenueAvailabilityWrap::AutoRandomOutages),
+                                    InstanceMethod("isUp", &VenueAvailabilityWrap::IsUp),
+                                    InstanceMethod("submitsAllowed", &VenueAvailabilityWrap::SubmitsAllowed),
+                                    InstanceMethod("cancelsAllowed", &VenueAvailabilityWrap::CancelsAllowed),
+                                    InstanceMethod("bookUpdatesAllowed",
+                                                   &VenueAvailabilityWrap::BookUpdatesAllowed),
+                                    InstanceMethod("tradesAllowed", &VenueAvailabilityWrap::TradesAllowed),
+                                    InstanceMethod("latencyMultiplier",
+                                                   &VenueAvailabilityWrap::LatencyMultiplier),
+                                    InstanceMethod("consumeWrongSideRecoveryBps",
+                                                   &VenueAvailabilityWrap::ConsumeWrongSideRecoveryBps)}));
   }
 
   VenueAvailabilityWrap(const Napi::CallbackInfo& info)
@@ -105,7 +101,7 @@ class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
     std::string policy = given(info[2])
                              ? argString(info[2], "scheduleOutage: onOpenOrders")
                              : "cancel_all";
-    int64_t ttl = info.Length() > 3 ? argInteger(info[3], "scheduleOutage: gtcTtlNs") : 0;
+    int64_t ttl = given(info[3]) ? argInteger(info[3], "scheduleOutage: gtcTtlNs") : 0;
     lrvx_venue_availability_schedule_outage(_h, start, duration, parseOnOutage(policy),
                                             ttl);
   }
@@ -116,7 +112,7 @@ class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
     std::string policy = given(info[2])
                              ? argString(info[2], "autoRandomOutages: onOpenOrders")
                              : "cancel_all";
-    uint64_t seed = info.Length() > 3 ? argInteger(info[3], "autoRandomOutages: seed") : 0xC0FFEEULL;
+    uint64_t seed = given(info[3]) ? argInteger(info[3], "autoRandomOutages: seed") : 0xC0FFEEULL;
     lrvx_venue_availability_auto_random_outages(_h, perDay, meanDur,
                                                 parseOnOutage(policy), seed);
   }
@@ -135,9 +131,9 @@ class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
     std::string policy = given(info[3])
                              ? argString(info[3], "scheduleOutageEx: onOpenOrders")
                              : "cancel_all";
-    int64_t ttl = info.Length() > 4 ? argInteger(info[4], "scheduleOutageEx: gtcTtlNs") : 0;
-    double degr = info.Length() > 5 ? argNumber(info[5], "scheduleOutageEx: degradationLatencyMultiplier") : 1.0;
-    double wsBps = info.Length() > 6 ? argNumber(info[6], "scheduleOutageEx: wrongSideRecoveryBps") : 0.0;
+    int64_t ttl = given(info[4]) ? argInteger(info[4], "scheduleOutageEx: gtcTtlNs") : 0;
+    double degr = given(info[5]) ? argNumber(info[5], "scheduleOutageEx: degradationLatencyMultiplier") : 1.0;
+    double wsBps = given(info[6]) ? argNumber(info[6], "scheduleOutageEx: wrongSideRecoveryBps") : 0.0;
     lrvx_venue_availability_schedule_outage_ex(
         _h, start, duration, parseOutageType(outageType), parseOnOutage(policy),
         ttl, degr, wsBps);

@@ -69,7 +69,7 @@ class DeltaBookEncoderWrap : public Napi::ObjectWrap<DeltaBookEncoderWrap>
     if (given(info[0]))
     {
       auto opts = argObject(info[0], "DeltaBookEncoder: opts");
-      if (opts.Has("anchorEvery"))
+      if (given(opts.Get("anchorEvery")))
       {
         anchor_every = argUint32(opts.Get("anchorEvery"), "DeltaBookEncoder: anchorEvery");
       }

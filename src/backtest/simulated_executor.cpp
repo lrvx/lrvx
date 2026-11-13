@@ -2752,7 +2752,9 @@ void SimulatedExecutor::forgetPendingReplace(OrderId orderId)
 
 void SimulatedExecutor::finalizePendingReplaces()
 {
-  if (_pendingReplaces.empty() || !_callback)
+  // A replacement applies whether or not anyone listens; only the events
+  // need a callback.
+  if (_pendingReplaces.empty())
   {
     return;
   }
@@ -2803,7 +2805,10 @@ void SimulatedExecutor::finalizePendingReplaces()
     accepted.newOrder = newOrder;
     accepted.exchangeTsNs = UnixNanos::fromRaw(now);
     accepted.timestamps = timestampsFor(orderId);
-    _callback(accepted);
+    if (_callback)
+    {
+      _callback(accepted);
+    }
 
     // The callback may have re-entered and moved the books: look again.
     if (untriggered)
@@ -2831,7 +2836,10 @@ void SimulatedExecutor::finalizePendingReplaces()
     replaced.newOrder = newOrder;
     replaced.exchangeTsNs = UnixNanos::fromRaw(now);
     replaced.timestamps = timestampsFor(orderId);
-    _callback(replaced);
+    if (_callback)
+    {
+      _callback(replaced);
+    }
   }
 }
 
@@ -2889,7 +2897,7 @@ void SimulatedExecutor::finalizePendingSubmissions()
 
 void SimulatedExecutor::resolveLateReplaceOnFill(const Order& order)
 {
-  if (_pendingReplaces.empty() || !_callback)
+  if (_pendingReplaces.empty())
   {
     return;
   }
@@ -2906,7 +2914,10 @@ void SimulatedExecutor::resolveLateReplaceOnFill(const Order& order)
     ev.rejectReason = "late_replace_after_fill";
     ev.exchangeTsNs = _clock.nowNs();
     ev.timestamps = timestampsFor(order.id);
-    _callback(ev);
+    if (_callback)
+    {
+      _callback(ev);
+    }
     *it = _pendingReplaces.back();
     _pendingReplaces.pop_back();
     return;
@@ -3168,7 +3179,7 @@ void SimulatedExecutor::finalizePendingCancels()
 
 void SimulatedExecutor::resolveLateCancelOnFill(const Order& order)
 {
-  if (_pendingCancels.empty() || !_callback)
+  if (_pendingCancels.empty())
   {
     return;
   }
@@ -3184,7 +3195,10 @@ void SimulatedExecutor::resolveLateCancelOnFill(const Order& order)
     ev.rejectReason = "late_cancel_after_fill";
     ev.exchangeTsNs = _clock.nowNs();
     ev.timestamps = timestampsFor(order.id);
-    _callback(ev);
+    if (_callback)
+    {
+      _callback(ev);
+    }
     *it = _pendingCancels.back();
     _pendingCancels.pop_back();
     return;

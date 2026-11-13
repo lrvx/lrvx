@@ -28,11 +28,7 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
   // returns the global `Function`, and `Function(0, 1, 100000)` parses its
   // last argument as a function body -- every factory threw
   // "SyntaxError: Unexpected number".
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<VenueStackWrap>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
@@ -74,20 +70,18 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
          StaticMethod("okxSwap", &VenueStackWrap::OkxSwap),
          StaticMethod("deribit", &VenueStackWrap::Deribit),
          StaticMethod("fromVenue", &VenueStackWrap::FromVenue)});
-    Ctor() = Napi::Persistent(fn);
-    Ctor().SuppressDestruct();
-    return fn;
+    return keepCtor(Ctor(env), fn);
   }
 
   VenueStackWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<VenueStackWrap>(info)
   {
     const uint8_t venueCode =
-        info.Length() > 0 ? argUint32(info[0], "VenueStack: venueCode") : 0;
+        given(info[0]) ? argUint32(info[0], "VenueStack: venueCode") : 0;
     const uint64_t accountId =
-        info.Length() > 1 ? argInteger(info[1], "VenueStack: accountId") : 0;
+        given(info[1]) ? argInteger(info[1], "VenueStack: accountId") : 0;
     const double equity =
-        info.Length() > 2 ? argNumber(info[2], "VenueStack: equity") : 0.0;
+        given(info[2]) ? argNumber(info[2], "VenueStack: equity") : 0.0;
     _h = lrvx_venue_stack_create(venueCode, accountId, equity);
   }
   ~VenueStackWrap()
@@ -103,13 +97,13 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
                                     uint8_t venue)
   {
     Napi::Env env = info.Env();
-    if (Ctor().IsEmpty())
+    if (Ctor(info.Env()).IsEmpty())
     {
       Napi::Error::New(env, "VenueStack constructor unavailable")
           .ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    return Ctor().New({Napi::Number::New(env, venue), info[0], info[1]});
+    return Ctor(info.Env()).New({Napi::Number::New(env, venue), info[0], info[1]});
   }
   static Napi::Value BinanceUmFutures(const Napi::CallbackInfo& info)
   {
@@ -129,8 +123,7 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
   }
   static Napi::Value FromVenue(const Napi::CallbackInfo& info)
   {
-    const std::string name =
-        info[0].IsString() ? argString(info[0], "fromVenue: name") : "";
+    const std::string name = argString(info[0], "fromVenue: name");
     uint8_t code = 0;
     if (name == "bybit_linear" || name == "bybit")
     {
@@ -154,13 +147,13 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
           .ThrowAsJavaScriptException();
       return info.Env().Undefined();
     }
-    if (Ctor().IsEmpty())
+    if (Ctor(info.Env()).IsEmpty())
     {
       Napi::Error::New(info.Env(), "VenueStack constructor unavailable")
           .ThrowAsJavaScriptException();
       return info.Env().Undefined();
     }
-    return Ctor().New({Napi::Number::New(info.Env(), code), info[1], info[2]});
+    return Ctor(info.Env()).New({Napi::Number::New(info.Env(), code), info[1], info[2]});
   }
 
   Napi::Value VenueName(const Napi::CallbackInfo& info)

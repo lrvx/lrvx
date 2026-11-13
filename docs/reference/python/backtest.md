@@ -81,6 +81,18 @@ gets `new_price` as its trigger; any other order gets it as its limit.
 is no longer working, is refused and the order is left as it was. `symbol` is
 used only when the simulator does not hold the order.
 
+Returns what the simulator decided, as a string:
+
+| Return | Meaning |
+|---|---|
+| `"accepted"` | The replacement is working now (a `REPLACED` order event). |
+| `"pending"` | The simulator holds the request: it waits on the replace ack latency (`REPLACE_SUBMITTED`) or on a venue outage. The original keeps working until then, and the outcome arrives later as a `REPLACED` or `REPLACE_REJECTED` order event. |
+| `"refused"` | Rejected (`REPLACE_REJECTED` or `REJECTED_RATE_LIMIT`): off the tick or lot, not working, or rate limited. The original is left as it was. |
+
+It used to return `True` or `False` by reading the order right after the
+call, which with a replace ack latency was still the original, so a pending
+replacement read as refused.
+
 #### `order_is_live(order_id)`
 
 `True` while the simulator still holds the order: resting, waiting on its

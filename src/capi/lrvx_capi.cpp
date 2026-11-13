@@ -12,6 +12,7 @@
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/log/abstract_logger.h"
+#include "lrvx/log/console_logger.h"
 #include "lrvx/log/log_stream.h"
 #include "queued_order_event.h"
 #include "tracker_ownership.h"
@@ -48,6 +49,7 @@
 #include "lrvx/replay/tape_diff.h"
 #include "lrvx/report/heatmap_html.h"
 #include "lrvx/risk/portfolio_risk.h"
+#include "lrvx/run/trace_handlers.h"
 #include "lrvx/run/trace_reader.h"
 #include "lrvx/run/trace_recorder.h"
 #include "lrvx/stats/deflated_sharpe.h"
@@ -132,6 +134,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cerrno>
 #include <cmath>
 #include <cstring>
@@ -146,6 +149,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
@@ -7491,6 +7495,8 @@ class RunnerSignalHandler : public ISignalHandler
       view.strength_raw = 0;
       view.symbol_ids = {static_cast<uint32_t>(sig.symbol)};
       view.name = signalTypeName(sig.type);
+      const std::string payload = lrvx::run::conditionalTriggerPayload(sig);
+      view.payload = payload;
       recorder->writeSignal(view);
     }
 
@@ -9654,49 +9660,124 @@ void lrvx_executor_get_capabilities(LrvxExecutorHandle executor,
 namespace
 {
 
+// The callback lrvx_set_log_callback installed. One adapter is the global
+// logger from the first call on and is never freed, so a thread that loaded
+// it just before a replacement still calls into live memory; with no
+// callback set it writes to the console, as the default logger does. The
+// callback it forwards to is swapped under a mutex, and a replacement waits
+// for the calls already inside the old callback on other threads to return:
+// once lrvx_set_log_callback returns, the old callback is neither running
+// elsewhere nor called again, and its user data may be freed. The adapter
+// used to be freed right after the swap, while a logging thread could still
+// be in it.
 class CapiCallbackLogger : public lrvx::ILogger
 {
  public:
-  CapiCallbackLogger(LrvxLogCallback cb, void* ud) : _cb(cb), _ud(ud) {}
+  void info(std::string_view msg) override { dispatch(lrvx::LogLevel::Info, msg); }
+  void warn(std::string_view msg) override { dispatch(lrvx::LogLevel::Warn, msg); }
+  void error(std::string_view msg) override { dispatch(lrvx::LogLevel::Error, msg); }
 
-  void info(std::string_view msg) override { dispatch(0, msg); }
-  void warn(std::string_view msg) override { dispatch(1, msg); }
-  void error(std::string_view msg) override { dispatch(2, msg); }
-
- private:
-  void dispatch(int32_t level, std::string_view msg)
+  void set(LrvxLogCallback cb, void* ud)
   {
-    // string_view is not guaranteed null-terminated; the C callback expects
-    // const char*. Construct a std::string for the call duration.
-    std::string s(msg);
-    _cb(_ud, level, s.c_str());
+    std::shared_ptr<Target> old;
+    {
+      std::lock_guard<std::mutex> lock(_mutex);
+      old = std::move(_target);
+      if (cb != nullptr)
+      {
+        _target = std::make_shared<Target>(cb, ud);
+      }
+    }
+    if (old == nullptr)
+    {
+      return;
+    }
+    // A callback that replaces or removes itself, at any depth of logging
+    // from inside itself, has its own calls in flight on this thread; it
+    // waits only for the other threads'.
+    const auto own = static_cast<int>(std::count(t_frames.begin(), t_frames.end(), old.get()));
+    while (old->inFlight.load(std::memory_order_acquire) > own)
+    {
+      std::this_thread::yield();
+    }
   }
 
-  LrvxLogCallback _cb;
-  void* _ud;
+ private:
+  struct Target
+  {
+    Target(LrvxLogCallback c, void* u) : cb(c), ud(u) {}
+    LrvxLogCallback cb;
+    void* ud;
+    std::atomic<int> inFlight{0};
+  };
+
+  // Ends one call into a target, however the callback leaves: a call left
+  // counted would make every later replacement wait for it forever.
+  struct Frame
+  {
+    explicit Frame(std::shared_ptr<Target> target) : t(std::move(target))
+    {
+      t_frames.push_back(t.get());
+    }
+    ~Frame()
+    {
+      t_frames.pop_back();
+      t->inFlight.fetch_sub(1, std::memory_order_acq_rel);
+    }
+    Frame(const Frame&) = delete;
+    Frame& operator=(const Frame&) = delete;
+    std::shared_ptr<Target> t;
+  };
+
+  void dispatch(lrvx::LogLevel level, std::string_view msg)
+  {
+    std::shared_ptr<Target> t;
+    {
+      std::lock_guard<std::mutex> lock(_mutex);
+      t = _target;
+      if (t != nullptr)
+      {
+        t->inFlight.fetch_add(1, std::memory_order_acq_rel);
+      }
+    }
+    if (t == nullptr)
+    {
+      _console.log(level, msg);
+      return;
+    }
+    Frame frame(std::move(t));
+    // string_view is not guaranteed null-terminated; the C callback expects
+    // const char*. Construct a std::string for the call duration.
+    const std::string s(msg);
+    frame.t->cb(frame.t->ud, static_cast<int32_t>(level), s.c_str());
+  }
+
+  std::mutex _mutex;
+  std::shared_ptr<Target> _target;
+  lrvx::ConsoleLogger _console;
+  // The targets this thread is inside, innermost last.
+  static thread_local std::vector<const Target*> t_frames;
 };
 
-// Owned by the C API; outlives the registered call. Reset via
-// lrvx_set_log_callback(NULL, ...).
-std::unique_ptr<CapiCallbackLogger> g_capiLogger;
+thread_local std::vector<const CapiCallbackLogger::Target*> CapiCallbackLogger::t_frames;
+
+CapiCallbackLogger& capiLogger()
+{
+  static auto* logger = new CapiCallbackLogger;
+  return *logger;
+}
 
 }  // namespace
 
 void lrvx_set_log_callback(LrvxLogCallback callback, void* user_data)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
-  if (callback == nullptr)
-  {
-    lrvx::setGlobalLogger(nullptr);
-    g_capiLogger.reset();
-    return;
-  }
-  auto next = std::make_unique<CapiCallbackLogger>(callback, user_data);
-  lrvx::setGlobalLogger(next.get());
-  // Replace AFTER swapping the pointer so concurrent log calls never see
-  // a dangling adapter. If two lrvx_set_log_callback calls race, the loser
-  // simply destroys its adapter without ever being installed.
-  g_capiLogger = std::move(next);
+  CapiCallbackLogger& logger = capiLogger();
+  // The adapter stays the global logger either way. Swapping the global to
+  // the default and the adapter's target in two steps let two concurrent
+  // calls interleave so that the adapter stayed installed with no target.
+  logger.set(callback, user_data);
+  lrvx::setGlobalLogger(&logger);
   LRVX_CAPI_LEAVE_VOID;
 }
 
@@ -12156,7 +12237,11 @@ extern "C" uint64_t lrvx_run_reader_signal_payload(LrvxRunReaderHandle handle, u
     return p.size();
   }
   uint64_t n = std::min(static_cast<uint64_t>(p.size()), max_bytes);
-  std::memcpy(out, p.data(), n);
+  // An empty payload's data() may be null, and memcpy's source must not be.
+  if (n > 0)
+  {
+    std::memcpy(out, p.data(), n);
+  }
   return n;
   LRVX_CAPI_LEAVE;
 }

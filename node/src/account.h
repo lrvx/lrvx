@@ -16,35 +16,31 @@ namespace node_lrvx
 class AccountWrap : public Napi::ObjectWrap<AccountWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<AccountWrap>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
-    return keepCtor(Ctor(), DefineClass(
-                                env, "Account",
-                                {InstanceMethod("accountId", &AccountWrap::AccountId),
-                                 InstanceMethod("equity", &AccountWrap::Equity),
-                                 InstanceMethod("setEquity", &AccountWrap::SetEquity),
-                                 InstanceMethod("addEquity", &AccountWrap::AddEquity),
-                                 InstanceMethod("marginMode", &AccountWrap::MarginMode),
-                                 InstanceMethod("setMarginMode", &AccountWrap::SetMarginMode),
-                                 InstanceMethod("openPosition", &AccountWrap::OpenPosition),
-                                 InstanceMethod("closePosition", &AccountWrap::ClosePosition),
-                                 InstanceMethod("positionCount", &AccountWrap::PositionCount),
-                                 InstanceMethod("setMark", &AccountWrap::SetMark),
-                                 InstanceMethod("markTsFor", &AccountWrap::MarkTsFor),
-                                 InstanceMethod("hasStaleMarks", &AccountWrap::HasStaleMarks),
-                                 InstanceMethod("totalNotional", &AccountWrap::TotalNotional),
-                                 InstanceMethod("totalUnrealisedPnl", &AccountWrap::TotalUpnl),
-                                 InstanceMethod("recordFill", &AccountWrap::RecordFill),
-                                 InstanceMethod("rollingNotionalBySymbol30d",
-                                                &AccountWrap::RollingNotionalBySymbol),
-                                 InstanceMethod("rollingNotional30d", &AccountWrap::RollingNotional),
-                                 InstanceMethod("resetRolling", &AccountWrap::ResetRolling)}));
+    return keepCtor(Ctor(env), DefineClass(
+                                   env, "Account",
+                                   {InstanceMethod("accountId", &AccountWrap::AccountId),
+                                    InstanceMethod("equity", &AccountWrap::Equity),
+                                    InstanceMethod("setEquity", &AccountWrap::SetEquity),
+                                    InstanceMethod("addEquity", &AccountWrap::AddEquity),
+                                    InstanceMethod("marginMode", &AccountWrap::MarginMode),
+                                    InstanceMethod("setMarginMode", &AccountWrap::SetMarginMode),
+                                    InstanceMethod("openPosition", &AccountWrap::OpenPosition),
+                                    InstanceMethod("closePosition", &AccountWrap::ClosePosition),
+                                    InstanceMethod("positionCount", &AccountWrap::PositionCount),
+                                    InstanceMethod("setMark", &AccountWrap::SetMark),
+                                    InstanceMethod("markTsFor", &AccountWrap::MarkTsFor),
+                                    InstanceMethod("hasStaleMarks", &AccountWrap::HasStaleMarks),
+                                    InstanceMethod("totalNotional", &AccountWrap::TotalNotional),
+                                    InstanceMethod("totalUnrealisedPnl", &AccountWrap::TotalUpnl),
+                                    InstanceMethod("recordFill", &AccountWrap::RecordFill),
+                                    InstanceMethod("rollingNotionalBySymbol30d",
+                                                   &AccountWrap::RollingNotionalBySymbol),
+                                    InstanceMethod("rollingNotional30d", &AccountWrap::RollingNotional),
+                                    InstanceMethod("resetRolling", &AccountWrap::ResetRolling)}));
   }
 
   AccountWrap(const Napi::CallbackInfo& info)

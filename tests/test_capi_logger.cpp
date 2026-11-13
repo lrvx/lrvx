@@ -17,8 +17,11 @@
 
 #include <gtest/gtest.h>
 #include <atomic>
+#include <chrono>
+#include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace
@@ -150,4 +153,192 @@ TEST(CapiLogger, LoggingDisabledMacroSuppressesCallback)
   EXPECT_EQ(state.calls.load(), 1);
 
   lrvx_set_log_callback(nullptr, nullptr);
+}
+
+namespace
+{
+
+// A callback's user data. Once lrvx_set_log_callback has replaced or removed
+// the callback that owns it, the caller may free it, so a call that still
+// reaches it is a call into freed memory.
+struct Sink
+{
+  std::atomic<bool> retired{false};
+};
+
+std::atomic<int> g_lateCalls{0};
+std::atomic<int> g_calls{0};
+
+void sinkCb(void* ud, int32_t, const char*)
+{
+  auto* s = static_cast<Sink*>(ud);
+  g_calls.fetch_add(1, std::memory_order_relaxed);
+  // Stay in the callback a moment, as a real sink formatting or queueing
+  // the line would, so a replacement lands while calls are in flight.
+  std::this_thread::yield();
+  if (s->retired.load(std::memory_order_acquire))
+  {
+    g_lateCalls.fetch_add(1, std::memory_order_relaxed);
+  }
+}
+
+}  // namespace
+
+// Replacing or removing the callback while other threads log through it.
+// The old adapter was freed right after the global logger was swapped, while
+// a thread that had already loaded it could still be inside it, and the old
+// callback could still be called with user data its owner had been told it
+// could free. Once lrvx_set_log_callback returns, the old callback is neither
+// running nor called again.
+TEST(CapiLogger, ReplacingAndRemovingIsSafeWhileThreadsLog)
+{
+  g_lateCalls = 0;
+  g_calls = 0;
+  std::atomic<bool> stop{false};
+  std::vector<std::thread> loggers;
+  for (int t = 0; t < 4; ++t)
+  {
+    loggers.emplace_back(
+        [&stop]
+        {
+          while (!stop.load(std::memory_order_acquire))
+          {
+            LRVX_LOG_WARN("concurrent line");
+          }
+        });
+  }
+
+  std::vector<std::unique_ptr<Sink>> sinks;
+  Sink* current = nullptr;
+  for (int i = 0; i < 3000; ++i)
+  {
+    Sink* previous = current;
+    if (i % 3 == 2)
+    {
+      lrvx_set_log_callback(nullptr, nullptr);
+      current = nullptr;
+    }
+    else
+    {
+      sinks.push_back(std::make_unique<Sink>());
+      current = sinks.back().get();
+      const int before = g_calls.load();
+      lrvx_set_log_callback(sinkCb, current);
+      // Let the loggers reach it before it is replaced.
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+      while (g_calls.load() == before && std::chrono::steady_clock::now() < deadline)
+      {
+        std::this_thread::yield();
+      }
+    }
+    if (previous != nullptr)
+    {
+      previous->retired.store(true, std::memory_order_release);
+    }
+  }
+  lrvx_set_log_callback(nullptr, nullptr);
+  if (current != nullptr)
+  {
+    current->retired.store(true, std::memory_order_release);
+  }
+  const int callsAtDetach = g_calls.load();
+  stop.store(true, std::memory_order_release);
+  for (auto& th : loggers)
+  {
+    th.join();
+  }
+
+  EXPECT_GT(callsAtDetach, 0) << "the loggers reached the callback";
+  EXPECT_EQ(g_lateCalls.load(), 0) << "a replaced or removed callback was still called";
+  EXPECT_EQ(g_calls.load(), callsAtDetach) << "a call arrived after the last detach";
+}
+
+// A callback may replace or remove itself: the call that does it does not
+// wait for itself to finish.
+TEST(CapiLogger, ACallbackMayDetachItself)
+{
+  static std::atomic<int> calls{0};
+  calls = 0;
+  lrvx_set_log_callback(
+      [](void*, int32_t, const char*)
+      {
+        calls.fetch_add(1);
+        lrvx_set_log_callback(nullptr, nullptr);
+      },
+      nullptr);
+  LRVX_LOG_INFO("first");
+  LRVX_LOG_INFO("second");
+  EXPECT_EQ(calls.load(), 1);
+}
+
+namespace
+{
+
+// How deep the nested callback goes before it detaches itself, and what it
+// saw. It logs from inside itself until it is `detachAt` calls deep.
+struct Nesting
+{
+  int detachAt = 0;
+  int depth = 0;
+  int calls = 0;
+};
+
+void nestingCb(void* ud, int32_t, const char*)
+{
+  auto* n = static_cast<Nesting*>(ud);
+  ++n->calls;
+  ++n->depth;
+  if (n->depth < n->detachAt)
+  {
+    LRVX_LOG_INFO("nested");
+  }
+  else
+  {
+    lrvx_set_log_callback(nullptr, nullptr);
+  }
+  --n->depth;
+}
+
+// Runs one nested self-detach on its own thread. False when it has not
+// returned within two seconds: it waits on its own outer calls.
+bool nestedSelfDetachReturns(Nesting& n)
+{
+  auto done = std::make_shared<std::atomic<bool>>(false);
+  std::thread([&n, done]
+              {
+                lrvx_set_log_callback(nestingCb, &n);
+                LRVX_LOG_INFO("outer");
+                done->store(true); })
+      .detach();
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (!done->load() && std::chrono::steady_clock::now() < deadline)
+  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  return done->load();
+}
+
+}  // namespace
+
+// A callback that logs from inside itself and detaches in a nested call: the
+// detach waited for the outer calls on its own thread, which cannot return
+// until it does. A thread now never waits for its own frames.
+TEST(CapiLogger, ACallbackMayDetachItselfTwoCallsDeep)
+{
+  static Nesting n;
+  n = Nesting{.detachAt = 2};
+  ASSERT_TRUE(nestedSelfDetachReturns(n)) << "the detach waited on its own outer call";
+  EXPECT_EQ(n.calls, 2);
+  LRVX_LOG_INFO("after");
+  EXPECT_EQ(n.calls, 2) << "detached";
+}
+
+TEST(CapiLogger, ACallbackMayDetachItselfThreeCallsDeep)
+{
+  static Nesting n;
+  n = Nesting{.detachAt = 3};
+  ASSERT_TRUE(nestedSelfDetachReturns(n)) << "the detach waited on its own outer calls";
+  EXPECT_EQ(n.calls, 3);
+  LRVX_LOG_INFO("after");
+  EXPECT_EQ(n.calls, 3) << "detached";
 }

@@ -202,3 +202,53 @@ TEST(ReplaceInFlight, AckCarriesNewOrderPayload)
     }
   }
 }
+
+// Nobody listening to order events changes nothing about what the simulator
+// does with a pending replacement: pending replaces were finalized only when
+// an order-event callback was set, so without one the replacement was held
+// forever and the original kept working at its old price and size.
+TEST(ReplaceInFlight, PendingReplaceAppliesWithNoListener)
+{
+  SimulatedClock clock;
+  SimulatedExecutor exec(clock);
+  exec.applyConfig(configWithReplaceLatency(5'000'000));
+
+  pushBook(exec, 1, 100.0, 5.0, 101.0, 5.0);
+  exec.submitOrder(limitBuy(1, 1, 99.0, 1.0));
+  exec.replaceOrder(1, limitBuy(1, 1, 99.5, 2.0));
+  ASSERT_NE(exec.findOrder(1), nullptr);
+  EXPECT_DOUBLE_EQ(exec.findOrder(1)->price.toDouble(), 99.0);
+
+  clock.advanceTo(clock.nowNs() + DurationNs{6'000'000});
+  pushBook(exec, 1, 100.0, 5.0, 101.0, 5.0);
+
+  const Order* now = exec.findOrder(1);
+  ASSERT_NE(now, nullptr);
+  EXPECT_DOUBLE_EQ(now->price.toDouble(), 99.5);
+  EXPECT_DOUBLE_EQ(now->quantity.toDouble(), 2.0);
+}
+
+// A replacement still pending when the original fills is dropped with or
+// without a listener: one left behind landed on a later order that reused
+// the id.
+TEST(ReplaceInFlight, LateReplaceAfterFillIsDroppedWithNoListener)
+{
+  SimulatedClock clock;
+  SimulatedExecutor exec(clock);
+  exec.applyConfig(configWithReplaceLatency(10'000'000));
+
+  pushBook(exec, 1, 100.0, 0.0, 101.0, 5.0);
+  exec.submitOrder(limitBuy(1, 1, 100.0, 1.0));
+  exec.replaceOrder(1, limitBuy(1, 1, 99.5, 3.0));
+  clock.advanceTo(clock.nowNs() + DurationNs{1'000'000});
+  exec.onTrade(1, Price::fromDouble(100.0), Quantity::fromDouble(1.0), false);
+  ASSERT_EQ(exec.findOrder(1), nullptr);
+
+  exec.submitOrder(limitBuy(1, 1, 98.0, 1.0));
+  clock.advanceTo(clock.nowNs() + DurationNs{20'000'000});
+  pushBook(exec, 1, 100.0, 5.0, 101.0, 5.0);
+  const Order* now = exec.findOrder(1);
+  ASSERT_NE(now, nullptr);
+  EXPECT_DOUBLE_EQ(now->price.toDouble(), 98.0);
+  EXPECT_DOUBLE_EQ(now->quantity.toDouble(), 1.0);
+}

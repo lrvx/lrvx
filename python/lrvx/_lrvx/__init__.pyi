@@ -2879,9 +2879,9 @@ class SimulatedExecutor:
         """
         Remaining hidden quantity (raw fixed-point) for an iceberg order.
         """
-    def modify_order(self, order_id: typing.SupportsInt | typing.SupportsIndex, new_price: typing.SupportsFloat | typing.SupportsIndex, new_quantity: typing.SupportsFloat | typing.SupportsIndex, symbol: typing.SupportsInt | typing.SupportsIndex) -> bool:
+    def modify_order(self, order_id: typing.SupportsInt | typing.SupportsIndex, new_price: typing.SupportsFloat | typing.SupportsIndex, new_quantity: typing.SupportsFloat | typing.SupportsIndex, symbol: typing.SupportsInt | typing.SupportsIndex) -> str:
         """
-        Replace a working order with its new price and quantity, as a Modify signal does in BacktestRunner: the trigger of a stop_market, tp_market or trailing_stop order moves to new_price, the limit of any other; new_quantity is what is left to work. An off-tick replacement, or an id that is no longer working, is refused and the order is left as it was. symbol is used only when the simulator does not hold the order. Returns True when the replacement was taken, False when it was refused.
+        Replace a working order with its new price and quantity, as a Modify signal does in BacktestRunner: the trigger of a stop_market, tp_market or trailing_stop order moves to new_price, the limit of any other; new_quantity is what is left to work. An off-tick replacement, or an id that is no longer working, is refused and the order is left as it was. symbol is used only when the simulator does not hold the order. Returns what the simulator decided: 'accepted' when the replacement is working now; 'pending' when it waits on the replace ack latency or a venue outage, the original working meanwhile and the outcome arriving later as a REPLACED or REPLACE_REJECTED order event; 'refused' when it was rejected (off tick or lot, not working, rate limited) and the original is left as it was.
         """
     def on_bar(self, symbol: typing.SupportsInt | typing.SupportsIndex, close_price: typing.SupportsFloat | typing.SupportsIndex) -> None:
         """

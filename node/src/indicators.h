@@ -381,7 +381,7 @@ inline Napi::Value batch_adf(const Napi::CallbackInfo& info)
   // Codon) and returns { testStat, pValue, usedLag }.
   auto in = argFloat64Array(info[0], "adf: input");
   size_t n = in.ElementLength();
-  size_t maxLag = info.Length() > 1 ? argUint32(info[1], "adf: maxLag") : 4u;
+  size_t maxLag = given(info[1]) ? argUint32(info[1], "adf: maxLag") : 4u;
   std::string regression =
       given(info[2]) ? argString(info[2], "adf: regression") : "c";
   lrvx::indicator::AdfResult r =
@@ -500,8 +500,8 @@ class KAMAWrap : public Napi::ObjectWrap<KAMAWrap>
   KAMAWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<KAMAWrap>(info),
         _ind(checkedIndicator<lrvx::indicator::KAMA>(info.Env(), "kama", argUint32(info[0], "KAMA: period"),
-                                                     info.Length() > 1 ? argUint32(info[1], "KAMA: fast") : 2u,
-                                                     info.Length() > 2 ? argUint32(info[2], "KAMA: slow") : 30u))
+                                                     given(info[1]) ? argUint32(info[1], "KAMA: fast") : 2u,
+                                                     given(info[2]) ? argUint32(info[2], "KAMA: slow") : 30u))
   {
   }
 
@@ -544,7 +544,7 @@ class ShannonEntropyWrap : public Napi::ObjectWrap<ShannonEntropyWrap>
   ShannonEntropyWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<ShannonEntropyWrap>(info),
         _ind(checkedIndicator<lrvx::indicator::ShannonEntropy>(info.Env(), "shannon_entropy", argUint32(info[0], "ShannonEntropy: period"),
-                                                               info.Length() > 1 ? argUint32(info[1], "ShannonEntropy: bins") : 10u))
+                                                               given(info[1]) ? argUint32(info[1], "ShannonEntropy: bins") : 10u))
   {
   }
 
@@ -823,9 +823,9 @@ class MACDWrap : public Napi::ObjectWrap<MACDWrap>
   }
   MACDWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<MACDWrap>(info),
-        _ind(checkedIndicator<lrvx::indicator::MACD>(info.Env(), "macd", info.Length() > 0 ? argUint32(info[0], "MACD: fast") : 12u,
-                                                     info.Length() > 1 ? argUint32(info[1], "MACD: slow") : 26u,
-                                                     info.Length() > 2 ? argUint32(info[2], "MACD: signal") : 9u))
+        _ind(checkedIndicator<lrvx::indicator::MACD>(info.Env(), "macd", given(info[0]) ? argUint32(info[0], "MACD: fast") : 12u,
+                                                     given(info[1]) ? argUint32(info[1], "MACD: slow") : 26u,
+                                                     given(info[2]) ? argUint32(info[2], "MACD: signal") : 9u))
   {
   }
 
@@ -885,8 +885,8 @@ class BollingerWrap : public Napi::ObjectWrap<BollingerWrap>
   }
   BollingerWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<BollingerWrap>(info),
-        _ind(checkedIndicator<lrvx::indicator::Bollinger>(info.Env(), "bollinger", info.Length() > 0 ? argUint32(info[0], "Bollinger: period") : 20u,
-                                                          info.Length() > 1 ? argNumber(info[1], "Bollinger: stdDev") : 2.0))
+        _ind(checkedIndicator<lrvx::indicator::Bollinger>(info.Env(), "bollinger", given(info[0]) ? argUint32(info[0], "Bollinger: period") : 20u,
+                                                          given(info[1]) ? argNumber(info[1], "Bollinger: stdDev") : 2.0))
   {
   }
 
@@ -942,8 +942,8 @@ class StochasticWrap : public Napi::ObjectWrap<StochasticWrap>
   }
   StochasticWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<StochasticWrap>(info),
-        _ind(checkedIndicator<lrvx::indicator::Stochastic>(info.Env(), "stochastic", info.Length() > 0 ? argUint32(info[0], "Stochastic: kPeriod") : 14u,
-                                                           info.Length() > 1 ? argUint32(info[1], "Stochastic: dPeriod") : 3u))
+        _ind(checkedIndicator<lrvx::indicator::Stochastic>(info.Env(), "stochastic", given(info[0]) ? argUint32(info[0], "Stochastic: kPeriod") : 14u,
+                                                           given(info[1]) ? argUint32(info[1], "Stochastic: dPeriod") : 3u))
   {
   }
 

@@ -104,6 +104,17 @@ function runGateScenarios() {
       // A truthy non-boolean: a binding that coerced instead of checking
       // would let this through.
       ['returns a non-boolean', () => 'yes', 'boolean'],
+      // Values that cannot be turned into a string for the report: the
+      // report used to convert them and threw from inside the bridge.
+      ['returns a Symbol', () => Symbol('allow'), 'boolean'],
+      ['returns an object whose toString throws',
+       () => ({ toString() { throw new Error('no string'); } }), 'boolean'],
+      // A thrown value that is not an Error used to be reported with an
+      // empty message.
+      ['throws a Symbol', () => { throw Symbol('deny'); }, 'threw a symbol'],
+      ['throws a string', () => { throw 'plain refusal'; }, "threw 'plain refusal'"],
+      ['throws an object whose message getter throws',
+       () => { throw { get message() { throw new Error('inner'); } }; }, 'threw an object'],
     ]) {
       checkGateFailure(setter, method, hookName, mode, impl, wanted);
     }

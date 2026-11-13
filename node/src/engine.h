@@ -239,21 +239,17 @@ inline Napi::Object statsObj(Napi::Env env, const BacktestStats& s)
 class SignalBuilderWrap : public Napi::ObjectWrap<SignalBuilderWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<SignalBuilderWrap>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
-    return keepCtor(Ctor(), DefineClass(env, "SignalBuilder",
-                                        {InstanceMethod("buy", &SignalBuilderWrap::Buy),
-                                         InstanceMethod("sell", &SignalBuilderWrap::Sell),
-                                         InstanceMethod("limitBuy", &SignalBuilderWrap::LimitBuy),
-                                         InstanceMethod("limitSell", &SignalBuilderWrap::LimitSell),
-                                         InstanceAccessor("length", &SignalBuilderWrap::Length, nullptr),
-                                         InstanceMethod("clear", &SignalBuilderWrap::Clear)}));
+    return keepCtor(Ctor(env), DefineClass(env, "SignalBuilder",
+                                           {InstanceMethod("buy", &SignalBuilderWrap::Buy),
+                                            InstanceMethod("sell", &SignalBuilderWrap::Sell),
+                                            InstanceMethod("limitBuy", &SignalBuilderWrap::LimitBuy),
+                                            InstanceMethod("limitSell", &SignalBuilderWrap::LimitSell),
+                                            InstanceAccessor("length", &SignalBuilderWrap::Length, nullptr),
+                                            InstanceMethod("clear", &SignalBuilderWrap::Clear)}));
   }
 
   SignalBuilderWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<SignalBuilderWrap>(info) {}
@@ -330,8 +326,8 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
 
   EngineWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<EngineWrap>(info)
   {
-    _config.initialCapital = info.Length() > 0 ? argNumber(info[0], "Engine: initialCapital") : 100000.0;
-    _config.feeRate = info.Length() > 1 ? argNumber(info[1], "Engine: feeRate") : 0.0001;
+    _config.initialCapital = given(info[0]) ? argNumber(info[0], "Engine: initialCapital") : 100000.0;
+    _config.feeRate = given(info[1]) ? argNumber(info[1], "Engine: feeRate") : 0.0001;
     _config.usePercentageFee = true;
   }
 

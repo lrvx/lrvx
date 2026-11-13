@@ -17,9 +17,44 @@
 #include <atomic>
 #include <cstdint>
 #include <span>
+#include <string>
 
 namespace lrvx::run
 {
+
+/**
+ * The trigger of a conditional order, as the payload of its captured signal.
+ * An `OrderEventRecord` has one price field, which holds the order's limit
+ * price (0 for a stop or take-profit that fills at market), and no field for
+ * a trigger, so capture and reproducibility bundles both write it here, as
+ * compact JSON with sorted keys:
+ *
+ *   stop / take-profit, market or limit   {"trigger_price_raw":N}
+ *   trailing stop                         {"trailing_bps":N,"trailing_offset_raw":N}
+ *
+ * `trigger_price_raw` is the trigger, or the price when the signal names no
+ * trigger; raw values are fixed-point at scale 1e8. Every other signal gets
+ * an empty payload.
+ */
+inline std::string conditionalTriggerPayload(const Signal& s)
+{
+  switch (s.type)
+  {
+    case SignalType::StopMarket:
+    case SignalType::StopLimit:
+    case SignalType::TakeProfitMarket:
+    case SignalType::TakeProfitLimit:
+    {
+      const int64_t trigger = s.triggerPrice.raw() > 0 ? s.triggerPrice.raw() : s.price.raw();
+      return "{\"trigger_price_raw\":" + std::to_string(trigger) + "}";
+    }
+    case SignalType::TrailingStop:
+      return "{\"trailing_bps\":" + std::to_string(s.trailingCallbackRate) +
+             ",\"trailing_offset_raw\":" + std::to_string(s.trailingOffset.raw()) + "}";
+    default:
+      return {};
+  }
+}
 
 /**
  * Thin `ISignalHandler` wrapper that forwards to the inner handler and
@@ -88,6 +123,8 @@ class TraceSignalHandler : public ISignalHandler
     view.strength_raw = 0;
     view.symbol_ids = {static_cast<uint32_t>(signal.symbol)};
     view.name = signalTypeName(signal.type);
+    const std::string payload = conditionalTriggerPayload(signal);
+    view.payload = payload;
     _recorder->writeSignal(view);
   }
 

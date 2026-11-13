@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <string>
+#include <unordered_map>
 
 namespace node_lrvx
 {
@@ -262,23 +263,54 @@ inline uint32_t argNamedCode(const Napi::Value& v, const char* what,
                                           " or a code");
 }
 
+struct LogSink;
+
+// What one instance of this module keeps for itself. Node loads the addon
+// once per environment -- the main thread and each worker thread -- and a
+// constructor or a callback belongs to the environment that made it.
+// Process-wide statics held the one of whichever environment registered
+// last, so every other environment used a reference from another isolate.
+struct EnvData
+{
+  std::unordered_map<const void*, Napi::FunctionReference> byClass;
+  // The callback setLogCallback installed here, if any (hooks.h).
+  LogSink* logSink{nullptr};
+};
+
+inline EnvData& envData(Napi::Env env)
+{
+  auto* data = env.GetInstanceData<EnvData>();
+  if (data == nullptr)
+  {
+    data = new EnvData;
+    env.SetInstanceData(data);
+  }
+  return *data;
+}
+
+template <typename T>
+inline constexpr char kClassKey = 0;
+
+// The constructor T registered in `env`: `static Napi::FunctionReference&
+// Ctor(Napi::Env env) { return ctorOf<T>(env); }` in each wrap class.
+template <typename T>
+inline Napi::FunctionReference& ctorOf(Napi::Env env)
+{
+  return envData(env).byClass[&kClassKey<T>];
+}
+
 // The constructor a wrap class keeps so that argInstance can tell its
-// instances apart: `return keepCtor(Ctor(), DefineClass(...));` in Init.
+// instances apart: `return keepCtor(Ctor(env), DefineClass(...));` in Init.
 inline Napi::Function keepCtor(Napi::FunctionReference& ref, Napi::Function fn)
 {
   ref = Napi::Persistent(fn);
-  ref.SuppressDestruct();
   return fn;
 }
 
-// The native object behind `v`, which must be an instance of the class T
-// registers in T::Ctor(). ObjectWrap<T>::Unwrap() alone takes any wrapped
-// object: a plain one threw a bare "Invalid argument" and an instance of
-// another lrvx class was read as a T.
 template <typename T>
 inline T* argInstance(const Napi::Value& v, const char* what)
 {
-  Napi::FunctionReference& ctor = T::Ctor();
+  Napi::FunctionReference& ctor = T::Ctor(v.Env());
   if (!ctor.IsEmpty() && v.IsObject() && v.As<Napi::Object>().InstanceOf(ctor.Value()))
   {
     return Napi::ObjectWrap<T>::Unwrap(v.As<Napi::Object>());
@@ -295,6 +327,40 @@ inline T* argInstance(const Napi::Value& v, const char* what)
   const bool vowel = std::string("AEIOUaeiou").find(cls[0]) != std::string::npos;
   throw Napi::TypeError::New(v.Env(),
                              std::string(what) + " must be " + (vowel ? "an " : "a ") + cls);
+}
+
+// An opaque C handle JavaScript holds as a Napi::External. Every External
+// is the same JavaScript type, so As<External>() took a handle of one kind
+// where another was read and handed its pointer to the C API as the other C
+// type; anything else threw a bare "Invalid argument". Each kind tags the
+// Externals it makes, and argHandle reads only an External with its tag.
+struct HandleKind
+{
+  napi_type_tag tag;
+  const char* name;  // the type index.d.ts declares, with its article
+};
+
+inline Napi::External<void> newHandle(Napi::Env env, const HandleKind& kind, void* h,
+                                      void (*destroy)(void*))
+{
+  Napi::External<void> ext =
+      Napi::External<void>::New(env, h, [destroy](Napi::Env, void* d)
+                                { destroy(d); });
+  ext.TypeTag(&kind.tag);
+  return ext;
+}
+
+inline void* argHandle(const Napi::Value& v, const HandleKind& kind, const char* what)
+{
+  if (v.IsExternal())
+  {
+    Napi::External<void> ext = v.As<Napi::External<void>>();
+    if (ext.CheckTypeTag(&kind.tag))
+    {
+      return ext.Data();
+    }
+  }
+  throw Napi::TypeError::New(v.Env(), std::string(what) + " must be " + kind.name);
 }
 
 // A typed array of exactly the element type the native side reads. As<>()

@@ -228,6 +228,8 @@ gs.setFactory((params) => {
 const results = gs.run();  // [{index, params, stats}, ...]
 ```
 
+A key the factory leaves out reads 0. A key of another type (a string where a number belongs), a return value that is not an object, or an error the factory throws stops the run, and `run()` throws that error.
+
 ### Pairs with walk-forward
 
 Compose with [walk-forward](walk-forward.md): run a `GridSearch` on each fold's train slice, pick the best params by your criterion, evaluate on test. The two primitives stay separate so the choice of "best" stays opinionated to the caller (sharpe vs. profit factor vs. drawdown-aware).

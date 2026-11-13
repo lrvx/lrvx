@@ -38,7 +38,7 @@ class MultiFeedClockWrap : public Napi::ObjectWrap<MultiFeedClockWrap>
       return;
     }
     auto opts = argObject(info[0], "MultiFeedClock: opts");
-    if (!opts.Has("symbols") || !opts.Get("symbols").IsArray())
+    if (!given(opts.Get("symbols")) || !opts.Get("symbols").IsArray())
     {
       Napi::TypeError::New(info.Env(), "options.symbols must be an array")
           .ThrowAsJavaScriptException();
@@ -53,7 +53,7 @@ class MultiFeedClockWrap : public Napi::ObjectWrap<MultiFeedClockWrap>
     }
 
     uint8_t policy = 0;  // WaitForAll
-    if (opts.Has("policy"))
+    if (given(opts.Get("policy")))
     {
       auto p = opts.Get("policy");
       if (p.IsString())
@@ -87,13 +87,13 @@ class MultiFeedClockWrap : public Napi::ObjectWrap<MultiFeedClockWrap>
       }
     }
 
-    int64_t timeout = opts.Has("timeoutMs")
+    int64_t timeout = given(opts.Get("timeoutMs"))
                           ? argInteger(opts.Get("timeoutMs"), "MultiFeedClock: timeoutMs")
                           : 200;
-    uint32_t leader = opts.Has("leaderSymbol")
+    uint32_t leader = given(opts.Get("leaderSymbol"))
                           ? argUint32(opts.Get("leaderSymbol"), "MultiFeedClock: leaderSymbol")
                           : 0;
-    int64_t budget = opts.Has("stalenessBudgetMs")
+    int64_t budget = given(opts.Get("stalenessBudgetMs"))
                          ? argInteger(opts.Get("stalenessBudgetMs"), "MultiFeedClock: stalenessBudgetMs")
                          : 200;
     _h = lrvx_feed_clock_create(symVec.data(), static_cast<uint32_t>(symVec.size()), policy,

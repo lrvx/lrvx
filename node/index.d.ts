@@ -507,7 +507,12 @@ export interface ExecutionListener {
 
 /** Install a Node callable as the global lrvx log sink. Pass null to
  *  detach. Receives `(level: number, msg: string)`; level: 0=info,
- *  1=warn, 2=error. */
+ *  1=warn, 2=error. Each environment (the main thread and every worker
+ *  thread) installs, replaces and detaches only its own callback. The
+ *  engine logs from whatever thread it runs on, so every installed
+ *  callback receives every line, called on its own thread; with none
+ *  installed lrvx logs to its default sink. An installed callback keeps
+ *  its thread's event loop alive until it is detached. */
 export function setLogCallback(
   callback: ((level: number, msg: string) => void) | null
 ): void;
@@ -964,7 +969,9 @@ export class GridSearch {
   addAxis(values: number[]): void;
   /** The factory's return value is read key-by-key in the
    *  `BacktestRunner.run*` shape, so a `run*` result can be returned
-   *  directly. Missing keys read as 0. */
+   *  directly. Missing keys read as 0; a key of another type, a value that
+   *  is not an object, or an error the factory throws stops the run and
+   *  `run()` throws it. */
   setFactory(factory: (params: number[]) => RunnerStats): void;
   total(): number;
   paramsForIndex(index: number): number[];

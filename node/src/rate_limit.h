@@ -19,24 +19,20 @@ namespace node_lrvx
 class RateLimitPolicyWrap : public Napi::ObjectWrap<RateLimitPolicyWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<RateLimitPolicyWrap>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
-    return keepCtor(Ctor(), DefineClass(
-                                env, "RateLimitPolicy",
-                                {InstanceMethod("addBucket", &RateLimitPolicyWrap::AddBucket),
-                                 InstanceMethod("addFamilyBucket", &RateLimitPolicyWrap::AddFamilyBucket),
-                                 InstanceMethod("setBan", &RateLimitPolicyWrap::SetBan),
-                                 InstanceMethod("loadProfile", &RateLimitPolicyWrap::LoadProfile),
-                                 InstanceMethod("banUntilNs", &RateLimitPolicyWrap::BanUntilNs),
-                                 InstanceMethod("consecutiveRejects",
-                                                &RateLimitPolicyWrap::ConsecutiveRejects),
-                                 InstanceMethod("bucketStates", &RateLimitPolicyWrap::BucketStates)}));
+    return keepCtor(Ctor(env), DefineClass(
+                                   env, "RateLimitPolicy",
+                                   {InstanceMethod("addBucket", &RateLimitPolicyWrap::AddBucket),
+                                    InstanceMethod("addFamilyBucket", &RateLimitPolicyWrap::AddFamilyBucket),
+                                    InstanceMethod("setBan", &RateLimitPolicyWrap::SetBan),
+                                    InstanceMethod("loadProfile", &RateLimitPolicyWrap::LoadProfile),
+                                    InstanceMethod("banUntilNs", &RateLimitPolicyWrap::BanUntilNs),
+                                    InstanceMethod("consecutiveRejects",
+                                                   &RateLimitPolicyWrap::ConsecutiveRejects),
+                                    InstanceMethod("bucketStates", &RateLimitPolicyWrap::BucketStates)}));
   }
 
   RateLimitPolicyWrap(const Napi::CallbackInfo& info)
@@ -59,9 +55,9 @@ class RateLimitPolicyWrap : public Napi::ObjectWrap<RateLimitPolicyWrap>
     std::string name = argString(info[0], "addBucket: name");
     int64_t window_ns = argInteger(info[1], "addBucket: windowNs");
     uint32_t capacity = argUint32(info[2], "addBucket: capacity");
-    uint32_t sw = info.Length() > 3 ? argUint32(info[3], "addBucket: submitWeight") : 1;
-    uint32_t cw = info.Length() > 4 ? argUint32(info[4], "addBucket: cancelWeight") : 1;
-    uint32_t rw = info.Length() > 5 ? argUint32(info[5], "addBucket: replaceWeight") : 2;
+    uint32_t sw = given(info[3]) ? argUint32(info[3], "addBucket: submitWeight") : 1;
+    uint32_t cw = given(info[4]) ? argUint32(info[4], "addBucket: cancelWeight") : 1;
+    uint32_t rw = given(info[5]) ? argUint32(info[5], "addBucket: replaceWeight") : 2;
     lrvx_rate_limit_policy_add_bucket(_h, name.c_str(), window_ns, capacity, sw, cw, rw);
   }
   void AddFamilyBucket(const Napi::CallbackInfo& info)
@@ -72,7 +68,7 @@ class RateLimitPolicyWrap : public Napi::ObjectWrap<RateLimitPolicyWrap>
     std::string name = argString(info[1], "addFamilyBucket: name");
     int64_t window_ns = argInteger(info[2], "addFamilyBucket: windowNs");
     uint32_t capacity = argUint32(info[3], "addFamilyBucket: capacity");
-    uint32_t qw = info.Length() > 4 ? argUint32(info[4], "addFamilyBucket: queryWeight") : 1;
+    uint32_t qw = given(info[4]) ? argUint32(info[4], "addFamilyBucket: queryWeight") : 1;
     lrvx_rate_limit_policy_add_bucket_family(_h, name.c_str(), window_ns, capacity,
                                              1, 1, 2, family, qw);
   }

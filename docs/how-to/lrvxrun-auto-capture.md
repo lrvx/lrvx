@@ -42,6 +42,8 @@ The `feed_ts_ns` setter is the only piece the engine wiring still has to drive â
 
 A captured signal's id is the id of the order it asks for, all 64 bits of it (`(subscriber id << 32) + n`; the record used to keep the low 32), and every order event the listener writes carries that order id in `parent_signal_id`. A signal and the events of its order therefore join on `signalId64() == parent_signal_id == order_id`, and a later cancel or modify signal for the same order carries the same id. See [the format](../spec/lrvxrun.md).
 
+A captured stop, take-profit or trailing-stop signal carries its trigger in the record's payload (`{"trigger_price_raw":N}`, or `{"trailing_bps":N,"trailing_offset_raw":N}` for a trailing stop), the same payload a reproducibility bundle writes; the order events keep the order's limit price in `price_raw`. It used to carry no payload, so stops at different triggers captured the same trace.
+
 A `nullptr` recorder pointer disables capture without removing the inner-handler delegation, so attaching the wrapper unconditionally during setup is safe.
 
 ## Phase status

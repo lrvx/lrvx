@@ -77,6 +77,12 @@ _RECORDS_COMPARABLE_KEY = "lrvxrun_records_comparable"
 # replay drops them too.
 _CANCELS_MODIFIES_KEY = "cancels_and_modifies_routed"
 _CANCEL_MODIFY_SIGNALS = frozenset({"cancel", "cancel_all", "modify"})
+# Pack recorded the trigger of each conditional order in its submit signal's
+# payload. A bundle without the key was packed when the trace had no trigger
+# at all, and its replay records none.
+_TRIGGERS_RECORDED_KEY = "conditional_triggers_recorded"
+_CONDITIONAL_ORDER_TYPES = frozenset(
+    {"stop_market", "stop_limit", "tp_market", "tp_limit", "trailing_stop"})
 _COMPARED_RECORDS = "signal, order event and fill records"
 _COMPARED_ALL = "signals, order events, fills"
 # The trace record fields two replays of one bundle need not agree on.
@@ -162,6 +168,26 @@ def _find_strategy_class(mod) -> type:
 # ── Run helper: drive a strategy through a tape with a simulator ──
 
 
+def _trigger_payload(order_type: str, price: float, trigger: float,
+                     trailing_offset: float, trailing_bps: int) -> bytes:
+    """The trigger of a conditional order, as the payload of its submit
+    signal. The order event record has one price field, which holds the
+    order's limit price (0 for a stop or take-profit that fills at market),
+    as the capture listener writes it; the trigger has no field there.
+
+    ``trigger_price_raw`` is the trigger the simulator arms, scale 1e8: the
+    signal's trigger, or its price when it names none. A trailing stop's
+    trigger follows the market from the distance it was placed with, so it
+    carries that instead: ``trailing_offset_raw`` (scale 1e8) and
+    ``trailing_bps``."""
+    if order_type == "trailing_stop":
+        fields = {"trailing_offset_raw": round(trailing_offset * 1e8),
+                  "trailing_bps": int(trailing_bps)}
+    else:
+        fields = {"trigger_price_raw": round((trigger if trigger > 0.0 else price) * 1e8)}
+    return json.dumps(fields, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
 def _run_strategy_against_tape(
     strategy_path: Path,
     tape_path: Path,
@@ -173,6 +199,7 @@ def _run_strategy_against_tape(
     slippage_params: Optional[Dict[str, float]] = None,
     lrvxrun_out: Optional[Path] = None,
     route_cancels_and_modifies: bool = True,
+    record_triggers: bool = True,
 ) -> Dict[str, Any]:
     """Replay the trades in ``tape_path`` through the strategy at
     ``strategy_path`` using a SimulatedExecutor with the given
@@ -188,7 +215,11 @@ def _run_strategy_against_tape(
     and modify signals to the simulator, traces them and counts them in the
     returned dict. False drops them, as pack did before the bundle's manifest
     had ``cancels_and_modifies_routed``, so such a bundle replays as it was
-    packed."""
+    packed.
+
+    ``record_triggers`` writes the trigger of a conditional order into the
+    payload of its submit signal; False leaves it out, as pack did before the
+    manifest had ``conditional_triggers_recorded``."""
     import lrvx
 
     mod = _load_strategy_module(strategy_path)
@@ -293,7 +324,7 @@ def _run_strategy_against_tape(
         else:
             new_price = float(getattr(sig, "new_price", 0.0) or 0.0)
             new_qty = float(getattr(sig, "new_quantity", 0.0) or 0.0)
-            taken = sim.modify_order(oid, new_price, new_qty, int(sym))
+            taken = sim.modify_order(oid, new_price, new_qty, int(sym)) == "accepted"
             done = []
             if taken and oid in sent:
                 side, kind = sent[oid][0], sent[oid][1]
@@ -316,12 +347,15 @@ def _run_strategy_against_tape(
             next_id[0] += 1
         price = float(getattr(sig, "price", 0.0))
         qty = float(getattr(sig, "quantity", 0.0))
+        trigger = float(getattr(sig, "trigger_price", 0.0) or 0.0)
+        trailing_offset = float(getattr(sig, "trailing_offset", 0.0) or 0.0)
+        trailing_bps = int(getattr(sig, "trailing_bps", 0) or 0)
         sim.submit_order(
             oid, side, price, qty,
             type=order_type, symbol=int(sym),
-            trigger=float(getattr(sig, "trigger_price", 0.0) or 0.0),
-            trailing_offset=float(getattr(sig, "trailing_offset", 0.0) or 0.0),
-            trailing_bps=int(getattr(sig, "trailing_bps", 0) or 0),
+            trigger=trigger,
+            trailing_offset=trailing_offset,
+            trailing_bps=trailing_bps,
         )
         sent[oid] = (side, order_type, price, qty)
         if rec is not None and not trace_errors:
@@ -329,9 +363,13 @@ def _run_strategy_against_tape(
             # so a failed write is kept here and raised once the run is over.
             try:
                 ts = time.time_ns()
+                payload = b""
+                if record_triggers and order_type in _CONDITIONAL_ORDER_TYPES:
+                    payload = _trigger_payload(order_type, price, trigger,
+                                               trailing_offset, trailing_bps)
                 rec.write_signal(
                     run_ts_ns=ts, feed_ts_ns=feed_ts[0], signal_id=oid, name=order_type,
-                    symbol_ids=[int(sym)],
+                    symbol_ids=[int(sym)], payload=payload,
                 )
                 rec.write_order_event(
                     run_ts_ns=ts, feed_ts_ns=feed_ts[0], order_id=oid, parent_signal_id=oid,
@@ -518,6 +556,7 @@ def pack_bundle(
         # key is compared on its record counts.
         _RECORDS_COMPARABLE_KEY: True,
         _CANCELS_MODIFIES_KEY: True,
+        _TRIGGERS_RECORDED_KEY: True,
         "slippage_model": slippage_model,
         "slippage_params": slippage_params,
     }
@@ -785,6 +824,7 @@ def replay_bundle(bundle_path: Path) -> BundleResult:
             slippage_params=manifest.get("slippage_params") or {},
             lrvxrun_out=actual_lrvxrun,
             route_cancels_and_modifies=bool(manifest.get(_CANCELS_MODIFIES_KEY)),
+            record_triggers=bool(manifest.get(_TRIGGERS_RECORDED_KEY)),
         )
 
         # Integrity check: the manifest carries a hash of the strategy

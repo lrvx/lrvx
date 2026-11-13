@@ -16,23 +16,19 @@ namespace node_lrvx
 class LatencyDistributionWrap : public Napi::ObjectWrap<LatencyDistributionWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<LatencyDistributionWrap>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
-    return keepCtor(Ctor(), DefineClass(
-                                env, "LatencyDistribution",
-                                {InstanceMethod("setConstant", &LatencyDistributionWrap::SetConstant),
-                                 InstanceMethod("setUniform", &LatencyDistributionWrap::SetUniform),
-                                 InstanceMethod("setLognormal", &LatencyDistributionWrap::SetLognormal),
-                                 InstanceMethod("setEmpirical", &LatencyDistributionWrap::SetEmpirical),
-                                 InstanceMethod("setBurstCorrelation",
-                                                &LatencyDistributionWrap::SetBurstCorrelation),
-                                 InstanceMethod("medianNs", &LatencyDistributionWrap::MedianNs)}));
+    return keepCtor(Ctor(env), DefineClass(
+                                   env, "LatencyDistribution",
+                                   {InstanceMethod("setConstant", &LatencyDistributionWrap::SetConstant),
+                                    InstanceMethod("setUniform", &LatencyDistributionWrap::SetUniform),
+                                    InstanceMethod("setLognormal", &LatencyDistributionWrap::SetLognormal),
+                                    InstanceMethod("setEmpirical", &LatencyDistributionWrap::SetEmpirical),
+                                    InstanceMethod("setBurstCorrelation",
+                                                   &LatencyDistributionWrap::SetBurstCorrelation),
+                                    InstanceMethod("medianNs", &LatencyDistributionWrap::MedianNs)}));
   }
 
   LatencyDistributionWrap(const Napi::CallbackInfo& info)
@@ -95,76 +91,72 @@ class LatencyDistributionWrap : public Napi::ObjectWrap<LatencyDistributionWrap>
 class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<SimulatedExecutorWrap>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
-    return keepCtor(Ctor(), DefineClass(env, "SimulatedExecutor",
-                                        {InstanceMethod("submitOrder", &SimulatedExecutorWrap::SubmitOrder),
-                                         InstanceMethod("cancelOrder", &SimulatedExecutorWrap::CancelOrder),
-                                         InstanceMethod("cancelAll", &SimulatedExecutorWrap::CancelAll),
-                                         InstanceMethod("onBar", &SimulatedExecutorWrap::OnBar),
-                                         InstanceMethod("onBarOhlc", &SimulatedExecutorWrap::OnBarOhlc),
-                                         InstanceMethod("beginBarCallbackWindow",
-                                                        &SimulatedExecutorWrap::BeginBarCallbackWindow),
-                                         InstanceMethod("endBarCallbackWindow",
-                                                        &SimulatedExecutorWrap::EndBarCallbackWindow),
-                                         InstanceMethod("reset", &SimulatedExecutorWrap::Reset),
-                                         InstanceMethod("onTrade", &SimulatedExecutorWrap::OnTrade),
-                                         InstanceMethod("onTopOfBook", &SimulatedExecutorWrap::OnTopOfBook),
-                                         InstanceMethod("advanceClock", &SimulatedExecutorWrap::AdvanceClock),
-                                         InstanceMethod("setDefaultSlippage", &SimulatedExecutorWrap::SetDefaultSlippage),
-                                         InstanceMethod("setQueueModel", &SimulatedExecutorWrap::SetQueueModel),
-                                         InstanceMethod("setQueueFifoTopN", &SimulatedExecutorWrap::SetQueueFifoTopN),
-                                         InstanceMethod("setTopPriorityShare", &SimulatedExecutorWrap::SetTopPriorityShare),
-                                         InstanceMethod("setLmmOrders", &SimulatedExecutorWrap::SetLmmOrders),
-                                         InstanceMethod("setLmmBonusMultiplier", &SimulatedExecutorWrap::SetLmmBonusMultiplier),
-                                         InstanceMethod("setOrderPriorityMultiplier", &SimulatedExecutorWrap::SetOrderPriorityMultiplier),
-                                         InstanceMethod("setSubmitAckLatency", &SimulatedExecutorWrap::SetSubmitAck),
-                                         InstanceMethod("setCancelAckLatency", &SimulatedExecutorWrap::SetCancelAck),
-                                         InstanceMethod("setReplaceAckLatency", &SimulatedExecutorWrap::SetReplaceAck),
-                                         InstanceMethod("setSubmitAckLatencyDistribution",
-                                                        &SimulatedExecutorWrap::SetSubmitAckDist),
-                                         InstanceMethod("setCancelAckLatencyDistribution",
-                                                        &SimulatedExecutorWrap::SetCancelAckDist),
-                                         InstanceMethod("setReplaceAckLatencyDistribution",
-                                                        &SimulatedExecutorWrap::SetReplaceAckDist),
-                                         InstanceMethod("applyLatencyProfile", &SimulatedExecutorWrap::ApplyLatencyProfile),
-                                         InstanceMethod("setRateLimitPolicy",
-                                                        &SimulatedExecutorWrap::SetRateLimitPolicy),
-                                         InstanceMethod("clearRateLimitPolicy",
-                                                        &SimulatedExecutorWrap::ClearRateLimitPolicy),
-                                         InstanceMethod("setSTPMode", &SimulatedExecutorWrap::SetSTPMode),
-                                         InstanceMethod("setSTPGroupMembership", &SimulatedExecutorWrap::SetStpGroupMembership),
-                                         InstanceMethod("stpGroupFor", &SimulatedExecutorWrap::StpGroupFor),
-                                         InstanceMethod("setFokMode", &SimulatedExecutorWrap::SetFokMode),
-                                         InstanceMethod("fokMode", &SimulatedExecutorWrap::FokMode),
-                                         InstanceMethod("setVenueAvailability",
-                                                        &SimulatedExecutorWrap::SetVenueAvailability),
-                                         InstanceMethod("submitBracket",
-                                                        &SimulatedExecutorWrap::SubmitBracket),
-                                         InstanceMethod("cancelBracket",
-                                                        &SimulatedExecutorWrap::CancelBracket),
-                                         InstanceMethod("bracketState",
-                                                        &SimulatedExecutorWrap::BracketState),
-                                         InstanceMethod("setBracketChildArmMode",
-                                                        &SimulatedExecutorWrap::SetBracketChildArmMode),
-                                         InstanceMethod("submitIceberg", &SimulatedExecutorWrap::SubmitIceberg),
-                                         InstanceMethod("setIcebergRefreshLatency",
-                                                        &SimulatedExecutorWrap::SetIcebergRefreshLatency),
-                                         InstanceMethod("icebergHiddenRemainingRaw",
-                                                        &SimulatedExecutorWrap::IcebergHiddenRemainingRaw),
-                                         InstanceMethod("setIcebergSizeRandomisationPct",
-                                                        &SimulatedExecutorWrap::SetIcebergSizeRandomisationPct),
-                                         InstanceMethod("setIcebergPriorityMode",
-                                                        &SimulatedExecutorWrap::SetIcebergPriorityMode),
-                                         InstanceMethod("setIcebergJitterSeed",
-                                                        &SimulatedExecutorWrap::SetIcebergJitterSeed),
-                                         InstanceAccessor("fillCount", &SimulatedExecutorWrap::FillCount, nullptr)}));
+    return keepCtor(Ctor(env), DefineClass(env, "SimulatedExecutor",
+                                           {InstanceMethod("submitOrder", &SimulatedExecutorWrap::SubmitOrder),
+                                            InstanceMethod("cancelOrder", &SimulatedExecutorWrap::CancelOrder),
+                                            InstanceMethod("cancelAll", &SimulatedExecutorWrap::CancelAll),
+                                            InstanceMethod("onBar", &SimulatedExecutorWrap::OnBar),
+                                            InstanceMethod("onBarOhlc", &SimulatedExecutorWrap::OnBarOhlc),
+                                            InstanceMethod("beginBarCallbackWindow",
+                                                           &SimulatedExecutorWrap::BeginBarCallbackWindow),
+                                            InstanceMethod("endBarCallbackWindow",
+                                                           &SimulatedExecutorWrap::EndBarCallbackWindow),
+                                            InstanceMethod("reset", &SimulatedExecutorWrap::Reset),
+                                            InstanceMethod("onTrade", &SimulatedExecutorWrap::OnTrade),
+                                            InstanceMethod("onTopOfBook", &SimulatedExecutorWrap::OnTopOfBook),
+                                            InstanceMethod("advanceClock", &SimulatedExecutorWrap::AdvanceClock),
+                                            InstanceMethod("setDefaultSlippage", &SimulatedExecutorWrap::SetDefaultSlippage),
+                                            InstanceMethod("setQueueModel", &SimulatedExecutorWrap::SetQueueModel),
+                                            InstanceMethod("setQueueFifoTopN", &SimulatedExecutorWrap::SetQueueFifoTopN),
+                                            InstanceMethod("setTopPriorityShare", &SimulatedExecutorWrap::SetTopPriorityShare),
+                                            InstanceMethod("setLmmOrders", &SimulatedExecutorWrap::SetLmmOrders),
+                                            InstanceMethod("setLmmBonusMultiplier", &SimulatedExecutorWrap::SetLmmBonusMultiplier),
+                                            InstanceMethod("setOrderPriorityMultiplier", &SimulatedExecutorWrap::SetOrderPriorityMultiplier),
+                                            InstanceMethod("setSubmitAckLatency", &SimulatedExecutorWrap::SetSubmitAck),
+                                            InstanceMethod("setCancelAckLatency", &SimulatedExecutorWrap::SetCancelAck),
+                                            InstanceMethod("setReplaceAckLatency", &SimulatedExecutorWrap::SetReplaceAck),
+                                            InstanceMethod("setSubmitAckLatencyDistribution",
+                                                           &SimulatedExecutorWrap::SetSubmitAckDist),
+                                            InstanceMethod("setCancelAckLatencyDistribution",
+                                                           &SimulatedExecutorWrap::SetCancelAckDist),
+                                            InstanceMethod("setReplaceAckLatencyDistribution",
+                                                           &SimulatedExecutorWrap::SetReplaceAckDist),
+                                            InstanceMethod("applyLatencyProfile", &SimulatedExecutorWrap::ApplyLatencyProfile),
+                                            InstanceMethod("setRateLimitPolicy",
+                                                           &SimulatedExecutorWrap::SetRateLimitPolicy),
+                                            InstanceMethod("clearRateLimitPolicy",
+                                                           &SimulatedExecutorWrap::ClearRateLimitPolicy),
+                                            InstanceMethod("setSTPMode", &SimulatedExecutorWrap::SetSTPMode),
+                                            InstanceMethod("setSTPGroupMembership", &SimulatedExecutorWrap::SetStpGroupMembership),
+                                            InstanceMethod("stpGroupFor", &SimulatedExecutorWrap::StpGroupFor),
+                                            InstanceMethod("setFokMode", &SimulatedExecutorWrap::SetFokMode),
+                                            InstanceMethod("fokMode", &SimulatedExecutorWrap::FokMode),
+                                            InstanceMethod("setVenueAvailability",
+                                                           &SimulatedExecutorWrap::SetVenueAvailability),
+                                            InstanceMethod("submitBracket",
+                                                           &SimulatedExecutorWrap::SubmitBracket),
+                                            InstanceMethod("cancelBracket",
+                                                           &SimulatedExecutorWrap::CancelBracket),
+                                            InstanceMethod("bracketState",
+                                                           &SimulatedExecutorWrap::BracketState),
+                                            InstanceMethod("setBracketChildArmMode",
+                                                           &SimulatedExecutorWrap::SetBracketChildArmMode),
+                                            InstanceMethod("submitIceberg", &SimulatedExecutorWrap::SubmitIceberg),
+                                            InstanceMethod("setIcebergRefreshLatency",
+                                                           &SimulatedExecutorWrap::SetIcebergRefreshLatency),
+                                            InstanceMethod("icebergHiddenRemainingRaw",
+                                                           &SimulatedExecutorWrap::IcebergHiddenRemainingRaw),
+                                            InstanceMethod("setIcebergSizeRandomisationPct",
+                                                           &SimulatedExecutorWrap::SetIcebergSizeRandomisationPct),
+                                            InstanceMethod("setIcebergPriorityMode",
+                                                           &SimulatedExecutorWrap::SetIcebergPriorityMode),
+                                            InstanceMethod("setIcebergJitterSeed",
+                                                           &SimulatedExecutorWrap::SetIcebergJitterSeed),
+                                            InstanceAccessor("fillCount", &SimulatedExecutorWrap::FillCount, nullptr)}));
   }
 
   SimulatedExecutorWrap(const Napi::CallbackInfo& info)
@@ -186,7 +178,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     double price = argNumber(info[2], "submitOrder: price");
     double qty = argNumber(info[3], "submitOrder: qty");
     std::string type = given(info[4]) ? argString(info[4], "submitOrder: type") : "market";
-    uint32_t sym = info.Length() > 5 ? argUint32(info[5], "submitOrder: symbol") : 1;
+    uint32_t sym = given(info[5]) ? argUint32(info[5], "submitOrder: symbol") : 1;
     uint8_t s = side == "buy" ? 0 : 1;
     // lrvx_simulated_executor_submit_order takes an order_type in the
     // lrvx::OrderType space (LIMIT=0, MARKET=1, ...), NOT the
@@ -206,7 +198,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       uint8_t tif = 0;
       bool reduceOnly = false;
       int64_t expiresAtNs = 0;
-      if (opts.Has("tif"))
+      if (given(opts.Get("tif")))
       {
         std::string tifStr = argString(opts.Get("tif"), "submitOrder: tif");
         if (tifStr == "ioc")
@@ -226,11 +218,11 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
           tif = 4;
         }
       }
-      if (opts.Has("reduceOnly"))
+      if (given(opts.Get("reduceOnly")))
       {
         reduceOnly = argBool(opts.Get("reduceOnly"), "submitOrder: reduceOnly");
       }
-      if (opts.Has("expiresAtNs"))
+      if (given(opts.Get("expiresAtNs")))
       {
         expiresAtNs = toInt64Ns(opts.Get("expiresAtNs"), "submitOrder: expiresAtNs");
       }
@@ -318,8 +310,13 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     }
     else
     {
-      const std::string model =
-          info.Length() > 0 ? info[0].ToString().Utf8Value() : std::string("undefined");
+      if (!info[0].IsString())
+      {
+        throw Napi::TypeError::New(info.Env(), "setDefaultSlippage: model must be one of " +
+                                                   lrvx::slippageModelNameList() +
+                                                   " or a SLIPPAGE_* code");
+      }
+      const std::string model = info[0].As<Napi::String>().Utf8Value();
       const auto parsed = lrvx::slippageModelFromName(model);
       if (!parsed)
       {
@@ -331,10 +328,10 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       }
       m = static_cast<int32_t>(*parsed);
     }
-    int32_t ticks = info.Length() > 1 ? argInt32(info[1], "setDefaultSlippage: ticks") : 0;
-    double tickSize = info.Length() > 2 ? argNumber(info[2], "setDefaultSlippage: tickSize") : 0.0;
-    double bps = info.Length() > 3 ? argNumber(info[3], "setDefaultSlippage: bps") : 0.0;
-    double impact = info.Length() > 4 ? argNumber(info[4], "setDefaultSlippage: impactCoeff") : 0.0;
+    int32_t ticks = given(info[1]) ? argInt32(info[1], "setDefaultSlippage: ticks") : 0;
+    double tickSize = given(info[2]) ? argNumber(info[2], "setDefaultSlippage: tickSize") : 0.0;
+    double bps = given(info[3]) ? argNumber(info[3], "setDefaultSlippage: bps") : 0.0;
+    double impact = given(info[4]) ? argNumber(info[4], "setDefaultSlippage: impactCoeff") : 0.0;
     lrvx_clear_last_error();
     lrvx_simulated_executor_set_default_slippage(_h, m, ticks, tickSize, bps, impact);
     if (lrvx_last_error_code() != 0)
@@ -355,8 +352,13 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     }
     else
     {
-      const std::string model =
-          info.Length() > 0 ? info[0].ToString().Utf8Value() : std::string("undefined");
+      if (!info[0].IsString())
+      {
+        throw Napi::TypeError::New(info.Env(), "setQueueModel: model must be one of " +
+                                                   lrvx::queueModelNameList() +
+                                                   " or a QUEUE_* code");
+      }
+      const std::string model = info[0].As<Napi::String>().Utf8Value();
       const auto parsed = lrvx::queueModelFromName(model);
       if (!parsed)
       {
@@ -367,7 +369,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       }
       m = static_cast<int32_t>(*parsed);
     }
-    uint32_t depth = info.Length() > 1 ? argUint32(info[1], "setQueueModel: depth") : 1;
+    uint32_t depth = given(info[1]) ? argUint32(info[1], "setQueueModel: depth") : 1;
     lrvx_clear_last_error();
     lrvx_simulated_executor_set_queue_model(_h, m, depth);
     if (lrvx_last_error_code() != 0)
@@ -411,19 +413,19 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   void SetSubmitAck(const Napi::CallbackInfo& info)
   {
     int64_t latency = argInteger(info[0], "setSubmitAckLatency: latencyNs");
-    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setSubmitAckLatency: jitterNs") : 0;
+    int64_t jitter = given(info[1]) ? argInteger(info[1], "setSubmitAckLatency: jitterNs") : 0;
     lrvx_simulated_executor_set_submit_ack_latency(_h, latency, jitter);
   }
   void SetCancelAck(const Napi::CallbackInfo& info)
   {
     int64_t latency = argInteger(info[0], "setCancelAckLatency: latencyNs");
-    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setCancelAckLatency: jitterNs") : 0;
+    int64_t jitter = given(info[1]) ? argInteger(info[1], "setCancelAckLatency: jitterNs") : 0;
     lrvx_simulated_executor_set_cancel_ack_latency(_h, latency, jitter);
   }
   void SetReplaceAck(const Napi::CallbackInfo& info)
   {
     int64_t latency = argInteger(info[0], "setReplaceAckLatency: latencyNs");
-    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setReplaceAckLatency: jitterNs") : 0;
+    int64_t jitter = given(info[1]) ? argInteger(info[1], "setReplaceAckLatency: jitterNs") : 0;
     lrvx_simulated_executor_set_replace_ack_latency(_h, latency, jitter);
   }
   void ApplyLatencyProfile(const Napi::CallbackInfo& info)
@@ -527,7 +529,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   {
     auto opts = argObject(info[0], "submitBracket: opts");
     uint64_t bracketId = argInteger(opts.Get("bracketId"), "submitBracket: bracketId");
-    uint32_t sym = opts.Has("symbol") ? argUint32(opts.Get("symbol"), "submitBracket: symbol") : 1;
+    uint32_t sym = given(opts.Get("symbol")) ? argUint32(opts.Get("symbol"), "submitBracket: symbol") : 1;
     auto sideOf = [&](const std::string& key)
     {
       const std::string s = argString(opts.Get(key), ("submitBracket: " + key).c_str());
@@ -596,7 +598,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     double price = argNumber(info[2], "submitIceberg: price");
     double total = argNumber(info[3], "submitIceberg: totalQuantity");
     double visible = argNumber(info[4], "submitIceberg: visibleQuantity");
-    uint32_t sym = info.Length() > 5 ? argUint32(info[5], "submitIceberg: symbol") : 1;
+    uint32_t sym = given(info[5]) ? argUint32(info[5], "submitIceberg: symbol") : 1;
     uint8_t s = side == "buy" ? 0 : 1;
     lrvx_simulated_executor_submit_iceberg(_h, id, s, price, total, visible, sym);
   }
@@ -643,8 +645,8 @@ class BacktestResultWrap : public Napi::ObjectWrap<BacktestResultWrap>
   }
   BacktestResultWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<BacktestResultWrap>(info)
   {
-    double cap = info.Length() > 0 ? argNumber(info[0], "BacktestResult: initialCapital") : 100000.0;
-    double fee = info.Length() > 1 ? argNumber(info[1], "BacktestResult: feeRate") : 0.0001;
+    double cap = given(info[0]) ? argNumber(info[0], "BacktestResult: initialCapital") : 100000.0;
+    double fee = given(info[1]) ? argNumber(info[1], "BacktestResult: feeRate") : 0.0001;
     _h = lrvx_backtest_result_create(cap, fee, 1, 0.0, 0.0, 252.0);
   }
   ~BacktestResultWrap()

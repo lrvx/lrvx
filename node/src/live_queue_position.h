@@ -86,7 +86,7 @@ class LiveQueuePositionEstimatorWrap
         static_cast<uint64_t>(argInteger(info[3], "onOrderPlaced: orderId"));
     double order_qty = argNumber(info[4], "onOrderPlaced: orderQty");
     double level_qty = argNumber(info[5], "onOrderPlaced: levelQtyNow");
-    int64_t ts_ns = info.Length() > 6 ? toInt64Ns(info[6], "onOrderPlaced: tsNs") : 0;
+    int64_t ts_ns = given(info[6]) ? toInt64Ns(info[6], "onOrderPlaced: tsNs") : 0;
     lrvx_live_queue_position_on_order_placed(
         _h, symbol, side, lrvx_price_from_double(price), order_id,
         lrvx_quantity_from_double(order_qty), lrvx_quantity_from_double(level_qty),
@@ -97,7 +97,7 @@ class LiveQueuePositionEstimatorWrap
   {
     uint64_t order_id =
         static_cast<uint64_t>(argInteger(info[0], "onOrderCancelled: orderId"));
-    int64_t ts_ns = info.Length() > 1 ? toInt64Ns(info[1], "onOrderCancelled: tsNs") : 0;
+    int64_t ts_ns = given(info[1]) ? toInt64Ns(info[1], "onOrderCancelled: tsNs") : 0;
     lrvx_live_queue_position_on_order_cancelled(_h, order_id, ts_ns);
   }
 
@@ -106,7 +106,7 @@ class LiveQueuePositionEstimatorWrap
     uint64_t order_id =
         static_cast<uint64_t>(argInteger(info[0], "onOrderFilled: orderId"));
     double cum = argNumber(info[1], "onOrderFilled: cumulativeFill");
-    int64_t ts_ns = info.Length() > 2 ? toInt64Ns(info[2], "onOrderFilled: tsNs") : 0;
+    int64_t ts_ns = given(info[2]) ? toInt64Ns(info[2], "onOrderFilled: tsNs") : 0;
     lrvx_live_queue_position_on_order_filled(_h, order_id,
                                              lrvx_quantity_from_double(cum), ts_ns);
   }
@@ -116,7 +116,7 @@ class LiveQueuePositionEstimatorWrap
     uint32_t symbol = argUint32(info[0], "onTrade: symbol");
     double price = argNumber(info[1], "onTrade: price");
     double qty = argNumber(info[2], "onTrade: qty");
-    int64_t ts_ns = info.Length() > 3 ? toInt64Ns(info[3], "onTrade: tsNs") : 0;
+    int64_t ts_ns = given(info[3]) ? toInt64Ns(info[3], "onTrade: tsNs") : 0;
     lrvx_live_queue_position_on_trade(_h, symbol, lrvx_price_from_double(price),
                                       lrvx_quantity_from_double(qty), ts_ns);
   }
@@ -154,7 +154,7 @@ class LiveQueuePositionEstimatorWrap
     uint8_t side = static_cast<uint8_t>(argUint32(info[1], "onLevelUpdate: side"));
     double price = argNumber(info[2], "onLevelUpdate: price");
     double new_qty = argNumber(info[3], "onLevelUpdate: newQty");
-    int64_t ts_ns = info.Length() > 4 ? toInt64Ns(info[4], "onLevelUpdate: tsNs") : 0;
+    int64_t ts_ns = given(info[4]) ? toInt64Ns(info[4], "onLevelUpdate: tsNs") : 0;
     lrvx_live_queue_position_on_level_update(_h, symbol, side,
                                              lrvx_price_from_double(price),
                                              lrvx_quantity_from_double(new_qty), ts_ns);
@@ -165,7 +165,7 @@ class LiveQueuePositionEstimatorWrap
     auto env = info.Env();
     uint64_t order_id =
         static_cast<uint64_t>(argInteger(info[0], "snapshot: orderId"));
-    int64_t now_ns = info.Length() > 1 ? toInt64Ns(info[1], "snapshot: nowNs") : 0;
+    int64_t now_ns = given(info[1]) ? toInt64Ns(info[1], "snapshot: nowNs") : 0;
     int64_t slots[6] = {0};
     uint8_t ok = lrvx_live_queue_position_snapshot(_h, order_id, now_ns, slots);
     if (!ok)

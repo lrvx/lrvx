@@ -25520,6 +25520,11 @@
         },
         {
           "kind": "method",
+          "name": "orderEventCallback",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "orderLotRaw",
           "parent": "SimulatedExecutor"
         },

@@ -40,11 +40,7 @@ using namespace lrvx;
 class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
 {
  public:
-  static Napi::FunctionReference& Ctor()
-  {
-    static Napi::FunctionReference ref;
-    return ref;
-  }
+  static Napi::FunctionReference& Ctor(Napi::Env env) { return ctorOf<SymbolRegistryNode>(env); }
 
   static Napi::Function Init(Napi::Env env)
   {
@@ -56,7 +52,7 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
                                         InstanceMethod("tickSizeDeclared", &SymbolRegistryNode::tickSizeDeclared),
                                         InstanceMethod("lotSize", &SymbolRegistryNode::lotSize),
                                     });
-    return keepCtor(Ctor(), fn);
+    return keepCtor(Ctor(env), fn);
   }
 
   static SymbolRegistry* of(const Napi::Value& v, const char* what)
@@ -1265,7 +1261,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     auto modelV = opts.Get("slippageModel");
     if (!modelV.IsUndefined())
     {
-      const std::string m = modelV.ToString().Utf8Value();
+      const std::string m = argString(modelV, "BacktestRunner: slippageModel");
       const auto parsed = lrvx::slippageModelFromName(m);
       if (!parsed)
       {
@@ -1815,7 +1811,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     auto env = info.Env();
     auto* reg = SymbolRegistryNode::of(info[0], "Runner: registry");
     auto onSig = argFunction(info[1], "Runner: onSignal");
-    bool threaded = info.Length() > 2 && argBool(info[2], "Runner: threaded");
+    bool threaded = given(info[2]) && argBool(info[2], "Runner: threaded");
 
     if (threaded)
     {
@@ -1981,7 +1977,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       throw Napi::TypeError::New(info.Env(), "onTrade: isBuy must be a boolean");
     }
     bool isBuy = argBool(info[3], "onTrade: isBuy");
-    int64_t ts = info.Length() > 4 ? toInt64Ns(info[4], "onTrade: timestampNs") : 0;
+    int64_t ts = given(info[4]) ? toInt64Ns(info[4], "onTrade: timestampNs") : 0;
     if (_mode == Mode::Sync)
     {
       lrvx_runner_on_trade(_runner, sym, price, qty, isBuy ? 1 : 0, ts);
@@ -2003,7 +1999,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     auto bidQ = argFloat64Array(info[2], "onBookSnapshot: bidQtys");
     auto askP = argFloat64Array(info[3], "onBookSnapshot: askPrices");
     auto askQ = argFloat64Array(info[4], "onBookSnapshot: askQtys");
-    int64_t ts = info.Length() > 5 ? toInt64Ns(info[5], "onBookSnapshot: timestampNs") : 0;
+    int64_t ts = given(info[5]) ? toInt64Ns(info[5], "onBookSnapshot: timestampNs") : 0;
     // The C ABI takes one length per side (bp/bq share bpLen, ap/aq share
     // apLen), so mismatched price/qty arrays on one side used to make the
     // qty side get read at the price side's length.
@@ -2061,7 +2057,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     {
       return info.Env().Undefined();
     }
-    int64_t ts = info.Length() > 3 ? toInt64Ns(info[3], "onBookTop: timestampNs") : 0;
+    int64_t ts = given(info[3]) ? toInt64Ns(info[3], "onBookTop: timestampNs") : 0;
     if (_mode == Mode::Sync)
     {
       lrvx_runner_on_book_top(_runner, sym, hasBid, bidPrice, bidQty, hasAsk, askPrice,
@@ -2372,7 +2368,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     // Detect the built-in BinaryLogRecorderHook wrapper via the cached
     // constructor stored at module init.
     LrvxMarketDataRecorderHandle binlog_handle = nullptr;
-    auto& ctor = node_lrvx::BinaryLogRecorderHookWrap::Ctor();
+    auto& ctor = node_lrvx::BinaryLogRecorderHookWrap::Ctor(env);
     if (!ctor.IsEmpty() && obj.InstanceOf(ctor.Value()))
     {
       auto* hook = Napi::ObjectWrap<node_lrvx::BinaryLogRecorderHookWrap>::Unwrap(obj);
@@ -2521,7 +2517,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       }
       return opts.Get(key).As<Napi::String>().Utf8Value();
     };
-    if (!opts.Has("orderId") || !opts.Has("symbol"))
+    if (!given(opts.Get("orderId")) || !given(opts.Get("symbol")))
     {
       throw Napi::TypeError::New(env, "onOrderEvent: orderId and symbol are required");
     }
@@ -2549,13 +2545,13 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
                                           lrvx::capi::unknownOrderEventStatusMessage(status));
     }
     const auto number = [&](const char* key, const char* what)
-    { return opts.Has(key) ? argNumber(opts.Get(key), what) : 0.0; };
+    { return given(opts.Get(key)) ? argNumber(opts.Get(key), what) : 0.0; };
     ev.fill_qty_raw = lrvx_quantity_from_double(number("fillQty", "onOrderEvent: fillQty"));
     ev.fill_price_raw = lrvx_price_from_double(number("fillPrice", "onOrderEvent: fillPrice"));
-    ev.exchange_ts_ns = opts.Has("tsNs") ? toInt64Ns(opts.Get("tsNs"), "onOrderEvent: tsNs") : 0;
+    ev.exchange_ts_ns = given(opts.Get("tsNs")) ? toInt64Ns(opts.Get("tsNs"), "onOrderEvent: tsNs") : 0;
     const std::string rejectReason = text("rejectReason", "");
     ev.reject_reason = rejectReason.empty() ? nullptr : rejectReason.c_str();
-    if (opts.Has("isMaker"))
+    if (given(opts.Get("isMaker")))
     {
       if (!opts.Get("isMaker").IsBoolean())
       {
@@ -2655,16 +2651,16 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     const auto u8 = [&opts](const char* key, const char* what)
     { return static_cast<uint8_t>(argUint32(opts.Get(key), what)); };
     uint64_t order_id = argUint64(opts.Get("orderId"), "traceOrderEvent: orderId");
-    uint64_t parent = opts.Has("parentSignalId")
+    uint64_t parent = given(opts.Get("parentSignalId"))
                           ? argUint64(opts.Get("parentSignalId"), "traceOrderEvent: parentSignalId")
                           : 0;
     uint32_t sym = argUint32(opts.Get("symbolId"), "traceOrderEvent: symbolId");
     uint8_t kind = u8("eventKind", "traceOrderEvent: eventKind");
     uint8_t side = u8("side", "traceOrderEvent: side");
-    uint8_t order_type = opts.Has("orderType") ? u8("orderType", "traceOrderEvent: orderType") : 0;
-    double price = opts.Has("price") ? argNumber(opts.Get("price"), "traceOrderEvent: price") : 0.0;
-    double qty = opts.Has("qty") ? argNumber(opts.Get("qty"), "traceOrderEvent: qty") : 0.0;
-    uint32_t flags = opts.Has("flags") ? argUint32(opts.Get("flags"), "traceOrderEvent: flags") : 0;
+    uint8_t order_type = given(opts.Get("orderType")) ? u8("orderType", "traceOrderEvent: orderType") : 0;
+    double price = given(opts.Get("price")) ? argNumber(opts.Get("price"), "traceOrderEvent: price") : 0.0;
+    double qty = given(opts.Get("qty")) ? argNumber(opts.Get("qty"), "traceOrderEvent: qty") : 0.0;
+    uint32_t flags = given(opts.Get("flags")) ? argUint32(opts.Get("flags"), "traceOrderEvent: flags") : 0;
     lrvx_runner_trace_order_event(_runner, order_id, parent, sym, kind, side, order_type,
                                   lrvx_price_from_double(price),
                                   lrvx_quantity_from_double(qty), flags);
@@ -2682,13 +2678,13 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     }
     auto opts = argOptions(info, "traceFill");
     uint64_t order_id = argUint64(opts.Get("orderId"), "traceFill: orderId");
-    uint64_t fill_id = opts.Has("fillId") ? argUint64(opts.Get("fillId"), "traceFill: fillId") : 0;
+    uint64_t fill_id = given(opts.Get("fillId")) ? argUint64(opts.Get("fillId"), "traceFill: fillId") : 0;
     double price = argNumber(opts.Get("price"), "traceFill: price");
     double qty = argNumber(opts.Get("qty"), "traceFill: qty");
-    double fee = opts.Has("fee") ? argNumber(opts.Get("fee"), "traceFill: fee") : 0.0;
+    double fee = given(opts.Get("fee")) ? argNumber(opts.Get("fee"), "traceFill: fee") : 0.0;
     uint32_t sym = argUint32(opts.Get("symbolId"), "traceFill: symbolId");
     uint8_t side = static_cast<uint8_t>(argUint32(opts.Get("side"), "traceFill: side"));
-    uint8_t liq = opts.Has("liquidity")
+    uint8_t liq = given(opts.Get("liquidity"))
                       ? static_cast<uint8_t>(argUint32(opts.Get("liquidity"), "traceFill: liquidity"))
                       : 0;
     lrvx_runner_trace_fill(_runner, order_id, fill_id, lrvx_price_from_double(price),
