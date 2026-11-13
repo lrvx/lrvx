@@ -889,8 +889,9 @@ extern "C"
   typedef void (*LrvxExecutorCancelAllFn)(void*, uint32_t);
   typedef void (*LrvxExecutorReplaceFn)(void*, uint64_t, const LrvxOrder*);
   // The two legs carry different ids: the first the id of the strategy's OCO
-  // signal, the second one the runner assigns. Either id names its leg in a
-  // later cancel or replace.
+  // signal, the second one the runner assigns from its own block, counted
+  // from 0x1FFFFF00000001, which no strategy's ids reach. Either id names its
+  // leg in a later cancel or replace.
   typedef void (*LrvxExecutorSubmitOCOFn)(void*, const LrvxOrder*, const LrvxOrder*);
   typedef void (*LrvxExecutorCapabilitiesFn)(void*, LrvxExchangeCapabilities*);
   typedef void (*LrvxExecutorLifecycleFn)(void*);
@@ -1605,6 +1606,12 @@ extern "C"
 
   LrvxLiveEngineHandle lrvx_live_engine_create(LrvxRegistryHandle registry);
   void lrvx_live_engine_destroy(LrvxLiveEngineHandle engine);
+  // Refused, with the reason in lrvx_last_error_message, when a strategy with
+  // the same subscriber id is already attached to this engine (order ids are
+  // (id << 32) + n, so the two would issue the same ids) and when the id is
+  // 2097151 (0x1FFFFF), the block the runner takes its own order ids from.
+  // Nothing is attached then. Call lrvx_clear_last_error first and read
+  // lrvx_last_error_code after.
   void lrvx_live_engine_add_strategy(LrvxLiveEngineHandle engine, LrvxStrategyHandle strategy,
                                      LrvxOnSignalCallback on_signal, void* user_data);
   void lrvx_live_engine_start(LrvxLiveEngineHandle engine);
@@ -1726,10 +1733,25 @@ extern "C"
   int lrvx_funding_schedule_load_profile(LrvxFundingScheduleHandle h, const char* profile_name);
   void lrvx_funding_schedule_set_constant_rate(LrvxFundingScheduleHandle h, double rate);
   void lrvx_funding_schedule_reset(LrvxFundingScheduleHandle h);
+  // Settles the funding events in (last tick, now_ns]: 6 doubles per event in
+  // out_buf (timestamp_ns, symbol, rate, mark_price, position_signed, amount),
+  // at most max_events of them, and returns how many were written. With
+  // out_buf NULL or max_events 0 it returns the number due and settles
+  // nothing, so the call that follows with a buffer still gets them.
   uint32_t lrvx_funding_schedule_tick(LrvxFundingScheduleHandle h, int64_t now_ns,
                                       const uint32_t* symbols, const double* positions,
                                       const double* mark_prices, uint32_t n_symbols,
                                       double* out_buf, uint32_t max_events);
+  // The same walk with each event's timestamp also written to
+  // out_timestamps_ns as an integer: slot 0 of out_buf is a double and cannot
+  // hold a nanosecond epoch exactly. Returns the number of events due. When
+  // that is more than max_events, or a buffer is NULL, nothing is written and
+  // nothing is settled: call again with room for that many.
+  uint32_t lrvx_funding_schedule_tick_exact(LrvxFundingScheduleHandle h, int64_t now_ns,
+                                            const uint32_t* symbols, const double* positions,
+                                            const double* mark_prices, uint32_t n_symbols,
+                                            int64_t* out_timestamps_ns, double* out_buf,
+                                            uint32_t max_events);
 
   // ============================================================
   // Grid Search
@@ -2474,6 +2496,11 @@ extern "C"
   LrvxExportResult lrvx_segment_export(const char* input_path, const char* output_path,
                                        uint8_t format, int64_t from_ns, int64_t to_ns,
                                        const uint32_t* symbols, uint32_t num_symbols);
+  // recompress returns 0, and the two extracts return 0 events, when the
+  // input cannot be read or the output cannot be written, with the reason in
+  // lrvx_last_error_message. An extract that matches nothing also returns 0
+  // and records no error: call lrvx_clear_last_error first and read
+  // lrvx_last_error_code after to tell the two apart.
   uint8_t lrvx_segment_recompress(const char* input_path, const char* output_path,
                                   uint8_t compression);
   uint64_t lrvx_segment_extract_symbols(const char* input_path, const char* output_path,
@@ -2612,6 +2639,11 @@ extern "C"
                                             const LrvxStrategyCallbacks* callbacks);
   void lrvx_strategy_replace_callbacks_p(LrvxStrategyHandle strategy,
                                          const LrvxStrategyCallbacks* callbacks);
+  // The subscriber id a strategy holds, and a way to change it before the
+  // strategy is attached and before it emits: its order ids are
+  // (id << 32) + n.
+  uint32_t lrvx_strategy_id(LrvxStrategyHandle strategy);
+  void lrvx_strategy_set_id(LrvxStrategyHandle strategy, uint32_t id);
 
   // ============================================================
   // Strategyrunner Synchronous
@@ -2620,6 +2652,12 @@ extern "C"
   LrvxRunnerHandle lrvx_runner_create(LrvxRegistryHandle registry, LrvxOnSignalCallback on_signal,
                                       void* user_data);
   void lrvx_runner_destroy(LrvxRunnerHandle runner);
+  // Refused, with the reason in lrvx_last_error_message, when a strategy with
+  // the same subscriber id is already attached here (order ids are
+  // (id << 32) + n, so the two would issue the same ids) and when the id is
+  // 2097151 (0x1FFFFF), the block the runner takes its own order ids from.
+  // Nothing is attached then. Call lrvx_clear_last_error first and read
+  // lrvx_last_error_code after.
   void lrvx_runner_add_strategy(LrvxRunnerHandle runner, LrvxStrategyHandle strategy);
   void lrvx_runner_start(LrvxRunnerHandle runner);
   void lrvx_runner_stop(LrvxRunnerHandle runner);
@@ -2857,8 +2895,10 @@ extern "C"
    * lrvx_walk_forward_run_csv, lrvx_run_reader_open,
    * lrvx_run_recorder_create, lrvx_tape_diff_create,
    * lrvx_merged_tape_reader_create, lrvx_funding_schedule_load_tape, and a
-   * segment merge, split or export that ends with success = 0 -- leave the
-   * reason here beside their failure value. Never NULL -- an empty string
+   * segment merge, split or export that ends with success = 0, a segment
+   * recompress or extract that could not read or write, and a strategy a
+   * runner or engine refuses to attach -- leave the reason here beside their
+   * failure value. Never NULL -- an empty string
    * means nothing has been recorded on this thread. Valid until the next
    * failure on this thread or the next lrvx_clear_last_error. */
   const char* lrvx_last_error_message(void);

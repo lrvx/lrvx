@@ -121,6 +121,11 @@ class Strategy : public IStrategy
 
   SubscriberId id() const override { return _id; }
 
+  // Before the strategy is attached to a bus or a runner, and before it has
+  // emitted: order ids carry the subscriber id, and the ones already issued
+  // keep the old one.
+  void setSubscriberId(SubscriberId id) noexcept { _id = id; }
+
   // Each symbol's entry as the registry held it when the strategy was built, in
   // symbols() order. A copy, so the registry need not outlive the strategy.
   // BacktestRunner reads the declared ticks from here when it is not given a

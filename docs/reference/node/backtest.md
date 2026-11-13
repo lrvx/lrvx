@@ -29,6 +29,9 @@ executor's slippage and latency, the `BacktestConfig` fields camelCased -- `slip
 the Python ones: see [BacktestRunner constructor](../python/strategy.md#constructor). A runner
 built with options refuses `setExecutor`.
 
+`runCsv`, `runOhlcv` and `runBars` take a registered symbol's name. With `symbol` omitted or `''`
+they replay for the first symbol registered.
+
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `setStrategy(strategy)` | `void` | Attach a strategy |

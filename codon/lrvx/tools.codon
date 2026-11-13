@@ -345,6 +345,8 @@ from C import lrvx_data_reader_stats_p(cobj, Ptr[byte])
 
 # MergedTapeReader -- N-tape merged consumption.
 from C import lrvx_last_error_message() -> cobj
+from C import lrvx_clear_last_error()
+from lrvx.abi import last_error
 from C import lrvx_merged_tape_reader_create(Ptr[cobj], u32, i64, i64,
                                               Ptr[u32], u32) -> cobj
 from C import lrvx_merged_tape_reader_destroy(cobj)
@@ -1949,6 +1951,9 @@ class Partitioner:
 
 def recompress_segment(input_path: str, output_path: str,
                        compression: int = 1) -> bool:
+    """False when the input cannot be read or the output cannot be written;
+    last_error() says which."""
+    lrvx_clear_last_error()
     return lrvx_segment_recompress(
         input_path.c_str(), output_path.c_str(), u8(compression)) != u8(0)
 
@@ -1956,6 +1961,7 @@ def recompress_segment(input_path: str, output_path: str,
 def extract_symbols(input_path: str, output_path: str,
                     symbols: List[int]) -> int:
     sym_buf = [u32(s) for s in symbols]
+    lrvx_clear_last_error()
     return int(lrvx_segment_extract_symbols(
         input_path.c_str(), output_path.c_str(),
         sym_buf.arr.ptr, u32(len(sym_buf))))
@@ -1963,6 +1969,7 @@ def extract_symbols(input_path: str, output_path: str,
 
 def extract_time_range(input_path: str, output_path: str,
                        from_ns: int, to_ns: int) -> int:
+    lrvx_clear_last_error()
     return int(lrvx_segment_extract_time_range(
         input_path.c_str(), output_path.c_str(), i64(from_ns), i64(to_ns)))
 

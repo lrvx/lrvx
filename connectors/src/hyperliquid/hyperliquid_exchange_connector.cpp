@@ -212,7 +212,7 @@ void HyperliquidExchangeConnector::loadInstrumentSpecs()
       auto it = specs->find(coin);
       if (it == specs->end())
       {
-        _specs.addError(coin + ": not listed in the meta universe");
+        _specs.addError(coin, "not listed in the meta universe");
         continue;
       }
       _specs.add(coin, it->second);

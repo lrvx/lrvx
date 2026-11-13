@@ -172,20 +172,20 @@ void PolymarketExchangeConnector::loadInstrumentSpecs()
     // the same timeout inside start().
     if (!unreachable.empty())
     {
-      _specs.addError(tokenId + ": not requested, " + unreachable);
+      _specs.addError(tokenId, "not requested, " + unreachable);
       continue;
     }
     auto body = fetch(_config.instrumentInfoUrl + "/tick-size?token_id=" + tokenId, "");
     if (!body)
     {
-      _specs.addError(tokenId + ": " + body.error());
+      _specs.addError(tokenId, body.error());
       unreachable = "the previous request failed";
       continue;
     }
     auto spec = instrument_info::parsePolymarketTickSize(*body);
     if (!spec)
     {
-      _specs.addError(tokenId + ": " + spec.error());
+      _specs.addError(tokenId, spec.error());
       continue;
     }
     _specs.add(tokenId, *spec);

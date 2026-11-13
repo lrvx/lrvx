@@ -4,7 +4,7 @@
 # The C ABI handshake runs when this module is imported: see
 # lrvx/abi.codon. Every module that declares a `from C import`
 # pulls it in, so no entry point into the binding skips it.
-from lrvx.abi import check_abi_version
+from lrvx.abi import check_abi_version, last_error
 
 from C import lrvx_funding_schedule_create() -> cobj
 from C import lrvx_funding_schedule_destroy(cobj)
@@ -14,7 +14,8 @@ from C import lrvx_funding_schedule_load_tape(cobj, cobj) -> u8
 from C import lrvx_funding_schedule_load_profile(cobj, cobj) -> i32
 from C import lrvx_funding_schedule_set_constant_rate(cobj, f64)
 from C import lrvx_funding_schedule_reset(cobj)
-from C import lrvx_funding_schedule_tick(cobj, i64, cobj, cobj, cobj, u32, cobj, u32) -> u32
+from C import lrvx_funding_schedule_tick_exact(cobj, i64, cobj, cobj, cobj, u32, cobj, cobj, u32) -> u32
+from C import lrvx_clear_last_error()
 
 
 def _cstr(s: str) -> cobj:
@@ -71,7 +72,9 @@ class FundingSchedule:
             self._h, cobj(ts.arr.ptr), cobj(sy.arr.ptr), cobj(rs.arr.ptr), u32(n))
 
     def load_tape(self, path: str) -> bool:
-        """Read CSV with columns timestamp_ns, symbol, funding_rate."""
+        """Read CSV with columns timestamp_ns, symbol, funding_rate. False
+        when the file cannot be opened; lrvx.abi.last_error() then names it."""
+        lrvx_clear_last_error()
         return bool(int(lrvx_funding_schedule_load_tape(self._h, _cstr(path))))
 
     def load_profile(self, name: str):
@@ -92,21 +95,29 @@ class FundingSchedule:
         sy = [u32(s) for s in symbols]
         ps = [f64(p) for p in positions]
         mp = [f64(m) for m in mark_prices]
-        # First call: learn the event count.
-        count = int(lrvx_funding_schedule_tick(
+        # One call settles and hands over; a second is made only when more
+        # events were due than the first had room for, and that first one
+        # settled nothing.
+        room = 16
+        ts = [i64(0)] * room
+        buf = [f64(0.0)] * (room * 6)
+        count = int(lrvx_funding_schedule_tick_exact(
             self._h, i64(now_ns), cobj(sy.arr.ptr), cobj(ps.arr.ptr),
-            cobj(mp.arr.ptr), u32(n), cobj(), u32(0)))
-        if count == 0:
-            return []
-        buf = [f64(0.0)] * (count * 6)
-        lrvx_funding_schedule_tick(
-            self._h, i64(now_ns), cobj(sy.arr.ptr), cobj(ps.arr.ptr),
-            cobj(mp.arr.ptr), u32(n), cobj(buf.arr.ptr), u32(count))
+            cobj(mp.arr.ptr), u32(n), cobj(ts.arr.ptr), cobj(buf.arr.ptr),
+            u32(room)))
+        if count > room:
+            room = count
+            ts = [i64(0)] * room
+            buf = [f64(0.0)] * (room * 6)
+            count = int(lrvx_funding_schedule_tick_exact(
+                self._h, i64(now_ns), cobj(sy.arr.ptr), cobj(ps.arr.ptr),
+                cobj(mp.arr.ptr), u32(n), cobj(ts.arr.ptr), cobj(buf.arr.ptr),
+                u32(room)))
         out = list[FundingPayment]()
         for i in range(count):
             base = i * 6
             out.append(FundingPayment(
-                timestamp_ns=int(buf[base + 0]),
+                timestamp_ns=int(ts[i]),
                 symbol=int(buf[base + 1]),
                 rate=float(buf[base + 2]),
                 mark_price=float(buf[base + 3]),

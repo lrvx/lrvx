@@ -1,0 +1,128 @@
+# Smoke test: strategies on one Runner hold different subscriber ids.
+#
+# Strategy.__init__ defaulted strategy_id to 1 and order ids are
+# (strategy_id << 32) + n, so two default-constructed strategies on one Runner
+# issued the same order ids, and the Runner took both.
+#   * two default strategies on one Runner number their orders apart
+#   * the same holds when they are constructed with the registry
+#   * an explicit id is kept, and a default strategy steps around it
+#   * a second strategy with an explicit id the Runner holds is refused
+#   * a BacktestRunner still gives a default strategy id 1
+
+from C import lrvx_registry_create() -> cobj
+from C import lrvx_registry_destroy(cobj)
+from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+
+from lrvx.runner import Runner, BacktestRunner, Signal
+from lrvx.strategy import Strategy, SymbolContext
+from lrvx.types import TradeData
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+def on_signal(sig: Signal):
+    pass
+
+
+# Every strategy here is an instance of this subclass; the program never runs
+# a plain base Strategy.
+class Quiet(Strategy):
+    trades: int
+
+    def __init__(self, symbols: List[int], strategy_id: int = -1, registry: cobj = cobj()):
+        super().__init__(symbols, strategy_id, registry)
+        self.trades = 0
+
+    def on_trade(self, ctx: SymbolContext, trade: TradeData):
+        self.trades += 1
+
+
+reg = lrvx_registry_create()
+sym = int(lrvx_registry_add_symbol(reg, "test".c_str(), "BTCUSDT".c_str(), 0.01))
+
+# Constructed without a registry: the handle is made when the Runner attaches.
+runner = Runner(reg, on_signal)
+a = Quiet([sym])
+b = Quiet([sym])
+runner.add_strategy(a)
+runner.add_strategy(b)
+ida = a.emit_limit_buy(sym, 100.0, 1.0)
+idb = b.emit_limit_buy(sym, 100.0, 1.0)
+check(ida != idb, "two default strategies do not share an order id")
+check((ida >> 32) == 1, "the first default strategy holds id 1")
+check((idb >> 32) == 2, "the second holds id 2")
+check((ida & 0xFFFFFFFF) == (idb & 0xFFFFFFFF), "each counts its own orders from 1")
+
+# Constructed with the registry: the handle already exists and takes the id.
+runner2 = Runner(reg, on_signal)
+c = Quiet([sym], registry=reg)
+d = Quiet([sym], registry=reg)
+runner2.add_strategy(c)
+runner2.add_strategy(d)
+idc = c.emit_limit_buy(sym, 100.0, 1.0)
+idd = d.emit_limit_buy(sym, 100.0, 1.0)
+check((idc >> 32) == 1 and (idd >> 32) == 2, "strategies built with a registry too")
+
+# An explicit id is kept; a default strategy takes the lowest id still free.
+runner3 = Runner(reg, on_signal)
+explicit = Quiet([sym], strategy_id=1)
+auto = Quiet([sym])
+zero = Quiet([sym], strategy_id=0)
+runner3.add_strategy(explicit)
+runner3.add_strategy(auto)
+runner3.add_strategy(zero)
+check((explicit.emit_limit_buy(sym, 100.0, 1.0) >> 32) == 1, "an explicit id is kept")
+check((auto.emit_limit_buy(sym, 100.0, 1.0) >> 32) == 2, "a default one steps around it")
+check((zero.emit_limit_buy(sym, 100.0, 1.0) >> 32) == 0, "0 is an id like any other")
+
+# The same explicit id twice is an error at add time.
+refused = False
+reason = ""
+try:
+    runner3.add_strategy(Quiet([sym], strategy_id=1))
+except ValueError as e:
+    refused = True
+    reason = str(e)
+check(refused, "a second strategy with an explicit id the Runner holds is refused")
+check("subscriber id 1" in reason, "and the error names the id: " + reason)
+
+# Threaded mode refuses it the same way.
+live = Runner(reg, on_signal, True)
+live.add_strategy(Quiet([sym], strategy_id=5))
+live_refused = False
+try:
+    live.add_strategy(Quiet([sym], strategy_id=5))
+except ValueError as e:
+    live_refused = True
+check(live_refused, "a threaded Runner refuses a duplicate id as well")
+
+# A backtest has one strategy and its ids do not move.
+bt = BacktestRunner(reg, 0.0, 10_000.0)
+solo = Quiet([sym])
+bt.set_strategy(solo)
+check((solo.emit_limit_buy(sym, 100.0, 1.0) >> 32) == 1, "a default strategy in a backtest holds id 1")
+bt.close()
+
+block_refused = False
+bt2 = BacktestRunner(reg, 0.0, 10_000.0)
+try:
+    bt2.set_strategy(Quiet([sym], strategy_id=2097151))
+except ValueError as e:
+    block_refused = True
+check(block_refused, "the id of the runner's own order-id block is refused")
+bt2.close()
+
+lrvx_registry_destroy(reg)
+
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")

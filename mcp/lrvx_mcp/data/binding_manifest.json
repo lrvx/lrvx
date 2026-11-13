@@ -1223,6 +1223,11 @@
           "name": "lrvx_funding_schedule_tick"
         },
         {
+          "group": "funding_schedule",
+          "kind": "function",
+          "name": "lrvx_funding_schedule_tick_exact"
+        },
+        {
           "group": "context_queries",
           "kind": "function",
           "name": "lrvx_get_order_status"
@@ -3438,6 +3443,11 @@
           "name": "lrvx_strategy_get_bar_ring_capacity"
         },
         {
+          "group": "strategy_lifecycle",
+          "kind": "function",
+          "name": "lrvx_strategy_id"
+        },
+        {
           "group": "multi_tf_helpers",
           "kind": "function",
           "name": "lrvx_strategy_last_closed_bar"
@@ -3461,6 +3471,11 @@
           "group": "multi_tf_helpers",
           "kind": "function",
           "name": "lrvx_strategy_set_bar_ring_capacity"
+        },
+        {
+          "group": "strategy_lifecycle",
+          "kind": "function",
+          "name": "lrvx_strategy_set_id"
         },
         {
           "group": "indicatorgraph",
@@ -5024,6 +5039,10 @@
         {
           "kind": "function",
           "name": "kurtosis"
+        },
+        {
+          "kind": "function",
+          "name": "last_error"
         },
         {
           "kind": "function",
@@ -8004,6 +8023,11 @@
         },
         {
           "kind": "method",
+          "name": "_take_auto_id",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "bar_ring_capacity",
           "parent": "Strategy"
         },
@@ -9727,6 +9751,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_funding_schedule_tick"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_funding_schedule_tick_exact"
         },
         {
           "kind": "c_import",
@@ -11502,6 +11530,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_strategy_id"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_strategy_last_closed_bar"
         },
         {
@@ -11519,6 +11551,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_strategy_set_bar_ring_capacity"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_strategy_set_id"
         },
         {
           "kind": "c_import",
@@ -18571,6 +18607,11 @@
         },
         {
           "kind": "method",
+          "name": "cursor",
+          "parent": "FundingSchedule"
+        },
+        {
+          "kind": "method",
           "name": "intervalNs",
           "parent": "FundingSchedule"
         },
@@ -18617,6 +18658,11 @@
         {
           "kind": "method",
           "name": "reset",
+          "parent": "FundingSchedule"
+        },
+        {
+          "kind": "method",
+          "name": "restoreCursor",
           "parent": "FundingSchedule"
         },
         {
@@ -26056,6 +26102,11 @@
         },
         {
           "kind": "method",
+          "name": "setSubscriberId",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "symbol",
           "parent": "Strategy"
         },
@@ -28432,6 +28483,10 @@
         {
           "kind": "function",
           "name": "kurtosis"
+        },
+        {
+          "kind": "function",
+          "name": "lastError"
         },
         {
           "kind": "function",
@@ -35479,6 +35534,10 @@
         },
         {
           "kind": "function",
+          "name": "last_error"
+        },
+        {
+          "kind": "function",
           "name": "list_indicators"
         },
         {
@@ -40452,6 +40511,10 @@
         },
         {
           "kind": "function",
+          "name": "lastError"
+        },
+        {
+          "kind": "function",
           "name": "loadCsv"
         },
         {
@@ -41349,6 +41412,10 @@
         {
           "kind": "global",
           "name": "__lrvx_l3_remove_order"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_last_error"
         },
         {
           "kind": "global",
@@ -43738,7 +43805,8 @@
         "lrvx_funding_schedule_set_constant_rate",
         "lrvx_funding_schedule_set_tape",
         "lrvx_funding_schedule_set_tape_by_symbol",
-        "lrvx_funding_schedule_tick"
+        "lrvx_funding_schedule_tick",
+        "lrvx_funding_schedule_tick_exact"
       ],
       "codon": {
         "present": true,
@@ -45469,8 +45537,10 @@
         "lrvx_strategy_create",
         "lrvx_strategy_create_p",
         "lrvx_strategy_destroy",
+        "lrvx_strategy_id",
         "lrvx_strategy_replace_callbacks",
-        "lrvx_strategy_replace_callbacks_p"
+        "lrvx_strategy_replace_callbacks_p",
+        "lrvx_strategy_set_id"
       ],
       "codon": {
         "present": true,

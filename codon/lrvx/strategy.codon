@@ -7,6 +7,7 @@
 from lrvx.abi import check_abi_version
 
 from C import lrvx_strategy_create_p(u32, Ptr[u32], u32, cobj, cobj) -> cobj
+from C import lrvx_strategy_set_id(cobj, u32)
 from C import lrvx_registry_get_symbol_name(cobj, u32, cobj, int, cobj, int) -> u8
 from C import lrvx_strategy_destroy(cobj)
 from C import lrvx_emit_market_buy(cobj, u32, i64) -> u64
@@ -90,6 +91,9 @@ class Strategy:
 
     _handle: cobj
     _strategy_id: int
+    # True when the constructor was given no strategy_id: a Runner then picks
+    # one no other strategy attached to it holds.
+    _auto_id: bool
     _symbols: List[int]
     _symbol_names: List[str]
     _symbol_map: Dict[str, int]
@@ -99,11 +103,18 @@ class Strategy:
     # the trampolines; see dispatch.bind_callbacks for why.
     _suppress_start: bool
 
-    def __init__(self, symbols: List[int], strategy_id: int = 1,
+    def __init__(self, symbols: List[int], strategy_id: int = -1,
                  registry: cobj = cobj()):
         """Construct a strategy bound to a registry. Without an attached
         runner the handle is created but has no event source; pass it
-        into a Runner to drive trades / bars."""
+        into a Runner to drive trades / bars.
+
+        strategy_id is the subscriber id: order ids are
+        (strategy_id << 32) + n. Left out, it is 1 until the strategy is
+        added to a Runner, which gives it the lowest id from 1 that no
+        strategy on that Runner holds, so default-constructed strategies on
+        one Runner number their orders apart. Given, it is kept, and a Runner
+        that already holds that id refuses the strategy."""
         self._symbols = symbols
         self._symbol_names = list[str]()
         self._symbol_map = dict[str, int]()
@@ -114,7 +125,8 @@ class Strategy:
         # on_market_position_change, user_data, on_touch). Zero-initialise —
         # overrides happen on the C++ side via the BridgeStrategy that
         # the runner attaches to this handle.
-        self._strategy_id = strategy_id
+        self._auto_id = strategy_id < 0
+        self._strategy_id = 1 if strategy_id < 0 else strategy_id
         self._suppress_start = False
         self._callbacks_buf = Ptr[byte](_CALLBACKS_BYTES)
         for i in range(_CALLBACKS_BYTES):
@@ -163,6 +175,20 @@ class Strategy:
             if name != "":
                 self._symbol_map[name] = sym
                 self._reverse_map[sym] = name
+
+    def _take_auto_id(self, taken: List[int]):
+        """Called by a Runner before it attaches the strategy: a strategy
+        constructed without an id moves to the lowest id from 1 not in
+        `taken`. Its orders so far, if any, keep the ids they have."""
+        if not self._auto_id:
+            return
+        free = 1
+        while free in taken:
+            free += 1
+        if free != self._strategy_id:
+            self._strategy_id = free
+            if self._handle != cobj():
+                lrvx_strategy_set_id(self._handle, u32(free))
 
     def _rebuild_handle(self, registry: cobj):
         """Create the handle for a strategy that was constructed without a

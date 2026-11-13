@@ -126,6 +126,12 @@ void BacktestRunner::setStrategy(IStrategy* strategy)
     LRVX_LOG_ERROR("BacktestRunner: setStrategy(nullptr) ignored");
     return;
   }
+  if (strategy->id() == kRunnerOrderIdSubscriber)
+  {
+    throw std::invalid_argument(
+        "subscriber id " + std::to_string(kRunnerOrderIdSubscriber) +
+        " is the block the runner takes its own order ids from; give the strategy another id");
+  }
   _strategy = strategy;
   strategy->setSignalHandler(this);
   // The symbols an lrvx::Strategy was built with, so its ticks are checked
@@ -202,7 +208,7 @@ void BacktestRunner::resetRunState()
   {
     _venueClock->reset();
   }
-  _nextOrderId = 1;
+  _nextOrderId = kRunnerOrderIdBase + 1;
   _customOrders.clear();
   _orderSymbols.clear();
   _eventCount = 0;

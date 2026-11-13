@@ -62,7 +62,7 @@ Runner(registry: cobj, on_signal, threaded: bool = False)
 
 | Method | Description |
 |--------|-------------|
-| `add_strategy(strategy)` | Register a strategy instance and install its event callbacks |
+| `add_strategy(strategy)` | Register a strategy instance and install its event callbacks. A strategy constructed without a `strategy_id` is given one no other strategy on this runner holds; raises `ValueError` when the strategy's explicit id is already attached here |
 | `start()` | Start the runner |
 | `stop()` | Stop and clean up |
 | `on_trade(symbol, price, qty, is_buy, ts_ns)` | Push a trade tick |
@@ -112,6 +112,9 @@ names and meaning of the Python runner (see
 `lrvx.latency` and must outlive the runner. An invalid setting raises `ValueError`.
 
 ### Methods
+
+`run_csv`, `run_ohlcv` and `run_bars` take a registered symbol's name. With `symbol=""` they
+replay for the first symbol registered.
 
 | Method | Returns | Description |
 |--------|---------|-------------|

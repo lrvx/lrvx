@@ -5,6 +5,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/replay/ops/partitioner.h"
 #include "lrvx/replay/ops/segment_ops.h"
 #include "lrvx/replay/ops/validator.h"
@@ -364,10 +365,15 @@ inline void bindSegmentOps(py::module_& m)
       [](const std::string& inputPath, const std::string& outputPath,
          const std::string& compression)
       {
+        // The three below go through the C API, which leaves the reason for
+        // a False or a 0 where lrvx.last_error() reads it. The record is per
+        // thread and releasing the GIL does not change threads.
+        const uint8_t codec = parseCompression(compression) == CompressionType::LZ4 ? 1 : 0;
         bool ok;
+        lrvx_clear_last_error();
         {
           py::gil_scoped_release release;
-          ok = SegmentOps::recompress(inputPath, outputPath, parseCompression(compression));
+          ok = lrvx_segment_recompress(inputPath.c_str(), outputPath.c_str(), codec) != 0;
         }
         return ok;
       },
@@ -378,15 +384,13 @@ inline void bindSegmentOps(py::module_& m)
       [](const std::string& inputPath, const std::string& outputPath,
          std::vector<uint32_t> symbols)
       {
-        std::set<uint32_t> symSet(symbols.begin(), symbols.end());
-        WriterConfig wc;
-        wc.output_dir = std::filesystem::path(outputPath).parent_path();
-        wc.output_filename = std::filesystem::path(outputPath).filename().string();
-
         uint64_t count;
+        lrvx_clear_last_error();
         {
           py::gil_scoped_release release;
-          count = SegmentOps::extractSymbols(inputPath, outputPath, symSet, wc);
+          count = lrvx_segment_extract_symbols(inputPath.c_str(), outputPath.c_str(),
+                                               symbols.data(),
+                                               static_cast<uint32_t>(symbols.size()));
         }
         return count;
       },
@@ -397,14 +401,12 @@ inline void bindSegmentOps(py::module_& m)
       [](const std::string& inputPath, const std::string& outputPath,
          int64_t fromNs, int64_t toNs)
       {
-        WriterConfig wc;
-        wc.output_dir = std::filesystem::path(outputPath).parent_path();
-        wc.output_filename = std::filesystem::path(outputPath).filename().string();
-
         uint64_t count;
+        lrvx_clear_last_error();
         {
           py::gil_scoped_release release;
-          count = SegmentOps::extractTimeRange(inputPath, outputPath, fromNs, toNs, wc);
+          count = lrvx_segment_extract_time_range(inputPath.c_str(), outputPath.c_str(), fromNs,
+                                                  toNs);
         }
         return count;
       },

@@ -86,6 +86,7 @@ public:
 
   // Utilities
   void clear();
+  // In registration order (ascending id).
   std::vector<SymbolInfo> getAllSymbols() const;
   size_t size() const;
 };

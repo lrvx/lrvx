@@ -533,6 +533,20 @@ LrvxStrategyHandle lrvx_strategy_create(uint32_t id, const uint32_t* symbols,
   LRVX_CAPI_LEAVE;
 }
 
+void lrvx_strategy_set_id(LrvxStrategyHandle strategy, uint32_t id)
+{
+  LRVX_CAPI_ENTER_VOID(strategy);
+  toStrategy(strategy)->setSubscriberId(static_cast<SubscriberId>(id));
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+uint32_t lrvx_strategy_id(LrvxStrategyHandle strategy)
+{
+  LRVX_CAPI_ENTER(strategy);
+  return static_cast<uint32_t>(toStrategy(strategy)->id());
+  LRVX_CAPI_LEAVE;
+}
+
 LrvxStrategyHandle lrvx_strategy_create_p(uint32_t id, const uint32_t* symbols,
                                           uint32_t num_symbols, LrvxRegistryHandle registry,
                                           const LrvxStrategyCallbacks* callbacks)
@@ -5366,8 +5380,14 @@ uint8_t lrvx_segment_recompress(const char* input_path, const char* output_path,
   LRVX_CAPI_ENTER_NOHANDLE;
   LRVX_CAPI_REQUIRE(input_path);
   LRVX_CAPI_REQUIRE(output_path);
-  return replay::SegmentOps::recompress(input_path, output_path, toCompression(compression)) ? 1
-                                                                                             : 0;
+  std::string error;
+  const bool ok =
+      replay::SegmentOps::recompress(input_path, output_path, toCompression(compression), &error);
+  if (!ok)
+  {
+    lrvxCapiNoteException(__func__, error.empty() ? "failed" : error.c_str());
+  }
+  return ok ? 1 : 0;
   LRVX_CAPI_LEAVE;
 }
 
@@ -5377,12 +5397,23 @@ uint64_t lrvx_segment_extract_symbols(const char* input_path, const char* output
   LRVX_CAPI_ENTER_NOHANDLE;
   LRVX_CAPI_REQUIRE(input_path);
   LRVX_CAPI_REQUIRE(output_path);
-  std::set<uint32_t> symSet(symbols, symbols + num_symbols);
+  std::set<uint32_t> symSet;
+  if (symbols != nullptr)
+  {
+    symSet.insert(symbols, symbols + num_symbols);
+  }
   replay::WriterConfig wc;
   auto out = std::filesystem::path(output_path);
   wc.output_dir = out.parent_path();
   wc.output_filename = out.filename().string();
-  return replay::SegmentOps::extractSymbols(input_path, output_path, symSet, wc);
+  std::string error;
+  const uint64_t written =
+      replay::SegmentOps::extractSymbols(input_path, output_path, symSet, wc, &error);
+  if (!error.empty())
+  {
+    lrvxCapiNoteException(__func__, error.c_str());
+  }
+  return written;
   LRVX_CAPI_LEAVE;
 }
 
@@ -5396,7 +5427,14 @@ uint64_t lrvx_segment_extract_time_range(const char* input_path, const char* out
   auto out = std::filesystem::path(output_path);
   wc.output_dir = out.parent_path();
   wc.output_filename = out.filename().string();
-  return replay::SegmentOps::extractTimeRange(input_path, output_path, from_ns, to_ns, wc);
+  std::string error;
+  const uint64_t written = replay::SegmentOps::extractTimeRange(input_path, output_path, from_ns,
+                                                                to_ns, wc, nullptr, &error);
+  if (!error.empty())
+  {
+    lrvxCapiNoteException(__func__, error.c_str());
+  }
+  return written;
   LRVX_CAPI_LEAVE;
 }
 
@@ -6916,10 +6954,99 @@ inline LrvxOrder signalToLrvxOrder(const Signal& sig) noexcept
   return fo;
 }
 
+// Orders handed to an executor, by id, and the ids of the OCO second legs
+// sent to it. One per executor path: a runner has one handler and one of
+// these, a live engine gives every strategy its own handler and all of them
+// this one record, because they share the executor and a strategy may modify
+// or cancel an order another one placed. Nothing here hears of a fill, so an
+// entry stays until its cancel or until the executor is swapped. Signals
+// arrive from more than one consumer thread, hence the lock.
+class ForwardedOrders
+{
+ public:
+  void put(const LrvxOrder& order)
+  {
+    std::lock_guard lock(_mutex);
+    _orders[order.id] = order;
+  }
+  void erase(uint64_t id)
+  {
+    std::lock_guard lock(_mutex);
+    _orders.erase(id);
+  }
+  void eraseSymbol(uint32_t symbol)
+  {
+    std::lock_guard lock(_mutex);
+    // order: not observable -- every order of the symbol is dropped
+    std::erase_if(_orders,
+                  [&](const auto& entry)
+                  { return entry.second.symbol == symbol; });
+  }
+  void clear()
+  {
+    std::lock_guard lock(_mutex);
+    _orders.clear();
+  }
+  // Applies `change` to the order on record under `id`, in place, and
+  // returns the result; nullopt when the id is not on record.
+  template <typename Change>
+  std::optional<LrvxOrder> update(uint64_t id, Change&& change)
+  {
+    std::lock_guard lock(_mutex);
+    const auto it = _orders.find(id);
+    if (it == _orders.end())
+    {
+      return std::nullopt;
+    }
+    change(it->second);
+    return it->second;
+  }
+  // From the runner's own block, as the backtest runner counts them, so no
+  // strategy's (subscriber id << 32) + n can equal one.
+  uint64_t nextLegId() noexcept { return _nextLegId.fetch_add(1, std::memory_order_relaxed); }
+
+ private:
+  std::mutex _mutex;
+  std::unordered_map<uint64_t, LrvxOrder> _orders;
+  std::atomic<uint64_t> _nextLegId{lrvx::kRunnerOrderIdBase + 1};
+};
+
+// What a runner or a live engine refuses to attach: a strategy whose
+// subscriber id is already attached there would issue the same order ids as
+// the first, and one holding the runner's own block would issue the ids of
+// OCO second legs.
+static void requireAttachableId(const std::vector<BridgeStrategy*>& attached,
+                                const BridgeStrategy* s)
+{
+  if (s->id() == lrvx::kRunnerOrderIdSubscriber)
+  {
+    throw std::invalid_argument(
+        "subscriber id " + std::to_string(s->id()) +
+        " is the block the runner takes its own order ids from; give the strategy another id");
+  }
+  for (const auto* other : attached)
+  {
+    if (other->id() == s->id())
+    {
+      throw std::invalid_argument(
+          "a strategy with subscriber id " + std::to_string(s->id()) +
+          " is already attached; order ids are (subscriber id << 32) + n, so the two would "
+          "issue the same ids. Give each strategy its own id");
+    }
+  }
+}
+
 class RunnerSignalHandler : public ISignalHandler
 {
  public:
-  RunnerSignalHandler(LrvxOnSignalCallback cb, void* ud) : _cb(cb), _ud(ud) {}
+  RunnerSignalHandler(LrvxOnSignalCallback cb, void* ud,
+                      std::shared_ptr<ForwardedOrders> forwarded =
+                          std::make_shared<ForwardedOrders>())
+      : _cb(cb), _ud(ud), _forwarded(std::move(forwarded))
+  {
+  }
+
+  ForwardedOrders& forwarded() noexcept { return *_forwarded; }
 
   // Set or clear the optional pre-trade hooks. Safe to call from any
   // thread while consumer threads are active: the handle is resolved to a
@@ -6947,12 +7074,10 @@ class RunnerSignalHandler : public ISignalHandler
   {
     _sink.set(TrackerRegistry<LrvxStorageSinkImpl>::lookup(s));
   }
+  // The owner clears the forwarded-order record when it swaps the executor;
+  // a handler that only joins an engine's executor must leave it alone.
   void setExecutor(LrvxExecutorImpl* e)
   {
-    {
-      std::lock_guard lock(_forwardedMutex);
-      _forwarded.clear();
-    }
     _executor.set(TrackerRegistry<LrvxExecutorImpl>::lookup(e));
   }
   void setTraceRecorder(void* rec) noexcept
@@ -7175,8 +7300,7 @@ class RunnerSignalHandler : public ISignalHandler
           // A market order never rests, so there is nothing of it to modify.
           if (sig.type != SignalType::Market)
           {
-            std::lock_guard lock(_forwardedMutex);
-            _forwarded[fo.id] = fo;
+            _forwarded->put(fo);
           }
           if (exec->cb.submit != nullptr)
           {
@@ -7186,10 +7310,7 @@ class RunnerSignalHandler : public ISignalHandler
         }
         case SignalType::Cancel:
         {
-          {
-            std::lock_guard lock(_forwardedMutex);
-            _forwarded.erase(sig.orderId);
-          }
+          _forwarded->erase(sig.orderId);
           if (exec->cb.cancel != nullptr)
           {
             exec->cb.cancel(exec->cb.user_data, sig.orderId);
@@ -7198,13 +7319,7 @@ class RunnerSignalHandler : public ISignalHandler
         }
         case SignalType::CancelAll:
         {
-          {
-            std::lock_guard lock(_forwardedMutex);
-            // order: not observable -- every order of the symbol is dropped
-            std::erase_if(_forwarded,
-                          [&](const auto& entry)
-                          { return entry.second.symbol == sig.symbol; });
-          }
+          _forwarded->eraseSymbol(sig.symbol);
           if (exec->cb.cancel_all != nullptr)
           {
             exec->cb.cancel_all(exec->cb.user_data, sig.symbol);
@@ -7223,19 +7338,17 @@ class RunnerSignalHandler : public ISignalHandler
         case SignalType::OCO:
         {
           // Two limit orders, as in the backtest runner: the first keeps the
-          // signal's id and price, the second takes an id of the handler's
-          // own and the signal's second price, which travels in triggerPrice.
+          // signal's id and price, the second takes an id from the runner's
+          // own block and the signal's second price, which travels in
+          // triggerPrice.
           LrvxOrder fo1 = signalToLrvxOrder(sig);
           fo1.type = static_cast<uint8_t>(OrderType::LIMIT);
           LrvxOrder fo2 = fo1;
-          fo2.id = nextLegId();
+          fo2.id = _forwarded->nextLegId();
           fo2.price_raw = sig.triggerPrice.raw();
           fo2.trigger_price_raw = 0;
-          {
-            std::lock_guard lock(_forwardedMutex);
-            _forwarded[fo1.id] = fo1;
-            _forwarded[fo2.id] = fo2;
-          }
+          _forwarded->put(fo1);
+          _forwarded->put(fo2);
           if (exec->cb.submit_oco != nullptr)
           {
             exec->cb.submit_oco(exec->cb.user_data, &fo1, &fo2);
@@ -7267,62 +7380,46 @@ class RunnerSignalHandler : public ISignalHandler
  private:
   // A Modify signal names an order and its new price and quantity, nothing
   // else. This is that order as it was forwarded, with the two fields
-  // changed: same id, symbol, side and type. An id this handler never
-  // forwarded (or has since seen cancelled) still goes out under that id.
+  // changed: same id, symbol, side and type. An id nothing on this executor
+  // path forwarded (or that has since been cancelled) still goes out under
+  // that id.
   LrvxOrder modifiedOrder(const Signal& sig)
   {
+    // The one price a Modify carries is the price the order works at, as
+    // in the backtest runner: the trigger of a stop, take-profit or trailing
+    // order that fills at market, the limit of everything else.
+    const auto apply = [&sig](LrvxOrder& fo)
+    {
+      switch (static_cast<OrderType>(fo.type))
+      {
+        case OrderType::STOP_MARKET:
+        case OrderType::TAKE_PROFIT_MARKET:
+        case OrderType::TRAILING_STOP:
+          fo.trigger_price_raw = sig.newPrice.raw();
+          break;
+        default:
+          fo.price_raw = sig.newPrice.raw();
+          break;
+      }
+      fo.quantity_raw = sig.newQuantity.raw();
+      // The replacement is a fresh order: newQuantity is what is left to work.
+      fo.filled_quantity_raw = 0;
+    };
+    if (const auto known = _forwarded->update(sig.orderId, apply))
+    {
+      return *known;
+    }
     LrvxOrder fo{};
     fo.id = sig.orderId;
     fo.symbol = sig.symbol;
     fo.type = static_cast<uint8_t>(OrderType::LIMIT);
-    std::lock_guard lock(_forwardedMutex);
-    const auto it = _forwarded.find(sig.orderId);
-    if (it != _forwarded.end())
-    {
-      fo = it->second;
-    }
-    // The one price a Modify carries is the price the order works at, as
-    // in the backtest runner: the trigger of a stop, take-profit or trailing
-    // order that fills at market, the limit of everything else.
-    switch (static_cast<OrderType>(fo.type))
-    {
-      case OrderType::STOP_MARKET:
-      case OrderType::TAKE_PROFIT_MARKET:
-      case OrderType::TRAILING_STOP:
-        fo.trigger_price_raw = sig.newPrice.raw();
-        break;
-      default:
-        fo.price_raw = sig.newPrice.raw();
-        break;
-    }
-    fo.quantity_raw = sig.newQuantity.raw();
-    // The replacement is a fresh order: newQuantity is what is left to work.
-    fo.filled_quantity_raw = 0;
-    if (it != _forwarded.end())
-    {
-      it->second = fo;
-    }
+    apply(fo);
     return fo;
   }
 
   LrvxOnSignalCallback _cb;
   void* _ud;
-  // Orders handed to the executor, by id. The handler cannot ask the
-  // executor what it holds and hears of no fill from it, so an entry stays
-  // until its cancel or until the executor is swapped. Signals reach a
-  // handler from more than one consumer thread, hence the lock.
-  std::mutex _forwardedMutex;
-  std::unordered_map<uint64_t, LrvxOrder> _forwarded;
-  // Ids for the second leg of an OCO, small numbers counted from 1 as the
-  // backtest runner counts them. A strategy's own ids carry its subscriber id
-  // above bit 32, so they stay clear of these for every subscriber id but 0.
-  // One counter for the process: a live engine gives each strategy its own
-  // handler and all of them one executor, which must not see an id twice.
-  static uint64_t nextLegId() noexcept
-  {
-    static std::atomic<uint64_t> next{1};
-    return next.fetch_add(1, std::memory_order_relaxed);
-  }
+  std::shared_ptr<ForwardedOrders> _forwarded;
   TrackerSlot<LrvxRiskManagerImpl> _risk;
   TrackerSlot<LrvxKillSwitchImpl> _kill;
   TrackerSlot<LrvxOrderValidatorImpl> _validator;
@@ -7406,6 +7503,7 @@ struct LrvxRunnerImpl
 
   void addStrategy(BridgeStrategy* s)
   {
+    requireAttachableId(strategies, s);
     s->setSignalHandler(&handler);
     strategies.push_back(s);
   }
@@ -7433,6 +7531,7 @@ struct LrvxRunnerImpl
   void setExecutor(LrvxExecutorImpl* e)
   {
     auto* prev = executor.exchange(e, std::memory_order_acq_rel);
+    handler.forwarded().clear();
     handler.setExecutor(e);
     if (executorRunning.load(std::memory_order_acquire))
     {
@@ -7640,6 +7739,8 @@ struct LrvxLiveEngineImpl
 
   // Per-strategy signal handlers (owned here, outlive strategies)
   std::vector<std::unique_ptr<RunnerSignalHandler>> handlers;
+  // The one record of what went to the executor, shared by every handler.
+  std::shared_ptr<ForwardedOrders> forwarded{std::make_shared<ForwardedOrders>()};
   std::vector<BridgeStrategy*> strategies;
 
   // Latest pre-trade hooks attached to this engine. Stored here (rather
@@ -7665,7 +7766,8 @@ struct LrvxLiveEngineImpl
 
   void addStrategy(BridgeStrategy* s, LrvxOnSignalCallback cb, void* ud)
   {
-    auto h = std::make_unique<RunnerSignalHandler>(cb, ud);
+    requireAttachableId(strategies, s);
+    auto h = std::make_unique<RunnerSignalHandler>(cb, ud, forwarded);
     h->setRiskManager(riskManager.load(std::memory_order_acquire));
     h->setKillSwitch(killSwitch.load(std::memory_order_acquire));
     h->setOrderValidator(orderValidator.load(std::memory_order_acquire));
@@ -7748,6 +7850,7 @@ struct LrvxLiveEngineImpl
   void setExecutor(LrvxExecutorImpl* e)
   {
     auto* prev = executor.exchange(e, std::memory_order_acq_rel);
+    forwarded->clear();
     for (auto& h : handlers)
     {
       h->setExecutor(e);
@@ -9006,6 +9109,7 @@ void lrvx_runner_destroy(LrvxRunnerHandle runner)
 void lrvx_runner_add_strategy(LrvxRunnerHandle runner, LrvxStrategyHandle strategy)
 {
   LRVX_CAPI_ENTER_VOID(runner);
+  LRVX_CAPI_REQUIRE_VOID(strategy);
   toRunner(runner)->addStrategy(toStrategy(strategy));
   LRVX_CAPI_LEAVE_VOID;
 }
@@ -9224,6 +9328,7 @@ void lrvx_live_engine_add_strategy(LrvxLiveEngineHandle engine,
                                    void* user_data)
 {
   LRVX_CAPI_ENTER_VOID(engine);
+  LRVX_CAPI_REQUIRE_VOID(strategy);
   toLiveEngine(engine)->addStrategy(toStrategy(strategy), on_signal, user_data);
   LRVX_CAPI_LEAVE_VOID;
 }
@@ -12311,14 +12416,12 @@ extern "C" void lrvx_funding_schedule_reset(LrvxFundingScheduleHandle h)
   toFunding(h)->reset();
   LRVX_CAPI_LEAVE_VOID;
 }
-extern "C" uint32_t lrvx_funding_schedule_tick(LrvxFundingScheduleHandle h, int64_t now_ns,
-                                               const uint32_t* symbols,
-                                               const double* positions,
-                                               const double* mark_prices,
-                                               uint32_t n_symbols, double* out_buf,
-                                               uint32_t max_events)
+namespace
 {
-  LRVX_CAPI_ENTER(h);
+std::vector<lrvx::FundingPayment> fundingTick(LrvxFundingScheduleHandle h, int64_t now_ns,
+                                              const uint32_t* symbols, const double* positions,
+                                              const double* mark_prices, uint32_t n_symbols)
+{
   std::vector<lrvx::SymbolId> syms(n_symbols);
   std::vector<double> pos(n_symbols);
   std::vector<double> mark(n_symbols);
@@ -12328,22 +12431,68 @@ extern "C" uint32_t lrvx_funding_schedule_tick(LrvxFundingScheduleHandle h, int6
     pos[i] = positions ? positions[i] : 0.0;
     mark[i] = mark_prices ? mark_prices[i] : 0.0;
   }
-  auto events = toFunding(h)->tick(now_ns, syms, pos, mark);
+  return toFunding(h)->tick(now_ns, syms, pos, mark);
+}
+
+void writeFundingPayment(const lrvx::FundingPayment& p, double* out)
+{
+  out[0] = static_cast<double>(p.timestampNs.raw());
+  out[1] = static_cast<double>(p.symbol);
+  out[2] = p.rate;
+  out[3] = p.markPrice;
+  out[4] = p.positionSigned;
+  out[5] = p.amount;
+}
+}  // namespace
+
+extern "C" uint32_t lrvx_funding_schedule_tick(LrvxFundingScheduleHandle h, int64_t now_ns,
+                                               const uint32_t* symbols,
+                                               const double* positions,
+                                               const double* mark_prices,
+                                               uint32_t n_symbols, double* out_buf,
+                                               uint32_t max_events)
+{
+  LRVX_CAPI_ENTER(h);
+  const auto cursor = toFunding(h)->cursor();
+  const auto events = fundingTick(h, now_ns, symbols, positions, mark_prices, n_symbols);
   if (out_buf == nullptr || max_events == 0)
   {
+    // A count probe: the settlements stay due for the call that takes them.
+    toFunding(h)->restoreCursor(cursor);
     return static_cast<uint32_t>(events.size());
   }
   uint32_t n = std::min<uint32_t>(max_events, static_cast<uint32_t>(events.size()));
   for (uint32_t i = 0; i < n; ++i)
   {
-    out_buf[i * 6 + 0] = static_cast<double>(events[i].timestampNs.raw());
-    out_buf[i * 6 + 1] = static_cast<double>(events[i].symbol);
-    out_buf[i * 6 + 2] = events[i].rate;
-    out_buf[i * 6 + 3] = events[i].markPrice;
-    out_buf[i * 6 + 4] = events[i].positionSigned;
-    out_buf[i * 6 + 5] = events[i].amount;
+    writeFundingPayment(events[i], out_buf + i * 6);
   }
   return n;
+  LRVX_CAPI_LEAVE;
+}
+
+extern "C" uint32_t lrvx_funding_schedule_tick_exact(LrvxFundingScheduleHandle h,
+                                                     int64_t now_ns, const uint32_t* symbols,
+                                                     const double* positions,
+                                                     const double* mark_prices,
+                                                     uint32_t n_symbols,
+                                                     int64_t* out_timestamps_ns,
+                                                     double* out_buf, uint32_t max_events)
+{
+  LRVX_CAPI_ENTER(h);
+  const auto cursor = toFunding(h)->cursor();
+  const auto events = fundingTick(h, now_ns, symbols, positions, mark_prices, n_symbols);
+  const auto total = static_cast<uint32_t>(events.size());
+  if (out_buf == nullptr || out_timestamps_ns == nullptr || total > max_events)
+  {
+    toFunding(h)->restoreCursor(cursor);
+    return total;
+  }
+  for (uint32_t i = 0; i < total; ++i)
+  {
+    out_timestamps_ns[i] = events[i].timestampNs.raw();
+    writeFundingPayment(events[i], out_buf + i * 6);
+  }
+  return total;
   LRVX_CAPI_LEAVE;
 }
 

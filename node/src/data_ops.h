@@ -1275,6 +1275,7 @@ inline Napi::Value seg_recompress(const Napi::CallbackInfo& info)
       c = 0;
     }
   }
+  lrvx_clear_last_error();
   return Napi::Boolean::New(info.Env(), lrvx_segment_recompress(
                                             info[0].As<Napi::String>().Utf8Value().c_str(),
                                             info[1].As<Napi::String>().Utf8Value().c_str(), c));
@@ -1283,6 +1284,7 @@ inline Napi::Value seg_recompress(const Napi::CallbackInfo& info)
 inline Napi::Value seg_extract_symbols(const Napi::CallbackInfo& info)
 {
   auto syms = info[2].As<Napi::Uint32Array>();
+  lrvx_clear_last_error();
   return Napi::Number::New(info.Env(), (double)lrvx_segment_extract_symbols(
                                            info[0].As<Napi::String>().Utf8Value().c_str(),
                                            info[1].As<Napi::String>().Utf8Value().c_str(),
@@ -1291,6 +1293,7 @@ inline Napi::Value seg_extract_symbols(const Napi::CallbackInfo& info)
 
 inline Napi::Value seg_extract_time_range(const Napi::CallbackInfo& info)
 {
+  lrvx_clear_last_error();
   return Napi::Number::New(info.Env(), (double)lrvx_segment_extract_time_range(
                                            info[0].As<Napi::String>().Utf8Value().c_str(),
                                            info[1].As<Napi::String>().Utf8Value().c_str(),

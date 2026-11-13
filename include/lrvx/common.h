@@ -96,6 +96,15 @@ using SymbolId = uint32_t;
 using OrderId = uint64_t;
 using ExchangeId = uint16_t;
 
+// Order ids a runner assigns itself: the second leg of an OCO, and an order
+// built from a signal that carries no id. A strategy's ids are
+// (subscriber id << 32) + n, so this is one subscriber id's block, and a
+// strategy holding that subscriber id is refused when it is attached. The
+// block ends below 2^53: every id in it is exact as a double, which is how
+// the JavaScript bindings carry order ids.
+inline constexpr uint64_t kRunnerOrderIdSubscriber = 0x1F'FFFFULL;
+inline constexpr OrderId kRunnerOrderIdBase = kRunnerOrderIdSubscriber << 32;
+
 static constexpr ExchangeId InvalidExchangeId = 0xFFFF;
 
 enum class VenueType : uint8_t

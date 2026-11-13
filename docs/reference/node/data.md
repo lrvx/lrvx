@@ -140,3 +140,19 @@ All methods return an array of partition objects `{ partitionId, fromNs, toNs, w
 | `bySymbol(numPartitions)` | Split by symbol group |
 | `perSymbol()` | One partition per symbol |
 | `byEventCount(numPartitions)` | Split by event count |
+
+## Segment operations that return a flag or a count
+
+`recompress(inputPath, outputPath, codec?)` returns `false`, and
+`extractSymbols(inputPath, outputPath, symbols)` and
+`extractTimeRange(inputPath, outputPath, fromNs, toNs)` return `0`, when the input cannot be read
+or the output cannot be written. `lrvx.lastError()` then returns the reason: a string that opens
+with the C function's name and names the file. Each of the three clears it on entry, so `''` means
+the call did not fail; an extract that matched nothing returns `0` with `''`.
+`FundingSchedule.loadTape(path)` reports a file it could not open the same way.
+
+```javascript
+if (!lrvx.recompress('in.lrvx', 'out.lrvx', 'lz4')) {
+  console.error(lrvx.lastError());
+}
+```

@@ -20,6 +20,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 namespace lrvx
 {
@@ -88,7 +89,11 @@ Price hyperliquidPerpTick(int szDecimals);
 }  // namespace instrument_info
 
 // The specs one connector loaded, shared between start() and the message
-// thread that registers symbols on first sight.
+// thread that registers symbols on first sight, and what is wrong with them
+// now. The report is kept per symbol: a symbol whose tick could not be read
+// has one entry, which goes when the venue supplies the tick later; a symbol
+// whose declared tick disagrees with the venue's has one entry, which is
+// rewritten when the venue's tick changes and goes when the two agree.
 class InstrumentSpecTable
 {
  public:
@@ -96,30 +101,56 @@ class InstrumentSpecTable
   {
     std::lock_guard lock(_mutex);
     _specs = std::move(specs);
-    _error = std::move(error);
+    _issues.clear();
+    if (!error.empty())
+    {
+      _issues.push_back({Issue::Kind::General, {}, std::move(error)});
+    }
   }
 
+  // The venue's spec for a symbol. Whatever said its tick could not be read
+  // no longer holds.
   void add(const std::string& symbol, InstrumentSpec spec)
   {
     std::lock_guard lock(_mutex);
     _specs[symbol] = spec;
+    eraseIssue(Issue::Kind::NotLoaded, symbol);
   }
 
+  // A failure that belongs to no one symbol (the whole response was
+  // unusable). Stays until the next load.
   void addError(const std::string& error)
   {
     std::lock_guard lock(_mutex);
-    if (!_error.empty())
-    {
-      _error += "; ";
-    }
-    _error += error;
+    _issues.push_back({Issue::Kind::General, {}, error});
+  }
+
+  // Why this symbol's spec could not be read. One entry per symbol: a later
+  // reason replaces the earlier one.
+  void addError(const std::string& symbol, const std::string& reason)
+  {
+    std::lock_guard lock(_mutex);
+    putIssue(Issue::Kind::NotLoaded, symbol, reason);
+  }
+
+  // The registry declares a tick for this symbol that is not the venue's.
+  void setConflict(const std::string& symbol, const std::string& text)
+  {
+    std::lock_guard lock(_mutex);
+    putIssue(Issue::Kind::Conflict, symbol, text);
+  }
+
+  void clearConflict(const std::string& symbol)
+  {
+    std::lock_guard lock(_mutex);
+    eraseIssue(Issue::Kind::Conflict, symbol);
   }
 
   void clear()
   {
     std::lock_guard lock(_mutex);
     _specs.clear();
-    _error.clear();
+    _issues.clear();
   }
 
   std::optional<InstrumentSpec> find(std::string_view symbol) const
@@ -133,17 +164,68 @@ class InstrumentSpecTable
     return it->second;
   }
 
-  // Empty when every requested instrument loaded and reached the registry.
+  // Empty when every requested instrument is loaded and reached the
+  // registry. Otherwise what is wrong now, "; "-separated, a symbol's entry
+  // as "<symbol>: <text>", in the order the entries first appeared.
   std::string error() const
   {
     std::lock_guard lock(_mutex);
-    return _error;
+    std::string out;
+    for (const auto& issue : _issues)
+    {
+      if (!out.empty())
+      {
+        out += "; ";
+      }
+      if (issue.kind != Issue::Kind::General)
+      {
+        out += issue.symbol + ": ";
+      }
+      out += issue.text;
+    }
+    return out;
   }
 
  private:
+  struct Issue
+  {
+    enum class Kind : uint8_t
+    {
+      General,
+      NotLoaded,
+      Conflict
+    };
+    Kind kind;
+    std::string symbol;
+    std::string text;
+  };
+
+  // Callers hold _mutex.
+  void putIssue(Issue::Kind kind, const std::string& symbol, const std::string& text)
+  {
+    for (auto& issue : _issues)
+    {
+      if (issue.kind == kind && issue.symbol == symbol)
+      {
+        issue.text = text;
+        return;
+      }
+    }
+    _issues.push_back({kind, symbol, text});
+  }
+
+  void eraseIssue(Issue::Kind kind, const std::string& symbol)
+  {
+    std::erase_if(_issues,
+                  [&](const Issue& issue)
+                  {
+                    return issue.kind == kind && issue.symbol == symbol;
+                  });
+  }
+
   mutable std::mutex _mutex;
   InstrumentSpecs _specs;
-  std::string _error;
+  std::vector<Issue> _issues;
 };
 
 // Registers a venue symbol, with the venue's tick when the table has one.
@@ -155,7 +237,8 @@ class InstrumentSpecTable
 // declares a different tick keeps it -- the caller may know better (a
 // product the venue lists differently, a test of the refusal path) and a
 // declaration is not silently replaced -- and the disagreement is logged as
-// an error and added to the table's error(), naming both ticks.
+// an error and kept in the table's error(), naming both ticks, for as long
+// as the two differ.
 SymbolId registerVenueSymbol(SymbolRegistry& registry, SymbolInfo info, InstrumentSpecTable& specs,
                              ILogger* logger);
 

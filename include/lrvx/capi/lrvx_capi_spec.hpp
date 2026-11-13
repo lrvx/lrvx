@@ -254,6 +254,14 @@ extern "C"
   void lrvx_strategy_replace_callbacks(LrvxStrategyHandle strategy,
                                        LrvxStrategyCallbacks callbacks);
 
+  // The subscriber id a strategy holds, and a way to change it before the
+  // strategy is attached and before it emits: its order ids are
+  // (id << 32) + n.
+  LRVX_EXPORT(group = "strategy_lifecycle")
+  uint32_t lrvx_strategy_id(LrvxStrategyHandle strategy);
+  LRVX_EXPORT(group = "strategy_lifecycle")
+  void lrvx_strategy_set_id(LrvxStrategyHandle strategy, uint32_t id);
+
   // Pointer-variant constructors for FFIs that cannot pass a struct
   // by value. The `_p` form takes a pointer to the same struct;
   // calling `*p` to read is equivalent to passing the struct directly.
@@ -2061,6 +2069,11 @@ extern "C"
                                        uint8_t format, int64_t from_ns, int64_t to_ns,
                                        const uint32_t* symbols, uint32_t num_symbols);
 
+  // recompress returns 0, and the two extracts return 0 events, when the
+  // input cannot be read or the output cannot be written, with the reason in
+  // lrvx_last_error_message. An extract that matches nothing also returns 0
+  // and records no error: call lrvx_clear_last_error first and read
+  // lrvx_last_error_code after to tell the two apart.
   LRVX_EXPORT(group = "segment")
   uint8_t lrvx_segment_recompress(const char* input_path, const char* output_path,
                                   uint8_t compression);
@@ -3100,6 +3113,10 @@ extern "C"
   typedef void (*LrvxExecutorReplaceFn)(void* user_data,
                                         uint64_t old_order_id,
                                         const LrvxOrder* new_order);
+  // The two legs carry different ids: the first the id of the strategy's OCO
+  // signal, the second one the runner assigns from its own block, counted
+  // from 0x1FFFFF00000001, which no strategy's ids reach. Either id names its
+  // leg in a later cancel or replace.
   typedef void (*LrvxExecutorSubmitOCOFn)(void* user_data,
                                           const LrvxOrder* order1,
                                           const LrvxOrder* order2);
@@ -3164,6 +3181,12 @@ extern "C"
   // Attach a strategy to both TradeBus and BookUpdateBus.
   // on_signal is called from the consumer thread when the strategy emits an order.
   // The caller must ensure thread safety when submitting orders from on_signal.
+  // Refused, with the reason in lrvx_last_error_message, when a strategy with
+  // the same subscriber id is already attached to this engine (order ids are
+  // (id << 32) + n, so the two would issue the same ids) and when the id is
+  // 2097151 (0x1FFFFF), the block the runner takes its own order ids from.
+  // Nothing is attached then. Call lrvx_clear_last_error first and read
+  // lrvx_last_error_code after.
   LRVX_EXPORT(group = "lrvxliveengine_disruptor")
   void lrvx_live_engine_add_strategy(LrvxLiveEngineHandle engine,
                                      LrvxStrategyHandle strategy,
@@ -3287,6 +3310,12 @@ extern "C"
 
   // Attach a strategy (created via lrvx_strategy_create) to the runner.
   // The runner does NOT take ownership; call lrvx_strategy_destroy separately.
+  // Refused, with the reason in lrvx_last_error_message, when a strategy with
+  // the same subscriber id is already attached here (order ids are
+  // (id << 32) + n, so the two would issue the same ids) and when the id is
+  // 2097151 (0x1FFFFF), the block the runner takes its own order ids from.
+  // Nothing is attached then. Call lrvx_clear_last_error first and read
+  // lrvx_last_error_code after.
   LRVX_EXPORT(group = "strategyrunner_synchronous")
   void lrvx_runner_add_strategy(LrvxRunnerHandle runner, LrvxStrategyHandle strategy);
 
@@ -3404,7 +3433,11 @@ extern "C"
                                          LrvxStrategyHandle strategy);
 
   // Replay a CSV file (columns: timestamp, open, high, low, close, volume).
-  // Returns 1 on success, 0 on error.
+  // run_csv, run_ohlcv and run_bars take a registered symbol's name; NULL or
+  // "" means the registry's first symbol. A name the registry does not hold
+  // is an error: they return 0, replay nothing, and lrvx_last_error_message
+  // names it. Every run_* returns 1 on success and 0 on failure with the
+  // reason there.
   LRVX_EXPORT(group = "backtestrunner_replay")
   int lrvx_backtest_runner_run_csv(LrvxBacktestRunnerHandle runner,
                                    const char* path,
@@ -3608,6 +3641,11 @@ extern "C"
   // Run walk-forward over a CSV. Returns the total fold count.
   // If folds_out is NULL, computes the total without running anything;
   // pass max_folds = total in a second call to fill the buffer.
+  // Zero is a result (a file too short for one fold) and also the failure
+  // value: a CSV that cannot be opened, a row that cannot be parsed and a
+  // symbol name the registry does not hold each return 0 with the reason in
+  // lrvx_last_error_message. Call lrvx_clear_last_error first and read
+  // lrvx_last_error_code after to tell the two apart.
   LRVX_EXPORT(group = "walk_forward")
   uint32_t lrvx_walk_forward_run_csv(LrvxRegistryHandle registry,
                                      const char* csv_path, const char* symbol,
@@ -4726,8 +4764,9 @@ extern "C"
 
   // Read a CSV with columns timestamp_ns, symbol, funding_rate. Lines
   // starting with '#' and a leading alphabetic header row are
-  // skipped. Returns 1 on success, 0 if the file could not be opened
-  // (existing tape state preserved on failure).
+  // skipped. Returns 1 on success. 0 when the file cannot be opened: the
+  // schedule keeps the tape it had and lrvx_last_error_message names the
+  // path.
   LRVX_EXPORT(group = "funding_schedule")
   uint8_t lrvx_funding_schedule_load_tape(LrvxFundingScheduleHandle h,
                                           const char* path);
@@ -4754,12 +4793,26 @@ extern "C"
   //   [3] mark_price
   //   [4] position_signed
   //   [5] amount
-  // First call with out_buf=NULL returns the event count.
+  // At most max_events are written and the count written is returned. With
+  // out_buf NULL or max_events 0 it returns the number due and settles
+  // nothing, so the call that follows with a buffer still gets them.
   LRVX_EXPORT(group = "funding_schedule")
   uint32_t lrvx_funding_schedule_tick(LrvxFundingScheduleHandle h, int64_t now_ns,
                                       const uint32_t* symbols, const double* positions,
                                       const double* mark_prices, uint32_t n_symbols,
                                       double* out_buf, uint32_t max_events);
+
+  // The same walk with each event's timestamp also written to
+  // out_timestamps_ns as an integer: slot 0 of out_buf is a double and cannot
+  // hold a nanosecond epoch exactly. Returns the number of events due. When
+  // that is more than max_events, or a buffer is NULL, nothing is written and
+  // nothing is settled: call again with room for that many.
+  LRVX_EXPORT(group = "funding_schedule")
+  uint32_t lrvx_funding_schedule_tick_exact(LrvxFundingScheduleHandle h, int64_t now_ns,
+                                            const uint32_t* symbols, const double* positions,
+                                            const double* mark_prices, uint32_t n_symbols,
+                                            int64_t* out_timestamps_ns, double* out_buf,
+                                            uint32_t max_events);
 
   // ---- Live queue position estimator -----------------------------
   //
@@ -5279,9 +5332,16 @@ extern "C"
   int lrvx_last_error_code(void);
 
   // Text for the code above: the function that failed, and what the exception
-  // said. Never NULL -- an empty string means nothing has been recorded on
-  // this thread. Valid until the next failure on this thread or the next
-  // lrvx_clear_last_error.
+  // said. The functions that open a path -- the run_* calls,
+  // lrvx_walk_forward_run_csv, lrvx_run_reader_open,
+  // lrvx_run_recorder_create, lrvx_tape_diff_create,
+  // lrvx_merged_tape_reader_create, lrvx_funding_schedule_load_tape, a
+  // segment merge, split or export that ends with success = 0, a segment
+  // recompress or extract that could not read or write, and a strategy a
+  // runner or engine refuses to attach -- leave the reason here beside their
+  // failure value. Never NULL -- an empty string means nothing has been
+  // recorded on this thread. Valid until the next failure on this thread or
+  // the next lrvx_clear_last_error.
   LRVX_EXPORT(group = "capi_diagnostics")
   const char* lrvx_last_error_message(void);
 

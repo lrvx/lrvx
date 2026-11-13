@@ -404,11 +404,15 @@ SymbolId registerVenueSymbol(SymbolRegistry& registry, SymbolInfo info, Instrume
     if (spec)
     {
       const auto r = registry.applyVenueTick(*existing, spec->tickSize);
-      if (r.outcome == VenueTickOutcome::Conflict)
+      if (r.outcome != VenueTickOutcome::Conflict)
       {
-        specs.addError(info.symbol + ": the registry declares tick " + r.heldTick.toString() +
-                       ", the venue uses " + spec->tickSize.toString() +
-                       "; the declared tick is kept");
+        specs.clearConflict(info.symbol);
+      }
+      else
+      {
+        specs.setConflict(info.symbol, "the registry declares tick " + r.heldTick.toString() +
+                                           ", the venue uses " + spec->tickSize.toString() +
+                                           "; the declared tick is kept");
         const std::string msg =
             "[" + info.exchange + "] " + info.symbol + " was registered with tick " +
             r.heldTick.toString() + " and the venue uses " + spec->tickSize.toString() +

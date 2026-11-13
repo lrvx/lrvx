@@ -47,6 +47,14 @@ export const CAPI_ABI_VERSION: number;
 /** C ABI version the loaded lrvx library reports. */
 export function capiAbiVersion(): number;
 
+/** Why the last call that reports failure through its return value failed:
+ *  `FundingSchedule.loadTape` returning `false`, `recompress` returning
+ *  `false`, `extractSymbols` / `extractTimeRange` returning `0`. Each of them
+ *  clears it on entry, so `''` after one means it did not fail (an extract
+ *  that matched nothing returns `0` with `''`). The text opens with the name
+ *  of the C function. */
+export function lastError(): string;
+
 // ── Common types ──────────────────────────────────────────────────────
 
 /** Side of an order or trade. */
@@ -1031,8 +1039,8 @@ export class Account {
   closePosition(symbol: number): void;
   positionCount(): number;
   setMark(symbol: number, price: number, tsNs?: number | bigint): void;
-  /** Last timestamp the symbol was marked. Very negative when never marked. */
-  markTsFor(symbol: number): number;
+  /** Last timestamp the symbol was marked, exact. Very negative when never marked. */
+  markTsFor(symbol: number): bigint;
   /** Returns true when any position's mark is older than budgetNs
    *  relative to nowNs, or has never been marked. */
   hasStaleMarks(nowNs: number | bigint, budgetNs: number): boolean;
@@ -1096,7 +1104,8 @@ export class VenueStack {
 }
 
 export interface FundingPaymentEvent {
-  timestampNs: number;
+  /** The settlement's timestamp, exact. */
+  timestampNs: bigint;
   symbol: number;
   rate: number;
   markPrice: number;

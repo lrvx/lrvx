@@ -875,10 +875,35 @@ std::string SegmentOps::formatJSONEvent(const ReplayEvent& event, bool pretty, i
   return oss.str();
 }
 
+namespace
+{
+void noteError(std::string* error, std::string text)
+{
+  if (error != nullptr && error->empty())
+  {
+    *error = std::move(text);
+  }
+}
+
+std::string cannotOpenInput(const std::filesystem::path& p)
+{
+  return "Cannot open input file: " + p.string();
+}
+
+std::string cannotWriteOutput(const WriterConfig& config)
+{
+  return "Cannot write output file: " + (config.output_dir / config.output_filename).string();
+}
+}  // namespace
+
 bool SegmentOps::recompress(const std::filesystem::path& input_path,
                             const std::filesystem::path& output_path,
-                            CompressionType new_compression)
+                            CompressionType new_compression, std::string* error)
 {
+  if (error != nullptr)
+  {
+    error->clear();
+  }
   WriterConfig config{.output_dir = output_path.parent_path(),
                       .output_filename = output_path.filename().string(),
                       .max_segment_bytes = std::numeric_limits<uint64_t>::max(),
@@ -888,6 +913,7 @@ bool SegmentOps::recompress(const std::filesystem::path& input_path,
   BinaryLogIterator iter(input_path);
   if (!iter.isValid())
   {
+    noteError(error, cannotOpenInput(input_path));
     return false;
   }
 
@@ -896,7 +922,12 @@ bool SegmentOps::recompress(const std::filesystem::path& input_path,
   ReplayEvent event;
   while (iter.next(event))
   {
-    writeReplayEvent(writer, event);
+    if (!writeReplayEvent(writer, event))
+    {
+      noteError(error, cannotWriteOutput(config));
+      writer.close();
+      return false;
+    }
   }
 
   writer.close();
@@ -906,11 +937,16 @@ bool SegmentOps::recompress(const std::filesystem::path& input_path,
 uint64_t SegmentOps::filter(const std::filesystem::path& input_path,
                             const std::filesystem::path& output_path,
                             const std::function<bool(const ReplayEvent&)>& predicate,
-                            const WriterConfig& output_config)
+                            const WriterConfig& output_config, std::string* error)
 {
+  if (error != nullptr)
+  {
+    error->clear();
+  }
   BinaryLogIterator iter(input_path);
   if (!iter.isValid())
   {
+    noteError(error, cannotOpenInput(input_path));
     return 0;
   }
 
@@ -930,7 +966,11 @@ uint64_t SegmentOps::filter(const std::filesystem::path& input_path,
   {
     if (predicate(event))
     {
-      writeReplayEvent(writer, event);
+      if (!writeReplayEvent(writer, event))
+      {
+        noteError(error, cannotWriteOutput(single_file));
+        break;
+      }
       ++count;
     }
   }
@@ -941,7 +981,8 @@ uint64_t SegmentOps::filter(const std::filesystem::path& input_path,
 
 uint64_t SegmentOps::extractSymbols(const std::filesystem::path& input_path,
                                     const std::filesystem::path& output_path,
-                                    const std::set<uint32_t>& symbols, const WriterConfig& config)
+                                    const std::set<uint32_t>& symbols, const WriterConfig& config,
+                                    std::string* error)
 {
   auto predicate = [&symbols](const ReplayEvent& event)
   {
@@ -950,14 +991,18 @@ uint64_t SegmentOps::extractSymbols(const std::filesystem::path& input_path,
     return symbols.find(sym) != symbols.end();
   };
 
-  return filter(input_path, output_path, predicate, config);
+  return filter(input_path, output_path, predicate, config, error);
 }
 
 uint64_t SegmentOps::extractTimeRange(const std::filesystem::path& input_path,
                                       const std::filesystem::path& output_path, int64_t from_ns,
                                       int64_t to_ns, const WriterConfig& config,
-                                      RangeExtractStats* stats)
+                                      RangeExtractStats* stats, std::string* error)
 {
+  if (error != nullptr)
+  {
+    error->clear();
+  }
   RangeExtractStats local;
   RangeExtractStats& out = stats ? *stats : local;
   out = RangeExtractStats{};
@@ -999,6 +1044,7 @@ uint64_t SegmentOps::extractTimeRange(const std::filesystem::path& input_path,
   BinaryLogIterator iter(input_path);
   if (!iter.isValid())
   {
+    noteError(error, cannotOpenInput(input_path));
     return 0;
   }
 
@@ -1038,7 +1084,11 @@ uint64_t SegmentOps::extractTimeRange(const std::filesystem::path& input_path,
       }
       continue;
     }
-    writeReplayEvent(writer, event);
+    if (!writeReplayEvent(writer, event))
+    {
+      noteError(error, cannotWriteOutput(single_file));
+      break;
+    }
     ++count;
   }
 

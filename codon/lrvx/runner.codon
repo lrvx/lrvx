@@ -43,6 +43,8 @@ from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
 from C import lrvx_runner_create(cobj, cobj, cobj) -> cobj
 from C import lrvx_runner_destroy(cobj)
 from C import lrvx_runner_add_strategy(cobj, cobj)
+from C import lrvx_clear_last_error()
+from C import lrvx_last_error_code() -> i32
 from C import lrvx_runner_start(cobj)
 from C import lrvx_runner_stop(cobj)
 from C import lrvx_runner_on_trade(cobj, u32, float, float, u8, i64)
@@ -253,12 +255,15 @@ class Runner[F]:
     # the documented call.
     _on_signal:     F
     _threaded:      bool
+    # Subscriber ids of the strategies attached so far.
+    _strategy_ids:  List[int]
 
     def __init__(self, registry: cobj, on_signal: F,
                  threaded: bool = False):
         self._on_signal = on_signal
         self._threaded  = threaded
         self._registry  = registry
+        self._strategy_ids = list[int]()
         self._sync_handle = cobj()
         self._live_handle = cobj()
 
@@ -286,9 +291,11 @@ class Runner[F]:
         self._attach(strategy, type(strategy))
 
     def _attach(self, strategy, T: type):
+        strategy._take_auto_id(self._strategy_ids)
         if strategy._handle == cobj():
             strategy._rebuild_handle(self._registry)
         bind_callbacks(strategy, T)
+        lrvx_clear_last_error()
         if self._threaded:
             lrvx_live_engine_add_strategy(
                 self._live_handle, strategy._handle,
@@ -296,6 +303,10 @@ class Runner[F]:
             )
         else:
             lrvx_runner_add_strategy(self._sync_handle, strategy._handle)
+        if int(lrvx_last_error_code()) != 0:
+            raise ValueError(
+                "Runner.add_strategy: " + str.from_ptr(lrvx_last_error_message()))
+        self._strategy_ids.append(strategy._strategy_id)
 
     def start(self):
         if self._threaded: lrvx_live_engine_start(self._live_handle)
@@ -473,7 +484,11 @@ class BacktestRunner:
         if strategy._handle == cobj():
             strategy._rebuild_handle(self._registry)
         bind_callbacks(strategy, T)
+        lrvx_clear_last_error()
         lrvx_backtest_runner_set_strategy(self._handle, strategy._handle)
+        if int(lrvx_last_error_code()) != 0:
+            raise ValueError(
+                "BacktestRunner.set_strategy: " + str.from_ptr(lrvx_last_error_message()))
 
     def _parse_stats(self, buf: List[i64]) -> BacktestStats:
         fp = Ptr[f64](buf.arr.ptr)

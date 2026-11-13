@@ -466,6 +466,11 @@ std::vector<SymbolInfo> SymbolRegistry::getAllSymbols() const
   {
     result.push_back(info);
   }
+  // Ids are handed out in registration order; the map's own order is the
+  // standard library's, and "the first symbol" must not depend on it.
+  std::sort(result.begin(), result.end(),
+            [](const SymbolInfo& a, const SymbolInfo& b)
+            { return a.id < b.id; });
   return result;
 }
 

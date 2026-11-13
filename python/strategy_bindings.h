@@ -1197,8 +1197,14 @@ class PyStrategyRunner
   {
     uint32_t id = static_cast<uint32_t>(_hosts.size()) + 1;
     auto host = std::make_unique<PyStrategyHost>(strat, _reg, id, false);
+    lrvx_clear_last_error();
     lrvx_runner_add_strategy(_runner,
                              static_cast<LrvxStrategyHandle>(host->bridge.get()));
+    if (lrvx_last_error_code() != 0)
+    {
+      throw lrvx::LrvxError("E_VAL_002",
+                            std::string("Runner.add_strategy: ") + lrvx_last_error_message());
+    }
     _hosts.push_back(std::move(host));
   }
 
@@ -1482,9 +1488,15 @@ class PyLiveEngine
   {
     uint32_t id = static_cast<uint32_t>(_hosts.size()) + 1;
     auto host = std::make_unique<PyStrategyHost>(strat, _reg, id, true);
+    lrvx_clear_last_error();
     lrvx_live_engine_add_strategy(_engine,
                                   static_cast<LrvxStrategyHandle>(host->bridge.get()),
                                   &PyLiveEngine::signalCallback, this);
+    if (lrvx_last_error_code() != 0)
+    {
+      throw lrvx::LrvxError("E_VAL_002",
+                            std::string("LiveEngine.add_strategy: ") + lrvx_last_error_message());
+    }
     _hosts.push_back(std::move(host));
   }
 
@@ -2371,8 +2383,7 @@ class PyBacktestRunner
                        const std::string& symbol = "")
   {
     refuseWithoutDepth("run_ohlcv");
-    std::string sym = symbol.empty() ? "default" : symbol;
-    auto id = resolveSymbol(sym);
+    auto id = resolveRunSymbol(symbol);
     auto n = ts.size();
     std::vector<OhlcvBacktestReader::Bar> bars;
     bars.reserve(n);
@@ -2407,8 +2418,7 @@ class PyBacktestRunner
           "Attach a strategy with set_strategy(MyStrategy()) first.");
     }
     refuseWithoutDepth("run_bars");
-    std::string sym = symbol.empty() ? "default" : symbol;
-    auto id = resolveSymbol(sym);
+    auto id = resolveRunSymbol(symbol);
     const auto n = start_ns.size();
     if (end_ns.size() != n || open.size() != n || high.size() != n || low.size() != n || close.size() != n || volume.size() != n)
     {
@@ -2800,6 +2810,19 @@ class PyBacktestRunner
               "Use fixed_ticks or fixed_bps here, or volume_impact with run_tape on a tape "
               "that records the book.");
     }
+  }
+
+  // The symbol run_ohlcv and run_bars replay for: the one named, or with no
+  // name the registry's first symbol, as lrvx_backtest_runner_run_ohlcv and
+  // lrvx_backtest_runner_run_bars choose it.
+  uint32_t resolveRunSymbol(const std::string& sym)
+  {
+    if (!sym.empty())
+    {
+      return resolveSymbol(sym);
+    }
+    const auto all = _reg->getAllSymbols();
+    return all.empty() ? 0 : all.front().id;
   }
 
   uint32_t resolveSymbol(const std::string& sym)

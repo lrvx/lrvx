@@ -118,7 +118,13 @@ timestamp_ns,symbol,funding_rate
     const sched = new lrvx.FundingSchedule();
     sched.loadTape("funding.csv");
     sched.setConstantRate(0.00005);
+    const payments = sched.tick(nowNs, [1, 2], [pos1, pos2], [mark1, mark2]);
+    // payments[i].timestampNs is a BigInt; rate, markPrice, positionSigned, amount are Numbers
     ```
+
+`load_tape` / `loadTape` returns `False` when the file cannot be opened and the schedule keeps
+the tape it had. The reason is then in `lrvx.last_error()` (Python), `lrvx.lastError()` (Node,
+QuickJS) or `lrvx.abi.last_error()` (Codon).
 
 To build the same tape in memory instead of from CSV, pass
 `FundingTapeEntry` rows (`timestamp_ns`, `symbol`, `rate`) to the

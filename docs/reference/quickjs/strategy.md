@@ -12,6 +12,8 @@ class MyStrategy extends Strategy {
     onBookUpdate(ctx, book) { ... }
     onTouch(ctx, book) { ... }
     onBar(ctx, bar) { ... }
+    onFill(ctx, ev) { ... }
+    onOrderUpdate(ctx, ev) { ... }
     onStart() { ... }
     onStop() { ... }
 }
@@ -49,16 +51,22 @@ super({ symbols: ['Binance:BTCUSDT', 'Bybit:ETHUSDT'] })
 | `ctx.symbolId` | `number` | Numeric symbol ID |
 | `ctx.position` | `number` | Current position size. In `onFill` and `onOrderUpdate` it already counts the fill being delivered, as `this.position()` does |
 | `ctx.avgEntryPrice` | `number` | Average entry price, `NaN` when the position manager reports none |
+| `ctx.lastTradePrice` | `number` | Price of the symbol's last trade |
+| `ctx.lastUpdateNs`, `ctx.lastTouchNs` | `bigint` | Stamp of the last frame that updated the book, and of the last one that moved the touch |
 | `ctx.book.bidPrice` | `number \| null` | Best bid; `null` when the bid side has no level (`0` is a price) |
 | `ctx.book.askPrice` | `number \| null` | Best ask; `null` when the ask side has no level |
 | `ctx.book.midPrice` | `number \| null` | Mid price; `null` unless both sides have a level |
 | `ctx.book.spread` | `number \| null` | Spread; `null` unless both sides have a level |
 | `trade.symbol` | `string` | Symbol name |
+| `trade.symbolId` | `number` | Numeric symbol ID |
 | `trade.price` | `number` | Trade price |
 | `trade.qty` | `number` | Trade quantity |
 | `trade.side` | `string` | `"buy"` or `"sell"` |
 | `trade.isBuy` | `boolean` | |
-| `trade.timestampNs` | `number` | Nanosecond timestamp |
+| `trade.timestampNs` | `bigint` | Exchange timestamp, nanoseconds |
+
+Clock readings are `BigInt` in every callback: a nanosecond epoch does not fit a
+`Number`. See [the JavaScript value boundary](../../explanation/javascript-value-boundary.md).
 
 ### `onTouch(ctx, book)`
 
@@ -73,9 +81,41 @@ touch; `book.timestampNs` is the stamp of the frame that moved it.
 |---|---|---|
 | `bar.open`, `bar.high`, `bar.low`, `bar.close` | `number` | OHLC prices |
 | `bar.volume`, `bar.buyVolume` | `number` | Total / buy-side volume |
-| `bar.startTimeNs`, `bar.endTimeNs` | `number` | Bar window timestamps (nanoseconds) |
+| `bar.symbol`, `bar.symbolId` | `string`, `number` | Symbol name and numeric ID |
+| `bar.startTimeNs`, `bar.endTimeNs` | `bigint` | Bar window timestamps (nanoseconds) |
 | `bar.barType`, `bar.barTypeParam` | `number` | 0=Time, 1=Tick, ... + interval/threshold |
 | `bar.closeReason` | `number` | 0=Threshold, 1=Gap, 2=Forced, 3=Warmup. The engine emits `Threshold` for a normal close, `Gap` for the bar that absorbs the remainder of a Renko price jump too wide to walk brick by brick, and `Forced` for a `stop()` flush; `Warmup` is never assigned by the engine itself -- it is for callers who construct their own `Bar` objects from historical data before calling `BarMatrix::warmup()`. |
+
+### `onFill(ctx, ev)` / `onOrderUpdate(ctx, ev)`
+
+`onFill` fires for every fill of this strategy's own orders (`ev.status` is
+`PARTIALLY_FILLED` or `FILLED`). `onOrderUpdate` fires for every other change of
+an order's status: `ACCEPTED`, `CANCELED`, `REJECTED`, `REPLACED`, `TRIGGERED`,
+`TRAILING_UPDATED` and the rest. A fill reaches `onFill` only.
+`onQueuePositionChange(ctx, ev)` and `onMarketPositionChange(ctx, ev)` take the
+same `ev` when a resting limit order's queue position or its place relative to
+the touch changes with no other status change (backtest only).
+
+`ctx` is the context `onTrade` receives. `ctx.position` already counts the fill
+being delivered: after a buy of 1 from flat it is 1 inside `onFill`, as
+`this.position()` is.
+
+| Field | Type | Description |
+|---|---|---|
+| `ev.orderId` | `number` | The id the order method returned |
+| `ev.symbolId` | `number` | Numeric symbol ID (`ctx.symbol` has the name) |
+| `ev.side` | `string` | `"buy"` or `"sell"` |
+| `ev.orderType` | `string` | `"MARKET"`, `"LIMIT"`, `"STOP_MARKET"`, ... |
+| `ev.status` | `string` | `"ACCEPTED"`, `"PARTIALLY_FILLED"`, `"FILLED"`, `"CANCELED"`, `"REJECTED"`, ... |
+| `ev.fillQty`, `ev.fillPrice` | `number` | Quantity and price of this fill; 0 outside a fill |
+| `ev.isMaker` | `boolean` | Whether the fill added liquidity |
+| `ev.fillRole` | `string \| null` | `"maker"` or `"taker"` on a fill, `null` otherwise |
+| `ev.rejectReason` | `string \| null` | Why the order was rejected, `null` otherwise |
+| `ev.queueAhead`, `ev.queueTotal` | `number` | Queue position of a resting limit order |
+| `ev.marketPosition` | `string \| null` | `"best"`, `"behind_best"`, `"mid_spread"`, `"level_empty"` or `"crossed"` on a market-position event, `null` otherwise |
+| `ev.distanceToBestTicks` | `number` | Ticks between the order and the best price on its side |
+| `ev.exchangeTsNs` | `bigint` | Timestamp of the event |
+| `ev.submittedAtNs`, `ev.acceptedAtNs`, `ev.firstFillAtNs`, `ev.lastFillAtNs`, `ev.canceledAtNs`, `ev.rejectedAtNs`, `ev.triggeredAtNs`, `ev.expiredAtNs` | `bigint` | When the order reached each stage; `0n` for a stage it has not reached |
 
 ### `onStart()` / `onStop()`
 
@@ -86,6 +126,8 @@ Called when the strategy starts and stops.
 ## Order methods
 
 All methods accept an options object. `symbol` defaults to the primary symbol when omitted.
+Each method that sends an order returns its id, a `number`: the `orderId` its events carry and
+the value `cancel` and `modify` take.
 
 ### Market
 
