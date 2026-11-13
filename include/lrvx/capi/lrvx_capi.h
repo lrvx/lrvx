@@ -2225,6 +2225,11 @@ extern "C"
   // Logger
   // ============================================================
 
+  // Routes every log line to `callback` (NULL restores the default console
+  // logger). Any thread may log while it is replaced or removed: once this
+  // returns, the previous callback is no longer running on another thread
+  // and is not called again, so its user_data may be freed. A callback may
+  // replace or remove itself.
   void lrvx_set_log_callback(LrvxLogCallback callback, void* user_data);
 
   // ============================================================
