@@ -116,6 +116,9 @@ set_target_properties(lrvx_node PROPERTIES PREFIX "" SUFFIX ".node")
 # Match the runtime library used by lrvx.lib (/MD) — cmake-js defaults to /MT
 if(MSVC)
   set_property(TARGET lrvx_node PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+  # The addon and the C API compile into two very large objects; without
+  # /bigobj cl stops at C1128 (section count limit).
+  target_compile_options(lrvx_node PRIVATE /bigobj)
 endif()
 target_link_libraries(lrvx_node ${CMAKE_JS_LIB} ${LRVX_LIB})
 # NODE_ADDON_API_CPP_EXCEPTIONS_ALL widens node-addon-api's callback wrapper

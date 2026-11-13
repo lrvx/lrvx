@@ -76,7 +76,8 @@ jobs:
     needs: [check-actor]
     if: needs.check-actor.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # A cold build alone takes about 17 minutes.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
 
@@ -115,7 +116,7 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             arch: x64
-          - os: macos-14
+          - os: macos-15
             platform: darwin
             arch: arm64
           - os: windows-latest
@@ -123,6 +124,9 @@ jobs:
             arch: x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    env:
+      # Same minimum macOS as the Python wheels (CIBW_ENVIRONMENT_MACOS).
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
     steps:
       - uses: actions/checkout@v5
         with:
