@@ -8,14 +8,20 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import sys
 import tarfile
 import warnings
 from pathlib import Path
 
 import pytest
 
-import lrvx
-from lrvx import bundle, tape
+sys.path.insert(0, os.path.dirname(__file__))
+
+import lrvx  # noqa: E402
+from lrvx import bundle, tape  # noqa: E402
+from support.bundle_traces import expected_trace as _expected_trace  # noqa: E402
+from support.bundle_traces import two_fill_trace as _two_fill_trace  # noqa: E402
 
 _STRATEGY = '''
 import lrvx
@@ -58,13 +64,6 @@ def _pack(work: Path) -> Path:
     return bundle.pack_bundle(strategy=strat, tape=tape_dir, output=work / "b.tar")
 
 
-def _expected_trace(bundle_path: Path, work: Path) -> Path:
-    out = work / "unpacked"
-    with tarfile.open(bundle_path, "r") as tf:
-        tf.extractall(out, filter="data")
-    return out / "expected.lrvxrun"
-
-
 def _validate(path: Path):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", bundle.BundleTrustWarning)
@@ -90,6 +89,7 @@ def _as_packed_before(bundle_path: Path, work: Path, *, fills: int) -> Path:
             if member.name == "manifest.json":
                 manifest = json.loads(data)
                 del manifest["lrvxrun_signals_recorded"]
+                del manifest["lrvxrun_records_comparable"]
                 data = json.dumps(manifest, indent=2, sort_keys=True).encode()
                 member.size = len(data)
             dst.addfile(member, io.BytesIO(data) if data is not None else None)
@@ -119,7 +119,7 @@ def test_the_manifest_says_the_trace_records_signals(tmp_path):
 def test_a_new_bundle_is_compared_on_all_three_counts(tmp_path):
     res = _validate(_pack(tmp_path))
     assert res.matches, res.diff
-    assert res.expected["lrvxrun_compared"] == "signals, order events, fills"
+    assert res.expected["lrvxrun_compared"] == "signal, order event and fill records"
     assert res.expected["lrvxrun_signal_count"] == 1
     assert res.expected["lrvxrun_order_count"] == 1
     assert res.actual["lrvxrun_signal_count"] == 1
@@ -154,46 +154,6 @@ def test_a_trace_write_failure_fails_the_pack(tmp_path, monkeypatch):
         bundle.pack_bundle(strategy=strat, tape=tape_dir, output=tmp_path / "b.tar")
 
 
-_TWO_ROUND_TRIPS = '''
-import lrvx
-
-
-class BuyThenSell(lrvx.Strategy):
-    """Buys on the first trade it sees and sells on the third."""
-
-    def __init__(self, symbols):
-        super().__init__(symbols)
-        self._seen = 0
-
-    def on_trade(self, ctx, trade):
-        self._seen += 1
-        if self._seen == 1:
-            self.market_buy(1.0)
-        elif self._seen == 3:
-            self.market_sell(1.0)
-'''
-
-
-def _two_fill_trace(work: Path):
-    strat = work / "strategy.py"
-    strat.write_text(_TWO_ROUND_TRIPS)
-    tape_dir = work / "tape"
-    tape_dir.mkdir()
-    registry = lrvx.SymbolRegistry()
-    sym = int(registry.add_symbol("bundle", "BTCUSDT", tick_size=0.01))
-    recorder = tape.make_recorder_hook(tape_dir)
-    runner = lrvx.Runner(registry, on_signal=lambda _: None)
-    runner.set_market_data_recorder(recorder)
-    runner.start()
-    for i in range(5):
-        runner.on_trade(sym, 100.0 + i, 1.0, True, (i + 1) * 1_000_000_000)
-    runner.stop()
-    recorder.close()
-    path = bundle.pack_bundle(strategy=strat, tape=tape_dir, output=work / "b.tar")
-    reader = lrvx.TraceReader(str(_expected_trace(path, work)))
-    return path, reader.read_all_signals(), reader.read_all_order_events(), reader.read_all_fills()
-
-
 def test_each_fill_has_its_own_id_and_its_own_times(tmp_path):
     """fill_id was the order's id, and every fill of a run carried the one
     run_ts_ns taken after the run, with no feed_ts_ns."""
@@ -217,8 +177,9 @@ def test_each_fill_has_its_own_id_and_its_own_times(tmp_path):
 
 
 def test_a_bundle_whose_trace_has_the_old_fill_ids_still_validates(tmp_path):
-    """Validation compares the three counts, so a bundle packed when a fill
-    carried its order's id and the run's one timestamp validates as before."""
+    """A bundle packed when a fill carried its order's id and the run's one
+    timestamp has no lrvxrun_records_comparable: it is compared on the three
+    counts and validates as before."""
     path, signals, orders, fills = _two_fill_trace(tmp_path)
 
     old_trace = tmp_path / "old_ids.lrvxrun"
@@ -240,6 +201,11 @@ def test_a_bundle_whose_trace_has_the_old_fill_ids_still_validates(tmp_path):
             if member.name.startswith("expected.lrvxrun"):
                 continue
             data = src.extractfile(member).read() if member.isfile() else None
+            if member.name == "manifest.json":
+                manifest = json.loads(data)
+                del manifest["lrvxrun_records_comparable"]
+                data = json.dumps(manifest, indent=2, sort_keys=True).encode()
+                member.size = len(data)
             dst.addfile(member, io.BytesIO(data) if data is not None else None)
         dst.add(str(old_trace), arcname="expected.lrvxrun")
 
