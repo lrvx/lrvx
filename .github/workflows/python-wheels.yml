@@ -141,7 +141,11 @@ jobs:
           CIBW_ARCHS_MACOS: "arm64"
           CIBW_ARCHS_WINDOWS: "AMD64"
           CIBW_MANYLINUX_X86_64_IMAGE: "manylinux_2_28"
-          CIBW_ENVIRONMENT_MACOS: "MACOSX_DEPLOYMENT_TARGET=14.0"
+          # lz4 is compiled into the extension (LRVX_VENDOR_LZ4): a wheel
+          # then carries no copy of the build host's lz4, whose minimum OS
+          # would otherwise become the wheel's.
+          CIBW_ENVIRONMENT: 'SKBUILD_CMAKE_ARGS="-DLRVX_VENDOR_LZ4=ON"'
+          CIBW_ENVIRONMENT_MACOS: 'MACOSX_DEPLOYMENT_TARGET=14.0 SKBUILD_CMAKE_ARGS="-DLRVX_VENDOR_LZ4=ON"'
           CIBW_BUILD_VERBOSITY: 1
           # cibuildwheel installs the just-built wheel into a clean venv
           # and runs this from a temp directory (not the checkout), so a

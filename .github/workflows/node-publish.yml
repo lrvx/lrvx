@@ -152,12 +152,32 @@ jobs:
             -DLRVX_BUILD_CAPI=ON \
             -DLRVX_ENABLE_BACKTEST=ON \
             -DLRVX_NATIVE=OFF \
+            -DLRVX_VENDOR_LZ4=ON \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --config Release
 
       - name: Build node addon
         working-directory: node
         run: npm run build
+
+      # The published addon must load on a machine with nothing but Node
+      # installed: lz4 is compiled in (LRVX_VENDOR_LZ4), so no lz4 library
+      # and nothing from the runner's package manager may be linked.
+      - name: Addon links no lz4 and nothing from the build host
+        if: matrix.platform != 'win32'
+        shell: bash
+        run: |
+          addon=$(find node/build -name lrvx_node.node | head -1)
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            deps=$(otool -L "$addon" | tail -n +2)
+          else
+            deps=$(readelf -d "$addon" | grep NEEDED)
+          fi
+          echo "$deps"
+          if echo "$deps" | grep -E -i 'lz4|/opt/homebrew|/usr/local'; then
+            echo "::error::the addon depends on a library a user's machine does not have"
+            exit 1
+          fi
 
       - name: Copy prebuilt
         shell: bash
