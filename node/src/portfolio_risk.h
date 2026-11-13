@@ -88,7 +88,7 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
         detail_pr::readOptDouble(r, "maxConcentrationPct",
                                  rules.has_max_concentration_pct, rules.max_concentration_pct);
       }
-      if (opts.Has("initialEquity"))
+      if (given(opts.Get("initialEquity")))
       {
         initial_equity = argNumber(opts.Get("initialEquity"), "PortfolioRisk: initialEquity");
       }
@@ -126,7 +126,7 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
     uint8_t mask = 0;
     auto putDouble = [&](const char* js_key, uint8_t bit, double& out)
     {
-      if (fields.Has(js_key))
+      if (given(fields.Get(js_key)))
       {
         out = argNumber(fields.Get(js_key), js_key);
         mask |= bit;
@@ -134,7 +134,7 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
     };
     auto putUint64 = [&](const char* js_key, uint8_t bit, uint64_t& out)
     {
-      if (fields.Has(js_key))
+      if (given(fields.Get(js_key)))
       {
         out = argUint64(fields.Get(js_key), js_key);
         mask |= bit;

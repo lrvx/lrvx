@@ -20,7 +20,7 @@ class PositionTrackerWrap : public Napi::ObjectWrap<PositionTrackerWrap>
                         InstanceMethod("totalRealizedPnl", &PositionTrackerWrap::TotalPnl)});
   }
   PositionTrackerWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<PositionTrackerWrap>(info),
-                                                        _h(lrvx_position_tracker_create(info.Length() > 0 ? argUint32(info[0], "PositionTracker: mode") : 0)) {}
+                                                        _h(lrvx_position_tracker_create(given(info[0]) ? argUint32(info[0], "PositionTracker: mode") : 0)) {}
   ~PositionTrackerWrap()
   {
     if (_h)
@@ -159,20 +159,20 @@ class OrderJourneyTracerWrap : public Napi::ObjectWrap<OrderJourneyTracerWrap>
     if (given(info[0]))
     {
       Napi::Object cfg = argObject(info[0], "OrderJourneyTracer: opts");
-      if (cfg.Has("maxOrders"))
+      if (given(cfg.Get("maxOrders")))
       {
         maxOrders = argInteger(cfg.Get("maxOrders"), "OrderJourneyTracer: maxOrders");
       }
-      if (cfg.Has("maxRecordsPerOrder"))
+      if (given(cfg.Get("maxRecordsPerOrder")))
       {
         maxRecordsPerOrder =
             argInteger(cfg.Get("maxRecordsPerOrder"), "OrderJourneyTracer: maxRecordsPerOrder");
       }
-      if (cfg.Has("sampleRate"))
+      if (given(cfg.Get("sampleRate")))
       {
         sampleRate = argNumber(cfg.Get("sampleRate"), "OrderJourneyTracer: sampleRate");
       }
-      if (cfg.Has("sampleSalt"))
+      if (given(cfg.Get("sampleSalt")))
       {
         sampleSalt = argInteger(cfg.Get("sampleSalt"), "OrderJourneyTracer: sampleSalt");
       }

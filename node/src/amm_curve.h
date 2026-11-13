@@ -103,8 +103,8 @@ inline Napi::Value ammCurveRaydiumCp(const Napi::CallbackInfo& info)
   const std::string r0 = detail_curve::bigintToDecimal(env, argBigInt(info[0], "ammCurveRaydiumCp: reserve0"));
   const std::string r1 = detail_curve::bigintToDecimal(env, argBigInt(info[1], "ammCurveRaydiumCp: reserve1"));
   const auto tradeFee = argInteger(info[2], "ammCurveRaydiumCp: tradeFeeRate");
-  const auto creatorFee = info.Length() > 3 ? argInteger(info[3], "ammCurveRaydiumCp: creatorFeeRate") : 0;
-  const bool onInput = info.Length() > 4 ? argBool(info[4], "ammCurveRaydiumCp: creatorFeeOnInput") : true;
+  const auto creatorFee = given(info[3]) ? argInteger(info[3], "ammCurveRaydiumCp: creatorFeeRate") : 0;
+  const bool onInput = given(info[4]) ? argBool(info[4], "ammCurveRaydiumCp: creatorFeeOnInput") : true;
   return detail_curve::wrapHandle(
       env, lrvx_curve_raydium_cp(r0.c_str(), r1.c_str(), static_cast<uint64_t>(tradeFee),
                                  static_cast<uint64_t>(creatorFee), onInput ? 1 : 0));

@@ -75,9 +75,9 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     }
     auto opts = argObject(info[0], "TraceRecorder: opts");
     std::string path = argString(opts.Get("path"), "TraceRecorder: path");
-    std::string sid = opts.Has("strategyId") ? argString(opts.Get("strategyId"), "TraceRecorder: strategyId") : "";
-    std::string shash = opts.Has("strategyHash") ? argString(opts.Get("strategyHash"), "TraceRecorder: strategyHash") : "";
-    int64_t started = opts.Has("runStartedNs") ? toInt64Ns(opts.Get("runStartedNs"), "TraceRecorder: runStartedNs") : 0;
+    std::string sid = given(opts.Get("strategyId")) ? argString(opts.Get("strategyId"), "TraceRecorder: strategyId") : "";
+    std::string shash = given(opts.Get("strategyHash")) ? argString(opts.Get("strategyHash"), "TraceRecorder: strategyHash") : "";
+    int64_t started = given(opts.Get("runStartedNs")) ? toInt64Ns(opts.Get("runStartedNs"), "TraceRecorder: runStartedNs") : 0;
     _h = lrvx_run_recorder_create(path.c_str(), sid.c_str(), shash.c_str(), started);
     if (!_h)
     {
@@ -101,9 +101,9 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
   {
     auto opts = argObject(info[0], "addTapeRef: opts");
     std::string path = argString(opts.Get("path"), "addTapeRef: path");
-    std::string ch = opts.Has("contentHash") ? argString(opts.Get("contentHash"), "addTapeRef: contentHash") : "";
-    int64_t first = opts.Has("firstEventNs") ? toInt64Ns(opts.Get("firstEventNs"), "addTapeRef: firstEventNs") : 0;
-    int64_t last = opts.Has("lastEventNs") ? toInt64Ns(opts.Get("lastEventNs"), "addTapeRef: lastEventNs") : 0;
+    std::string ch = given(opts.Get("contentHash")) ? argString(opts.Get("contentHash"), "addTapeRef: contentHash") : "";
+    int64_t first = given(opts.Get("firstEventNs")) ? toInt64Ns(opts.Get("firstEventNs"), "addTapeRef: firstEventNs") : 0;
+    int64_t last = given(opts.Get("lastEventNs")) ? toInt64Ns(opts.Get("lastEventNs"), "addTapeRef: lastEventNs") : 0;
     lrvx_run_recorder_add_tape_ref(_h, path.c_str(), ch.c_str(), first, last);
   }
 
@@ -116,22 +116,22 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
   {
     auto opts = argOptions(info, "writeSignal");
     int64_t run_ts = toInt64Ns(opts.Get("runTsNs"), "writeSignal: runTsNs");
-    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs"), "writeSignal: feedTsNs") : 0;
+    int64_t feed_ts = given(opts.Get("feedTsNs")) ? toInt64Ns(opts.Get("feedTsNs"), "writeSignal: feedTsNs") : 0;
     // A Number or a BigInt; the whole 64-bit id is written.
     uint64_t sid =
-        opts.Has("signalId") ? argUint64(opts.Get("signalId"), "writeSignal: signalId") : 0;
-    uint32_t flags = opts.Has("flags") ? argUint32(opts.Get("flags"), "writeSignal: flags") : 0;
-    int64_t strength = opts.Has("strengthRaw")
+        given(opts.Get("signalId")) ? argUint64(opts.Get("signalId"), "writeSignal: signalId") : 0;
+    uint32_t flags = given(opts.Get("flags")) ? argUint32(opts.Get("flags"), "writeSignal: flags") : 0;
+    int64_t strength = given(opts.Get("strengthRaw"))
                            ? argInt64(opts.Get("strengthRaw"), "writeSignal: strengthRaw")
                            : 0;
-    std::string name = opts.Has("name") ? argString(opts.Get("name"), "writeSignal: name") : "";
+    std::string name = given(opts.Get("name")) ? argString(opts.Get("name"), "writeSignal: name") : "";
     std::vector<uint32_t> sids;
-    if (opts.Has("symbolIds"))
+    if (given(opts.Get("symbolIds")))
     {
       sids = detail_runtrace::readU32Array(argArray(opts.Get("symbolIds"), "writeSignal: symbolIds"));
     }
     std::vector<uint8_t> payload;
-    if (opts.Has("payload"))
+    if (given(opts.Get("payload")))
     {
       payload = detail_runtrace::readBytes(opts.Get("payload"), "writeSignal: payload");
     }
@@ -146,27 +146,27 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     auto opts = argOptions(info, "writeOrderEvent");
     const auto u8 = [&opts](const char* key, const char* what, uint32_t fallback)
     {
-      return static_cast<uint8_t>(opts.Has(key) ? argUint32(opts.Get(key), what) : fallback);
+      return static_cast<uint8_t>(given(opts.Get(key)) ? argUint32(opts.Get(key), what) : fallback);
     };
     int64_t run_ts = toInt64Ns(opts.Get("runTsNs"), "writeOrderEvent: runTsNs");
-    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs"), "writeOrderEvent: feedTsNs") : 0;
+    int64_t feed_ts = given(opts.Get("feedTsNs")) ? toInt64Ns(opts.Get("feedTsNs"), "writeOrderEvent: feedTsNs") : 0;
     uint64_t oid =
-        opts.Has("orderId") ? argUint64(opts.Get("orderId"), "writeOrderEvent: orderId") : 0;
-    uint64_t pid = opts.Has("parentSignalId")
+        given(opts.Get("orderId")) ? argUint64(opts.Get("orderId"), "writeOrderEvent: orderId") : 0;
+    uint64_t pid = given(opts.Get("parentSignalId"))
                        ? argUint64(opts.Get("parentSignalId"), "writeOrderEvent: parentSignalId")
                        : 0;
     int64_t price =
-        opts.Has("priceRaw") ? argInt64(opts.Get("priceRaw"), "writeOrderEvent: priceRaw") : 0;
+        given(opts.Get("priceRaw")) ? argInt64(opts.Get("priceRaw"), "writeOrderEvent: priceRaw") : 0;
     int64_t qty =
-        opts.Has("qtyRaw") ? argInt64(opts.Get("qtyRaw"), "writeOrderEvent: qtyRaw") : 0;
+        given(opts.Get("qtyRaw")) ? argInt64(opts.Get("qtyRaw"), "writeOrderEvent: qtyRaw") : 0;
     uint32_t symid =
-        opts.Has("symbolId") ? argUint32(opts.Get("symbolId"), "writeOrderEvent: symbolId") : 0;
+        given(opts.Get("symbolId")) ? argUint32(opts.Get("symbolId"), "writeOrderEvent: symbolId") : 0;
     uint8_t kind = u8("eventKind", "writeOrderEvent: eventKind", 1);
     uint8_t side = u8("side", "writeOrderEvent: side", 0);
     uint8_t otype = u8("orderType", "writeOrderEvent: orderType", 0);
     uint32_t flags =
-        opts.Has("flags") ? argUint32(opts.Get("flags"), "writeOrderEvent: flags") : 0;
-    std::string reason = opts.Has("reason") ? argString(opts.Get("reason"), "writeOrderEvent: reason") : "";
+        given(opts.Get("flags")) ? argUint32(opts.Get("flags"), "writeOrderEvent: flags") : 0;
+    std::string reason = given(opts.Get("reason")) ? argString(opts.Get("reason"), "writeOrderEvent: reason") : "";
     lrvx_run_recorder_write_order_event(_h, run_ts, feed_ts, oid, pid, price, qty, symid, kind,
                                         side, otype, flags,
                                         reason.empty() ? nullptr : reason.data(), reason.size());
@@ -176,19 +176,19 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
   {
     auto opts = argOptions(info, "writeFill");
     int64_t run_ts = toInt64Ns(opts.Get("runTsNs"), "writeFill: runTsNs");
-    int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs"), "writeFill: feedTsNs") : 0;
-    uint64_t oid = opts.Has("orderId") ? argUint64(opts.Get("orderId"), "writeFill: orderId") : 0;
-    uint64_t fid = opts.Has("fillId") ? argUint64(opts.Get("fillId"), "writeFill: fillId") : 0;
+    int64_t feed_ts = given(opts.Get("feedTsNs")) ? toInt64Ns(opts.Get("feedTsNs"), "writeFill: feedTsNs") : 0;
+    uint64_t oid = given(opts.Get("orderId")) ? argUint64(opts.Get("orderId"), "writeFill: orderId") : 0;
+    uint64_t fid = given(opts.Get("fillId")) ? argUint64(opts.Get("fillId"), "writeFill: fillId") : 0;
     int64_t price =
-        opts.Has("priceRaw") ? argInt64(opts.Get("priceRaw"), "writeFill: priceRaw") : 0;
-    int64_t qty = opts.Has("qtyRaw") ? argInt64(opts.Get("qtyRaw"), "writeFill: qtyRaw") : 0;
-    int64_t fee = opts.Has("feeRaw") ? argInt64(opts.Get("feeRaw"), "writeFill: feeRaw") : 0;
+        given(opts.Get("priceRaw")) ? argInt64(opts.Get("priceRaw"), "writeFill: priceRaw") : 0;
+    int64_t qty = given(opts.Get("qtyRaw")) ? argInt64(opts.Get("qtyRaw"), "writeFill: qtyRaw") : 0;
+    int64_t fee = given(opts.Get("feeRaw")) ? argInt64(opts.Get("feeRaw"), "writeFill: feeRaw") : 0;
     uint32_t symid =
-        opts.Has("symbolId") ? argUint32(opts.Get("symbolId"), "writeFill: symbolId") : 0;
+        given(opts.Get("symbolId")) ? argUint32(opts.Get("symbolId"), "writeFill: symbolId") : 0;
     uint8_t side = static_cast<uint8_t>(
-        opts.Has("side") ? argUint32(opts.Get("side"), "writeFill: side") : 0);
+        given(opts.Get("side")) ? argUint32(opts.Get("side"), "writeFill: side") : 0);
     uint8_t liq = static_cast<uint8_t>(
-        opts.Has("liquidity") ? argUint32(opts.Get("liquidity"), "writeFill: liquidity") : 0);
+        given(opts.Get("liquidity")) ? argUint32(opts.Get("liquidity"), "writeFill: liquidity") : 0);
     lrvx_run_recorder_write_fill(_h, run_ts, feed_ts, oid, fid, price, qty, fee, symid, side, liq);
   }
 

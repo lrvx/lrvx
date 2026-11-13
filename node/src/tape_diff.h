@@ -52,11 +52,11 @@ inline Napi::Value tapeDiff(const Napi::CallbackInfo& info)
     if (given(info[2]))
     {
       auto opts = argObject(info[2], "tapeDiff: opts");
-      if (opts.Has("maxMismatches"))
+      if (given(opts.Get("maxMismatches")))
       {
         max_mismatches = argUint32(opts.Get("maxMismatches"), "tapeDiff: maxMismatches");
       }
-      if (opts.Has("fieldToleranceNs"))
+      if (given(opts.Get("fieldToleranceNs")))
       {
         tolerance_ns = argInteger(opts.Get("fieldToleranceNs"), "tapeDiff: fieldToleranceNs");
       }

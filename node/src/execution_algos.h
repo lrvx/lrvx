@@ -118,12 +118,12 @@ class TWAPWrap : public Napi::ObjectWrap<TWAPWrap>
     double target_qty = argNumber(opts.Get("targetQty"), "TWAPExecutor: targetQty");
     uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "TWAPExecutor: side"));
     uint32_t symbol =
-        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "TWAPExecutor: symbol") : 0;
-    uint8_t type = opts.Has("type")
+        given(opts.Get("symbol")) ? argUint32(opts.Get("symbol"), "TWAPExecutor: symbol") : 0;
+    uint8_t type = given(opts.Get("type"))
                        ? detail_exec::parseType(argString(opts.Get("type"), "TWAPExecutor: type"))
                        : 0;
     double limit_price =
-        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "TWAPExecutor: limitPrice") : 0.0;
+        given(opts.Get("limitPrice")) ? argNumber(opts.Get("limitPrice"), "TWAPExecutor: limitPrice") : 0.0;
     int64_t duration_ns = argInteger(opts.Get("durationNs"), "TWAPExecutor: durationNs");
     uint32_t slice_count = argUint32(opts.Get("sliceCount"), "TWAPExecutor: sliceCount");
     // A clock reading, not a duration: read it the way every other ns
@@ -158,12 +158,12 @@ class IcebergWrap : public Napi::ObjectWrap<IcebergWrap>
     double target_qty = argNumber(opts.Get("targetQty"), "IcebergExecutor: targetQty");
     uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "IcebergExecutor: side"));
     uint32_t symbol =
-        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "IcebergExecutor: symbol") : 0;
-    uint8_t type = opts.Has("type")
+        given(opts.Get("symbol")) ? argUint32(opts.Get("symbol"), "IcebergExecutor: symbol") : 0;
+    uint8_t type = given(opts.Get("type"))
                        ? detail_exec::parseType(argString(opts.Get("type"), "IcebergExecutor: type"))
                        : 0;
     double limit_price =
-        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "IcebergExecutor: limitPrice") : 0.0;
+        given(opts.Get("limitPrice")) ? argNumber(opts.Get("limitPrice"), "IcebergExecutor: limitPrice") : 0.0;
     double visible_qty = argNumber(opts.Get("visibleQty"), "IcebergExecutor: visibleQty");
     _h = lrvx_exec_iceberg_create(target_qty, side, symbol, type, limit_price, visible_qty);
     if (!_h)
@@ -193,15 +193,15 @@ class POVWrap : public Napi::ObjectWrap<POVWrap>
     double target_qty = argNumber(opts.Get("targetQty"), "POVExecutor: targetQty");
     uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "POVExecutor: side"));
     uint32_t symbol =
-        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "POVExecutor: symbol") : 0;
-    uint8_t type = opts.Has("type")
+        given(opts.Get("symbol")) ? argUint32(opts.Get("symbol"), "POVExecutor: symbol") : 0;
+    uint8_t type = given(opts.Get("type"))
                        ? detail_exec::parseType(argString(opts.Get("type"), "POVExecutor: type"))
                        : 0;
     double limit_price =
-        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "POVExecutor: limitPrice") : 0.0;
+        given(opts.Get("limitPrice")) ? argNumber(opts.Get("limitPrice"), "POVExecutor: limitPrice") : 0.0;
     double rate = argNumber(opts.Get("participationRate"), "POVExecutor: participationRate");
     double min_slice =
-        opts.Has("minSliceQty") ? argNumber(opts.Get("minSliceQty"), "POVExecutor: minSliceQty") : 0.0;
+        given(opts.Get("minSliceQty")) ? argNumber(opts.Get("minSliceQty"), "POVExecutor: minSliceQty") : 0.0;
     _h = lrvx_exec_pov_create(target_qty, side, symbol, type, limit_price, rate, min_slice);
     if (!_h)
     {
@@ -230,12 +230,12 @@ class VWAPWrap : public Napi::ObjectWrap<VWAPWrap>
     double target_qty = argNumber(opts.Get("targetQty"), "VWAPExecutor: targetQty");
     uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "VWAPExecutor: side"));
     uint32_t symbol =
-        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "VWAPExecutor: symbol") : 0;
-    uint8_t type = opts.Has("type")
+        given(opts.Get("symbol")) ? argUint32(opts.Get("symbol"), "VWAPExecutor: symbol") : 0;
+    uint8_t type = given(opts.Get("type"))
                        ? detail_exec::parseType(argString(opts.Get("type"), "VWAPExecutor: type"))
                        : 0;
     double limit_price =
-        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "VWAPExecutor: limitPrice") : 0.0;
+        given(opts.Get("limitPrice")) ? argNumber(opts.Get("limitPrice"), "VWAPExecutor: limitPrice") : 0.0;
 
     Napi::Array curve = argArray(opts.Get("volumeCurve"), "VWAPExecutor: volumeCurve");
     std::vector<int64_t> ts;

@@ -208,7 +208,7 @@ class CompositeBookMatrixWrap : public Napi::ObjectWrap<CompositeBookMatrixWrap>
           .ThrowAsJavaScriptException();
       return;
     }
-    int64_t recvNs = info.Length() > 6 ? toInt64Ns(info[6], (method + ": recvNs").c_str()) : 0;
+    int64_t recvNs = given(info[6]) ? toInt64Ns(info[6], (method + ": recvNs").c_str()) : 0;
     fn(_h, exchange, symbol, bp.Data(), bq.Data(), bp.ElementLength(), ap.Data(), aq.Data(),
        ap.ElementLength(), recvNs);
   }

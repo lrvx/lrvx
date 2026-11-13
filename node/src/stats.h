@@ -35,8 +35,8 @@ inline Napi::Value stat_win_rate(const Napi::CallbackInfo& info)
 inline Napi::Value stat_bootstrap_ci(const Napi::CallbackInfo& info)
 {
   auto a = argFloat64Array(info[0], "bootstrapCI: data");
-  double conf = info.Length() > 1 ? argNumber(info[1], "bootstrapCI: confidence") : 0.95;
-  uint32_t samples = info.Length() > 2 ? argUint32(info[2], "bootstrapCI: samples") : 10000;
+  double conf = given(info[1]) ? argNumber(info[1], "bootstrapCI: confidence") : 0.95;
+  uint32_t samples = given(info[2]) ? argUint32(info[2], "bootstrapCI: samples") : 10000;
   double lo, med, hi;
   lrvx_stat_bootstrap_ci(a.Data(), a.ElementLength(), conf, samples, &lo, &med, &hi);
   auto o = Napi::Object::New(info.Env());
@@ -50,7 +50,7 @@ inline Napi::Value stat_permutation_test(const Napi::CallbackInfo& info)
 {
   auto g1 = argFloat64Array(info[0], "permutationTest: group1");
   auto g2 = argFloat64Array(info[1], "permutationTest: group2");
-  uint32_t n = info.Length() > 2 ? argUint32(info[2], "permutationTest: samples") : 10000;
+  uint32_t n = given(info[2]) ? argUint32(info[2], "permutationTest: samples") : 10000;
   return Napi::Number::New(info.Env(), lrvx_stat_permutation_test(g1.Data(), g1.ElementLength(), g2.Data(), g2.ElementLength(), n));
 }
 
@@ -71,8 +71,8 @@ inline Napi::Value stat_whites_reality_check(const Napi::CallbackInfo& info)
   auto returns = argFloat64Array(info[0], "whitesRealityCheck: returns");
   size_t K = argUint32(info[1], "whitesRealityCheck: numStrategies");
   size_t T = argUint32(info[2], "whitesRealityCheck: numPeriods");
-  uint32_t numBootstrap = info.Length() > 3 ? argUint32(info[3], "whitesRealityCheck: numBootstrap") : 10000u;
-  double avgBlock = info.Length() > 4 ? argNumber(info[4], "whitesRealityCheck: avgBlockSize") : 0.0;
+  uint32_t numBootstrap = given(info[3]) ? argUint32(info[3], "whitesRealityCheck: numBootstrap") : 10000u;
+  double avgBlock = given(info[4]) ? argNumber(info[4], "whitesRealityCheck: avgBlockSize") : 0.0;
   if (returns.ElementLength() < K * T)
   {
     Napi::TypeError::New(info.Env(),
@@ -101,7 +101,7 @@ inline Napi::Value stat_pbo_cscv(const Napi::CallbackInfo& info)
   auto returns = argFloat64Array(info[0], "pboCscv: returns");
   size_t N = argUint32(info[1], "pboCscv: numTrials");
   size_t T = argUint32(info[2], "pboCscv: numPeriods");
-  uint32_t numBlocks = info.Length() > 3 ? argUint32(info[3], "pboCscv: numBlocks") : 16u;
+  uint32_t numBlocks = given(info[3]) ? argUint32(info[3], "pboCscv: numBlocks") : 16u;
   if (returns.ElementLength() < N * T)
   {
     Napi::TypeError::New(info.Env(), "returns array shorter than numTrials*numPeriods")
@@ -153,7 +153,7 @@ inline Napi::Value stat_grid_neighborhood(const Napi::CallbackInfo& info)
 {
   auto values = argFloat64Array(info[0], "gridNeighborhood: values");
   auto shapeArr = argArray(info[1], "gridNeighborhood: shape");
-  size_t radius = info.Length() > 2 ? argUint32(info[2], "gridNeighborhood: radius") : 1u;
+  size_t radius = given(info[2]) ? argUint32(info[2], "gridNeighborhood: radius") : 1u;
   std::vector<size_t> shape(shapeArr.Length());
   size_t total = shape.empty() ? 0 : 1;
   for (uint32_t i = 0; i < shapeArr.Length(); ++i)

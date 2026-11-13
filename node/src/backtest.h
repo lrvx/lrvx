@@ -178,7 +178,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     double price = argNumber(info[2], "submitOrder: price");
     double qty = argNumber(info[3], "submitOrder: qty");
     std::string type = given(info[4]) ? argString(info[4], "submitOrder: type") : "market";
-    uint32_t sym = info.Length() > 5 ? argUint32(info[5], "submitOrder: symbol") : 1;
+    uint32_t sym = given(info[5]) ? argUint32(info[5], "submitOrder: symbol") : 1;
     uint8_t s = side == "buy" ? 0 : 1;
     // lrvx_simulated_executor_submit_order takes an order_type in the
     // lrvx::OrderType space (LIMIT=0, MARKET=1, ...), NOT the
@@ -198,7 +198,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       uint8_t tif = 0;
       bool reduceOnly = false;
       int64_t expiresAtNs = 0;
-      if (opts.Has("tif"))
+      if (given(opts.Get("tif")))
       {
         std::string tifStr = argString(opts.Get("tif"), "submitOrder: tif");
         if (tifStr == "ioc")
@@ -218,11 +218,11 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
           tif = 4;
         }
       }
-      if (opts.Has("reduceOnly"))
+      if (given(opts.Get("reduceOnly")))
       {
         reduceOnly = argBool(opts.Get("reduceOnly"), "submitOrder: reduceOnly");
       }
-      if (opts.Has("expiresAtNs"))
+      if (given(opts.Get("expiresAtNs")))
       {
         expiresAtNs = toInt64Ns(opts.Get("expiresAtNs"), "submitOrder: expiresAtNs");
       }
@@ -323,10 +323,10 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       }
       m = static_cast<int32_t>(*parsed);
     }
-    int32_t ticks = info.Length() > 1 ? argInt32(info[1], "setDefaultSlippage: ticks") : 0;
-    double tickSize = info.Length() > 2 ? argNumber(info[2], "setDefaultSlippage: tickSize") : 0.0;
-    double bps = info.Length() > 3 ? argNumber(info[3], "setDefaultSlippage: bps") : 0.0;
-    double impact = info.Length() > 4 ? argNumber(info[4], "setDefaultSlippage: impactCoeff") : 0.0;
+    int32_t ticks = given(info[1]) ? argInt32(info[1], "setDefaultSlippage: ticks") : 0;
+    double tickSize = given(info[2]) ? argNumber(info[2], "setDefaultSlippage: tickSize") : 0.0;
+    double bps = given(info[3]) ? argNumber(info[3], "setDefaultSlippage: bps") : 0.0;
+    double impact = given(info[4]) ? argNumber(info[4], "setDefaultSlippage: impactCoeff") : 0.0;
     lrvx_clear_last_error();
     lrvx_simulated_executor_set_default_slippage(_h, m, ticks, tickSize, bps, impact);
     if (lrvx_last_error_code() != 0)
@@ -359,7 +359,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       }
       m = static_cast<int32_t>(*parsed);
     }
-    uint32_t depth = info.Length() > 1 ? argUint32(info[1], "setQueueModel: depth") : 1;
+    uint32_t depth = given(info[1]) ? argUint32(info[1], "setQueueModel: depth") : 1;
     lrvx_clear_last_error();
     lrvx_simulated_executor_set_queue_model(_h, m, depth);
     if (lrvx_last_error_code() != 0)
@@ -403,19 +403,19 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   void SetSubmitAck(const Napi::CallbackInfo& info)
   {
     int64_t latency = argInteger(info[0], "setSubmitAckLatency: latencyNs");
-    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setSubmitAckLatency: jitterNs") : 0;
+    int64_t jitter = given(info[1]) ? argInteger(info[1], "setSubmitAckLatency: jitterNs") : 0;
     lrvx_simulated_executor_set_submit_ack_latency(_h, latency, jitter);
   }
   void SetCancelAck(const Napi::CallbackInfo& info)
   {
     int64_t latency = argInteger(info[0], "setCancelAckLatency: latencyNs");
-    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setCancelAckLatency: jitterNs") : 0;
+    int64_t jitter = given(info[1]) ? argInteger(info[1], "setCancelAckLatency: jitterNs") : 0;
     lrvx_simulated_executor_set_cancel_ack_latency(_h, latency, jitter);
   }
   void SetReplaceAck(const Napi::CallbackInfo& info)
   {
     int64_t latency = argInteger(info[0], "setReplaceAckLatency: latencyNs");
-    int64_t jitter = info.Length() > 1 ? argInteger(info[1], "setReplaceAckLatency: jitterNs") : 0;
+    int64_t jitter = given(info[1]) ? argInteger(info[1], "setReplaceAckLatency: jitterNs") : 0;
     lrvx_simulated_executor_set_replace_ack_latency(_h, latency, jitter);
   }
   void ApplyLatencyProfile(const Napi::CallbackInfo& info)
@@ -519,7 +519,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
   {
     auto opts = argObject(info[0], "submitBracket: opts");
     uint64_t bracketId = argInteger(opts.Get("bracketId"), "submitBracket: bracketId");
-    uint32_t sym = opts.Has("symbol") ? argUint32(opts.Get("symbol"), "submitBracket: symbol") : 1;
+    uint32_t sym = given(opts.Get("symbol")) ? argUint32(opts.Get("symbol"), "submitBracket: symbol") : 1;
     auto sideOf = [&](const std::string& key)
     {
       const std::string s = argString(opts.Get(key), ("submitBracket: " + key).c_str());
@@ -588,7 +588,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     double price = argNumber(info[2], "submitIceberg: price");
     double total = argNumber(info[3], "submitIceberg: totalQuantity");
     double visible = argNumber(info[4], "submitIceberg: visibleQuantity");
-    uint32_t sym = info.Length() > 5 ? argUint32(info[5], "submitIceberg: symbol") : 1;
+    uint32_t sym = given(info[5]) ? argUint32(info[5], "submitIceberg: symbol") : 1;
     uint8_t s = side == "buy" ? 0 : 1;
     lrvx_simulated_executor_submit_iceberg(_h, id, s, price, total, visible, sym);
   }
@@ -635,8 +635,8 @@ class BacktestResultWrap : public Napi::ObjectWrap<BacktestResultWrap>
   }
   BacktestResultWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<BacktestResultWrap>(info)
   {
-    double cap = info.Length() > 0 ? argNumber(info[0], "BacktestResult: initialCapital") : 100000.0;
-    double fee = info.Length() > 1 ? argNumber(info[1], "BacktestResult: feeRate") : 0.0001;
+    double cap = given(info[0]) ? argNumber(info[0], "BacktestResult: initialCapital") : 100000.0;
+    double fee = given(info[1]) ? argNumber(info[1], "BacktestResult: feeRate") : 0.0001;
     _h = lrvx_backtest_result_create(cap, fee, 1, 0.0, 0.0, 252.0);
   }
   ~BacktestResultWrap()

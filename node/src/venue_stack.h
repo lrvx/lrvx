@@ -77,11 +77,11 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
       : Napi::ObjectWrap<VenueStackWrap>(info)
   {
     const uint8_t venueCode =
-        info.Length() > 0 ? argUint32(info[0], "VenueStack: venueCode") : 0;
+        given(info[0]) ? argUint32(info[0], "VenueStack: venueCode") : 0;
     const uint64_t accountId =
-        info.Length() > 1 ? argInteger(info[1], "VenueStack: accountId") : 0;
+        given(info[1]) ? argInteger(info[1], "VenueStack: accountId") : 0;
     const double equity =
-        info.Length() > 2 ? argNumber(info[2], "VenueStack: equity") : 0.0;
+        given(info[2]) ? argNumber(info[2], "VenueStack: equity") : 0.0;
     _h = lrvx_venue_stack_create(venueCode, accountId, equity);
   }
   ~VenueStackWrap()

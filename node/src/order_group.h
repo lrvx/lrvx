@@ -59,12 +59,12 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
     if (given(info[0]))
     {
       auto opts = argObject(info[0], "OrderGroup: opts");
-      if (opts.Has("parentSignalId"))
+      if (given(opts.Get("parentSignalId")))
       {
         parent =
             static_cast<uint64_t>(argInteger(opts.Get("parentSignalId"), "OrderGroup: parentSignalId"));
       }
-      if (opts.Has("policy"))
+      if (given(opts.Get("policy")))
       {
         auto p = opts.Get("policy");
         if (p.IsString())
@@ -259,13 +259,13 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
   void SetRiskLimits(const Napi::CallbackInfo& info)
   {
     auto opts = argObject(info[0], "setRiskLimits: opts");
-    double max_gross = opts.Has("maxGrossNotional")
+    double max_gross = given(opts.Get("maxGrossNotional"))
                            ? argNumber(opts.Get("maxGrossNotional"), "setRiskLimits: maxGrossNotional")
                            : 0.0;
-    double max_conc = opts.Has("maxConcentrationPct")
+    double max_conc = given(opts.Get("maxConcentrationPct"))
                           ? argNumber(opts.Get("maxConcentrationPct"), "setRiskLimits: maxConcentrationPct")
                           : 0.0;
-    double max_leg = opts.Has("maxLegQty")
+    double max_leg = given(opts.Get("maxLegQty"))
                          ? argNumber(opts.Get("maxLegQty"), "setRiskLimits: maxLegQty")
                          : 0.0;
     lrvx_order_group_set_risk_limits(_h, lrvx_quantity_from_double(max_gross), max_conc,
@@ -280,11 +280,11 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
     if (given(info[0]))
     {
       auto opts = argObject(info[0], "precheckSubmission: opts");
-      if (opts.Has("equity"))
+      if (given(opts.Get("equity")))
       {
         equity = argNumber(opts.Get("equity"), "precheckSubmission: equity");
       }
-      if (opts.Has("marketRefPrices"))
+      if (given(opts.Get("marketRefPrices")))
       {
         auto arr = argArray(opts.Get("marketRefPrices"), "precheckSubmission: marketRefPrices");
         ref_prices.reserve(arr.Length());
@@ -318,7 +318,7 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
     auto opts = argObject(info[0], "pairLatencyDecision: opts");
     int64_t submit_ts = toInt64Ns(opts.Get("leaderSubmitTsNs"), "pairLatencyDecision: leaderSubmitTsNs");
     int64_t ack_ts = toInt64Ns(opts.Get("leaderAckTsNs"), "pairLatencyDecision: leaderAckTsNs");
-    bool ack_received = opts.Has("ackReceived")
+    bool ack_received = given(opts.Get("ackReceived"))
                             ? argBool(opts.Get("ackReceived"), "pairLatencyDecision: ackReceived")
                             : false;
     uint8_t d = lrvx_order_group_pair_latency_decision(_h, submit_ts, ack_ts,

@@ -48,7 +48,7 @@ inline std::vector<int64_t> readInt64Array(const Napi::Value& v, const char* wha
 
 inline int64_t getInt64(const Napi::Object& o, const char* key, int64_t fallback)
 {
-  if (o.Has(key))
+  if (given(o.Get(key)))
   {
     return argInteger(o.Get(key), key);
   }
@@ -57,7 +57,7 @@ inline int64_t getInt64(const Napi::Object& o, const char* key, int64_t fallback
 
 inline double getDouble(const Napi::Object& o, const char* key, double fallback)
 {
-  if (o.Has(key))
+  if (given(o.Get(key)))
   {
     return argNumber(o.Get(key), key);
   }
@@ -245,15 +245,15 @@ class EmpiricalLatencyWrap : public Napi::ObjectWrap<EmpiricalLatencyWrap>
     if (given(info[0]))
     {
       auto opts = argObject(info[0], "EmpiricalLatency: opts");
-      if (opts.Has("feedSamples"))
+      if (given(opts.Get("feedSamples")))
       {
         feed = detail::readInt64Array(opts.Get("feedSamples"), "EmpiricalLatency: feedSamples");
       }
-      if (opts.Has("orderSamples"))
+      if (given(opts.Get("orderSamples")))
       {
         order = detail::readInt64Array(opts.Get("orderSamples"), "EmpiricalLatency: orderSamples");
       }
-      if (opts.Has("fillSamples"))
+      if (given(opts.Get("fillSamples")))
       {
         fill = detail::readInt64Array(opts.Get("fillSamples"), "EmpiricalLatency: fillSamples");
       }
