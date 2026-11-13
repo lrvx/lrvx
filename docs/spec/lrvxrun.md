@@ -128,6 +128,8 @@ Followed in order by:
 3. `payload_len` bytes of caller-defined payload (typically a JSON blob; opaque to the format).
 4. Padding to align the frame end to 8 bytes.
 
+A captured signal (`TraceSignalHandler`, a runner's attached recorder) and a reproducibility bundle's trace put one thing in the payload: the trigger of a conditional order, which the order event record has no field for (its `price_raw` is the order's limit price, 0 for a stop or take-profit that fills at market). It is compact JSON with sorted keys: `{"trigger_price_raw":N}` for a stop or take-profit order, market or limit (the trigger, or the price when the signal names none), and `{"trailing_bps":N,"trailing_offset_raw":N}` for a trailing stop; raw values are fixed-point at scale `1e8`. Any other captured signal has an empty payload.
+
 A single signal can carry several symbol ids because cross-symbol decisions are first-class. A pair-trade signal lists both symbols; a single-symbol signal lists one.
 
 ### `OrderEventRecord` (64 bytes fixed + optional payload, 8-byte aligned)

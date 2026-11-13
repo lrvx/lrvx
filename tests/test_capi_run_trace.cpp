@@ -174,3 +174,51 @@ TEST(CapiRunTrace, WriteSignal64OnANullHandleLeavesAReason)
   EXPECT_NE(lrvx_last_error_code(), 0);
   lrvx_clear_last_error();
 }
+
+// A runner's capture writes a conditional order's trigger into the payload
+// of its signal, with the keys a reproducibility bundle uses. It wrote no
+// payload, and the order's record has no field for a trigger, so a stop
+// at another trigger captured the same trace.
+TEST(CapiRunTrace, ACapturedConditionalSignalCarriesItsTrigger)
+{
+  const auto dir = scratch("trigger");
+  LrvxRegistryHandle registry = lrvx_registry_create();
+  const uint32_t symbol = lrvx_registry_add_symbol(registry, "test", "BTC", 0.01);
+  LrvxStrategyCallbacks scb{};
+  uint32_t syms[] = {symbol};
+  LrvxStrategyHandle strategy = lrvx_strategy_create(7, syms, 1, registry, scb);
+  LrvxRunnerHandle runner = lrvx_runner_create(registry, noopSignal, nullptr);
+  lrvx_runner_add_strategy(runner, strategy);
+  LrvxRunRecorderHandle recorder = lrvx_run_recorder_create(dir.string().c_str(), "s", "h", 1);
+  ASSERT_NE(recorder, nullptr) << lrvx_last_error_message();
+  lrvx_runner_attach_trace_recorder(runner, recorder);
+
+  lrvx_emit_stop_market(strategy, symbol, 1, 9500000000LL, 100000000LL);
+  lrvx_emit_take_profit_limit(strategy, symbol, 1, 10600000000LL, 10550000000LL, 100000000LL);
+  lrvx_emit_trailing_stop(strategy, symbol, 1, 250000000LL, 100000000LL);
+  lrvx_emit_limit_buy(strategy, symbol, 9900000000LL, 100000000LL);
+
+  lrvx_runner_attach_trace_recorder(runner, nullptr);
+  lrvx_run_recorder_close(recorder);
+  lrvx_run_recorder_destroy(recorder);
+
+  LrvxRunReaderHandle reader = lrvx_run_reader_open(dir.string().c_str());
+  ASSERT_NE(reader, nullptr) << lrvx_last_error_message();
+  ASSERT_EQ(lrvx_run_reader_signal_count(reader), 4u);
+  const auto payload = [&](uint64_t i)
+  {
+    uint8_t buf[256] = {0};
+    const uint64_t n = lrvx_run_reader_signal_payload(reader, i, buf, sizeof(buf));
+    return std::string(reinterpret_cast<const char*>(buf), static_cast<size_t>(n));
+  };
+  EXPECT_EQ(payload(0), "{\"trigger_price_raw\":9500000000}");
+  EXPECT_EQ(payload(1), "{\"trigger_price_raw\":10600000000}");
+  EXPECT_EQ(payload(2), "{\"trailing_bps\":0,\"trailing_offset_raw\":250000000}");
+  EXPECT_EQ(payload(3), "");
+  lrvx_run_reader_close(reader);
+
+  lrvx_runner_destroy(runner);
+  lrvx_strategy_destroy(strategy);
+  lrvx_registry_destroy(registry);
+  std::filesystem::remove_all(dir);
+}

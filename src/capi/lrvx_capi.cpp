@@ -48,6 +48,7 @@
 #include "lrvx/replay/tape_diff.h"
 #include "lrvx/report/heatmap_html.h"
 #include "lrvx/risk/portfolio_risk.h"
+#include "lrvx/run/trace_handlers.h"
 #include "lrvx/run/trace_reader.h"
 #include "lrvx/run/trace_recorder.h"
 #include "lrvx/stats/deflated_sharpe.h"
@@ -7491,6 +7492,8 @@ class RunnerSignalHandler : public ISignalHandler
       view.strength_raw = 0;
       view.symbol_ids = {static_cast<uint32_t>(sig.symbol)};
       view.name = signalTypeName(sig.type);
+      const std::string payload = lrvx::run::conditionalTriggerPayload(sig);
+      view.payload = payload;
       recorder->writeSignal(view);
     }
 

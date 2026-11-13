@@ -154,3 +154,31 @@ def test_a_bundle_packed_before_still_validates(tmp_path):
     res = _validate(old)
     assert res.matches, res.diff
     assert res.expected["lrvxrun_compared"] == "signal, order event and fill records"
+
+
+def test_capture_writes_the_payload_a_bundle_writes(tmp_path):
+    """A runner's trace capture and a bundle record a conditional order's
+    trigger with the same payload."""
+    import importlib.util
+
+    strat_path, tape_dir = _inputs(tmp_path)
+    path = bundle.pack_bundle(strategy=strat_path, tape=tape_dir, output=tmp_path / "b.tar")
+    packed = [s["payload"] for s in read_trace(expected_trace(path, tmp_path))["signals"]]
+
+    spec = importlib.util.spec_from_file_location("conditionals_capture", strat_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    reg = lrvx.SymbolRegistry()
+    sym = reg.add_symbol("bundle", "BTCUSDT", tick_size=0.01)
+    rec = lrvx.TraceRecorder(str(tmp_path / "captured.lrvxrun"), strategy_id="capture")
+    runner = lrvx.Runner(reg, lambda s: None)
+    runner.add_strategy(mod.Conditionals([sym]))
+    runner.attach_trace_recorder(rec)
+    runner.start()
+    runner.on_trade(sym, 100.0, 1.0, True, 1_000_000_000)
+    runner.stop()
+    runner.attach_trace_recorder(None)
+    rec.close()
+    captured = [s["payload"] for s in read_trace(tmp_path / "captured.lrvxrun")["signals"]]
+    assert captured == packed
+    assert all(captured)
