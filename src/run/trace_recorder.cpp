@@ -203,7 +203,8 @@ void TraceRecorder::writeSignal(const SignalView& s)
   SignalRecord rec{};
   rec.run_ts_ns = s.run_ts_ns;
   rec.feed_ts_ns = s.feed_ts_ns;
-  rec.signal_id = s.signal_id;
+  rec.signal_id = static_cast<uint32_t>(s.signal_id);
+  rec.signal_id_hi = static_cast<uint32_t>(s.signal_id >> 32);
   rec.name_len = static_cast<uint16_t>(s.name.size());
   rec.symbol_count = static_cast<uint16_t>(s.symbol_ids.size());
   rec.payload_len = static_cast<uint32_t>(s.payload.size());

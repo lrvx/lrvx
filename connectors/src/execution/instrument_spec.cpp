@@ -390,6 +390,7 @@ std::expected<InstrumentSpec, std::string> parsePolymarketTickSize(std::string_v
   }
   InstrumentSpec spec;
   spec.tickSize = *tick;
+  spec.lotSize = kPolymarketSizeStep;
   return spec;
 }
 

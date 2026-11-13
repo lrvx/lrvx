@@ -83,7 +83,7 @@ void BacktestRunner::setSimulatedExecutor(SimulatedExecutor* executor, Simulated
     // result() forwards to BacktestResult, so each fill is billed at the
     // tier the account's 30-day notional resolves to.
     installOrderEventCallback(*executor);
-    executor->setSymbolRegistry(symbolRegistry());
+    attachSymbolRegistry();
     if (clock != nullptr)
     {
       clock->advanceTo(_clock.nowNs());
@@ -100,10 +100,28 @@ void BacktestRunner::setSymbolRegistry(const SymbolRegistry* registry)
 void BacktestRunner::attachSymbolRegistry()
 {
   const SymbolRegistry* registry = symbolRegistry();
-  _executor.setSymbolRegistry(registry);
+  // The strategy's own entries are a copy; the log of the registry they were
+  // copied from carries what a connector applies to it afterwards.
+  std::shared_ptr<const VenueTickLog> sourceLog;
+  if (_registry == nullptr && registry != nullptr)
+  {
+    if (const auto* built = dynamic_cast<const Strategy*>(_strategy))
+    {
+      sourceLog = built->venueTickLog();
+    }
+  }
+  const auto attach = [&](SimulatedExecutor& executor)
+  {
+    executor.setSymbolRegistry(registry);
+    if (sourceLog)
+    {
+      executor.setVenueTickLog(sourceLog);
+    }
+  };
+  attach(_executor);
   if (_venueExecutor != nullptr)
   {
-    _venueExecutor->setSymbolRegistry(registry);
+    attach(*_venueExecutor);
   }
 }
 

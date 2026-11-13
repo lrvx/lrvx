@@ -484,7 +484,7 @@ TEST(SymbolRegistryVenueLot, AnUndeclaredLotTakesTheVenues)
   EXPECT_EQ(after.symbol, before.symbol);
   ASSERT_TRUE(registry.venueTickLog()->lotFor(id));
   EXPECT_EQ(registry.venueTickLog()->lotFor(id)->raw(), kMilliLot);
-  EXPECT_EQ(registry.venueTickLog()->revision(), rev) << "no book is sized on a lot";
+  EXPECT_GT(registry.venueTickLog()->revision(), rev) << "an executor's lot cache follows it";
   EXPECT_FALSE(registry.venueTickLog()->tickFor(id));
 }
 
@@ -553,4 +553,172 @@ TEST(SymbolRegistryVenueLot, TheSimulatorChecksAnAppliedLot)
   h.reg.applyVenueLot(h.sym, Quantity::fromDouble(0.001));
   h.exec.submitOrder(limitOrder(1, h.sym, Side::BUY, 99.0, 0.0015));
   expectRejected(h, 1, "quantity_off_lot");
+}
+
+// ---------------------------------------------------------------------------
+// Values applied after the executor's first read
+// ---------------------------------------------------------------------------
+
+// The executor caches each symbol's tick and lot on first use, "none known"
+// included. A value a connector applies after that read must still be picked
+// up by the same executor.
+TEST(SymbolRegistryVenueLot, AnExecutorThatAlreadyReadFollowsAnAppliedLot)
+{
+  Harness h(0.0);
+  h.exec.submitOrder(limitOrder(1, h.sym, Side::BUY, 99.0, 0.0015));
+  expectAccepted(h, 1);
+  ASSERT_EQ(h.exec.orderLotRaw(h.sym), 0);
+
+  ASSERT_EQ(h.reg.applyVenueLot(h.sym, Quantity::fromDouble(0.001)).outcome,
+            VenueTickOutcome::Applied);
+  EXPECT_EQ(h.exec.orderLotRaw(h.sym), kMilliLot);
+  h.exec.submitOrder(limitOrder(2, h.sym, Side::BUY, 99.0, 0.0015));
+  expectRejected(h, 2, "quantity_off_lot");
+
+  // And the venue's next lot after that.
+  ASSERT_EQ(h.reg.applyVenueLot(h.sym, Quantity::fromDouble(0.0005)).outcome,
+            VenueTickOutcome::Applied);
+  h.exec.submitOrder(limitOrder(3, h.sym, Side::BUY, 99.0, 0.0015));
+  expectAccepted(h, 3);
+}
+
+TEST(SymbolRegistryVenueLot, AnExecutorThatAlreadyReadFollowsAnAppliedTick)
+{
+  SymbolRegistry reg;
+  SymbolInfo info;
+  info.exchange = "test";
+  info.symbol = "UNTICKED";
+  const SymbolId sym = reg.registerSymbol(info);
+  SimulatedClock clock;
+  SimulatedExecutor exec(clock);
+  std::vector<OrderEvent> events;
+  exec.setSymbolRegistry(&reg);
+  exec.setOrderEventCallback([&events](const OrderEvent& ev)
+                             { events.push_back(ev); });
+
+  exec.submitOrder(limitOrder(1, sym, Side::BUY, 99.05, 1.0));
+  ASSERT_EQ(exec.orderTickRaw(sym), 0);
+  ASSERT_EQ(reg.applyVenueTick(sym, Price::fromDouble(0.1)).outcome, VenueTickOutcome::Applied);
+  EXPECT_EQ(exec.orderTickRaw(sym), Price::fromDouble(0.1).raw());
+
+  events.clear();
+  exec.submitOrder(limitOrder(2, sym, Side::BUY, 99.05, 1.0));
+  ASSERT_FALSE(events.empty());
+  EXPECT_EQ(events.front().status, OrderEventStatus::REJECTED);
+  EXPECT_EQ(events.front().rejectReason, "price_off_tick");
+}
+
+TEST(SymbolRegistryVenueLot, AnAppliedLotMovesTheLogRevision)
+{
+  SymbolRegistry registry;
+  const SymbolId id = addSymbol(registry, "BTCUSDT", 0.0);
+  const uint64_t rev = registry.venueTickLog()->revision();
+  registry.applyVenueLot(id, Quantity::fromDouble(0.001));
+  const uint64_t applied = registry.venueTickLog()->revision();
+  EXPECT_GT(applied, rev);
+  registry.applyVenueLot(id, Quantity::fromDouble(0.001));
+  EXPECT_EQ(registry.venueTickLog()->revision(), applied) << "nothing changed, nothing to follow";
+}
+
+namespace
+{
+
+class Idle : public Strategy
+{
+ public:
+  Idle(SymbolId sym, const SymbolRegistry& reg) : Strategy(1, sym, reg) {}
+  void start() override {}
+  void stop() override {}
+};
+
+SymbolId addUndeclared(SymbolRegistry& reg, const std::string& name)
+{
+  SymbolInfo info;
+  info.exchange = "test";
+  info.symbol = name;
+  return reg.registerSymbol(info);
+}
+
+}  // namespace
+
+// Strategy::symbolInfos() used to be the entries as copied in the
+// constructor, whatever a connector applied afterwards.
+TEST(StrategySymbolInfos, FollowAnAppliedTickAndLot)
+{
+  SymbolRegistry registry;
+  const SymbolId id = addUndeclared(registry, "BTCUSDT");
+  Idle strategy(id, registry);
+  ASSERT_EQ(strategy.symbolInfos().size(), 1u);
+  EXPECT_FALSE(strategy.symbolInfos()[0].tickSizeKnown);
+  EXPECT_EQ(strategy.symbolInfos()[0].lotSize.raw(), 0);
+
+  registry.applyVenueTick(id, Price::fromDouble(0.5));
+  registry.applyVenueLot(id, Quantity::fromDouble(0.001));
+  const auto infos = strategy.symbolInfos();
+  EXPECT_TRUE(infos[0].tickSizeKnown);
+  EXPECT_EQ(infos[0].tickSize.raw(), Price::fromDouble(0.5).raw());
+  EXPECT_EQ(infos[0].lotSize.raw(), kMilliLot);
+  EXPECT_EQ(orderTickRaw(infos[0]), Price::fromDouble(0.5).raw());
+  EXPECT_EQ(orderLotRaw(infos[0]), kMilliLot);
+
+  registry.applyVenueLot(id, Quantity::fromDouble(0.01));
+  EXPECT_EQ(strategy.symbolInfos()[0].lotSize.raw(), Quantity::fromDouble(0.01).raw());
+}
+
+// The copy outlives the registry it was taken from, applied values included.
+TEST(StrategySymbolInfos, OutliveTheRegistry)
+{
+  auto registry = std::make_unique<SymbolRegistry>();
+  const SymbolId id = addUndeclared(*registry, "BTCUSDT");
+  Idle strategy(id, *registry);
+  registry->applyVenueLot(id, Quantity::fromDouble(0.001));
+  registry.reset();
+  EXPECT_EQ(strategy.symbolInfos()[0].lotSize.raw(), kMilliLot);
+}
+
+// A BacktestRunner that was never given a registry reads the strategy's
+// entries. Values applied to the strategy's registry -- before or after the
+// runner took the strategy, before or after its executor first read the
+// symbol -- are the ones its executor checks against.
+TEST(StrategySymbolInfos, ARunnerWithoutARegistryFollowsAppliedValues)
+{
+  SymbolRegistry registry;
+  const SymbolId id = addUndeclared(registry, "BTCUSDT");
+  Idle strategy(id, registry);
+
+  BacktestRunner early;
+  early.setStrategy(&strategy);
+  ASSERT_EQ(early.executor().orderLotRaw(id), 0);
+  ASSERT_EQ(early.executor().orderTickRaw(id), 0);
+
+  registry.applyVenueTick(id, Price::fromDouble(0.5));
+  registry.applyVenueLot(id, Quantity::fromDouble(0.001));
+  EXPECT_EQ(early.executor().orderLotRaw(id), kMilliLot);
+  EXPECT_EQ(early.executor().orderTickRaw(id), Price::fromDouble(0.5).raw());
+
+  // A runner that takes the strategy after the values were applied.
+  Idle second(id, registry);
+  BacktestRunner late;
+  late.setStrategy(&second);
+  EXPECT_EQ(late.executor().orderLotRaw(id), kMilliLot);
+  EXPECT_EQ(late.executor().orderTickRaw(id), Price::fromDouble(0.5).raw());
+
+  // The venue moves both again.
+  registry.applyVenueTick(id, Price::fromDouble(0.25));
+  registry.applyVenueLot(id, Quantity::fromDouble(0.01));
+  EXPECT_EQ(early.executor().orderLotRaw(id), Quantity::fromDouble(0.01).raw());
+  EXPECT_EQ(late.executor().orderTickRaw(id), Price::fromDouble(0.25).raw());
+
+  // A registry passed to the runner takes precedence, as before.
+  SymbolRegistry own;
+  SymbolInfo declared;
+  declared.id = id;
+  declared.exchange = "test";
+  declared.symbol = "BTCUSDT";
+  declared.lotSize = Quantity::fromDouble(0.1);
+  own.registerSymbol(declared);
+  early.setSymbolRegistry(&own);
+  EXPECT_EQ(early.executor().orderLotRaw(id), Quantity::fromDouble(0.1).raw());
+  early.setSymbolRegistry(nullptr);
+  EXPECT_EQ(early.executor().orderLotRaw(id), Quantity::fromDouble(0.01).raw());
 }

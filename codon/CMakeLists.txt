@@ -9,14 +9,79 @@ endif()
 message(STATUS "Found Codon compiler: ${CODON_COMPILER}")
 
 # Compile a Codon source file to a native executable
-# Every Codon executable compiles the binding in; a change under
-# codon/lrvx/ must rebuild them all, or a tree (or a CI cache) tests the
-# old binding.
+# A Codon executable compiles in the binding modules it imports, so a change
+# to one of those must rebuild it, or a tree (or a CI cache) tests the old
+# binding. It need not rebuild the executables that never import the module:
+# each one depends on the modules its import graph reaches, not on all of
+# codon/lrvx/.
 file(GLOB_RECURSE LRVX_CODON_BINDING_SOURCES CONFIGURE_DEPENDS
      "${CMAKE_CURRENT_SOURCE_DIR}/lrvx/*.codon")
 
+# The lrvx.* modules a Codon file names: `from lrvx.x import ...` and
+# `import lrvx.x`, at any indentation. Sets ${out_modules} to the module
+# names and ${out_exact} to FALSE when the file also has an import this scan
+# cannot follow (`import lrvx`, `from lrvx import x`, a relative import), in
+# which case the caller depends on every module.
+function(lrvx_codon_imports file out_modules out_exact)
+  set(modules "")
+  set(exact TRUE)
+  file(STRINGS "${file}" lines REGEX "^[ \t]*(from|import)[ \t]+(lrvx|\\.)")
+  foreach(line IN LISTS lines)
+    if(line MATCHES "^[ \t]*(from|import)[ \t]+lrvx\\.([A-Za-z0-9_]+)")
+      list(APPEND modules "${CMAKE_MATCH_2}")
+    else()
+      set(exact FALSE)
+    endif()
+  endforeach()
+  list(REMOVE_DUPLICATES modules)
+  set(${out_modules} "${modules}" PARENT_SCOPE)
+  set(${out_exact} ${exact} PARENT_SCOPE)
+endfunction()
+
+# The binding files `source` reaches: its own lrvx.* imports, what those
+# import in turn, and lrvx/__init__.codon with everything it imports, which
+# Codon runs for any import from the package. Falls back to every binding
+# file when an import cannot be followed or names a module that is not a
+# file under codon/lrvx/.
+function(lrvx_codon_binding_deps source out_deps)
+  set(binding_dir "${CMAKE_CURRENT_SOURCE_DIR}/lrvx")
+  set(pending "${source}" "${binding_dir}/__init__.codon")
+  set(seen "")
+  set(deps "")
+  while(pending)
+    list(POP_FRONT pending file)
+    if(file IN_LIST seen)
+      continue()
+    endif()
+    list(APPEND seen "${file}")
+    lrvx_codon_imports("${file}" modules exact)
+    if(NOT exact)
+      set(${out_deps} "${LRVX_CODON_BINDING_SOURCES}" PARENT_SCOPE)
+      return()
+    endif()
+    foreach(module IN LISTS modules)
+      set(module_file "${binding_dir}/${module}.codon")
+      if(NOT EXISTS "${module_file}")
+        set(${out_deps} "${LRVX_CODON_BINDING_SOURCES}" PARENT_SCOPE)
+        return()
+      endif()
+      list(APPEND pending "${module_file}")
+    endforeach()
+    if(NOT file STREQUAL source)
+      list(APPEND deps "${file}")
+    endif()
+  endwhile()
+  set(${out_deps} "${deps}" PARENT_SCOPE)
+endfunction()
+
+# The import lists are read at configure time, so an edit to any file they
+# were read from re-runs the configure step and they are read again.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${LRVX_CODON_BINDING_SOURCES})
+
 function(add_codon_executable name source)
   set(OUTPUT_EXE ${CMAKE_CURRENT_BINARY_DIR}/${name})
+  lrvx_codon_binding_deps("${source}" binding_deps)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${source}")
   add_custom_command(
     OUTPUT ${OUTPUT_EXE}
     COMMAND ${CMAKE_COMMAND} -E env
@@ -26,7 +91,7 @@ function(add_codon_executable name source)
         -o ${OUTPUT_EXE}
         -l lrvx_capi
         ${source}
-    DEPENDS ${source} ${LRVX_CODON_BINDING_SOURCES} lrvx_capi
+    DEPENDS ${source} ${binding_deps} lrvx_capi
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Compiling Codon: ${name}"
   )

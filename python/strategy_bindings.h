@@ -28,6 +28,7 @@
 #include "lrvx/capi/order_type_names.hpp"
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/error/lrvx_error.h"
+#include "lrvx/execution/order_price_rule.h"
 #include "lrvx/replay/abstract_event_reader.h"
 #include "lrvx/replay/binary_format_v1.h"
 #include "lrvx/replay/binary_log_recorder_hook.h"
@@ -538,8 +539,11 @@ class PyStrategyBase
     emit_cancel_all(_resolve(symbol));
   }
 
+  // Cleared first, so lrvx.last_error() after the call is '' unless a live
+  // runner refused the modify (an id its executor record does not hold).
   void modify_order(uint64_t order_id, double new_price, double new_qty)
   {
+    lrvx_clear_last_error();
     emit_modify(order_id, new_price, new_qty);
   }
 
@@ -1367,6 +1371,8 @@ class PyStrategyRunner
     }
   }
 
+  void order_closed(uint64_t order_id) { lrvx_runner_order_closed(_runner, order_id); }
+
   void set_executor(std::shared_ptr<lrvx::PyExecutor> exec)
   {
     _executor_owner.reset();
@@ -1708,6 +1714,8 @@ class PyLiveEngine
     }
   }
 
+  void order_closed(uint64_t order_id) { lrvx_live_engine_order_closed(_engine, order_id); }
+
   void set_executor(std::shared_ptr<lrvx::PyExecutor> exec)
   {
     _executor_owner.reset();
@@ -1840,6 +1848,18 @@ class PyRunner
   _PYRUNNER_SET_HOOK(market_data_recorder, PyMarketDataRecorderHook)
   _PYRUNNER_SET_HOOK(executor, PyExecutor)
 #undef _PYRUNNER_SET_HOOK
+
+  void order_closed(uint64_t order_id)
+  {
+    if (_live)
+    {
+      _live->order_closed(order_id);
+    }
+    else
+    {
+      _sync->order_closed(order_id);
+    }
+  }
 
   // Built-in `.lrvx` recorder overload — picks up the same attach
   // slot as the user-callback flavour on the underlying runner / engine.
@@ -3059,6 +3079,35 @@ inline void bindStrategy(py::module_& m)
              }
              uint32_t id = static_cast<uint32_t>(reg.registerSymbol(info));
              return PySymbol{id, exchange, symbol, info.tickSize.toDouble(), lot_size ? std::optional<double>(info.lotSize.toDouble()) : std::nullopt}; }, py::arg("exchange"), py::arg("symbol"), py::arg("tick_size") = py::none(), py::arg("lot_size") = py::none(), "Register a symbol. tick_size is the venue's price increment and lot_size its quantity step; a backtest rejects an order priced off a given tick (price_off_tick) or sized off a given lot (quantity_off_lot). Left out, that side of the order is not checked.")
+      .def("tick_size", [](const SymbolRegistry& reg, uint32_t symbol) -> double
+           {
+            const auto info = reg.getSymbolInfo(symbol);
+            if (!info)
+            {
+              throw py::value_error("tick_size: symbol id " + std::to_string(symbol) + " is not registered");
+            }
+            return info->tickSize.toDouble(); }, py::arg("symbol"), "The price tick the entry holds now: the one given to add_symbol, one a connector read from the venue and applied since, or the 0.01 a symbol registered without a tick gets for its book. See tick_size_declared.")
+      .def("tick_size_declared", [](const SymbolRegistry& reg, uint32_t symbol) -> bool
+           {
+            const auto info = reg.getSymbolInfo(symbol);
+            if (!info)
+            {
+              throw py::value_error("tick_size_declared: symbol id " + std::to_string(symbol) + " is not registered");
+            }
+            return orderTickRaw(*info) != 0; }, py::arg("symbol"), "True when order prices on the symbol are checked against tick_size: a tick was given at registration or applied from the venue.")
+      .def("lot_size", [](const SymbolRegistry& reg, uint32_t symbol) -> std::optional<double>
+           {
+            const auto info = reg.getSymbolInfo(symbol);
+            if (!info)
+            {
+              throw py::value_error("lot_size: symbol id " + std::to_string(symbol) + " is not registered");
+            }
+            const int64_t lot = orderLotRaw(*info);
+            if (lot == 0)
+            {
+              return std::nullopt;
+            }
+            return Quantity::fromRaw(lot).toDouble(); }, py::arg("symbol"), "The quantity step the entry holds now (given to add_symbol or applied from the venue), or None when it declares none and quantities are not checked.")
       .def("symbol_count", &SymbolRegistry::size);
 
   py::class_<PyTradeData>(m, "TradeData")
@@ -3440,6 +3489,15 @@ inline void bindStrategy(py::module_& m)
            py::arg("recorder"), py::keep_alive<1, 2>())
       .def("set_executor", &PyRunner::set_executor, py::arg("executor"),
            py::keep_alive<1, 2>())
+      .def("order_closed", &PyRunner::order_closed, py::arg("order_id"),
+           "Tell the runner an order it sent to the executor has reached a terminal state "
+           "(filled, cancelled by the venue, rejected, expired). With an executor attached the "
+           "runner keeps every order that can rest so that a modify can be sent as that order "
+           "with its price and quantity changed, and nothing tells it of a fill: call this from "
+           "wherever the executor learns the order is finished and the entry is dropped. An id "
+           "that is not on record is ignored; market, IOC and FOK orders are never kept. A "
+           "modify that names an id not on record is not sent to the executor, and "
+           "lrvx.last_error() then says why, ending in [unknown_order].")
       .def("attach_trace_recorder", [](PyRunner& r, py::object recorder)
            {
              // Accepts a lrvx.TraceRecorder or None. The TraceRecorder

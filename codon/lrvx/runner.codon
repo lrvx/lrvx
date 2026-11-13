@@ -43,6 +43,11 @@ from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
 # rejects an order whose quantity is not a whole number of a positive lot
 # (reject_reason "quantity_off_lot"); 0.0 declares none.
 from C import lrvx_registry_add_symbol_with_lot(cobj, cobj, cobj, float, float) -> u32
+# The tick / lot an entry holds now: (registry, symbol_id, value_out,
+# declared_out) -> 1 when the id is registered. declared_out reads 0 for a
+# symbol whose prices / quantities are not checked.
+from C import lrvx_registry_get_symbol_tick(cobj, u32, Ptr[float], Ptr[u8]) -> u8
+from C import lrvx_registry_get_symbol_lot(cobj, u32, Ptr[float], Ptr[u8]) -> u8
 
 from C import lrvx_runner_create(cobj, cobj, cobj) -> cobj
 from C import lrvx_runner_destroy(cobj)

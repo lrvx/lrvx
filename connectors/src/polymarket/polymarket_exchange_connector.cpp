@@ -467,6 +467,8 @@ void PolymarketExchangeConnector::processTickSizeChange(std::string_view payload
   }
   InstrumentSpec spec = held.value_or(InstrumentSpec{});
   spec.tickSize = *tick;
+  // A token whose tick-size request failed at start() is first known here.
+  spec.lotSize = instrument_info::kPolymarketSizeStep;
   _specs.add(tokenId, spec);
   if (_logger)
   {

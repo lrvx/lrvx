@@ -526,12 +526,63 @@ declare const lrvx: {
     validateSegment(path: string): boolean;
     /** `false` when no segment was merged; `lastError()` says why. */
     mergeSegments(inputDir: string, outputPath: string): boolean;
+    /** `outputPath` is the segment that was written (`''` when none was).
+     *  `errors` has one entry for everything that went wrong, among them
+     *  `"Cannot open: <path>"` for each input that was skipped while the
+     *  others were merged; `success` is `false` whenever it is not empty. */
     mergeDir(inputDir: string, outputDir: string): {
         success: boolean;
         segmentsMerged: number;
         eventsWritten: number;
         bytesWritten: number;
+        outputPath: string;
+        errors: string[];
     };
+    /** Split one segment into several. `mode`: 0 by time (`timeIntervalNs`
+     *  per file), 1 by event count (`eventsPerFile`), 2 by size, 3 by symbol.
+     *  A zero or omitted interval or count takes the engine's default. */
+    splitSegment(inputPath: string, outputDir: string, mode?: number,
+                 timeIntervalNs?: number | bigint, eventsPerFile?: number): {
+        success: boolean;
+        segmentsCreated: number;
+        eventsWritten: number;
+    };
+    /** Export a segment's events. `format`: 0 CSV, 1 JSON, 2 JSON lines,
+     *  3 binary. `fromNs` / `toNs` of 0 leave that end open; an empty or
+     *  omitted `symbols` keeps every symbol. */
+    exportSegment(inputPath: string, outputPath: string, format?: number,
+                  fromNs?: number | bigint, toNs?: number | bigint, symbols?: number[]): {
+        success: boolean;
+        eventsExported: number;
+        bytesWritten: number;
+    };
+    /** Walk every record of a segment. `verifyCrc` and `verifyTimestamps`
+     *  are both on when left out; pass `false` to turn one off. */
+    validateSegmentFull(path: string, verifyCrc?: boolean, verifyTimestamps?: boolean): {
+        valid: boolean;
+        headerValid: boolean;
+        reportedEventCount: number;
+        actualEventCount: number;
+        hasIndex: boolean;
+        indexValid: boolean;
+        tradesFound: number;
+        bookUpdatesFound: number;
+        crcErrors: number;
+        timestampAnomalies: number;
+    };
+    /** Rewrite a segment with another compression: 0 none (the default),
+     *  1 LZ4. `false` when the input cannot be read or the output cannot be
+     *  written; `lastError()` says which. */
+    recompressSegment(inputPath: string, outputPath: string, compression?: number): boolean;
+    /** Copy the events of `symbols` into `outputPath`; returns how many were
+     *  written. 0 is also what a failure returns: `lastError()` is `''` when
+     *  nothing matched and the reason otherwise. */
+    extractSymbols(inputPath: string, outputPath: string, symbols: number[]): number;
+    /** Copy the events between `fromNs` and `toNs` into `outputPath`;
+     *  returns how many were written, with `lastError()` as for
+     *  `extractSymbols`. */
+    extractTimeRange(inputPath: string, outputPath: string,
+                     fromNs: number | bigint, toNs: number | bigint): number;
     /** `firstTimestamp` / `lastTimestamp` are nanoseconds. */
     validateDataset(dataDir: string): {
         valid: boolean;
@@ -810,6 +861,7 @@ interface BinaryLogRecorderStats {
 }
 
 declare class DataWriter {
+    /** `maxSegmentSize` is megabytes; 0 or omitted is the 256 MB default. */
     constructor(dir: string, maxSegmentSize?: number, exchangeId?: number);
     destroy(): void;
     writeTrade(timestampNs: bigint | number, exchangeNs: bigint | number,

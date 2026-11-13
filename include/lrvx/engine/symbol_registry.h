@@ -145,14 +145,15 @@ struct VenueLotResult
 // does not have to outlive it, and on its next event for a symbol it re-sizes
 // that book when the revision moved.
 //
-// The lots applyVenueLot wrote are kept beside them. Nothing sizes itself on
-// a lot, so they do not move the revision; the registry reads them back to
-// tell a lot the venue wrote from one the caller declared.
+// The lots applyVenueLot wrote are kept beside them, and move the revision
+// the same way: a simulated executor caches each symbol's tick and lot and
+// drops both caches when the revision moves, and the registry reads the lots
+// back to tell one the venue wrote from one the caller declared.
 class VenueTickLog
 {
  public:
-  // Bumped on every applied tick and on clear(). An acquire load: a reader
-  // that sees the new revision sees the tick written before it.
+  // Bumped on every applied tick or lot and on clear(). An acquire load: a
+  // reader that sees the new revision sees the value written before it.
   uint64_t revision() const noexcept { return _revision.load(std::memory_order_acquire); }
 
   // The venue tick applied to this symbol, if one was.
@@ -193,8 +194,11 @@ class VenueTickLog
 
   void recordLot(SymbolId id, Quantity lot)
   {
-    std::lock_guard lock(_mutex);
-    _lots[id] = lot;
+    {
+      std::lock_guard lock(_mutex);
+      _lots[id] = lot;
+    }
+    _revision.fetch_add(1, std::memory_order_release);
   }
 
   void reset()

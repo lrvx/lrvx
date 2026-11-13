@@ -18,6 +18,9 @@ public:
 
   // Where each symbol's tick is read. Without a registry nothing is checked.
   void setSymbolRegistry(const SymbolRegistry* registry);
+  // For a registry that is a copy of another's entries: the log of the
+  // registry it was copied from, whose applied ticks and lots win.
+  void setVenueTickLog(std::shared_ptr<const VenueTickLog> log);
   int64_t orderTickRaw(SymbolId symbol) const;  // 0 when no tick is known
   int64_t orderLotRaw(SymbolId symbol) const;   // 0 when no lot is declared
 
@@ -291,6 +294,21 @@ There is no default lot and no flag: a lot is declared by being positive. It is 
 its symbols without a tick and without a lot. A lot is the step only; a venue's minimum order size
 is a separate rule the simulator does not model. Fills the simulator sizes itself (a partial fill
 against a book level, a queue model's share) are not snapped to the lot.
+
+### A tick or lot applied after the executor read the symbol
+
+The executor caches each symbol's tick and lot on first use. The cache follows the registry: a
+connector that applies the venue's tick or lot to an entry afterwards
+(`SymbolRegistry::applyVenueTick` / `applyVenueLot`) moves the revision of the registry's venue
+tick log, the executor reads that revision on every check (one atomic load) and drops both caches
+when it has moved, so the next order is checked against the applied value. Before, the first
+answer stuck, "nothing declared" included, and an executor that had seen one order on a symbol
+never checked that symbol again.
+
+A C++ `BacktestRunner` that was not given a registry builds one from the strategy's entries
+(`Strategy::symbolInfos()`), which is a copy. It hands the executor the venue tick log of the
+registry the strategy was built from (`setVenueTickLog`), and a tick or lot that log holds is used
+in place of the copied entry's, so such a runner follows applied values too.
 
 ### Market orders
 

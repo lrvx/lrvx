@@ -11453,6 +11453,7 @@ Members:
 - `on_book_snapshot(self, symbol: typing.Any, bid_prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], bid_qtys: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ask_prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ask_qtys: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `on_book_top(self, symbol: typing.Any, bid: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ask: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `on_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
+- `order_closed(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> None`
 - `replace_strategy(self, index: typing.SupportsInt | typing.SupportsIndex, strategy: Strategy) -> None`
 - `set_executor(self, executor: Executor) -> None`
 - `set_kill_switch(self, ks: KillSwitch) -> None`
@@ -11819,7 +11820,10 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 **Members**
 
 - `add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None, lot_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol`
+- `lot_size(self, symbol: typing.SupportsInt | typing.SupportsIndex) -> float | None`
 - `symbol_count(self) -> int`
+- `tick_size(self, symbol: typing.SupportsInt | typing.SupportsIndex) -> float`
+- `tick_size_declared(self, symbol: typing.SupportsInt | typing.SupportsIndex) -> bool`
 
 ### `class TEMA`
 
@@ -12295,8 +12299,13 @@ btc = registry.add_symbol("binance", "BTCUSDT", tick_size=0.01)
 |--------|---------|-------------|
 | `add_symbol(exchange, symbol, tick_size=None, lot_size=None)` | `Symbol` | Register a symbol and return its `Symbol` object |
 | `symbol_count()` | `int` | Number of registered symbols |
+| `tick_size(symbol)` | `float` | The price tick the entry holds now |
+| `tick_size_declared(symbol)` | `bool` | Whether order prices on the symbol are checked against it |
+| `lot_size(symbol)` | `float \| None` | The quantity step the entry holds now, `None` when it declares none |
 
 `tick_size` is the venue's price increment, and a backtest rejects orders priced off it. Left out, the symbol's book uses 0.01 and order prices are not checked; `Symbol.tick_size` then reads 0.01.
+
+The three getters take a `Symbol` or its id and read the registry entry, where a `Symbol` only carries what `add_symbol` was given: `tick_size(symbol)` is 0.01 with `tick_size_declared(symbol)` `False` for a symbol registered without a tick, and both follow a tick or lot a connector applies to the entry later. An id that is not registered raises `ValueError`.
 
 `lot_size` is the venue's quantity step, and a backtest rejects an order whose quantity is not a whole number of it (`reject_reason` `"quantity_off_lot"`). Left out, quantities are not checked and `Symbol.lot_size` is `None`. A `lot_size` that is not positive raises `ValueError`.
 
@@ -12545,6 +12554,11 @@ runner.stop()
 | `set_order_validator(ov)` | Attach an `OrderValidator` |
 | `set_market_data_recorder(recorder)` | Attach a `MarketDataRecorderHook` or `BinaryLogRecorderHook` |
 | `set_executor(executor)` | Replace the executor |
+| `order_closed(order_id)` | Tell the runner an order it sent to the executor is finished |
+
+With an executor attached the runner keeps every order that can rest, by id, so that a strategy's `modify_order` reaches `Executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `order_closed(order_id)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. A `cancel_order` from the strategy drops the entry by itself, and market, IOC and FOK orders are never kept. `CcxtBroker` calls it for every terminal status its orders stream reports.
+
+A `modify_order` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor. `modify_order` clears `lrvx.last_error()` on entry, and after a refused one it reads `modify: order <id> is not on record with this executor ... [unknown_order]`, on the thread the strategy ran on.
 
 A `MarketDataRecorderHook` subclass overrides any of `on_trade(trade)`,
 `on_book_update(symbol, is_snapshot, bids, asks, ts_ns)`,
@@ -14590,6 +14604,10 @@ Merge all segments in a directory (shorthand for `merge`).
 result = lrvx.merge_dir("./raw_data", "./merged_data")
 ```
 
+A segment that cannot be opened is skipped and listed in `errors` as `"Cannot open: <path>"`; the
+others are still merged, `segments_merged` counts them, and `success` is `False` because `errors`
+is not empty.
+
 ---
 
 ## Split
@@ -15401,6 +15419,11 @@ const registry = new lrvx.SymbolRegistry();
 |--------|---------|-------------|
 | `addSymbol(exchange, name, tickSize?, lotSize?)` | `Symbol` | Register a symbol. `tickSize` is the venue's price increment and a backtest rejects orders priced off it; left out, the book uses 0.01 and order prices are not checked. `lotSize` is the venue's quantity step and a backtest rejects an order whose quantity is not a whole number of it; left out, quantities are not checked |
 | `symbolCount()` | `number` | Number of registered symbols |
+| `tickSize(symbol)` | `number` | The price tick the entry holds now |
+| `tickSizeDeclared(symbol)` | `boolean` | Whether order prices on the symbol are checked against it |
+| `lotSize(symbol)` | `number \| null` | The quantity step the entry holds now, `null` when it declares none |
+
+The three getters take a `Symbol` or its numeric id and read the registry entry: `tickSize(symbol)` is 0.01 with `tickSizeDeclared(symbol)` `false` for a symbol registered without a tick, and both follow a tick or lot applied to the entry later. An id that is not registered throws a `RangeError`.
 
 ### Symbol
 
@@ -15595,6 +15618,11 @@ Each takes a plain JS object, or `null` to detach.
 | `setOrderValidator(ov)` | Attach an order validator. Sync only |
 | `setMarketDataRecorder(recorder)` | Attach a `MarketDataRecorderHook` or `BinaryLogRecorderHook` |
 | `setExecutor(executor)` | Replace the executor. Sync only — `capabilities()` is read inline |
+| `orderClosed(orderId)` | Tell the runner an order it sent to the executor is finished. `orderId` is a `number` or a `bigint` |
+
+With an executor attached the runner keeps every order that can rest, by id, so that `emit.modify` reaches `executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `orderClosed(orderId)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. `emit.cancel` drops the entry by itself, and market, IOC and FOK orders are never kept.
+
+An `emit.modify` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor. `emit.modify` clears `lrvx.lastError()` on entry, and after a refused one it reads `modify: order <id> is not on record with this executor ... [unknown_order]`.
 
 #### What a hook is handed
 
@@ -16473,6 +16501,16 @@ with the C function's name and names the file. Each of the three clears it on en
 the call did not fail; an extract that matched nothing returns `0` with `''`.
 `FundingSchedule.loadTape(path)` reports a file it could not open the same way.
 
+`validate(path, verifyCrc?, verifyTimestamps?)` checks CRCs and timestamp order unless told not to:
+a flag left out (or `undefined`) is on, and `false` turns that check off. Both used to be ignored.
+
+`mergeDir(dir, outputPath)` returns `{ success, segmentsMerged, eventsWritten, bytesWritten,
+outputPath, errors }`. `outputPath` is the segment that was written (`""` when none was) and
+`errors` has one string for everything that went wrong, `"Cannot open: <path>"` for each input that
+was skipped while the others were merged; `success` is `false` whenever `errors` is not empty.
+`validateDataset(dir)` clears `lastError()` on entry and leaves the reason there when the directory
+is missing or cannot be listed.
+
 `validateSegment(path)`, `validate(path)` and `mergeSegments(inputDir, outputPath)` clear it on
 entry as well. `validateSegment` returns `false`, and `validate` returns `valid: false`, both for a
 segment that fails its checks and for a file that could not be read; only the unreadable file
@@ -16587,7 +16625,8 @@ Strategy(symbols: List[int], strategy_id: int = -1, registry: cobj = cobj())
   renumber the strategy, and refuses it with the duplicate-id `ValueError` when it already holds
   that id. A `BacktestRunner` has one strategy and leaves its id alone. `2097151` is
   refused everywhere: runners take their own order ids from that block. An id of 2^32 or more
-  raises `ValueError` from the constructor
+  raises `ValueError` from the constructor, and so does 2^32 - 1 (`4294967295`), the block the
+  position tracker numbers its explicit fills from
 - `registry` -- Symbol-registry handle. When omitted, the underlying handle is created empty and
   `Runner.add_strategy` rebuilds it once a registry is present. Pass the strategy into a `Runner` to
   give it an event source; on its own it has none.
@@ -16713,6 +16752,11 @@ with `lot > 0`: an order whose quantity is not a whole number of the lot is reje
 `ev.reject_reason` `quantity_off_lot`. A lot of 0, and `lrvx_registry_add_symbol`, declare none and
 quantities are not checked. See
 [SimulatedExecutor](../api/backtest/simulated_executor.md#order-quantities-and-the-lot).
+
+`lrvx_registry_get_symbol_tick(reg, u32(sym), value, declared)` and
+`lrvx_registry_get_symbol_lot(reg, u32(sym), value, declared)` (both importable from `lrvx.runner`)
+read back what an entry holds: they return `u8(1)` for a registered id and fill a `Ptr[float]` with
+the value and a `Ptr[u8]` with whether orders are checked against it.
 
 #### `emit_market_buy(symbol, qty) -> int`
 
@@ -18192,9 +18236,9 @@ merge_segments("input_dir", "output.bin")  # bool
 |----------|---------|-------------|
 | `validate_segment(path)` | `bool` | Quick validation |
 | `validate_segment_full(path, verify_crc=True, verify_timestamps=True)` | `SegmentValidation` | Full validation |
-| `validate_dataset(data_dir)` | `DatasetValidation` | Validate all segments in directory |
+| `validate_dataset(data_dir)` | `DatasetValidation` | Validate all segments in directory. Clears `last_error()` on entry; a directory that is missing or cannot be listed leaves the reason there |
 | `merge_segments(input_dir, output_path)` | `bool` | Merge directory into one file |
-| `merge_dir(input_dir, output_dir)` | `MergeResult` | Merge with result metadata |
+| `merge_dir(input_dir, output_dir)` | `MergeResult` | Merge with result metadata: the counts, `output_path` (the segment written, `""` when none was) and `errors` (a `List[str]`, `"Cannot open: <path>"` for each input that was skipped) |
 | `split_segment(input_path, output_dir, mode=0, time_interval_ns=0, events_per_file=0)` | `SplitResult` | Split segment |
 | `export_segment(input_path, output_path, format=0, from_ns=0, to_ns=0, symbols=[])` | `ExportResult` | Export to CSV or other format |
 | `recompress_segment(input_path, output_path, compression=1)` | `bool` | Recompress |
@@ -18712,10 +18756,10 @@ Extended operations:
 
 | Call | Description |
 |------|-------------|
-| `lrvx.mergeDir(inputDir, outputDir)` | Merge a directory into an output directory. Returns `{ success, segmentsMerged, eventsWritten, bytesWritten }`, the object Node's `mergeDir` returns |
+| `lrvx.mergeDir(inputDir, outputDir)` | Merge a directory into an output directory. Returns `{ success, segmentsMerged, eventsWritten, bytesWritten, outputPath, errors }`, the object Node's `mergeDir` returns: `outputPath` is the segment written (`''` when none was) and `errors` an array with one string per thing that went wrong, `"Cannot open: <path>"` for an input that was skipped |
 | `lrvx.splitSegment(inputPath, outputDir, mode, timeIntervalNs, eventsPerFile)` | Split one segment into many |
 | `lrvx.exportSegment(inputPath, outputPath, format, fromNs, toNs, symbols)` | Export a range to another format |
-| `lrvx.validateSegmentFull(path, verifyCrc, verifyTimestamps)` | Full validation, optional CRC and timestamp checks |
+| `lrvx.validateSegmentFull(path, verifyCrc, verifyTimestamps)` | Full validation. Both checks are on when the flag is left out; pass `false` to turn one off |
 | `lrvx.validateDataset(dataDir)` | Validate every segment in a dataset directory. Returns `{ valid, totalSegments, validSegments, corruptedSegments, totalEvents, totalBytes, firstTimestamp, lastTimestamp }`; the two timestamps are nanoseconds as `BigInt` |
 | `lrvx.recompressSegment(inputPath, outputPath, level)` | Recompress at a different level |
 | `lrvx.extractSymbols(inputPath, outputDir, symbols)` | Extract selected symbols |
@@ -18779,6 +18823,8 @@ Record shapes:
 - **Book update**: `{ exchangeTsNs, recvTsNs, seq, symbolId, eventType, bids: [{price, qty}, ...], asks: [{price, qty}, ...] }`
 
 `eventType` is the record byte: `0` snapshot, `1` delta, `2` top-of-book.
+
+`maxSegmentMb` of 0, or left out, is the 256 MB default.
 
 ```javascript
 const writer = new DataWriter('./out', maxSegmentMb, exchangeId);
@@ -18872,12 +18918,13 @@ Copy `quickjs/types/lrvx.d.ts` and `quickjs/jsconfig.json` into your project dir
 All language bindings (Python, Node.js, Codon, embedded JS) call into this header. You can use it directly to integrate lrvx into any language with a C FFI, or embed it in a C/C++ project.
 
 !!! warning "This page is a curated subset"
-    The full surface is **763 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums**
-    across 74 groups. This page covers the commonly used core (roughly 150 functions) with prose.
-    The complete, machine-generated reference — every function signature, in group order — is
+    This page covers the commonly used core of the surface with prose. The complete,
+    machine-generated reference — every function signature, in group order — is
     [`tools/codegen/golden/lrvx_capi.md`](https://github.com/lrvx/lrvx/blob/main/tools/codegen/golden/lrvx_capi.md),
-    generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. **That file is the reference of record.**
-    When this page and the header disagree, the header wins.
+    generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. **That file is the reference of record**,
+    and its **Surface** line gives the current size of the API (functions, handles, structs,
+    callback typedefs, enums, groups); the numbers are not repeated here, where nothing keeps them
+    current. When this page and the header disagree, the header wins.
 
     Groups with no prose coverage here: Account, Amm Curve, Delta Book, Dex Amount, Execution Algos,
     Fee Schedule, Feed Clock, Lrvxrun/trace, Funding Schedule, Grid Search, Heatmap, Indicator Graph,
@@ -18890,7 +18937,7 @@ All language bindings (Python, Node.js, Codon, embedded JS) call into this heade
 
 ## Opaque handles
 
-All 59 handles are `void*`. Lifetime is managed by the matching `_create` / `_destroy` pair.
+Every handle is `void*`. Lifetime is managed by the matching `_create` / `_destroy` pair.
 
 ```c
 typedef void* LrvxStrategyHandle;
@@ -19317,10 +19364,19 @@ uint8_t  lrvx_registry_get_symbol_name(LrvxRegistryHandle registry,
                                        uint32_t symbol_id,
                                        char* exchange_out, size_t exchange_len,
                                        char* name_out, size_t name_len);
+// The tick / lot the entry holds now. Return 1 and fill the outputs when
+// symbol_id is registered, 0 otherwise. declared_out (may be NULL) reads 1
+// when orders are checked against the value.
+uint8_t  lrvx_registry_get_symbol_tick(LrvxRegistryHandle registry, uint32_t symbol_id,
+                                       double* tick_size_out, uint8_t* declared_out);
+uint8_t  lrvx_registry_get_symbol_lot(LrvxRegistryHandle registry, uint32_t symbol_id,
+                                      double* lot_size_out, uint8_t* declared_out);
 uint32_t lrvx_registry_symbol_count(LrvxRegistryHandle registry);
 ```
 
 A positive `tick_size` is the venue's price increment: a backtest runner built on this registry rejects orders priced off it ([SimulatedExecutor](../backtest/simulated_executor.md#order-prices-and-the-tick)). Zero or less registers the symbol with the 0.01 default tick for its book and checks no order price.
+
+`lrvx_registry_get_symbol_tick` reads the tick back: 0.01 with `*declared_out` 0 for a symbol registered without one, the registered value with 1 otherwise, and the venue's tick with 1 once a connector has applied it (`SymbolRegistry::applyVenueTick`). `lrvx_registry_get_symbol_lot` does the same for the quantity step, reading 0.0 with `*declared_out` 0 for a symbol that declares none.
 
 ---
 
@@ -19333,6 +19389,8 @@ LrvxStrategyHandle lrvx_strategy_create(uint32_t id,
                                         LrvxStrategyCallbacks callbacks);
 void lrvx_strategy_destroy(LrvxStrategyHandle strategy);
 ```
+
+`lrvx_strategy_create` returns `NULL`, with the reason in `lrvx_last_error_message`, when the strategy cannot be built: a symbol id the registry does not hold, a `NULL` symbols array with `num_symbols > 0`, or the reserved subscriber id 4294967295 (`0xFFFFFFFF`), whose order ids are the block the position tracker numbers its explicit fills from.
 
 ---
 
@@ -20136,9 +20194,18 @@ void lrvx_binary_log_recorder_hook_stats_p(void* hook, void* out);
 // Quick validate/merge. validate returns 0 for a segment that fails its
 // checks and for a file it could not read; only the second leaves a reason in
 // lrvx_last_error_message. merge returns 0 when no segment was merged, with
-// the reason there.
+// the reason there; when it merged some segments and could not open others it
+// returns 1 and the last error lists the ones it skipped.
 uint8_t lrvx_segment_validate(const char* path);
 uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path);
+
+// merge_dir with the two things LrvxMergeResult has no room for: the path of
+// the segment written and every error, one per line. Returns the success
+// flag; any output may be NULL, and the strings are truncated to fit.
+uint8_t lrvx_segment_merge_dir_report(const char* input_dir, const char* output_dir,
+                                      LrvxMergeResult* result_out,
+                                      char* output_path_out, size_t output_path_len,
+                                      char* errors_out, size_t errors_len);
 
 // Full API (results written to out pointer, see struct definitions in header)
 void lrvx_segment_merge_full_p(const char* input_paths, size_t num_paths,
@@ -20166,6 +20233,8 @@ void lrvx_segment_validate_full_p(const char* path, uint8_t verify_crc,
                                    uint8_t verify_timestamps, void* out); // → LrvxSegmentValidation
 void lrvx_dataset_validate_p(const char* data_dir, void* out);            // → LrvxDatasetValidation
 ```
+
+`lrvx_dataset_validate` reports a directory that does not exist or cannot be listed as not valid with every count zero, and leaves the reason, naming the directory, in `lrvx_last_error_message`. A directory whose segments fail their checks is not valid either and records no error, so clear the last error first to tell the two apart.
 
 ---
 

@@ -24,6 +24,7 @@
 #include <lrvx/execution/bus/order_execution_bus.h>
 #include <lrvx/execution/events/order_event.h>
 #include <lrvx/execution/order.h>
+#include <lrvx/execution/order_price_rule.h>
 #include <lrvx/execution/order_tracker.h>
 #include <lrvx/log/atomic_logger.h>
 
@@ -661,8 +662,8 @@ TEST(HyperliquidPrecision, PricesAndSizesFollowSzDecimalsAndFiveSigFigs)
   eth.symbol = h.eth;
   eth.side = Side::BUY;
   eth.type = OrderType::LIMIT;
-  eth.price = Price::fromDouble(3456.8);          // 5 sig figs, on the grid
-  eth.quantity = Quantity::fromDouble(0.123456);  // szDecimals 4, truncated
+  eth.price = Price::fromDouble(3456.8);        // 5 sig figs, on the grid
+  eth.quantity = Quantity::fromDouble(0.1234);  // szDecimals 4
   h.executor->submitOrder(eth);
 
   Order pepe;
@@ -671,7 +672,7 @@ TEST(HyperliquidPrecision, PricesAndSizesFollowSzDecimalsAndFiveSigFigs)
   pepe.side = Side::SELL;
   pepe.type = OrderType::LIMIT;
   pepe.price = Price::fromDouble(0.000123);      // 6 - 0 = 6 decimals max
-  pepe.quantity = Quantity::fromDouble(1000.9);  // szDecimals 0
+  pepe.quantity = Quantity::fromDouble(1000.0);  // szDecimals 0
   h.executor->submitOrder(pepe);
 
   ASSERT_EQ(h.transport->calls.size(), 2u);
@@ -1101,7 +1102,12 @@ TEST(HyperliquidAssetMap, MainnetFallbackIsLoggedAsAWarning)
 
 // ---------------------------------------------------------------- precision boundaries
 
-TEST(HyperliquidPrecision, SizeJustBelowAStepIsNeverRoundedUp)
+// HL does not accept a size finer than szDecimals (its docs: at szDecimals 3,
+// 1.0001 is not a valid size). The executor used to truncate such a size and
+// send an order the strategy did not ask for, while a backtest of the same
+// order rejected it. It is refused with the simulator's reason, and nothing
+// is sent.
+TEST(HyperliquidPrecision, SizeOffTheStepIsRefusedNotTruncated)
 {
   Harness h("hl_sz_boundary.log");
   Order pepe;
@@ -1118,16 +1124,82 @@ TEST(HyperliquidPrecision, SizeJustBelowAStepIsNeverRoundedUp)
   btc.quantity = Quantity::fromDouble(0.00001999);  // szDecimals 5
   h.executor->submitOrder(btc);
 
-  Order exact = limitBuy(h.btc, 102);
-  exact.quantity = Quantity::fromDouble(1.23);  // on the grid stays as is
-  h.executor->submitOrder(exact);
+  EXPECT_TRUE(h.transport->calls.empty());
+  auto evs = h.events();
+  for (OrderId id : {OrderId{100}, OrderId{101}})
+  {
+    ASSERT_EQ(statusesFor(evs, id), (std::vector<OrderEventStatus>{OrderEventStatus::REJECTED}));
+  }
+  for (const auto& ev : evs)
+  {
+    EXPECT_EQ(ev.rejectReason, "quantity_off_lot");
+  }
 
-  ASSERT_EQ(h.transport->calls.size(), 3u);
-  EXPECT_NE(h.transport->calls[0].find(R"("s":"2",)"), std::string::npos) << h.transport->calls[0];
+  Order exact = limitBuy(h.btc, 102);
+  exact.quantity = Quantity::fromDouble(1.23);  // on the step: sent as it is
+  h.executor->submitOrder(exact);
+  Order finest = limitBuy(h.btc, 103);
+  finest.quantity = Quantity::fromDouble(0.00001);
+  h.executor->submitOrder(finest);
+
+  ASSERT_EQ(h.transport->calls.size(), 2u);
+  EXPECT_NE(h.transport->calls[0].find(R"("s":"1.23",)"), std::string::npos)
+      << h.transport->calls[0];
   EXPECT_NE(h.transport->calls[1].find(R"("s":"0.00001",)"), std::string::npos)
       << h.transport->calls[1];
-  EXPECT_NE(h.transport->calls[2].find(R"("s":"1.23",)"), std::string::npos)
-      << h.transport->calls[2];
+}
+
+// The simulator and the executor agree on the same order for a Hyperliquid
+// symbol whose registry entry holds the venue's step.
+TEST(HyperliquidPrecision, TheSimulatorAndTheExecutorRefuseTheSameSize)
+{
+  Harness h("hl_sz_sim.log");
+  // What the connector applies from the meta response: 10^-szDecimals.
+  ASSERT_EQ(h.registry.applyVenueLot(h.eth, Quantity::fromDouble(0.0001)).outcome,
+            VenueTickOutcome::Applied);
+
+  Order off = limitBuy(h.eth, 110);
+  off.quantity = Quantity::fromDouble(0.12345);
+  Order on = limitBuy(h.eth, 111);
+  on.quantity = Quantity::fromDouble(0.1234);
+
+  // The simulator's rule (SimulatedExecutor applies exactly this at submit).
+  const int64_t lot = orderLotRaw(*h.registry.getSymbolInfo(h.eth));
+  const char* simOff = offLotReason(off, lot);
+  ASSERT_NE(simOff, nullptr);
+  EXPECT_STREQ(simOff, "quantity_off_lot");
+  EXPECT_EQ(offLotReason(on, lot), nullptr);
+
+  h.executor->submitOrder(off);
+  h.executor->submitOrder(on);
+  auto evs = h.events();
+  ASSERT_EQ(statusesFor(evs, 110), (std::vector<OrderEventStatus>{OrderEventStatus::REJECTED}));
+  for (const auto& ev : evs)
+  {
+    if (ev.order.id == 110)
+    {
+      EXPECT_EQ(ev.rejectReason, simOff);
+    }
+  }
+  ASSERT_EQ(h.transport->calls.size(), 1u);
+  EXPECT_NE(h.transport->calls[0].find(R"("s":"0.1234",)"), std::string::npos)
+      << h.transport->calls[0];
+}
+
+// A lot the caller declared on the entry is checked as well, though it is
+// coarser than the venue's step.
+TEST(HyperliquidPrecision, ADeclaredLotOnTheEntryIsChecked)
+{
+  Harness h("hl_sz_declared.log");
+  ASSERT_EQ(h.registry.applyVenueLot(h.btc, Quantity::fromDouble(0.001)).outcome,
+            VenueTickOutcome::Applied);
+  Order o = limitBuy(h.btc, 120);
+  o.quantity = Quantity::fromDouble(0.0005);  // on HL's 1e-5, off the entry's 0.001
+  h.executor->submitOrder(o);
+  EXPECT_TRUE(h.transport->calls.empty());
+  auto evs = h.events();
+  ASSERT_EQ(statusesFor(evs, 120), (std::vector<OrderEventStatus>{OrderEventStatus::REJECTED}));
+  EXPECT_EQ(evs.back().rejectReason, "quantity_off_lot");
 }
 
 TEST(HyperliquidPrecision, TriggerPriceOffTheGridIsRefused)

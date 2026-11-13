@@ -49,6 +49,9 @@ def run():
     check("signal count", counts.signals == 1)
     check("order count", counts.orders == 1)
     check("fill count", counts.fills == 1)
+    # The whole 64-bit id; the record used to keep 32 bits of it.
+    check("signal id64 of the written record", reader.signal_id64(0) == 42)
+    check("signal id64 out of range is 0", reader.signal_id64(5) == 0)
     reader.close()
     os.system("rm -rf " + path)
 

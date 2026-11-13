@@ -744,7 +744,10 @@ PYBIND11_MODULE(_lrvx, m)
       "returning False, extract_symbols / extract_time_range returning 0.\n"
       "Each clears it on entry, so '' after one means it did not fail (an\n"
       "extract that matched nothing returns 0 with ''). The text opens with\n"
-      "the name of the C function. Per thread.");
+      "the name of the C function. Strategy.modify_order clears it too, and\n"
+      "a live Runner that refuses the modify (an id its executor record does\n"
+      "not hold) leaves the reason here, ending in [unknown_order]. Per\n"
+      "thread.");
 
   lrvx::bindOrderTypes(m);
 

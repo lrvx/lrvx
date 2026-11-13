@@ -12,8 +12,13 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -116,4 +121,121 @@ TEST(TraceHandlers, NullRecorderDisablesCaptureWithoutBreakingForward)
   auto buy = lrvx::Signal::marketBuy(1, lrvx::Quantity::fromDouble(1.0), 99);
   h.onSignal(buy);
   EXPECT_EQ(inner.count, 1);
+}
+
+namespace
+{
+
+// The fixed part of the first signal record in the trace, as it is on disk.
+std::vector<uint8_t> firstSignalRecordBytes(const std::filesystem::path& trace)
+{
+  std::ifstream in(trace / "signals-000000.bin", std::ios::binary);
+  std::vector<uint8_t> all((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+  constexpr size_t kSegmentHeader = 64;
+  constexpr size_t kFrameHeader = 12;
+  constexpr size_t kRecord = 48;
+  if (all.size() < kSegmentHeader + kFrameHeader + kRecord)
+  {
+    return {};
+  }
+  const auto start = all.begin() + kSegmentHeader + kFrameHeader;
+  return std::vector<uint8_t>(start, start + kRecord);
+}
+
+uint32_t u32At(const std::vector<uint8_t>& bytes, size_t offset)
+{
+  uint32_t v = 0;
+  std::memcpy(&v, bytes.data() + offset, sizeof v);
+  return v;
+}
+
+}  // namespace
+
+// A strategy's order ids are (subscriber id << 32) + n. Capture kept the low
+// 32 bits of the id and nothing else, so every strategy's first order was
+// signal 1. The low half stays at offset 16, where a reader that predates the
+// change looks; the high half is in the first four of the bytes that were
+// reserved.
+TEST(TraceHandlers, ACapturedSignalKeepsItsWholeOrderId)
+{
+  auto tmp = std::filesystem::temp_directory_path() / "lrvx_trace_handler_wide_id";
+  auto rec = makeRec(tmp);
+  lrvx::run::TraceSignalHandler h(nullptr, &rec);
+  const lrvx::OrderId wide = (lrvx::OrderId{7} << 32) + 5;
+  h.onSignal(lrvx::Signal::marketBuy(1, lrvx::Quantity::fromDouble(0.5), wide));
+  rec.close();
+
+  const auto bytes = firstSignalRecordBytes(tmp);
+  ASSERT_EQ(bytes.size(), 48u);
+  EXPECT_EQ(u32At(bytes, 16), 5u) << "signal_id: the low half, where it always was";
+  EXPECT_EQ(u32At(bytes, 40), 7u) << "signal_id_hi: the high half, in the reserved bytes";
+  EXPECT_EQ(u32At(bytes, 44), 0u) << "what is left of the reserved bytes";
+
+  lrvx::run::TraceReader reader(tmp.string());
+  auto sigs = reader.readAllSignals();
+  ASSERT_EQ(sigs.size(), 1u);
+  EXPECT_EQ(sigs[0].signal_id, 5u) << "the 32-bit field reads as before";
+  std::filesystem::remove_all(tmp);
+}
+
+// With an id below 2^32 the record is what it was: the bytes that used to be
+// reserved are still zero.
+TEST(TraceHandlers, ASignalIdBelowTwoToThe32LeavesTheReservedBytesZero)
+{
+  auto tmp = std::filesystem::temp_directory_path() / "lrvx_trace_handler_narrow_id";
+  auto rec = makeRec(tmp);
+  lrvx::run::TraceSignalHandler h(nullptr, &rec);
+  h.onSignal(lrvx::Signal::marketBuy(1, lrvx::Quantity::fromDouble(0.5), 0xFFFF'FFFFULL));
+  rec.close();
+
+  const auto bytes = firstSignalRecordBytes(tmp);
+  ASSERT_EQ(bytes.size(), 48u);
+  EXPECT_EQ(u32At(bytes, 16), 0xFFFF'FFFFu);
+  for (size_t i = 40; i < 48; ++i)
+  {
+    EXPECT_EQ(bytes[i], 0u) << "byte " << i;
+  }
+  std::filesystem::remove_all(tmp);
+}
+
+// Captured order events carried parent_signal_id 0, so nothing joined them to
+// the signal that asked for the order.
+TEST(TraceHandlers, CapturedOrderEventsNameTheirSignal)
+{
+  auto tmp = std::filesystem::temp_directory_path() / "lrvx_trace_handler_parent";
+  auto rec = makeRec(tmp);
+  lrvx::run::TraceSignalHandler signals(nullptr, &rec);
+  lrvx::run::TraceExecutionListener listener(2, nullptr, &rec);
+
+  const lrvx::OrderId first = (lrvx::OrderId{7} << 32) + 1;
+  const lrvx::OrderId second = (lrvx::OrderId{7} << 32) + 2;
+  signals.onSignal(lrvx::Signal::marketBuy(1, lrvx::Quantity::fromDouble(0.5), first));
+  signals.onSignal(lrvx::Signal::marketSell(1, lrvx::Quantity::fromDouble(0.5), second));
+
+  lrvx::Order a;
+  a.id = first;
+  a.symbol = 1;
+  a.quantity = lrvx::Quantity::fromDouble(0.5);
+  lrvx::Order b = a;
+  b.id = second;
+  b.side = lrvx::Side::SELL;
+  listener.onOrderSubmitted(a);
+  listener.onOrderAccepted(a);
+  listener.onOrderSubmitted(b);
+  listener.onOrderRejected(b, "no");
+  listener.onOrderCanceled(a);
+  rec.close();
+
+  lrvx::run::TraceReader reader(tmp.string());
+  const auto events = reader.readAllOrderEvents();
+  ASSERT_EQ(events.size(), 5u);
+  for (const auto& ev : events)
+  {
+    EXPECT_EQ(ev.parent_signal_id, ev.order_id);
+  }
+  EXPECT_EQ(events[0].parent_signal_id, first);
+  EXPECT_EQ(events[2].parent_signal_id, second);
+  EXPECT_EQ(events[3].parent_signal_id, second);
+  EXPECT_EQ(events[4].parent_signal_id, first);
+  std::filesystem::remove_all(tmp);
 }

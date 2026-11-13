@@ -7,12 +7,14 @@
 #     with reject_reason "quantity_off_lot"
 #   * an on-lot quantity is accepted
 #   * a symbol registered without a lot is not checked
+#   * lrvx_registry_get_symbol_tick / _lot read back what an entry holds
 
 from C import lrvx_registry_create() -> cobj
 from C import lrvx_registry_destroy(cobj)
 from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
 
 from lrvx.runner import BacktestRunner, lrvx_registry_add_symbol_with_lot
+from lrvx.runner import lrvx_registry_get_symbol_tick, lrvx_registry_get_symbol_lot
 from lrvx.strategy import Strategy, SymbolContext
 from lrvx.types import BarData, OrderEventData
 
@@ -86,6 +88,21 @@ check(on.updates > 0 and len(on.reasons) == 0, "an on-lot quantity is accepted")
 free = run(reg, without, "ETHUSDT", 0.00012345)
 check(free.updates > 0 and len(free.reasons) == 0,
       "a symbol registered without a lot takes any quantity")
+
+# The registry reads back what an entry holds: (value, declared).
+value = Ptr[float](1)
+declared = Ptr[u8](1)
+check(lrvx_registry_get_symbol_lot(reg, u32(with_lot), value, declared) == u8(1),
+      "get_symbol_lot finds the symbol")
+check(abs(value[0] - 0.001) < 1e-12 and declared[0] == u8(1), "its lot is 0.001, declared")
+check(lrvx_registry_get_symbol_lot(reg, u32(without), value, declared) == u8(1),
+      "and the symbol registered without one")
+check(value[0] == 0.0 and declared[0] == u8(0), "which declares no lot")
+check(lrvx_registry_get_symbol_tick(reg, u32(with_lot), value, declared) == u8(1),
+      "get_symbol_tick finds the symbol")
+check(abs(value[0] - 0.1) < 1e-12 and declared[0] == u8(1), "its tick is 0.1, declared")
+check(lrvx_registry_get_symbol_tick(reg, u32(9999), value, declared) == u8(0),
+      "an id that is not registered returns 0")
 
 lrvx_registry_destroy(reg)
 

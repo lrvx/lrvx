@@ -126,17 +126,40 @@ class Strategy : public IStrategy
   // Before the strategy is attached to a bus or a runner, and before it has
   // emitted: order ids carry the subscriber id, and the ones already issued
   // keep the old one.
-  // Throws std::invalid_argument, and keeps the id it has, for an id of 2^32
-  // or more (see orderIdSubscriber).
+  // Throws std::invalid_argument, and keeps the id it has, for an id of
+  // 2^32 - 1 or more (see orderIdSubscriber).
   void setSubscriberId(SubscriberId id) { _id = orderIdSubscriber(id); }
 
-  // Each symbol's entry as the registry held it when the strategy was built, in
-  // symbols() order. A copy, so the registry need not outlive the strategy.
-  // BacktestRunner reads the declared ticks from here when it is not given a
-  // registry of its own. A venue tick a connector applies later
-  // (SymbolRegistry::applyVenueTick) does not change this copy; it reaches the
-  // symbol's book (ctx().book.tickSize()) on the symbol's next event.
-  const std::vector<SymbolInfo>& symbolInfos() const noexcept { return _symbolInfos; }
+  // Each symbol's entry, in symbols() order: what the registry held when the
+  // strategy was built, with the venue tick and lot a connector has applied
+  // since (SymbolRegistry::applyVenueTick / applyVenueLot) in place of the
+  // ones copied then. Built from the strategy's own copy and the registry's
+  // venue tick log, so the registry need not outlive the strategy, and
+  // returned by value, so it may be called from any thread. BacktestRunner
+  // reads the declared ticks and lots from here when it is not given a
+  // registry of its own. An applied tick also reaches the symbol's book
+  // (ctx().book.tickSize()), on the symbol's next event.
+  std::vector<SymbolInfo> symbolInfos() const
+  {
+    std::vector<SymbolInfo> out = _symbolInfos;
+    for (SymbolInfo& info : out)
+    {
+      if (const auto tick = _venueTicks->tickFor(info.id); tick && tick->raw() > 0)
+      {
+        info.tickSize = *tick;
+        info.tickSizeKnown = true;
+      }
+      if (const auto lot = _venueTicks->lotFor(info.id); lot && lot->raw() > 0)
+      {
+        info.lotSize = *lot;
+      }
+    }
+    return out;
+  }
+
+  // The venue tick log of the registry the strategy was built from. Shared,
+  // so it stays valid after that registry is gone.
+  std::shared_ptr<const VenueTickLog> venueTickLog() const noexcept { return _venueTicks; }
 
   void setSignalHandler(ISignalHandler* handler) override { _signalHandler = handler; }
   void setOrderTracker(OrderTracker* tracker) noexcept { _orderTracker = tracker; }
@@ -573,15 +596,21 @@ class Strategy : public IStrategy
   //
   // The namespace is the subscriber id, which is the only identity a strategy
   // has; two strategies holding the same one share an id space, and they are
-  // already broken for every bus they sit on. Subscriber ids at or above
-  // 2^32-1 would reach the range MultiModePositionTracker reserves for its
-  // explicit fills.
+  // already broken for every bus they sit on.
   static constexpr int kOrderIdStrategyShift = 32;
 
-  // The id, or std::invalid_argument when it has bits the shift would drop:
-  // 2^32 + 5 would issue the order ids of subscriber 5.
+  // The id, or std::invalid_argument when it has bits the shift would drop
+  // (2^32 + 5 would issue the order ids of subscriber 5) or is 2^32 - 1, whose
+  // block MultiModePositionTracker numbers its explicit fills from.
   static SubscriberId orderIdSubscriber(SubscriberId id)
   {
+    if (id == kExplicitFillOrderIdSubscriber)
+    {
+      throw std::invalid_argument(
+          "subscriber id " + std::to_string(id) +
+          " is the block the position tracker numbers its explicit fills from; give the "
+          "strategy an id below 4294967295");
+    }
     if ((id >> kOrderIdStrategyShift) != 0)
     {
       throw std::invalid_argument(

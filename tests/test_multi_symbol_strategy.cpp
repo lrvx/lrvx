@@ -1572,3 +1572,25 @@ TEST(StrategySubscriberId, AnIdThatCannotMakeOrderIdsIsRefused)
   strategy.setSubscriberId(9);
   EXPECT_EQ(strategy.buy(sym), (OrderId{9} << 32) + 2);
 }
+
+// 2^32 - 1 fits the shift, but its block is the one MultiModePositionTracker
+// numbers explicit fills from: a strategy holding it issued those ids.
+TEST(StrategySubscriberId, TheExplicitFillBlockIsReserved)
+{
+  SymbolRegistry registry;
+  populateRegistry(registry, {1});
+  const SymbolId sym = *registry.getSymbolId("TEST", "SYM1");
+
+  EXPECT_EQ(kExplicitFillOrderIdSubscriber, 0xFFFF'FFFFULL);
+  EXPECT_EQ(kExplicitFillOrderIdBase, 0xFFFF'FFFF'0000'0000ULL);
+  EXPECT_THROW(IdProbeStrategy(kExplicitFillOrderIdSubscriber, sym, registry),
+               std::invalid_argument);
+
+  IdProbeStrategy strategy(7, sym, registry);
+  EXPECT_THROW(strategy.setSubscriberId(kExplicitFillOrderIdSubscriber), std::invalid_argument);
+  EXPECT_EQ(strategy.id(), 7u);
+
+  // The highest id a strategy can hold stays below the block.
+  IdProbeStrategy widest(kExplicitFillOrderIdSubscriber - 1, sym, registry);
+  EXPECT_LT(widest.buy(sym), kExplicitFillOrderIdBase);
+}

@@ -61,6 +61,37 @@ SimulatedExecutor::SimulatedExecutor(IClock& clock) : _clock(clock)
 void SimulatedExecutor::setSymbolRegistry(const SymbolRegistry* registry)
 {
   _registry = registry;
+  _venueTicks = registry != nullptr ? registry->venueTickLog() : nullptr;
+  _venueLogOverlay = false;
+  _venueLogSeen = _venueTicks ? _venueTicks->revision() : 0;
+  _orderTickFlat.fill(-1);
+  _orderLotFlat.fill(-1);
+}
+
+void SimulatedExecutor::setVenueTickLog(std::shared_ptr<const VenueTickLog> log)
+{
+  _venueTicks = std::move(log);
+  _venueLogOverlay = _venueTicks != nullptr;
+  _venueLogSeen = _venueTicks ? _venueTicks->revision() : 0;
+  _orderTickFlat.fill(-1);
+  _orderLotFlat.fill(-1);
+}
+
+// Drops both caches when a tick or lot was applied since they were filled.
+// The revision is read before the entries the caches are refilled from, so a
+// value applied in between moves it again and is read on the next call.
+void SimulatedExecutor::followVenueLog() const
+{
+  if (!_venueTicks)
+  {
+    return;
+  }
+  const uint64_t revision = _venueTicks->revision();
+  if (revision == _venueLogSeen)
+  {
+    return;
+  }
+  _venueLogSeen = revision;
   _orderTickFlat.fill(-1);
   _orderLotFlat.fill(-1);
 }
@@ -71,6 +102,7 @@ int64_t SimulatedExecutor::orderTickRaw(SymbolId symbol) const
   {
     return 0;
   }
+  followVenueLog();
   if (symbol < kMaxSymbols && _orderTickFlat[symbol] >= 0)
   {
     return _orderTickFlat[symbol];
@@ -82,7 +114,14 @@ int64_t SimulatedExecutor::orderTickRaw(SymbolId symbol) const
     // later is still read.
     return 0;
   }
-  const int64_t tick = lrvx::orderTickRaw(*info);
+  int64_t tick = lrvx::orderTickRaw(*info);
+  if (_venueLogOverlay)
+  {
+    if (const auto applied = _venueTicks->tickFor(symbol); applied && applied->raw() > 0)
+    {
+      tick = applied->raw();
+    }
+  }
   if (symbol < kMaxSymbols)
   {
     _orderTickFlat[symbol] = tick;
@@ -96,6 +135,7 @@ int64_t SimulatedExecutor::orderLotRaw(SymbolId symbol) const
   {
     return 0;
   }
+  followVenueLog();
   if (symbol < kMaxSymbols && _orderLotFlat[symbol] >= 0)
   {
     return _orderLotFlat[symbol];
@@ -105,7 +145,14 @@ int64_t SimulatedExecutor::orderLotRaw(SymbolId symbol) const
   {
     return 0;
   }
-  const int64_t lot = lrvx::orderLotRaw(*info);
+  int64_t lot = lrvx::orderLotRaw(*info);
+  if (_venueLogOverlay)
+  {
+    if (const auto applied = _venueTicks->lotFor(symbol); applied && applied->raw() > 0)
+    {
+      lot = applied->raw();
+    }
+  }
   if (symbol < kMaxSymbols)
   {
     _orderLotFlat[symbol] = lot;

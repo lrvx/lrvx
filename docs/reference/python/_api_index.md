@@ -1760,6 +1760,7 @@ Members:
 - `on_book_snapshot(self, symbol: typing.Any, bid_prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], bid_qtys: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ask_prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ask_qtys: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `on_book_top(self, symbol: typing.Any, bid: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ask: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `on_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
+- `order_closed(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> None`
 - `replace_strategy(self, index: typing.SupportsInt | typing.SupportsIndex, strategy: Strategy) -> None`
 - `set_executor(self, executor: Executor) -> None`
 - `set_kill_switch(self, ks: KillSwitch) -> None`
@@ -2126,7 +2127,10 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 **Members**
 
 - `add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None, lot_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol`
+- `lot_size(self, symbol: typing.SupportsInt | typing.SupportsIndex) -> float | None`
 - `symbol_count(self) -> int`
+- `tick_size(self, symbol: typing.SupportsInt | typing.SupportsIndex) -> float`
+- `tick_size_declared(self, symbol: typing.SupportsInt | typing.SupportsIndex) -> bool`
 
 ### `class TEMA`
 

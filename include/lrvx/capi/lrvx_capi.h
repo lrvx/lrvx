@@ -1521,7 +1521,25 @@ extern "C"
   void lrvx_executor_get_capabilities(LrvxExecutorHandle executor,
                                       LrvxExchangeCapabilities* caps_out);
   void lrvx_live_engine_set_executor(LrvxLiveEngineHandle engine, LrvxExecutorHandle executor);
+  // The engine's counterpart of lrvx_runner_order_closed, over the record its
+  // strategies share.
+  void lrvx_live_engine_order_closed(LrvxLiveEngineHandle engine, uint64_t order_id);
   void lrvx_runner_set_executor(LrvxRunnerHandle runner, LrvxExecutorHandle executor);
+  // Tells the runner an order it forwarded to the executor has reached a
+  // terminal state (filled, cancelled by the venue, rejected, expired). With
+  // an executor attached the runner keeps every order that can rest, by id,
+  // so a later Modify can be sent as that order with its price and quantity
+  // changed. Nothing tells it of a fill, so the host calls this when it
+  // learns the order is finished and the entry is dropped; an id that is not
+  // on record is ignored. A market, IOC or FOK order is never kept and needs
+  // no call, and a Cancel the strategy emits drops the entry by itself.
+  //
+  // A Modify that names an id not on record (never forwarded, not an order
+  // that rests, cancelled, or reported closed here) is not sent to the
+  // executor: lrvx_emit_modify returns with the reason in
+  // lrvx_last_error_message, ending in "[unknown_order]". Call
+  // lrvx_clear_last_error first and read lrvx_last_error_code after.
+  void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id);
   void lrvx_backtest_runner_add_execution_listener(LrvxBacktestRunnerHandle runner,
                                                    LrvxExecutionListenerHandle listener);
   void lrvx_backtest_runner_set_executor(LrvxBacktestRunnerHandle runner,
@@ -1680,6 +1698,11 @@ extern "C"
                                      uint32_t* out_signal_id, uint32_t* out_flags,
                                      int64_t* out_strength_raw, uint64_t* out_name_len,
                                      uint64_t* out_symbol_count, uint64_t* out_payload_len);
+  // The whole 64-bit id of signal `index`. lrvx_run_reader_signal_header
+  // reports its low 32 bits, as it always has; the two differ for a signal a
+  // runner captured, whose id is its order id ((subscriber id << 32) + n).
+  // 0 when index is out of range.
+  uint64_t lrvx_run_reader_signal_id64(LrvxRunReaderHandle handle, uint64_t index);
   uint64_t lrvx_run_reader_signal_name(LrvxRunReaderHandle handle, uint64_t index, char* out,
                                        uint64_t max_bytes);
   uint64_t lrvx_run_reader_signal_symbol_ids(LrvxRunReaderHandle handle, uint64_t index,
@@ -2480,7 +2503,10 @@ extern "C"
   // validate returns 0 for a segment that fails its checks and for a file it
   // could not read; only the unreadable file leaves a reason in
   // lrvx_last_error_message. merge returns 0 when no segment was merged, with
-  // the reason there. Call lrvx_clear_last_error first to tell the cases apart.
+  // the reason there. When it merged some segments and could not open others
+  // it still returns 1, and the last error names each one it skipped
+  // ("merged N segment(s); skipped: Cannot open: <path>; ..."). Call
+  // lrvx_clear_last_error first to tell the cases apart.
   uint8_t lrvx_segment_validate(const char* path);
   uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path);
   /* input_paths is one buffer holding num_paths consecutive NUL-terminated
@@ -2495,6 +2521,19 @@ extern "C"
                                           const char* output_dir, const char* output_name,
                                           uint8_t sort);
   LrvxMergeResult lrvx_segment_merge_dir(const char* input_dir, const char* output_dir);
+  // The same merge, also saying where the merged segment was written and
+  // everything that went wrong. Returns the result's success flag; the
+  // counts go to *result_out, the path of the segment written to
+  // output_path_out and the errors to errors_out, one per line ("\n"
+  // between them, none after the last). A segment that could not be opened is
+  // an error line ("Cannot open: <path>") while the others are still merged.
+  // Both strings are truncated to their buffer and always terminated; any of
+  // the three outputs may be NULL. On failure the first error is also in
+  // lrvx_last_error_message.
+  uint8_t lrvx_segment_merge_dir_report(const char* input_dir, const char* output_dir,
+                                        LrvxMergeResult* result_out, char* output_path_out,
+                                        size_t output_path_len, char* errors_out,
+                                        size_t errors_len);
   LrvxSplitResult lrvx_segment_split(const char* input_path, const char* output_dir, uint8_t mode,
                                      int64_t time_interval_ns, uint64_t events_per_file);
   LrvxExportResult lrvx_segment_export(const char* input_path, const char* output_path,
@@ -2633,6 +2672,11 @@ extern "C"
   // Strategy Lifecycle
   // ============================================================
 
+  // NULL, with the reason in lrvx_last_error_message, when the strategy
+  // cannot be built: a symbol id the registry does not hold, a NULL symbols
+  // array with num_symbols > 0, or the reserved subscriber id 4294967295
+  // (0xFFFFFFFF), the block the position tracker numbers its explicit fills
+  // from.
   LrvxStrategyHandle lrvx_strategy_create(uint32_t id, const uint32_t* symbols,
                                           uint32_t num_symbols, LrvxRegistryHandle registry,
                                           LrvxStrategyCallbacks callbacks);
@@ -2700,6 +2744,18 @@ extern "C"
   uint8_t lrvx_registry_get_symbol_name(LrvxRegistryHandle registry, uint32_t symbol_id,
                                         char* exchange_out, size_t exchange_len, char* name_out,
                                         size_t name_len);
+  // The price tick an entry holds now, and whether it is declared. Returns 1
+  // and fills the outputs when symbol_id is registered, 0 otherwise. An entry
+  // registered without a tick holds 0.01 for its book with *declared_out 0:
+  // order prices are not checked against it. A tick given at registration,
+  // or one a connector read from the venue and applied since, reads back with
+  // *declared_out 1. declared_out may be NULL.
+  uint8_t lrvx_registry_get_symbol_tick(LrvxRegistryHandle registry, uint32_t symbol_id,
+                                        double* tick_size_out, uint8_t* declared_out);
+  // The same for the order-quantity step. An entry that declares no lot reads
+  // 0.0 with *declared_out 0: order quantities are not checked.
+  uint8_t lrvx_registry_get_symbol_lot(LrvxRegistryHandle registry, uint32_t symbol_id,
+                                       double* lot_size_out, uint8_t* declared_out);
   uint32_t lrvx_registry_symbol_count(LrvxRegistryHandle registry);
 
   // ============================================================
@@ -2805,6 +2861,11 @@ extern "C"
 
   LrvxSegmentValidation lrvx_segment_validate_full(const char* path, uint8_t verify_crc,
                                                    uint8_t verify_timestamps);
+  // A directory that does not exist or cannot be listed validates as not
+  // valid with every count zero, and the reason, naming the directory, is in
+  // lrvx_last_error_message. A directory whose segments fail their checks is
+  // not valid either and records no error: call lrvx_clear_last_error first
+  // and read lrvx_last_error_code after to tell the two apart.
   LrvxDatasetValidation lrvx_dataset_validate(const char* data_dir);
 
   // ============================================================

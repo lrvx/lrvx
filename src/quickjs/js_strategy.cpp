@@ -438,8 +438,9 @@ void LrvxJsStrategy::loadStdlib()
     }
 
     class DataWriter {
-      constructor(dir, maxSegmentSize, compression) {
-        this._h = __lrvx_dw_create(dir, maxSegmentSize || 0, compression || 0);
+      // maxSegmentSize is megabytes; 0 or left out is the 256 MB default.
+      constructor(dir, maxSegmentSize, exchangeId) {
+        this._h = __lrvx_dw_create(dir, maxSegmentSize || 0, exchangeId || 0);
       }
       destroy() { __lrvx_dw_destroy(this._h); }
       // C ABI order: (exchange_ts_ns, recv_ts_ns, price, qty, trade_id,
@@ -743,8 +744,11 @@ void LrvxJsStrategy::loadStdlib()
         return __lrvx_seg_export(inputPath, outputPath, format || 0,
                                  fromNs || 0, toNs || 0, symbols || []);
       },
+      // A flag left out is on; one that is given is honoured.
       validateSegmentFull: function(path, verifyCrc, verifyTimestamps) {
-        return __lrvx_seg_validate_full(path, verifyCrc ? 1 : 0, verifyTimestamps ? 1 : 0);
+        return __lrvx_seg_validate_full(path,
+                                        verifyCrc === undefined || verifyCrc ? 1 : 0,
+                                        verifyTimestamps === undefined || verifyTimestamps ? 1 : 0);
       },
       validateDataset: function(dataDir) { return __lrvx_dataset_validate(dataDir); },
       recompressSegment: function(inputPath, outputPath, level) {

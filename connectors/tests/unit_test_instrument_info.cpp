@@ -215,6 +215,10 @@ TEST(InstrumentInfoParse, PolymarketTickIsReadFromItsText)
   auto coarse = instrument_info::parsePolymarketTickSize(fixture("polymarket_tick_001.json"));
   ASSERT_TRUE(coarse) << coarse.error();
   EXPECT_EQ(coarse->tickSize.raw(), 1000000);
+  // Two size decimals at every tick size, per the CLOB documentation.
+  EXPECT_EQ(instrument_info::kPolymarketSizeStep.raw(), Quantity::fromDouble(0.01).raw());
+  EXPECT_EQ(fine->lotSize.raw(), Quantity::fromDouble(0.01).raw());
+  EXPECT_EQ(coarse->lotSize.raw(), Quantity::fromDouble(0.01).raw());
   auto missing =
       instrument_info::parsePolymarketTickSize(fixture("polymarket_tick_not_found.json"));
   ASSERT_FALSE(missing);
@@ -348,8 +352,12 @@ TEST(InstrumentInfoLoad, PolymarketReadsEachTokensTick)
   auto fine = registry.getSymbolInfo(*registry.getSymbolId("polymarket", "FINE"));
   EXPECT_TRUE(fine->tickSizeKnown);
   EXPECT_EQ(fine->tickSize.raw(), 100000);
+  EXPECT_EQ(orderLotRaw(*fine), Quantity::fromDouble(0.01).raw());
+  ASSERT_TRUE(connector.instrumentSpec("FINE"));
+  EXPECT_EQ(connector.instrumentSpec("FINE")->lotSize.raw(), Quantity::fromDouble(0.01).raw());
   auto gone = registry.getSymbolInfo(*registry.getSymbolId("polymarket", "GONE"));
   EXPECT_FALSE(gone->tickSizeKnown);
+  EXPECT_EQ(orderLotRaw(*gone), 0) << "a token the venue does not list declares nothing";
   EXPECT_NE(connector.instrumentInfoError().find("market not found"), std::string::npos);
 }
 
@@ -695,12 +703,11 @@ TEST(InstrumentInfoPreRegistered, EveryVenueAppliesItsTick)
   EXPECT_EQ(orderTickRaw(*registry.getSymbolInfo(pmFine)), 100000);
   EXPECT_EQ(*registry.getSymbolId("polymarket", "FINE"), pmFine);
 
-  // And its lot, where the same response states one: Bitget's sizeMultiplier,
-  // Hyperliquid's 10^-szDecimals. Polymarket's tick-size answer has no size
-  // field, so that entry declares no lot.
+  // And its lot: Bitget's sizeMultiplier, Hyperliquid's 10^-szDecimals,
+  // Polymarket's documented two size decimals.
   EXPECT_EQ(orderLotRaw(*registry.getSymbolInfo(bitgetDoge)), Quantity::fromDouble(1).raw());
   EXPECT_EQ(orderLotRaw(*registry.getSymbolInfo(hlBtc)), Quantity::fromDouble(0.00001).raw());
-  EXPECT_EQ(orderLotRaw(*registry.getSymbolInfo(pmFine)), 0);
+  EXPECT_EQ(orderLotRaw(*registry.getSymbolInfo(pmFine)), Quantity::fromDouble(0.01).raw());
 }
 
 // A declared lot equal to the venue's is left alone; one that differs is

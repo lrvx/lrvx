@@ -6,11 +6,15 @@
 # nothing returns.
 #   * each failure leaves its reason, naming the path
 #   * a call that did not fail leaves ""
+#   * merge_dir returns output_path and errors; validate_dataset says why a
+#     directory could not be read; validate_segment_full checks CRCs and
+#     timestamps unless told not to
 
 from lrvx.abi import last_error
 from lrvx.funding_schedule import FundingSchedule
 from lrvx.tools import recompress_segment, extract_symbols, extract_time_range
 from lrvx.tools import validate_segment, merge_segments
+from lrvx.tools import DataWriter, merge_dir, validate_dataset, validate_segment_full
 
 from C import getpid() -> i32
 
@@ -61,6 +65,42 @@ with open(tape, "w") as f:
 check(fs.load_tape(tape), "load_tape reads a file that is there")
 check(last_error() == "", "and leaves no error behind: '" + last_error() + "'")
 fs.close()
+
+# merge_dir says where it wrote and lists what it skipped; validate_dataset
+# says why it could not read a directory.
+tape_dir = root + "-tape"
+w = DataWriter(tape_dir, 64, 0)
+SEC = 1_000_000_000
+for i, s in enumerate([30, 10, 20]):
+    w.write_trade(s * SEC, s * SEC, 100.0 + float(i), 1.0, i + 1, 1, 0)
+w.close()
+
+merged = merge_dir(tape_dir, root + "-merged-dir")
+check(merged.success and merged.segments_merged == 1 and merged.events_written == 3,
+      "merge_dir counts are what they were")
+check(merged.output_path.startswith(root + "-merged-dir"),
+      "output_path is the segment written: " + merged.output_path)
+check(len(merged.errors) == 0, "and errors is empty")
+
+nothing = merge_dir(missing, root + "-merged-none")
+check(not nothing.success and nothing.output_path == "", "nothing to merge: no output_path")
+check(len(nothing.errors) >= 1, "and the reason is in errors")
+
+# The tape's timestamps go backwards, which the timestamp check counts. A
+# flag left out is on; one that is given is honoured.
+checked = validate_segment_full(merged.output_path)
+check(checked.actual_event_count == 3, "validate_segment_full walks the three events")
+check(checked.timestamp_anomalies > 0, "flags left out: timestamps are checked")
+check(validate_segment_full(merged.output_path, True, False).timestamp_anomalies == 0,
+      "verify_timestamps=False turns the check off")
+
+gone = validate_dataset(missing)
+check(not gone.valid and gone.total_segments == 0, "validate_dataset: a missing directory is not valid")
+check(missing in last_error(), "and last_error() names it: " + last_error())
+check("Directory not found" in last_error(), "saying it is not there")
+there = validate_dataset(tape_dir)
+check(there.total_segments == 1, "validate_dataset reads a directory that is there")
+check(last_error() == "", "and leaves no error behind: '" + last_error() + "'")
 
 if failed > 0:
     raise ValueError(str(failed) + " check(s) failed")

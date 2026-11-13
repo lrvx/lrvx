@@ -669,7 +669,7 @@ groups:
         lrvx_segment_extract_symbols: __lrvx_seg_extract_symbols
         lrvx_segment_extract_time_range: __lrvx_seg_extract_time
         lrvx_segment_merge: __lrvx_segment_merge
-        lrvx_segment_merge_dir: __lrvx_seg_merge_dir
+        lrvx_segment_merge_dir_report: __lrvx_seg_merge_dir
         lrvx_segment_recompress: __lrvx_seg_recompress
         lrvx_segment_split: __lrvx_seg_split
         lrvx_segment_validate: __lrvx_segment_validate
@@ -1180,6 +1180,7 @@ groups:
         lrvx_run_reader_run_started_ns: __lrvx_run_reader_run_started_ns
         lrvx_run_reader_signal_count: __lrvx_run_reader_signals
         lrvx_run_reader_signal_header: __lrvx_run_reader_signals
+        lrvx_run_reader_signal_id64: __lrvx_run_reader_signals
         lrvx_run_reader_signal_name: __lrvx_run_reader_signals
         lrvx_run_reader_signal_payload: __lrvx_run_reader_signals
         lrvx_run_reader_signal_symbol_ids: __lrvx_run_reader_signals
@@ -1848,7 +1849,9 @@ allowlist_functions:
     lrvx_registry_create: *cpp_direct
     lrvx_registry_destroy: *cpp_direct
     lrvx_registry_get_symbol_id: *cpp_direct
+    lrvx_registry_get_symbol_lot: *cpp_direct
     lrvx_registry_get_symbol_name: *cpp_direct
+    lrvx_registry_get_symbol_tick: *cpp_direct
     lrvx_registry_symbol_count: *cpp_direct
     lrvx_render_heatmap_html: *cpp_direct
     lrvx_replay_source_create_p: *cpp_direct
@@ -1865,6 +1868,7 @@ allowlist_functions:
     lrvx_run_reader_run_started_ns: *cpp_direct
     lrvx_run_reader_signal_count: *cpp_direct
     lrvx_run_reader_signal_header: *cpp_direct
+    lrvx_run_reader_signal_id64: *cpp_direct
     lrvx_run_reader_signal_name: *cpp_direct
     lrvx_run_reader_signal_payload: *cpp_direct
     lrvx_run_reader_signal_symbol_ids: *cpp_direct
@@ -1887,6 +1891,7 @@ allowlist_functions:
     lrvx_segment_merge: *cpp_direct
     lrvx_segment_merge_dir: *cpp_direct
     lrvx_segment_merge_dir_p: *cpp_direct
+    lrvx_segment_merge_dir_report: *cpp_direct
     lrvx_segment_merge_full: *cpp_direct
     lrvx_segment_merge_full_p: *cpp_direct
     lrvx_segment_recompress: *cpp_direct
@@ -2153,7 +2158,9 @@ allowlist_functions:
     lrvx_registry_create: *no_napi_wrapper
     lrvx_registry_destroy: *no_napi_wrapper
     lrvx_registry_get_symbol_id: *no_napi_wrapper
+    lrvx_registry_get_symbol_lot: *no_napi_wrapper
     lrvx_registry_get_symbol_name: *no_napi_wrapper
+    lrvx_registry_get_symbol_tick: *no_napi_wrapper
     lrvx_registry_symbol_count: *no_napi_wrapper
     lrvx_replay_source_create: *no_napi_wrapper
     lrvx_replay_source_create_p: *no_napi_wrapper
@@ -2161,6 +2168,7 @@ allowlist_functions:
     lrvx_replay_source_seek_to: *no_napi_wrapper
     lrvx_risk_manager_create_p: *no_napi_wrapper
     lrvx_segment_export_p: *no_napi_wrapper
+    lrvx_segment_merge_dir: *no_napi_wrapper
     lrvx_segment_merge_dir_p: *no_napi_wrapper
     lrvx_segment_merge_full: *no_napi_wrapper
     lrvx_segment_merge_full_p: *no_napi_wrapper
@@ -2298,6 +2306,7 @@ allowlist_functions:
     lrvx_liquidation_engine_deficits_paid_by_fund_size: *no_codon_import
     lrvx_liquidation_engine_fund_balance_history_copy: *no_codon_import
     lrvx_liquidation_engine_fund_balance_history_size: *no_codon_import
+    lrvx_live_engine_order_closed: *no_codon_import
     lrvx_live_engine_set_executor: *no_codon_import
     lrvx_live_engine_set_kill_switch: *no_codon_import
     lrvx_live_engine_set_order_validator: *no_codon_import
@@ -2360,6 +2369,7 @@ allowlist_functions:
     lrvx_run_reader_tape_ref_count: *no_codon_import
     lrvx_run_reader_tape_ref_path: *no_codon_import
     lrvx_runner_attach_trace_recorder: *no_codon_import
+    lrvx_runner_order_closed: *no_codon_import
     lrvx_runner_set_executor: *no_codon_import
     lrvx_runner_set_kill_switch: *no_codon_import
     lrvx_runner_set_order_validator: *no_codon_import
@@ -2504,6 +2514,7 @@ allowlist_functions:
     lrvx_live_engine_publish_book_snapshot: *no_quickjs_global
     lrvx_live_engine_publish_book_top: *no_quickjs_global
     lrvx_live_engine_publish_trade: *no_quickjs_global
+    lrvx_live_engine_order_closed: *no_quickjs_global
     lrvx_live_engine_set_executor: *no_quickjs_global
     lrvx_live_engine_set_kill_switch: *no_quickjs_global
     lrvx_live_engine_set_market_data_recorder: *no_quickjs_global
@@ -2553,7 +2564,9 @@ allowlist_functions:
     lrvx_registry_create: *no_quickjs_global
     lrvx_registry_destroy: *no_quickjs_global
     lrvx_registry_get_symbol_id: *no_quickjs_global
+    lrvx_registry_get_symbol_lot: *no_quickjs_global
     lrvx_registry_get_symbol_name: *no_quickjs_global
+    lrvx_registry_get_symbol_tick: *no_quickjs_global
     lrvx_registry_symbol_count: *no_quickjs_global
     lrvx_render_heatmap_html: *no_quickjs_global
     lrvx_replay_source_create: *no_quickjs_global
@@ -2574,6 +2587,7 @@ allowlist_functions:
     lrvx_runner_on_book_snapshot: *no_quickjs_global
     lrvx_runner_on_book_top: *no_quickjs_global
     lrvx_runner_on_trade: *no_quickjs_global
+    lrvx_runner_order_closed: *no_quickjs_global
     lrvx_runner_set_executor: *no_quickjs_global
     lrvx_runner_set_kill_switch: *no_quickjs_global
     lrvx_runner_set_market_data_recorder: *no_quickjs_global
@@ -2587,6 +2601,7 @@ allowlist_functions:
     lrvx_runner_trace_fill: *no_quickjs_global
     lrvx_runner_trace_order_event: *no_quickjs_global
     lrvx_segment_export_p: *no_quickjs_global
+    lrvx_segment_merge_dir: *no_quickjs_global
     lrvx_segment_merge_dir_p: *no_quickjs_global
     lrvx_segment_merge_full: *no_quickjs_global
     lrvx_segment_merge_full_p: *no_quickjs_global

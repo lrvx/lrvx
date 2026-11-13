@@ -259,7 +259,9 @@ from C import lrvx_executor_create_p(cobj) -> cobj
 from C import lrvx_executor_destroy(cobj)
 from C import lrvx_executor_get_capabilities(cobj, cobj)
 from C import lrvx_live_engine_set_executor(cobj, cobj)
+from C import lrvx_live_engine_order_closed(cobj, u64)
 from C import lrvx_runner_set_executor(cobj, cobj)
+from C import lrvx_runner_order_closed(cobj, u64)
 from C import lrvx_backtest_runner_add_execution_listener(cobj, cobj)
 from C import lrvx_backtest_runner_set_executor(cobj, cobj)
 
@@ -522,6 +524,7 @@ from C import lrvx_run_reader_signal_count(cobj) -> u64
 from C import lrvx_run_reader_order_event_count(cobj) -> u64
 from C import lrvx_run_reader_fill_count(cobj) -> u64
 from C import lrvx_run_reader_signal_header(cobj, u64, Ptr[i64], Ptr[i64], Ptr[u32], Ptr[u32], Ptr[i64], Ptr[u64], Ptr[u64], Ptr[u64])
+from C import lrvx_run_reader_signal_id64(cobj, u64) -> u64
 from C import lrvx_run_reader_signal_name(cobj, u64, cobj, u64) -> u64
 from C import lrvx_run_reader_signal_symbol_ids(cobj, u64, Ptr[u32], u64) -> u64
 from C import lrvx_run_reader_signal_payload(cobj, u64, Ptr[u8], u64) -> u64
@@ -756,6 +759,7 @@ from C import lrvx_segment_validate(cobj) -> u8
 from C import lrvx_segment_merge(cobj, cobj) -> u8
 from C import lrvx_segment_merge_full(cobj, int, cobj, cobj, u8) -> cobj
 from C import lrvx_segment_merge_dir(cobj, cobj) -> cobj
+from C import lrvx_segment_merge_dir_report(cobj, cobj, cobj, cobj, int, cobj, int) -> u8
 from C import lrvx_segment_split(cobj, cobj, u8, i64, u64) -> cobj
 from C import lrvx_segment_export(cobj, cobj, u8, i64, i64, Ptr[u32], u32) -> cobj
 from C import lrvx_segment_recompress(cobj, cobj, u8) -> u8
@@ -861,6 +865,8 @@ from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
 from C import lrvx_registry_add_symbol_with_lot(cobj, cobj, cobj, float, float) -> u32
 from C import lrvx_registry_get_symbol_id(cobj, cobj, cobj, Ptr[u32]) -> u8
 from C import lrvx_registry_get_symbol_name(cobj, u32, cobj, int, cobj, int) -> u8
+from C import lrvx_registry_get_symbol_tick(cobj, u32, Ptr[float], Ptr[u8]) -> u8
+from C import lrvx_registry_get_symbol_lot(cobj, u32, Ptr[float], Ptr[u8]) -> u8
 from C import lrvx_registry_symbol_count(cobj) -> u32
 
 # ── tape_aggregator ──

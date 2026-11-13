@@ -15,7 +15,9 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -510,3 +512,226 @@ TEST_F(CapiRunnerUnknownSymbol, RunBars)
 }
 
 }  // namespace
+
+namespace
+{
+
+// A tape of `n` trades in `dir`; the segment files it wrote.
+std::vector<std::string> writeTape(const std::filesystem::path& dir, int n = 5)
+{
+  LrvxDataWriterHandle w = lrvx_data_writer_create(dir.string().c_str(), 16, 1);
+  if (w == nullptr)
+  {
+    return {};
+  }
+  for (int i = 0; i < n; ++i)
+  {
+    lrvx_data_writer_write_trade(w, (10 + i) * kSec, (10 + i) * kSec, 100.0 + i, 1.0,
+                                 static_cast<uint64_t>(i + 1), 1, 0);
+  }
+  lrvx_data_writer_close(w);
+  lrvx_data_writer_destroy(w);
+  std::vector<std::string> segments;
+  for (const auto& entry : std::filesystem::directory_iterator(dir))
+  {
+    if (entry.path().extension() != ".idx")
+    {
+      segments.push_back(entry.path().string());
+    }
+  }
+  return segments;
+}
+
+// A file with a segment's extension that is not a segment.
+std::string writeGarbageSegment(const std::filesystem::path& dir, const std::string& name)
+{
+  const auto path = dir / name;
+  std::ofstream(path, std::ios::binary) << std::string(256, 'x');
+  return path.string();
+}
+
+}  // namespace
+
+// lrvx_segment_merge returned 1 with nothing said when some of the inputs
+// could not be opened: the caller had a merged tape and no way to learn it
+// was short. It still returns 1; the inputs it skipped are in the last error.
+TEST_F(CapiPathErrors, MergeNamesTheInputsItCouldNotOpen)
+{
+  const auto dir = _root / "tape";
+  const auto segments = writeTape(dir);
+  ASSERT_FALSE(segments.empty());
+  const std::string ext = std::filesystem::path(segments.front()).extension().string();
+  const std::string bad1 = writeGarbageSegment(dir, "zz_bad_one" + ext);
+  const std::string bad2 = writeGarbageSegment(dir, "zz_bad_two" + ext);
+  lrvx_clear_last_error();
+
+  EXPECT_EQ(lrvx_segment_merge(dir.string().c_str(), (_root / "merged").string().c_str()), 1)
+      << "the segments that opened are still merged";
+  expectReason("lrvx_segment_merge");
+  expectReason(bad1);
+  expectReason(bad2);
+  EXPECT_EQ(lastError().find(segments.front()), std::string::npos)
+      << "a segment that was merged is not listed: " << lastError();
+}
+
+// The path and the errors, which LrvxMergeResult has no room for.
+TEST_F(CapiPathErrors, MergeDirReportGivesThePathAndEveryError)
+{
+  const auto dir = _root / "tape";
+  const auto segments = writeTape(dir);
+  ASSERT_FALSE(segments.empty());
+  const auto out = _root / "merged";
+  lrvx_clear_last_error();
+
+  LrvxMergeResult result{};
+  char path[1024] = {};
+  char errors[4096] = "untouched";
+  EXPECT_EQ(lrvx_segment_merge_dir_report(dir.string().c_str(), out.string().c_str(), &result,
+                                          path, sizeof path, errors, sizeof errors),
+            1);
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+  EXPECT_EQ(result.success, 1);
+  EXPECT_EQ(result.segments_merged, segments.size());
+  EXPECT_EQ(result.events_written, 5u);
+  EXPECT_STREQ(errors, "") << "no error, so an empty string";
+  ASSERT_NE(std::string(path), "");
+  EXPECT_TRUE(std::filesystem::exists(path)) << path;
+  EXPECT_EQ(std::string(path).find(out.string()), 0u) << path;
+
+  // The struct-returning call agrees on the counts.
+  const LrvxMergeResult plain =
+      lrvx_segment_merge_dir(dir.string().c_str(), (_root / "merged2").string().c_str());
+  EXPECT_EQ(plain.success, result.success);
+  EXPECT_EQ(plain.segments_merged, result.segments_merged);
+  EXPECT_EQ(plain.events_written, result.events_written);
+
+  // Two inputs that do not open: two error lines, and the merge of the rest
+  // is reported as the struct reports it.
+  const std::string ext = std::filesystem::path(segments.front()).extension().string();
+  const std::string bad1 = writeGarbageSegment(dir, "zz_bad_one" + ext);
+  const std::string bad2 = writeGarbageSegment(dir, "zz_bad_two" + ext);
+  lrvx_clear_last_error();
+  result = {};
+  const uint8_t ok = lrvx_segment_merge_dir_report(
+      dir.string().c_str(), (_root / "merged3").string().c_str(), &result, path, sizeof path,
+      errors, sizeof errors);
+  EXPECT_EQ(ok, result.success);
+  EXPECT_EQ(result.segments_merged, segments.size());
+  const std::string listed = errors;
+  EXPECT_NE(listed.find("Cannot open: " + bad1), std::string::npos) << listed;
+  EXPECT_NE(listed.find("Cannot open: " + bad2), std::string::npos) << listed;
+  EXPECT_EQ(std::count(listed.begin(), listed.end(), '\n'), 1) << listed;
+
+  // Every output is optional, and a short buffer is filled and terminated.
+  char tiny[8];
+  EXPECT_EQ(lrvx_segment_merge_dir_report(dir.string().c_str(),
+                                          (_root / "merged4").string().c_str(), nullptr, nullptr,
+                                          0, tiny, sizeof tiny),
+            ok);
+  EXPECT_EQ(std::string(tiny), listed.substr(0, sizeof tiny - 1));
+
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_segment_merge_dir_report(_missing.c_str(), out.string().c_str(), &result, path,
+                                          sizeof path, errors, sizeof errors),
+            0);
+  EXPECT_EQ(result.success, 0);
+  EXPECT_NE(lrvx_last_error_code(), 0);
+  EXPECT_STRNE(errors, "");
+}
+
+// A missing directory validated as "not valid" and nothing else, the same as
+// a directory of corrupt segments; a path that is a file threw out of the
+// directory walk with the standard library's wording.
+TEST_F(CapiPathErrors, DatasetValidateSaysWhyItCouldNotReadTheDirectory)
+{
+  LrvxDatasetValidation v = lrvx_dataset_validate(_missing.c_str());
+  EXPECT_EQ(v.valid, 0);
+  EXPECT_EQ(v.total_segments, 0u);
+  expectReason("lrvx_dataset_validate");
+  expectReason("Directory not found");
+  expectReason(_missing);
+
+  lrvx_clear_last_error();
+  const std::string file = writeCsv("a_file.txt", "not a directory");
+  v = lrvx_dataset_validate(file.c_str());
+  EXPECT_EQ(v.valid, 0);
+  expectReason("Cannot read directory");
+  expectReason(file);
+
+  // A directory that is there says nothing, valid or not.
+  lrvx_clear_last_error();
+  const auto dir = _root / "tape";
+  ASSERT_FALSE(writeTape(dir).empty());
+  v = lrvx_dataset_validate(dir.string().c_str());
+  EXPECT_EQ(v.valid, 1);
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+  writeGarbageSegment(dir, "zz_bad.lrvx");
+  v = lrvx_dataset_validate(dir.string().c_str());
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+}
+
+// NULL came back with nothing in the last error.
+TEST_F(CapiPathErrors, StrategyCreateSaysWhyItReturnedNull)
+{
+  LrvxStrategyCallbacks cb{};
+  const uint32_t unknown[1] = {_symbol + 1000};
+  EXPECT_EQ(lrvx_strategy_create(1, unknown, 1, _registry, cb), nullptr);
+  expectReason("lrvx_strategy_create");
+  expectReason(std::to_string(_symbol + 1000));
+
+  lrvx_clear_last_error();
+  const uint32_t known[1] = {_symbol};
+  EXPECT_EQ(lrvx_strategy_create(0xFFFF'FFFFu, known, 1, _registry, cb), nullptr);
+  expectReason("4294967295");
+
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_strategy_create(1, nullptr, 1, _registry, cb), nullptr);
+  expectReason("symbols");
+
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_strategy_create_p(1, unknown, 1, _registry, &cb), nullptr);
+  expectReason(std::to_string(_symbol + 1000));
+
+  lrvx_clear_last_error();
+  LrvxStrategyHandle ok = lrvx_strategy_create(1, known, 1, _registry, cb);
+  EXPECT_NE(ok, nullptr);
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+  lrvx_strategy_destroy(ok);
+  // No symbols at all is a strategy, as it was.
+  ok = lrvx_strategy_create(2, nullptr, 0, _registry, cb);
+  EXPECT_NE(ok, nullptr);
+  lrvx_strategy_destroy(ok);
+}
+
+// The path of a file that cannot be read is in the message once.
+TEST_F(CapiPathErrors, ValidateNamesTheFileOnce)
+{
+  EXPECT_EQ(lrvx_segment_validate(_missing.c_str()), 0);
+  const std::string why = lastError();
+  const size_t first = why.find(_missing);
+  ASSERT_NE(first, std::string::npos) << why;
+  EXPECT_EQ(why.find(_missing, first + 1), std::string::npos) << "named twice: " << why;
+}
+
+// "Cannot open file for reading" did not say which file; the C API appended
+// the path. The validator's own message names it now, once.
+TEST_F(CapiPathErrors, ValidateNamesAFileItCannotOpen)
+{
+  const std::string path = writeCsv("locked.lrvx", std::string(256, 'x'));
+  std::filesystem::permissions(path, std::filesystem::perms::none);
+  if (std::FILE* f = std::fopen(path.c_str(), "rb"))
+  {
+    std::fclose(f);
+    std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+    GTEST_SKIP() << "this user can read a file with no permission bits";
+  }
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_segment_validate(path.c_str()), 0);
+  const std::string why = lastError();
+  std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+
+  const std::string expected = "Cannot open file for reading: " + path;
+  const size_t at = why.find(expected);
+  ASSERT_NE(at, std::string::npos) << why;
+  EXPECT_EQ(why.find(path, at + expected.size()), std::string::npos) << "named twice: " << why;
+}

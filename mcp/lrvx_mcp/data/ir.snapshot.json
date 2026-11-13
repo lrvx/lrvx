@@ -7793,6 +7793,21 @@
       "return_type": "void"
     },
     {
+      "group": "execution",
+      "name": "lrvx_live_engine_order_closed",
+      "params": [
+        {
+          "name": "engine",
+          "type": "LrvxLiveEngineHandle"
+        },
+        {
+          "name": "order_id",
+          "type": "uint64_t"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
       "group": "lrvxliveengine_disruptor",
       "name": "lrvx_live_engine_publish_bar",
       "params": [
@@ -10908,6 +10923,29 @@
     },
     {
       "group": "symbol_registry",
+      "name": "lrvx_registry_get_symbol_lot",
+      "params": [
+        {
+          "name": "registry",
+          "type": "LrvxRegistryHandle"
+        },
+        {
+          "name": "symbol_id",
+          "type": "uint32_t"
+        },
+        {
+          "name": "lot_size_out",
+          "type": "double *"
+        },
+        {
+          "name": "declared_out",
+          "type": "uint8_t *"
+        }
+      ],
+      "return_type": "uint8_t"
+    },
+    {
+      "group": "symbol_registry",
       "name": "lrvx_registry_get_symbol_name",
       "params": [
         {
@@ -10933,6 +10971,29 @@
         {
           "name": "name_len",
           "type": "size_t"
+        }
+      ],
+      "return_type": "uint8_t"
+    },
+    {
+      "group": "symbol_registry",
+      "name": "lrvx_registry_get_symbol_tick",
+      "params": [
+        {
+          "name": "registry",
+          "type": "LrvxRegistryHandle"
+        },
+        {
+          "name": "symbol_id",
+          "type": "uint32_t"
+        },
+        {
+          "name": "tick_size_out",
+          "type": "double *"
+        },
+        {
+          "name": "declared_out",
+          "type": "uint8_t *"
         }
       ],
       "return_type": "uint8_t"
@@ -11312,6 +11373,21 @@
         }
       ],
       "return_type": "void"
+    },
+    {
+      "group": "lrvxrun",
+      "name": "lrvx_run_reader_signal_id64",
+      "params": [
+        {
+          "name": "handle",
+          "type": "LrvxRunReaderHandle"
+        },
+        {
+          "name": "index",
+          "type": "uint64_t"
+        }
+      ],
+      "return_type": "uint64_t"
     },
     {
       "group": "lrvxrun",
@@ -11948,6 +12024,21 @@
     },
     {
       "group": "execution",
+      "name": "lrvx_runner_order_closed",
+      "params": [
+        {
+          "name": "runner",
+          "type": "LrvxRunnerHandle"
+        },
+        {
+          "name": "order_id",
+          "type": "uint64_t"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "execution",
       "name": "lrvx_runner_set_executor",
       "params": [
         {
@@ -12346,6 +12437,41 @@
         }
       ],
       "return_type": "void"
+    },
+    {
+      "group": "segment",
+      "name": "lrvx_segment_merge_dir_report",
+      "params": [
+        {
+          "name": "input_dir",
+          "type": "const char *"
+        },
+        {
+          "name": "output_dir",
+          "type": "const char *"
+        },
+        {
+          "name": "result_out",
+          "type": "LrvxMergeResult *"
+        },
+        {
+          "name": "output_path_out",
+          "type": "char *"
+        },
+        {
+          "name": "output_path_len",
+          "type": "size_t"
+        },
+        {
+          "name": "errors_out",
+          "type": "char *"
+        },
+        {
+          "name": "errors_len",
+          "type": "size_t"
+        }
+      ],
+      "return_type": "uint8_t"
     },
     {
       "group": "segment",

@@ -116,7 +116,14 @@ class Strategy:
         one Runner number their orders apart. Given, it is kept, and a Runner
         that already holds that id refuses the strategy. The id the first
         Runner gives stays as well: a second Runner that holds it refuses the
-        strategy. An id of 2^32 or more raises ValueError."""
+        strategy. An id of 2^32 or more raises ValueError, and so does
+        2^32 - 1, the block the position tracker numbers its explicit fills
+        from."""
+        if strategy_id == 0xFFFFFFFF:
+            raise ValueError(
+                "Strategy: strategy_id " + str(strategy_id) +
+                " is the block the position tracker numbers its explicit fills from; "
+                "give the strategy an id below 4294967295")
         if strategy_id > 0xFFFFFFFF:
             raise ValueError(
                 "Strategy: strategy_id " + str(strategy_id) +

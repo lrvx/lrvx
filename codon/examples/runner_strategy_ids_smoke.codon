@@ -11,6 +11,8 @@
 #   * the id a Runner gave a default strategy stays: a second Runner that
 #     already holds it refuses the strategy instead of renumbering it
 #   * a strategy_id of 2^32 or more is refused; it was truncated to 32 bits
+#   * strategy_id 2^32 - 1 is refused: its order ids are the block the
+#     position tracker numbers explicit fills from
 
 from C import lrvx_registry_create() -> cobj
 from C import lrvx_registry_destroy(cobj)
@@ -154,6 +156,18 @@ except ValueError as e:
     wide_reason = str(e)
 check(wide_refused, "a strategy_id of 2^32 or more is refused")
 check("4294967301" in wide_reason, "and the error names it: " + wide_reason)
+
+# 2^32 - 1 fits the shift, but its block is the one the position tracker
+# numbers its explicit fills from.
+reserved_refused = False
+reserved_reason = ""
+try:
+    Quiet([sym], strategy_id=0xFFFFFFFF)
+except ValueError as e:
+    reserved_refused = True
+    reserved_reason = str(e)
+check(reserved_refused, "strategy_id 2^32 - 1 is refused")
+check("4294967295" in reserved_reason, "and the error names it: " + reserved_reason)
 
 lrvx_registry_destroy(reg)
 

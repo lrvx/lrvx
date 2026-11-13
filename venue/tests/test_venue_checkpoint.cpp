@@ -22,6 +22,7 @@
 #include "lrvx-venue/matching_book.h"
 #include "lrvx-venue/matching_engine.h"
 #include "lrvx-venue/sequenced_shard.h"
+#include "lrvx/util/base/sanitizer.h"
 #include "support/tmp_path.h"
 
 #include <gtest/gtest.h>
@@ -1253,7 +1254,11 @@ TEST(VenueCheckpoint, SnapshotPauseMeasuredOn100kOrders)
   }
   Rng rng{0xBEEFCAFEULL};
   const int64_t tickRaw = px(0.01).raw();
-  const int kOrders = 100'000;
+  // Under the thread sanitizer serializing is some fifty times slower and the
+  // two snapshots below took most of eight seconds. What the sanitizer checks
+  // here does not depend on the count, so it gets a fifth of the book; every
+  // other build measures the pause on the full 100k.
+  const int kOrders = LRVX_TSAN_ENABLED ? 20'000 : 100'000;
   for (int i = 0; i < kOrders; ++i)
   {
     const uint64_t r = rng.next();
@@ -1270,7 +1275,7 @@ TEST(VenueCheckpoint, SnapshotPauseMeasuredOn100kOrders)
     o.type = OrderType::LIMIT;
     eng.submit(InboundCommand{o}, 100 + i);
   }
-  ASSERT_GT(eng.restingOrderCount(), 90'000u);
+  ASSERT_GT(eng.restingOrderCount(), static_cast<size_t>(kOrders) * 9 / 10);
 
   // Old synchronous pause (reference): serialize the live engine directly.
   uint64_t bytes = 0;
@@ -1947,8 +1952,12 @@ TEST(VenueCheckpoint, GroupCommitAcksEverythingItJournalsWhenStopped)
     venue::SymbolConfig c = cfg();
     Ledger led;
     auto t = clockState(1'000'000);
-    auto s = std::make_unique<SequencedShard<>>(c, base, MatchingBook{}, Journal::Sync::Group,
-                                                clockOf(t));
+    // 1024-slot rings: what stop() has to drain is whatever the producer left
+    // in the ingress ring, and a full 65536-slot ring of it is two seconds of
+    // matching under the thread sanitizer, per repetition. The producer still
+    // runs into a full ring and is still writing when the shard stops.
+    auto s = std::make_unique<SequencedShard<MatchingBook, 1u << 10, 1u << 10>>(
+        c, base, MatchingBook{}, Journal::Sync::Group, clockOf(t));
     Counter w;
     s->engine().setLedger(&led, VENUE_ACCT);
     s->subscribeOutbound(&w);

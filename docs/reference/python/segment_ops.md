@@ -38,6 +38,10 @@ Merge all segments in a directory (shorthand for `merge`).
 result = lrvx.merge_dir("./raw_data", "./merged_data")
 ```
 
+A segment that cannot be opened is skipped and listed in `errors` as `"Cannot open: <path>"`; the
+others are still merged, `segments_merged` counts them, and `success` is `False` because `errors`
+is not empty.
+
 ---
 
 ## Split

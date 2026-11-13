@@ -11,6 +11,7 @@
 
 #include "lrvx/replay/binary_format_v1.h"
 
+#include <cstddef>
 #include <cstdint>
 
 namespace lrvx::run
@@ -76,6 +77,13 @@ inline constexpr uint32_t Exit = 0x02;
 inline constexpr uint32_t Rebalance = 0x04;
 }  // namespace SignalFlags
 
+// A signal's id is 64 bits wide (a captured signal carries its order id,
+// (subscriber id << 32) + n), stored in two halves. signal_id is the low 32
+// bits, where the field has always been. signal_id_hi is the high 32 bits,
+// in the first four of the eight bytes that used to be reserved and were
+// written as zero: a record whose id is below 2^32 is byte for byte what it
+// was, a reader that predates the field still reads the same low half, and a
+// record written before it reads back with a zero high half.
 struct alignas(8) SignalRecord
 {
   int64_t run_ts_ns{0};
@@ -86,9 +94,18 @@ struct alignas(8) SignalRecord
   uint32_t payload_len{0};
   uint32_t flags{0};
   int64_t strength_raw{0};
-  int64_t _reserved{0};
+  uint32_t signal_id_hi{0};
+  uint32_t _reserved{0};
+
+  uint64_t signalId64() const noexcept
+  {
+    return (static_cast<uint64_t>(signal_id_hi) << 32) | signal_id;
+  }
 };
 static_assert(sizeof(SignalRecord) == 48, "SignalRecord must be 48 bytes");
+static_assert(offsetof(SignalRecord, signal_id) == 16, "signal_id stays where it was");
+static_assert(offsetof(SignalRecord, signal_id_hi) == 40,
+              "signal_id_hi takes the first reserved bytes");
 
 enum class OrderEventKind : uint8_t
 {

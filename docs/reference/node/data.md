@@ -151,6 +151,16 @@ with the C function's name and names the file. Each of the three clears it on en
 the call did not fail; an extract that matched nothing returns `0` with `''`.
 `FundingSchedule.loadTape(path)` reports a file it could not open the same way.
 
+`validate(path, verifyCrc?, verifyTimestamps?)` checks CRCs and timestamp order unless told not to:
+a flag left out (or `undefined`) is on, and `false` turns that check off. Both used to be ignored.
+
+`mergeDir(dir, outputPath)` returns `{ success, segmentsMerged, eventsWritten, bytesWritten,
+outputPath, errors }`. `outputPath` is the segment that was written (`""` when none was) and
+`errors` has one string for everything that went wrong, `"Cannot open: <path>"` for each input that
+was skipped while the others were merged; `success` is `false` whenever `errors` is not empty.
+`validateDataset(dir)` clears `lastError()` on entry and leaves the reason there when the directory
+is missing or cannot be listed.
+
 `validateSegment(path)`, `validate(path)` and `mergeSegments(inputDir, outputPath)` clear it on
 entry as well. `validateSegment` returns `false`, and `validate` returns `valid: false`, both for a
 segment that fails its checks and for a file that could not be read; only the unreadable file

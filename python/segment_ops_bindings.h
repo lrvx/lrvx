@@ -190,6 +190,20 @@ inline py::dict datasetValidationToDict(const DatasetValidationResult& r)
     segs.append(segmentValidationToDict(seg));
   }
   d["segments"] = segs;
+
+  // Issues about the dataset rather than about one segment: a directory that
+  // is not there or cannot be listed, segments that overlap in time.
+  py::list issues;
+  for (const auto& issue : r.issues)
+  {
+    py::dict id;
+    id["message"] = issue.message;
+    id["severity"] = static_cast<int>(issue.severity);
+    id["file_offset"] = issue.file_offset;
+    id["timestamp_ns"] = issue.timestamp_ns;
+    issues.append(id);
+  }
+  d["issues"] = issues;
   return d;
 }
 

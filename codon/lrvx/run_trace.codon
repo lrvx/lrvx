@@ -25,6 +25,7 @@ from C import lrvx_run_reader_close(cobj)
 from C import lrvx_run_reader_run_started_ns(cobj) -> int
 from C import lrvx_run_reader_run_ended_ns(cobj) -> int
 from C import lrvx_run_reader_signal_count(cobj) -> int
+from C import lrvx_run_reader_signal_id64(cobj, int) -> int
 from C import lrvx_run_reader_order_event_count(cobj) -> int
 from C import lrvx_run_reader_fill_count(cobj) -> int
 
@@ -153,6 +154,11 @@ class TraceReader:
             orders=lrvx_run_reader_order_event_count(self._h),
             fills=lrvx_run_reader_fill_count(self._h),
         )
+
+    def signal_id64(self, index: int) -> int:
+        """The whole 64-bit id of signal `index` (0 when out of range). For
+        a signal a runner captured it is the order id the signal asks for."""
+        return lrvx_run_reader_signal_id64(self._h, index)
 
     def close(self):
         if self._h != cobj():

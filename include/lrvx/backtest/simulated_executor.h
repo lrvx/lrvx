@@ -76,7 +76,19 @@ class SimulatedExecutor : public IOrderExecutor
   // slippage model and percentage trailing triggers are snapped onto the tick
   // against the order's owner. Without a registry nothing is checked. The
   // registry must outlive the executor or be detached with nullptr.
+  //
+  // The tick and lot are cached per symbol and follow the registry: a value
+  // a connector applies later (SymbolRegistry::applyVenueTick /
+  // applyVenueLot) is read on the next order, at the cost of one atomic load
+  // per check while nothing changes.
   void setSymbolRegistry(const SymbolRegistry* registry);
+  // For a registry that is a copy of the entries another registry held (the
+  // one BacktestRunner builds from Strategy::symbolInfos()): the venue tick
+  // log of the registry the copy was taken from. A tick or lot that log holds
+  // is used in place of the copied entry's, so values applied to the source
+  // after the copy was taken are still followed. Call after
+  // setSymbolRegistry, which resets it to the registry's own log.
+  void setVenueTickLog(std::shared_ptr<const VenueTickLog> log);
   // The tick orders on `symbol` are checked against, as a raw price; 0 when
   // none is known.
   int64_t orderTickRaw(SymbolId symbol) const;
@@ -589,6 +601,13 @@ class SimulatedExecutor : public IOrderExecutor
   mutable std::array<int64_t, kMaxSymbols> _orderTickFlat{};
   // Per-symbol order lot, read the same way.
   mutable std::array<int64_t, kMaxSymbols> _orderLotFlat{};
+  // The log whose revision the two caches follow, and the revision they were
+  // filled at. _venueLogOverlay: the log belongs to another registry than
+  // _registry and its values replace the entry's (setVenueTickLog).
+  std::shared_ptr<const VenueTickLog> _venueTicks;
+  mutable uint64_t _venueLogSeen{0};
+  bool _venueLogOverlay{false};
+  void followVenueLog() const;
 
   // Seeds as configured, kept so reset() can put the generators back where a
   // fresh executor would have them.

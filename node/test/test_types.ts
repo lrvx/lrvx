@@ -129,6 +129,12 @@ void symLot;
 const _symId: number = sym.id;
 const _symName: string = sym.name;
 const _symCount: number = registry.symbolCount();
+const _regTick: number = registry.tickSize(sym);
+const _regTickDeclared: boolean = registry.tickSizeDeclared(sym.id);
+const _regLot: number | null = registry.lotSize(symWithLot);
+void _regTick;
+void _regTickDeclared;
+void _regLot;
 
 const strategy: Strategy = {
   symbols: [sym, 1],
@@ -172,6 +178,8 @@ runner.onTrade(1, 100, 1, false, 0);
 checkAcceptsBigint(() => runner.onBookSnapshot(sym, arr, arr, arr, arr, 0n), "Runner.onBookSnapshot accepts bigint ts and Float64Array levels");
 checkAcceptsBigint(() => runner.onBookTop(sym, { price: 100.02, qty: 4 }, null, 0n), "Runner.onBookTop accepts bigint ts and a null side");
 runner.onBar(sym, { open: 1, high: 2, low: 0.5, close: 1.5 });
+runner.orderClosed(42);
+runner.orderClosed(42n);
 runner.stop();
 
 const threadedRunner = new Runner(registry, (_s) => {}, true);
@@ -559,6 +567,8 @@ void part.byEventCount(4);
 const _vsOk: boolean = lrvx.validateSegment("/tmp/x");
 void _vsOk;
 const valRes = lrvx.validate("/tmp/x");
+void lrvx.validate("/tmp/x", false);
+void lrvx.validate("/tmp/x", true, false);
 void valRes.headerValid;
 void valRes.tradesFound;
 const dsRes = lrvx.validateDataset("/tmp/x");
@@ -568,6 +578,10 @@ const _msOk: boolean = lrvx.mergeSegments("/tmp/a", "/tmp/b");
 void _msOk;
 const mdRes = lrvx.mergeDir("/tmp/a", "/tmp/b");
 void mdRes.segmentsMerged;
+const _mdPath: string = mdRes.outputPath;
+const _mdErrors: string[] = mdRes.errors;
+void _mdPath;
+void _mdErrors;
 const splitRes = lrvx.split("/tmp/a", "/tmp/b", "time", 3_600_000_000_000n, 1_000_000);
 void splitRes.segmentsCreated;
 const exRes = lrvx.exportData("/tmp/a", "/tmp/b", "json", 0n, 0n);

@@ -158,10 +158,13 @@ disagreement. The connectors report a `Conflict` as an error naming both ticks, 
 their `instrumentInfoError()`.
 
 Every reader of the registry (`getSymbolInfo` returns a copy) sees the new tick from the call on.
-A copy taken earlier does not: `Strategy` sizes each symbol's book on the tick it read in its
-constructor, so it keeps the shared `venueTickLog()` and rebuilds a symbol's book on the applied
-tick at that symbol's next event. The log is a `shared_ptr`, so a strategy may outlive the
-registry. `clear()`, `loadFromFile` and `deserialize` reset it.
+A copy taken earlier does not by itself, so the holders of one keep the shared `venueTickLog()` and
+follow it. `Strategy` sizes each symbol's book on the tick it read in its constructor and rebuilds a
+symbol's book on the applied tick at that symbol's next event; its `symbolInfos()` returns the
+copied entries with the applied tick and lot in place. `SimulatedExecutor` caches each symbol's
+tick and lot and drops both caches when the log's revision moves, so an executor that already read
+a symbol checks the next order against the applied value. The log is a `shared_ptr`, so a strategy
+may outlive the registry. `clear()`, `loadFromFile` and `deserialize` reset it.
 
 ### The venue's lot
 
@@ -179,10 +182,10 @@ entry holds after the call:
 | Venue lot not positive | `InvalidTick` | Unchanged |
 
 An applied lot is recorded in `venueTickLog()` (`lotFor(id)`), which is how the registry tells it
-from a declared one on the next call. It does not move the log's revision: nothing is sized on a
-lot, so no copy has to follow it. A `SymbolInfo` copied before the call (a strategy's
-`symbolInfos()`) keeps the lot it was copied with. A lot read back from a saved registry is a
-declared one.
+from a declared one on the next call, and it moves the log's revision as an applied tick does, so
+the same holders follow it: a `SimulatedExecutor` that had already read "no lot" for the symbol
+checks the next order against the applied one, and a strategy's `symbolInfos()` reports it. A lot
+read back from a saved registry is a declared one.
 
 ## Symbol Equivalence
 
@@ -216,6 +219,20 @@ auto bybitEquiv = registry.getEquivalentOnExchange(btcBinance, bybitExchangeId);
 | `loadFromFile`  | Loads registry from a JSON file.                    |
 | `serialize`     | Returns binary representation as `std::vector<std::byte>`. |
 | `deserialize`   | Restores state from binary data.                    |
+
+Both writers emit the symbols in ascending id order, so two registries holding the same entries
+write the same bytes however the entries were added; the order used to be the hash map's.
+
+A load either takes the whole input or none of it. `deserialize` returns false and leaves the
+registry with no symbols when the blob is too short for its header, carries another magic or a
+version this build does not read, ends before the last entry its count announces (every read is
+bounds-checked; a truncated blob used to load entries built from zeros and return true), or holds
+an entry whose scale `registerSymbol` would refuse. `loadFromFile` returns false and leaves the
+registry with no symbols when the file does not parse, and when an entry of the `symbols` array
+lacks its `id`, `exchange` or `symbol`; such an entry used to end the load quietly, with the entries
+before it kept and those after it dropped. A file that cannot be opened or is empty returns false
+and leaves the registry as it was. The exchanges and the equivalence table are not part of either
+format and are not touched by a load, failed or not.
 
 Both formats keep `tickSizeKnown`, so a symbol whose tick was declared is checked the same way
 after a load as before the save. The JSON file writes `"tick_size_known": true` on such an entry;

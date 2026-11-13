@@ -126,10 +126,10 @@ Extended operations:
 
 | Call | Description |
 |------|-------------|
-| `lrvx.mergeDir(inputDir, outputDir)` | Merge a directory into an output directory. Returns `{ success, segmentsMerged, eventsWritten, bytesWritten }`, the object Node's `mergeDir` returns |
+| `lrvx.mergeDir(inputDir, outputDir)` | Merge a directory into an output directory. Returns `{ success, segmentsMerged, eventsWritten, bytesWritten, outputPath, errors }`, the object Node's `mergeDir` returns: `outputPath` is the segment written (`''` when none was) and `errors` an array with one string per thing that went wrong, `"Cannot open: <path>"` for an input that was skipped |
 | `lrvx.splitSegment(inputPath, outputDir, mode, timeIntervalNs, eventsPerFile)` | Split one segment into many |
 | `lrvx.exportSegment(inputPath, outputPath, format, fromNs, toNs, symbols)` | Export a range to another format |
-| `lrvx.validateSegmentFull(path, verifyCrc, verifyTimestamps)` | Full validation, optional CRC and timestamp checks |
+| `lrvx.validateSegmentFull(path, verifyCrc, verifyTimestamps)` | Full validation. Both checks are on when the flag is left out; pass `false` to turn one off |
 | `lrvx.validateDataset(dataDir)` | Validate every segment in a dataset directory. Returns `{ valid, totalSegments, validSegments, corruptedSegments, totalEvents, totalBytes, firstTimestamp, lastTimestamp }`; the two timestamps are nanoseconds as `BigInt` |
 | `lrvx.recompressSegment(inputPath, outputPath, level)` | Recompress at a different level |
 | `lrvx.extractSymbols(inputPath, outputDir, symbols)` | Extract selected symbols |
@@ -193,6 +193,8 @@ Record shapes:
 - **Book update**: `{ exchangeTsNs, recvTsNs, seq, symbolId, eventType, bids: [{price, qty}, ...], asks: [{price, qty}, ...] }`
 
 `eventType` is the record byte: `0` snapshot, `1` delta, `2` top-of-book.
+
+`maxSegmentMb` of 0, or left out, is the 256 MB default.
 
 ```javascript
 const writer = new DataWriter('./out', maxSegmentMb, exchangeId);

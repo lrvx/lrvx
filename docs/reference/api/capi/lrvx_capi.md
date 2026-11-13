@@ -7,12 +7,13 @@
 All language bindings (Python, Node.js, Codon, embedded JS) call into this header. You can use it directly to integrate lrvx into any language with a C FFI, or embed it in a C/C++ project.
 
 !!! warning "This page is a curated subset"
-    The full surface is **763 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums**
-    across 74 groups. This page covers the commonly used core (roughly 150 functions) with prose.
-    The complete, machine-generated reference — every function signature, in group order — is
+    This page covers the commonly used core of the surface with prose. The complete,
+    machine-generated reference — every function signature, in group order — is
     [`tools/codegen/golden/lrvx_capi.md`](https://github.com/lrvx/lrvx/blob/main/tools/codegen/golden/lrvx_capi.md),
-    generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. **That file is the reference of record.**
-    When this page and the header disagree, the header wins.
+    generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. **That file is the reference of record**,
+    and its **Surface** line gives the current size of the API (functions, handles, structs,
+    callback typedefs, enums, groups); the numbers are not repeated here, where nothing keeps them
+    current. When this page and the header disagree, the header wins.
 
     Groups with no prose coverage here: Account, Amm Curve, Delta Book, Dex Amount, Execution Algos,
     Fee Schedule, Feed Clock, Lrvxrun/trace, Funding Schedule, Grid Search, Heatmap, Indicator Graph,
@@ -25,7 +26,7 @@ All language bindings (Python, Node.js, Codon, embedded JS) call into this heade
 
 ## Opaque handles
 
-All 59 handles are `void*`. Lifetime is managed by the matching `_create` / `_destroy` pair.
+Every handle is `void*`. Lifetime is managed by the matching `_create` / `_destroy` pair.
 
 ```c
 typedef void* LrvxStrategyHandle;
@@ -452,10 +453,19 @@ uint8_t  lrvx_registry_get_symbol_name(LrvxRegistryHandle registry,
                                        uint32_t symbol_id,
                                        char* exchange_out, size_t exchange_len,
                                        char* name_out, size_t name_len);
+// The tick / lot the entry holds now. Return 1 and fill the outputs when
+// symbol_id is registered, 0 otherwise. declared_out (may be NULL) reads 1
+// when orders are checked against the value.
+uint8_t  lrvx_registry_get_symbol_tick(LrvxRegistryHandle registry, uint32_t symbol_id,
+                                       double* tick_size_out, uint8_t* declared_out);
+uint8_t  lrvx_registry_get_symbol_lot(LrvxRegistryHandle registry, uint32_t symbol_id,
+                                      double* lot_size_out, uint8_t* declared_out);
 uint32_t lrvx_registry_symbol_count(LrvxRegistryHandle registry);
 ```
 
 A positive `tick_size` is the venue's price increment: a backtest runner built on this registry rejects orders priced off it ([SimulatedExecutor](../backtest/simulated_executor.md#order-prices-and-the-tick)). Zero or less registers the symbol with the 0.01 default tick for its book and checks no order price.
+
+`lrvx_registry_get_symbol_tick` reads the tick back: 0.01 with `*declared_out` 0 for a symbol registered without one, the registered value with 1 otherwise, and the venue's tick with 1 once a connector has applied it (`SymbolRegistry::applyVenueTick`). `lrvx_registry_get_symbol_lot` does the same for the quantity step, reading 0.0 with `*declared_out` 0 for a symbol that declares none.
 
 ---
 
@@ -468,6 +478,8 @@ LrvxStrategyHandle lrvx_strategy_create(uint32_t id,
                                         LrvxStrategyCallbacks callbacks);
 void lrvx_strategy_destroy(LrvxStrategyHandle strategy);
 ```
+
+`lrvx_strategy_create` returns `NULL`, with the reason in `lrvx_last_error_message`, when the strategy cannot be built: a symbol id the registry does not hold, a `NULL` symbols array with `num_symbols > 0`, or the reserved subscriber id 4294967295 (`0xFFFFFFFF`), whose order ids are the block the position tracker numbers its explicit fills from.
 
 ---
 
@@ -1271,9 +1283,18 @@ void lrvx_binary_log_recorder_hook_stats_p(void* hook, void* out);
 // Quick validate/merge. validate returns 0 for a segment that fails its
 // checks and for a file it could not read; only the second leaves a reason in
 // lrvx_last_error_message. merge returns 0 when no segment was merged, with
-// the reason there.
+// the reason there; when it merged some segments and could not open others it
+// returns 1 and the last error lists the ones it skipped.
 uint8_t lrvx_segment_validate(const char* path);
 uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path);
+
+// merge_dir with the two things LrvxMergeResult has no room for: the path of
+// the segment written and every error, one per line. Returns the success
+// flag; any output may be NULL, and the strings are truncated to fit.
+uint8_t lrvx_segment_merge_dir_report(const char* input_dir, const char* output_dir,
+                                      LrvxMergeResult* result_out,
+                                      char* output_path_out, size_t output_path_len,
+                                      char* errors_out, size_t errors_len);
 
 // Full API (results written to out pointer, see struct definitions in header)
 void lrvx_segment_merge_full_p(const char* input_paths, size_t num_paths,
@@ -1301,6 +1322,8 @@ void lrvx_segment_validate_full_p(const char* path, uint8_t verify_crc,
                                    uint8_t verify_timestamps, void* out); // → LrvxSegmentValidation
 void lrvx_dataset_validate_p(const char* data_dir, void* out);            // → LrvxDatasetValidation
 ```
+
+`lrvx_dataset_validate` reports a directory that does not exist or cannot be listed as not valid with every count zero, and leaves the reason, naming the directory, in `lrvx_last_error_message`. A directory whose segments fail their checks is not valid either and records no error, so clear the last error first to tell the two apart.
 
 ---
 

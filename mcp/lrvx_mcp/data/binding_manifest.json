@@ -1848,6 +1848,11 @@
           "name": "lrvx_live_engine_destroy"
         },
         {
+          "group": "execution",
+          "kind": "function",
+          "name": "lrvx_live_engine_order_closed"
+        },
+        {
           "group": "lrvxliveengine_disruptor",
           "kind": "function",
           "name": "lrvx_live_engine_publish_bar"
@@ -2750,7 +2755,17 @@
         {
           "group": "symbol_registry",
           "kind": "function",
+          "name": "lrvx_registry_get_symbol_lot"
+        },
+        {
+          "group": "symbol_registry",
+          "kind": "function",
           "name": "lrvx_registry_get_symbol_name"
+        },
+        {
+          "group": "symbol_registry",
+          "kind": "function",
+          "name": "lrvx_registry_get_symbol_tick"
         },
         {
           "group": "symbol_registry",
@@ -2851,6 +2866,11 @@
           "group": "lrvxrun",
           "kind": "function",
           "name": "lrvx_run_reader_signal_header"
+        },
+        {
+          "group": "lrvxrun",
+          "kind": "function",
+          "name": "lrvx_run_reader_signal_id64"
         },
         {
           "group": "lrvxrun",
@@ -2970,6 +2990,11 @@
         {
           "group": "execution",
           "kind": "function",
+          "name": "lrvx_runner_order_closed"
+        },
+        {
+          "group": "execution",
+          "kind": "function",
           "name": "lrvx_runner_set_executor"
         },
         {
@@ -3061,6 +3086,11 @@
           "group": "pointer_out",
           "kind": "function",
           "name": "lrvx_segment_merge_dir_p"
+        },
+        {
+          "group": "segment",
+          "kind": "function",
+          "name": "lrvx_segment_merge_dir_report"
         },
         {
           "group": "segment",
@@ -8528,6 +8558,11 @@
         },
         {
           "kind": "method",
+          "name": "signal_id64",
+          "parent": "TraceReader"
+        },
+        {
+          "kind": "method",
           "name": "add_tape_ref",
           "parent": "TraceRecorder"
         },
@@ -10259,6 +10294,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_live_engine_order_closed"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_live_engine_publish_bar"
         },
         {
@@ -10979,7 +11018,15 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_registry_get_symbol_lot"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_registry_get_symbol_name"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_registry_get_symbol_tick"
         },
         {
           "kind": "c_import",
@@ -11060,6 +11107,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_run_reader_signal_header"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_run_reader_signal_id64"
         },
         {
           "kind": "c_import",
@@ -11155,6 +11206,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_runner_order_closed"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_runner_set_executor"
         },
         {
@@ -11228,6 +11283,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_segment_merge_dir_p"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_segment_merge_dir_report"
         },
         {
           "kind": "c_import",
@@ -22886,6 +22945,11 @@
         },
         {
           "kind": "method",
+          "name": "signalId64",
+          "parent": "OwnedSignal"
+        },
+        {
+          "kind": "method",
           "name": "observeVolume",
           "parent": "POVExecutor"
         },
@@ -25186,6 +25250,11 @@
         },
         {
           "kind": "method",
+          "name": "followVenueLog",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "forgetMarketPosition",
           "parent": "SimulatedExecutor"
         },
@@ -25547,6 +25616,11 @@
         {
           "kind": "method",
           "name": "setVenueAvailability",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "setVenueTickLog",
           "parent": "SimulatedExecutor"
         },
         {
@@ -26142,6 +26216,11 @@
         {
           "kind": "method",
           "name": "symbols",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
+          "name": "venueTickLog",
           "parent": "Strategy"
         },
         {
@@ -31621,7 +31700,17 @@
         },
         {
           "kind": "method",
+          "name": "errors",
+          "parent": "MergeDirResult"
+        },
+        {
+          "kind": "method",
           "name": "eventsWritten",
+          "parent": "MergeDirResult"
+        },
+        {
+          "kind": "method",
+          "name": "outputPath",
           "parent": "MergeDirResult"
         },
         {
@@ -32971,6 +33060,11 @@
         },
         {
           "kind": "method",
+          "name": "orderClosed",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "replaceStrategy",
           "parent": "Runner"
         },
@@ -33881,7 +33975,22 @@
         },
         {
           "kind": "method",
+          "name": "lotSize",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
           "name": "symbolCount",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
+          "name": "tickSize",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
+          "name": "tickSizeDeclared",
           "parent": "SymbolRegistry"
         },
         {
@@ -34427,6 +34536,11 @@
         {
           "kind": "method",
           "name": "signalId",
+          "parent": "TraceSignalRecord"
+        },
+        {
+          "kind": "method",
+          "name": "signalId64",
           "parent": "TraceSignalRecord"
         },
         {
@@ -38847,6 +38961,11 @@
         },
         {
           "kind": "method",
+          "name": "order_closed",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "replace_strategy",
           "parent": "Runner"
         },
@@ -39927,7 +40046,22 @@
         },
         {
           "kind": "method",
+          "name": "lot_size",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
           "name": "symbol_count",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
+          "name": "tick_size",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
+          "name": "tick_size_declared",
           "parent": "SymbolRegistry"
         },
         {
@@ -43565,7 +43699,9 @@
         "lrvx_executor_create_p",
         "lrvx_executor_destroy",
         "lrvx_executor_get_capabilities",
+        "lrvx_live_engine_order_closed",
         "lrvx_live_engine_set_executor",
+        "lrvx_runner_order_closed",
         "lrvx_runner_set_executor"
       ],
       "codon": {
@@ -44466,6 +44602,7 @@
         "lrvx_run_reader_run_started_ns",
         "lrvx_run_reader_signal_count",
         "lrvx_run_reader_signal_header",
+        "lrvx_run_reader_signal_id64",
         "lrvx_run_reader_signal_name",
         "lrvx_run_reader_signal_payload",
         "lrvx_run_reader_signal_symbol_ids",
@@ -45343,6 +45480,7 @@
         "lrvx_segment_extract_time_range",
         "lrvx_segment_merge",
         "lrvx_segment_merge_dir",
+        "lrvx_segment_merge_dir_report",
         "lrvx_segment_merge_full",
         "lrvx_segment_recompress",
         "lrvx_segment_split",
@@ -45724,7 +45862,9 @@
         "lrvx_registry_create",
         "lrvx_registry_destroy",
         "lrvx_registry_get_symbol_id",
+        "lrvx_registry_get_symbol_lot",
         "lrvx_registry_get_symbol_name",
+        "lrvx_registry_get_symbol_tick",
         "lrvx_registry_symbol_count"
       ],
       "codon": {

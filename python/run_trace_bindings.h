@@ -193,6 +193,7 @@ inline void bindRunTrace(py::module_& m)
                d["run_ts_ns"] = s.run_ts_ns;
                d["feed_ts_ns"] = s.feed_ts_ns;
                d["signal_id"] = s.signal_id;
+               d["signal_id64"] = s.signalId64();
                d["flags"] = s.flags;
                d["strength_raw"] = s.strength_raw;
                d["name"] = s.name;

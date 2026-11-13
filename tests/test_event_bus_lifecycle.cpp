@@ -29,6 +29,7 @@
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -843,6 +844,159 @@ TEST(EventBusLifecycle, StopAfterTheLastPublishDeliversEverything)
 
   EXPECT_EQ(listener.count.load(std::memory_order_relaxed), 1000u);
   EXPECT_EQ(listener.last.load(std::memory_order_relaxed), 999);
+}
+
+}  // namespace
+
+namespace
+{
+
+// An event that counts its constructions into a slot and its destructions, so
+// a test can tell that stop() destroyed every event still in the ring, once.
+struct CountedEvent
+{
+  using Listener = struct ICountedListener
+  {
+    virtual ~ICountedListener() = default;
+    virtual void onEvent(const CountedEvent& e) = 0;
+  };
+
+  static std::atomic<int64_t> alive;
+
+  int value{0};
+  uint64_t tickSequence{0};
+  bool inRing{false};
+
+  CountedEvent() = default;
+  CountedEvent(const CountedEvent& other)
+      : value(other.value), tickSequence(other.tickSequence), inRing(true)
+  {
+    alive.fetch_add(1, std::memory_order_relaxed);
+  }
+  CountedEvent& operator=(const CountedEvent&) = default;
+  ~CountedEvent()
+  {
+    if (inRing)
+    {
+      alive.fetch_sub(1, std::memory_order_relaxed);
+    }
+  }
+};
+
+std::atomic<int64_t> CountedEvent::alive{0};
+
+class CountedListener : public CountedEvent::Listener
+{
+ public:
+  void onEvent(const CountedEvent& e) override
+  {
+    values.push_back(e.value);
+    sequences.push_back(e.tickSequence);
+  }
+  std::vector<int> values;
+  std::vector<uint64_t> sequences;
+};
+
+}  // namespace
+
+namespace lrvx
+{
+template <>
+struct EventDispatcher<CountedEvent>
+{
+  static void dispatch(const CountedEvent& event, CountedEvent::Listener& listener)
+  {
+    listener.onEvent(event);
+  }
+};
+}  // namespace lrvx
+
+namespace
+{
+
+// stop() resets only the slots the run claimed. Whatever the run did -- nothing
+// at all, a handful of events, exactly a ring of them, several rings -- the
+// events left in the ring are destroyed once each, and the next run on the
+// same bus starts on an empty ring at sequence 0.
+TEST(EventBusLifecycle, StopEmptiesTheRingHoweverMuchOfItARunUsed)
+{
+  constexpr size_t kCapacity = 64;
+  using Bus = EventBus<CountedEvent, kCapacity, 2>;
+  auto bus = std::make_unique<Bus>();
+  CountedListener listener;
+  ASSERT_TRUE(bus->subscribe(&listener, /*required=*/true));
+  bus->enableDrainOnStop();
+  CountedEvent::alive.store(0, std::memory_order_relaxed);
+
+  int nextValue = 0;
+  // The run after a large one is a small one, so slots the earlier run used
+  // and this one does not are seen to have been emptied.
+  for (const size_t published : {size_t{0}, size_t{5}, kCapacity - 1, kCapacity, kCapacity + 1,
+                                 3 * kCapacity + 7, size_t{1}, size_t{0}, size_t{2}})
+  {
+    SCOPED_TRACE("a run of " + std::to_string(published) + " events");
+    listener.values.clear();
+    listener.sequences.clear();
+    bus->start();
+    const int first = nextValue;
+    CountedEvent ev;
+    for (size_t i = 0; i < published; ++i)
+    {
+      ev.value = nextValue++;
+      ASSERT_EQ(bus->publish(ev), static_cast<int64_t>(i));
+    }
+    bus->flush();
+    bus->stop();
+
+    EXPECT_EQ(CountedEvent::alive.load(std::memory_order_relaxed), 0)
+        << "every event constructed into the ring was destroyed, once";
+    ASSERT_EQ(listener.values.size(), published);
+    for (size_t i = 0; i < published; ++i)
+    {
+      EXPECT_EQ(listener.values[i], first + static_cast<int>(i));
+      EXPECT_EQ(listener.sequences[i], i) << "a run starts at sequence 0";
+    }
+  }
+
+  // And a bus destroyed with events still in it, never stopped by hand.
+  bus->start();
+  CountedEvent ev;
+  for (int i = 0; i < 9; ++i)
+  {
+    ASSERT_GE(bus->publish(ev), 0);
+  }
+  bus.reset();
+  EXPECT_EQ(CountedEvent::alive.load(std::memory_order_relaxed), 0);
+}
+
+// The same on a ring the size a venue shard uses, where the walk stop() no
+// longer makes was 65536 slots for every run.
+TEST(EventBusLifecycle, AShortRunOnALargeRingLeavesItEmpty)
+{
+  using Bus = EventBus<CountedEvent, 1 << 16, 2>;
+  auto bus = std::make_unique<Bus>();
+  CountedListener listener;
+  ASSERT_TRUE(bus->subscribe(&listener, /*required=*/true));
+  bus->enableDrainOnStop();
+  CountedEvent::alive.store(0, std::memory_order_relaxed);
+
+  for (int run = 0; run < 3; ++run)
+  {
+    listener.values.clear();
+    bus->start();
+    CountedEvent ev;
+    for (int i = 0; i < 10; ++i)
+    {
+      ev.value = run * 100 + i;
+      ASSERT_EQ(bus->publish(ev), i);
+    }
+    bus->flush();
+    bus->stop();
+    EXPECT_EQ(CountedEvent::alive.load(std::memory_order_relaxed), 0);
+    ASSERT_EQ(listener.values.size(), 10u);
+    EXPECT_EQ(listener.values.front(), run * 100);
+    EXPECT_EQ(listener.values.back(), run * 100 + 9);
+  }
 }
 
 }  // namespace
