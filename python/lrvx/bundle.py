@@ -9,7 +9,8 @@ the expected output field by field (trade count, every fill's symbol,
 side, price and quantity, total filled quantity), along with the
 strategy and tape hashes, the engine version and, when the bundle
 ships an expected `.lrvxrun`, the trace's signal, order and fill
-counts.
+counts (the fill count alone for a bundle packed before its trace
+recorded signals; see `_trace_holds_signals`).
 
 Bundle layout:
 
@@ -65,6 +66,9 @@ _EXPECTED_LRVXRUN_DIR = "expected.lrvxrun"
 # Bundles packed under the FLOX name carry these instead.
 _LEGACY_EXPECTED_RUN_DIR = "expected.floxrun"
 _LEGACY_VERSION_KEY = "flox_version"
+_SIGNALS_RECORDED_KEY = "lrvxrun_signals_recorded"
+_COMPARED_ALL = "signals, order events, fills"
+_COMPARED_FILLS = "fills"
 _STRATEGY_DIR = "strategy"
 _CONFIG_DIR = "config"
 _TAPE_DIR = "tape"
@@ -183,22 +187,16 @@ def _run_strategy_against_tape(
     # every signal / order / fill into a TraceRecorder so the bundle
     # can ship the per-run trace alongside the legacy JSON summary.
     rec: Any = None
-    submitted_orders: Dict[int, Dict[str, Any]] = {}
+    trace_errors: List[Exception] = []
     if lrvxrun_out is not None:
-        try:
-            from lrvx._lrvx import (
-                FillLiquidity, OrderEventKind, TraceRecorder,
-            )
-            rec = TraceRecorder(
-                path=str(lrvxrun_out),
-                strategy_id=strategy_path.stem,
-                strategy_hash=_sha256_file(strategy_path)[:16],
-                run_started_ns=time.time_ns(),
-            )
-        except Exception as e:
-            import sys as _sys
-            print(f"lrvx bundle: TraceRecorder unavailable: {e!r}", file=_sys.stderr)
-            rec = None
+        from lrvx._lrvx import FillLiquidity, OrderEventKind, TraceRecorder
+
+        rec = TraceRecorder(
+            path=str(lrvxrun_out),
+            strategy_id=strategy_path.stem,
+            strategy_hash=_sha256_file(strategy_path)[:16],
+            run_started_ns=time.time_ns(),
+        )
 
     # Signal.order_type and SimulatedExecutor.submit_order now spell the
     # order types the same way, so this is the accepted-signal filter
@@ -237,9 +235,10 @@ def _run_strategy_against_tape(
             trailing_offset=float(getattr(sig, "trailing_offset", 0.0) or 0.0),
             trailing_bps=int(getattr(sig, "trailing_bps", 0) or 0),
         )
-        if rec is not None:
+        if rec is not None and not trace_errors:
+            # The runner logs what a signal callback raises and carries on,
+            # so a failed write is kept here and raised once the run is over.
             try:
-                from lrvx._lrvx import OrderEventKind
                 ts = time.time_ns()
                 rec.write_signal(
                     run_ts_ns=ts, signal_id=oid, name=order_type,
@@ -253,9 +252,8 @@ def _run_strategy_against_tape(
                     order_type=_TRACE_ORDER_TYPE[order_type],
                     price_raw=int(price * 1e8), qty_raw=int(qty * 1e8),
                 )
-                submitted_orders[oid] = {"side": side, "symbol": int(sym)}
-            except Exception:
-                pass
+            except Exception as e:
+                trace_errors.append(e)
 
     runner = lrvx.Runner(registry, on_signal=on_signal)
     try:
@@ -299,24 +297,25 @@ def _run_strategy_against_tape(
     total_qty = sum(float(f["quantity"]) for f in fills)
 
     if rec is not None:
-        try:
-            from lrvx._lrvx import FillLiquidity
-            ts = time.time_ns()
-            for f in fills:
-                rec.write_fill(
-                    run_ts_ns=ts,
-                    order_id=int(f.get("order_id", 0) or 0),
-                    fill_id=int(f.get("order_id", 0) or 0),
-                    price_raw=int(float(f["price"]) * 1e8),
-                    qty_raw=int(float(f["quantity"]) * 1e8),
-                    symbol_id=int(f["symbol"]),
-                    side=0 if str(f["side"]).lower() == "buy" else 1,
-                    liquidity=FillLiquidity.TAKER,
-                )
-            rec.set_run_ended_ns(time.time_ns())
-            rec.close()
-        except Exception:
-            pass
+        if trace_errors:
+            raise RuntimeError(
+                f"bundle trace {lrvxrun_out}: a signal or order event could "
+                f"not be written: {type(trace_errors[0]).__name__}: "
+                f"{trace_errors[0]}") from trace_errors[0]
+        ts = time.time_ns()
+        for f in fills:
+            rec.write_fill(
+                run_ts_ns=ts,
+                order_id=int(f.get("order_id", 0) or 0),
+                fill_id=int(f.get("order_id", 0) or 0),
+                price_raw=int(float(f["price"]) * 1e8),
+                qty_raw=int(float(f["quantity"]) * 1e8),
+                symbol_id=int(f["symbol"]),
+                side=0 if str(f["side"]).lower() == "buy" else 1,
+                liquidity=FillLiquidity.TAKER,
+            )
+        rec.set_run_ended_ns(time.time_ns())
+        rec.close()
     # Order IDs are intentionally omitted: the runner assigns them
     # from a process-wide counter, so they are not stable across runs
     # in the same process. The pair (symbol, side, price, quantity)
@@ -398,6 +397,10 @@ def pack_bundle(
         # predates tick_size_declared still finds a number.
         "tick_size": 0.01 if tick_size is None else tick_size,
         "tick_size_declared": tick_size is not None,
+        # The expected trace holds this run's signals and order events. A
+        # bundle without the key was packed when they could be missing
+        # (see _trace_holds_signals).
+        _SIGNALS_RECORDED_KEY: True,
         "slippage_model": slippage_model,
         "slippage_params": slippage_params,
     }
@@ -523,6 +526,23 @@ def _trace_counts(trace: Path) -> Dict[str, int]:
         "lrvxrun_order_count": len(reader.read_all_order_events()),
         "lrvxrun_fill_count": len(reader.read_all_fills()),
     }
+
+
+def _trace_holds_signals(manifest: Dict[str, Any],
+                         expected_counts: Dict[str, int]) -> bool:
+    """Whether a bundle's expected trace can be compared on its signals
+    and order events.
+
+    A manifest with ``lrvxrun_signals_recorded`` says so. One without the
+    key was packed when a signal whose id did not fit 32 bits was dropped
+    from the trace together with its order event, and the runner's order
+    ids do not fit: such a trace has neither. A trace from that time that
+    does hold a signal or an order event recorded them all, because the
+    ids of one run are all in the same range."""
+    if _SIGNALS_RECORDED_KEY in manifest:
+        return bool(manifest[_SIGNALS_RECORDED_KEY])
+    return (expected_counts["lrvxrun_signal_count"] > 0
+            or expected_counts["lrvxrun_order_count"] > 0)
 
 
 def _manifest_tick(manifest: Dict[str, Any]) -> Optional[float]:
@@ -652,15 +672,32 @@ def replay_bundle(bundle_path: Path) -> BundleResult:
                 # carries the error under lrvxrun_read_error, the other
                 # side None, so the diff names it. Each message names its
                 # side, so two unreadable traces still disagree.
+                counts: Dict[str, Dict[str, int]] = {}
                 for side, out, trace in (("actual", actual, actual_lrvxrun),
                                          ("expected", expected, expected_lrvxrun)):
                     try:
-                        out.update(_trace_counts(trace))
+                        counts[side] = _trace_counts(trace)
                         out["lrvxrun_read_error"] = None
                     except Exception as e:
                         out["lrvxrun_read_error"] = (
                             f"{side} trace {trace.name} unreadable: "
                             f"{type(e).__name__}: {e}")
+                # An expected trace packed without its signals supports a
+                # fill-count comparison and no more; lrvxrun_compared says
+                # which of the two this was.
+                whole = ("expected" not in counts
+                         or _trace_holds_signals(manifest, counts["expected"]))
+                for side, out in (("actual", actual), ("expected", expected)):
+                    if side not in counts:
+                        continue
+                    if whole:
+                        out.update(counts[side])
+                    else:
+                        out["lrvxrun_fill_count"] = counts[side]["lrvxrun_fill_count"]
+                if "expected" in counts:
+                    compared = _COMPARED_ALL if whole else _COMPARED_FILLS
+                    actual["lrvxrun_compared"] = compared
+                    expected["lrvxrun_compared"] = compared
         # else: this bundle predates the .lrvxrun ride-along. Leave
         # `lrvxrun_present` out of both dicts entirely rather than
         # comparing "actual has a fresh one" against "expected never

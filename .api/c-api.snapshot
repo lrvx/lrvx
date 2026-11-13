@@ -590,6 +590,7 @@ lrvx_run_recorder_set_run_ended_ns|void|LrvxRunRecorderHandle|int64_t
 lrvx_run_recorder_write_fill|void|LrvxRunRecorderHandle|int64_t|int64_t|uint64_t|uint64_t|int64_t|int64_t|int64_t|uint32_t|uint8_t|uint8_t
 lrvx_run_recorder_write_order_event|void|LrvxRunRecorderHandle|int64_t|int64_t|uint64_t|uint64_t|int64_t|int64_t|uint32_t|uint8_t|uint8_t|uint8_t|uint32_t|const char *|size_t
 lrvx_run_recorder_write_signal|void|LrvxRunRecorderHandle|int64_t|int64_t|uint32_t|uint32_t|int64_t|const char *|size_t|const uint32_t *|size_t|const uint8_t *|size_t
+lrvx_run_recorder_write_signal64|void|LrvxRunRecorderHandle|int64_t|int64_t|uint64_t|uint32_t|int64_t|const char *|size_t|const uint32_t *|size_t|const uint8_t *|size_t
 lrvx_runner_add_strategy|void|LrvxRunnerHandle|LrvxStrategyHandle
 lrvx_runner_attach_trace_recorder|void|LrvxRunnerHandle|LrvxRunRecorderHandle
 lrvx_runner_create|LrvxRunnerHandle|LrvxRegistryHandle|LrvxOnSignalCallback|void *

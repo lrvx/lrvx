@@ -3414,7 +3414,8 @@ export interface TraceTapeRefInput {
 export interface TraceSignalInput {
   runTsNs: number | bigint;
   feedTsNs?: number | bigint;
-  signalId?: number;
+  /** The whole 64-bit id is written; a BigInt keeps one above 2^53 exact. */
+  signalId?: number | bigint;
   flags?: number;
   strengthRaw?: number;
   name?: string;

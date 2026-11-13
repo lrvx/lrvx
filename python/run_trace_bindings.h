@@ -77,7 +77,7 @@ inline void bindRunTrace(py::module_& m)
            py::arg("tape_refs") = std::vector<TapeRef>{})
       .def(
           "write_signal",
-          [](TraceRecorder& self, int64_t run_ts_ns, int64_t feed_ts_ns, uint32_t signal_id,
+          [](TraceRecorder& self, int64_t run_ts_ns, int64_t feed_ts_ns, uint64_t signal_id,
              uint32_t flags, int64_t strength_raw, const std::string& name,
              const std::vector<uint32_t>& symbol_ids, const py::bytes& payload)
           {
@@ -93,7 +93,7 @@ inline void bindRunTrace(py::module_& m)
             s.payload = p;
             self.writeSignal(s);
           },
-          py::arg("run_ts_ns"), py::arg("feed_ts_ns") = int64_t{0}, py::arg("signal_id") = uint32_t{0},
+          py::arg("run_ts_ns"), py::arg("feed_ts_ns") = int64_t{0}, py::arg("signal_id") = uint64_t{0},
           py::arg("flags") = uint32_t{0}, py::arg("strength_raw") = int64_t{0},
           py::arg("name") = std::string{},
           py::arg("symbol_ids") = std::vector<uint32_t>{},

@@ -11286,20 +11286,13 @@ extern "C" void lrvx_run_recorder_set_run_ended_ns(LrvxRunRecorderHandle handle,
   LRVX_CAPI_LEAVE_VOID;
 }
 
-extern "C" void lrvx_run_recorder_write_signal(LrvxRunRecorderHandle handle,
-                                               int64_t run_ts_ns, int64_t feed_ts_ns,
-                                               uint32_t signal_id, uint32_t flags,
-                                               int64_t strength_raw,
-                                               const char* name, size_t name_len,
-                                               const uint32_t* symbol_ids, size_t symbol_count,
-                                               const uint8_t* payload, size_t payload_len)
+namespace
 {
-  LRVX_CAPI_ENTER_VOID(handle);
-  auto* rec = asRecorder(handle);
-  if (rec == nullptr)
-  {
-    return;
-  }
+void writeSignalView(lrvx::run::TraceRecorder* rec, int64_t run_ts_ns, int64_t feed_ts_ns,
+                     uint64_t signal_id, uint32_t flags, int64_t strength_raw, const char* name,
+                     size_t name_len, const uint32_t* symbol_ids, size_t symbol_count,
+                     const uint8_t* payload, size_t payload_len)
+{
   lrvx::run::SignalView s;
   s.run_ts_ns = run_ts_ns;
   s.feed_ts_ns = feed_ts_ns;
@@ -11319,6 +11312,40 @@ extern "C" void lrvx_run_recorder_write_signal(LrvxRunRecorderHandle handle,
     s.payload = std::string_view(reinterpret_cast<const char*>(payload), payload_len);
   }
   rec->writeSignal(s);
+}
+}  // namespace
+
+extern "C" void lrvx_run_recorder_write_signal(LrvxRunRecorderHandle handle,
+                                               int64_t run_ts_ns, int64_t feed_ts_ns,
+                                               uint32_t signal_id, uint32_t flags,
+                                               int64_t strength_raw,
+                                               const char* name, size_t name_len,
+                                               const uint32_t* symbol_ids, size_t symbol_count,
+                                               const uint8_t* payload, size_t payload_len)
+{
+  LRVX_CAPI_ENTER_VOID(handle);
+  if (auto* rec = asRecorder(handle))
+  {
+    writeSignalView(rec, run_ts_ns, feed_ts_ns, signal_id, flags, strength_raw, name, name_len,
+                    symbol_ids, symbol_count, payload, payload_len);
+  }
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+extern "C" void lrvx_run_recorder_write_signal64(LrvxRunRecorderHandle handle,
+                                                 int64_t run_ts_ns, int64_t feed_ts_ns,
+                                                 uint64_t signal_id, uint32_t flags,
+                                                 int64_t strength_raw,
+                                                 const char* name, size_t name_len,
+                                                 const uint32_t* symbol_ids, size_t symbol_count,
+                                                 const uint8_t* payload, size_t payload_len)
+{
+  LRVX_CAPI_ENTER_VOID(handle);
+  if (auto* rec = asRecorder(handle))
+  {
+    writeSignalView(rec, run_ts_ns, feed_ts_ns, signal_id, flags, strength_raw, name, name_len,
+                    symbol_ids, symbol_count, payload, payload_len);
+  }
   LRVX_CAPI_LEAVE_VOID;
 }
 

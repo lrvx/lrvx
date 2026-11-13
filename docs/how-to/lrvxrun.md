@@ -124,6 +124,8 @@ This page covers the write-then-read loop. Format details live in the [lrvxrun s
 
     reader = TraceReader("run.lrvxrun")
     print(reader.counts().signals)
+    for s in reader.read_all_signals():
+        print(s.run_ts_ns, s.name, s.signal_id64)
     ```
 
 === "QuickJS"
@@ -209,11 +211,23 @@ for f in reader.read_all_fills():
 ```
 
 A signal has two id fields. `signal_id` is the low 32 bits, as it has always read; `signal_id64`
-(`signalId64` in Node and QuickJS, `TraceReader.signal_id64(index)` in Codon,
-`lrvx_run_reader_signal_id64` in C) is the whole id. They are equal for an id you wrote yourself,
-which is 32 bits wide. A signal a runner captured carries the id of the order it asks for,
+(`signalId64` in Node and QuickJS, `signal_id64` on a Codon `TraceSignal` and
+`TraceReader.signal_id64(index)`, `lrvx_run_reader_signal_id64` in C) is the whole id. They are
+equal for an id below 2^32. A signal a runner captured carries the id of the order it asks for,
 `(subscriber id << 32) + n`: join it to that order's events on `signal_id64 == order_id`, and to
 the events the C++ capture listener writes on `parent_signal_id` as well.
+
+`write_signal` takes the whole 64-bit id in every binding, so an order id can be passed as it
+is: Python `signal_id=`, Node and QuickJS `signalId` (a Number or a BigInt), Codon `signal_id=`,
+and `lrvx_run_recorder_write_signal64` in C (`lrvx_run_recorder_write_signal` keeps its 32-bit
+parameter). The id is stored the way a captured one is, and an id below 2^32 writes the same
+bytes as before. Python used to raise `TypeError` for an id of 2^32 or more; Node, QuickJS and
+Codon wrote its low 32 bits.
+
+The Codon reader returns the same records: `read_all_signals()`, `read_all_order_events()` and
+`read_all_fills()` give lists of `TraceSignal`, `TraceOrderEvent` and `TraceFill` with the fields
+above as attributes, next to `strategy_id()`, `strategy_hash()`, `tape_ref_paths()` and `counts()`.
+A signal's `payload` is a `str`.
 
 ## What is in a `.lrvxrun` directory
 

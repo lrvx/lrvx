@@ -4033,7 +4033,8 @@ static JSValue js_run_recorder_write_signal(JSContext* ctx, JSValueConst, int ar
   };
   int64_t run_ts = getI64("runTsNs");
   int64_t feed_ts = getI64("feedTsNs");
-  uint32_t signal_id = getU32("signalId");
+  // A Number or a BigInt; the whole 64-bit id is written.
+  uint64_t signal_id = static_cast<uint64_t>(getI64("signalId"));
   uint32_t flags = getU32("flags");
   int64_t strength = getI64("strengthRaw");
   std::string name;
@@ -4071,10 +4072,10 @@ static JSValue js_run_recorder_write_signal(JSContext* ctx, JSValueConst, int ar
     }
     JS_FreeValue(ctx, v);
   }
-  lrvx_run_recorder_write_signal(h, run_ts, feed_ts, signal_id, flags, strength,
-                                 name.empty() ? nullptr : name.data(), name.size(),
-                                 sids.empty() ? nullptr : sids.data(), sids.size(),
-                                 payload.empty() ? nullptr : payload.data(), payload.size());
+  lrvx_run_recorder_write_signal64(h, run_ts, feed_ts, signal_id, flags, strength,
+                                   name.empty() ? nullptr : name.data(), name.size(),
+                                   sids.empty() ? nullptr : sids.data(), sids.size(),
+                                   payload.empty() ? nullptr : payload.data(), payload.size());
   return JS_UNDEFINED;
 }
 

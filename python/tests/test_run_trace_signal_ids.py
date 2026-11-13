@@ -61,3 +61,20 @@ def test_a_captured_signal_reads_back_as_its_order_id(tmp_path):
     (sig,) = lrvx.TraceReader(path).read_all_signals()
     assert sig["signal_id64"] == strat.order_id
     assert sig["signal_id"] == strat.order_id & 0xFFFFFFFF
+
+
+def test_a_written_signal_keeps_an_id_above_32_bits(tmp_path):
+    path = tmp_path / "t.lrvxrun"
+    big = (7 << 32) + 5
+    rec = lrvx.TraceRecorder(str(path), strategy_id="ids")
+    rec.write_signal(run_ts_ns=1, signal_id=big, name="x", symbol_ids=[1])
+    rec.close()
+
+    (sig,) = lrvx.TraceReader(str(path)).read_all_signals()
+    assert sig["signal_id64"] == big
+    assert sig["signal_id"] == 5
+    raw = (path / "signals-000000.bin").read_bytes()
+    record = raw[64 + 12:64 + 12 + 48]
+    assert record[16:20] == (5).to_bytes(4, "little")
+    assert record[40:44] == (7).to_bytes(4, "little"), "the high half, where capture puts it"
+    assert record[44:48] == bytes(4)

@@ -46,11 +46,17 @@ A `nullptr` recorder pointer disables capture without removing the inner-handler
 
 ## Phase status
 
-The C++ adapter classes ship in `include/lrvx/run/trace_handlers.h` and are exercised by `tests/test_trace_handlers.cpp`. The one-call binding helper (`Runner.attach_trace_recorder`) and the executor-mirroring helpers (`Runner.trace_order_event`, `Runner.trace_fill`, plus `Runner.set_trace_feed_ts_ns`) have shipped — see the sections below. What is still a follow-up is end-to-end auto-subscription against the executor's listener bus: the mirroring calls are made by the caller, not wired automatically.
+The C++ adapter classes ship in `include/lrvx/run/trace_handlers.h` and are exercised by `tests/test_trace_handlers.cpp`. The one-call binding helper (`Runner.attach_trace_recorder`) and the executor-mirroring helpers (`Runner.trace_order_event`, `Runner.trace_fill`, plus `Runner.set_trace_feed_ts_ns`) have shipped — see the sections below. A binding `Runner` does not subscribe anything to an executor's listener bus: the mirroring calls are made by the caller.
 
 ## One-call attach
 
-The `Runner` (sync mode) now exposes `attach_trace_recorder(recorder)`. Every signal the strategy emits is auto-mirrored into the recorder. Order / fill auto-capture is a follow-up — wire those through `TraceExecutionListener` against the executor's listener bus until then.
+The `Runner` exposes `attach_trace_recorder(recorder)`. What it records by itself is signals, and only signals:
+
+- Every signal a strategy emits is written as a `SignalRecord`, order signals and `cancel` / `cancel_all` / `modify` alike. Its id is the order id the signal names, its name is the signal type (`market`, `limit`, `cancel`, ...), its symbol list is the signal's symbol, and its flags are `SIGNAL_FLAG_ENTER` for an order, `SIGNAL_FLAG_EXIT` for a cancel and 0 for the rest.
+- The record is written before the kill switch, the order validator and the risk manager see the signal, so a signal one of them drops is in the trace although it reached neither `on_signal` nor the executor.
+- No order event and no fill is written, with or without an executor set on the runner (`set_executor`). A trace captured this way has an empty order-event list and an empty fill list until the caller mirrors them with `trace_order_event` / `trace_fill` (below), or, in C++, subscribes a `TraceExecutionListener` to the executor's listener bus.
+
+`python/tests/test_runner_auto_capture.py` holds each of these statements as a test.
 
 ```python
 # pybind11

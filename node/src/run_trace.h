@@ -113,7 +113,8 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     auto opts = info[0].As<Napi::Object>();
     int64_t run_ts = toInt64Ns(opts.Get("runTsNs"));
     int64_t feed_ts = opts.Has("feedTsNs") ? toInt64Ns(opts.Get("feedTsNs")) : 0;
-    uint32_t sid = opts.Has("signalId") ? opts.Get("signalId").As<Napi::Number>().Uint32Value() : 0;
+    // A Number or a BigInt; the whole 64-bit id is written.
+    uint64_t sid = opts.Has("signalId") ? static_cast<uint64_t>(toInt64Ns(opts.Get("signalId"))) : 0;
     uint32_t flags = opts.Has("flags") ? opts.Get("flags").As<Napi::Number>().Uint32Value() : 0;
     int64_t strength = opts.Has("strengthRaw") ? opts.Get("strengthRaw").As<Napi::Number>().Int64Value() : 0;
     std::string name = opts.Has("name") ? opts.Get("name").As<Napi::String>().Utf8Value() : "";
@@ -127,10 +128,10 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     {
       payload = detail_runtrace::readBytes(opts.Get("payload"));
     }
-    lrvx_run_recorder_write_signal(_h, run_ts, feed_ts, sid, flags, strength,
-                                   name.empty() ? nullptr : name.data(), name.size(),
-                                   sids.empty() ? nullptr : sids.data(), sids.size(),
-                                   payload.empty() ? nullptr : payload.data(), payload.size());
+    lrvx_run_recorder_write_signal64(_h, run_ts, feed_ts, sid, flags, strength,
+                                     name.empty() ? nullptr : name.data(), name.size(),
+                                     sids.empty() ? nullptr : sids.data(), sids.size(),
+                                     payload.empty() ? nullptr : payload.data(), payload.size());
   }
 
   void WriteOrderEvent(const Napi::CallbackInfo& info)

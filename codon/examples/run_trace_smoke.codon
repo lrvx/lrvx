@@ -52,6 +52,59 @@ def run():
     # The whole 64-bit id; the record used to keep 32 bits of it.
     check("signal id64 of the written record", reader.signal_id64(0) == 42)
     check("signal id64 out of range is 0", reader.signal_id64(5) == 0)
+
+    check("strategy id", reader.strategy_id() == "codon-smoke")
+    check("strategy hash", reader.strategy_hash() == "sha256:test")
+    refs = reader.tape_ref_paths()
+    check("tape ref path", len(refs) == 1 and refs[0] == "BTCUSDT.lrvx")
+
+    signals = reader.read_all_signals()
+    check("one signal record", len(signals) == 1)
+    s = signals[0]
+    check("signal timestamps", s.run_ts_ns == 1700000000100000000 and
+          s.feed_ts_ns == 1700000000099000000)
+    check("signal ids", s.signal_id == 42 and s.signal_id64 == 42)
+    check("signal flags and strength", s.flags == SIGNAL_FLAG_ENTER and
+          s.strength_raw == 75000000)
+    check("signal name", s.name == "ratio-cross")
+    check("signal symbols", len(s.symbol_ids) == 2 and s.symbol_ids[0] == 1 and
+          s.symbol_ids[1] == 2)
+    check("signal payload", s.payload == '{"src":"ETH","dst":"BTC"}')
+
+    orders = reader.read_all_order_events()
+    check("one order event record", len(orders) == 1)
+    o = orders[0]
+    check("order ids", o.order_id == 7 and o.parent_signal_id == 42)
+    check("order price and qty", o.price_raw == 5000000000000 and o.qty_raw == 100000000)
+    check("order kind, side, type", o.event_kind == ORDER_KIND_SUBMIT and o.side == 0 and
+          o.order_type == 1)
+    check("order symbol and flags", o.symbol_id == 1 and o.flags == ORDER_FLAG_POST_ONLY)
+    check("order reason is empty", o.reason == "")
+
+    fills = reader.read_all_fills()
+    check("one fill record", len(fills) == 1)
+    f = fills[0]
+    check("fill ids", f.order_id == 7 and f.fill_id == 12345)
+    check("fill price, qty, fee", f.price_raw == 5000000000000 and
+          f.qty_raw == 100000000 and f.fee_raw == 50000)
+    check("fill symbol, side, liquidity", f.symbol_id == 1 and f.side == 0 and
+          f.liquidity == LIQUIDITY_MAKER)
+    check("fill timestamps", f.run_ts_ns == 1700000000300000000 and
+          f.feed_ts_ns == 1700000000250000000)
+    reader.close()
+    os.system("rm -rf " + path)
+
+    # An id above 32 bits is written whole; it used to be cut to its low half.
+    big = (7 << 32) + 5
+    rec = TraceRecorder(path, strategy_id="codon-smoke")
+    rec.write_signal(1, name="wide", symbol_ids=[1], signal_id=big)
+    rec.write_order_event(2, order_id=big, reason="why")
+    rec.close()
+    reader = TraceReader(path)
+    wide = reader.read_all_signals()
+    check("a wide id reads back whole", wide[0].signal_id64 == big)
+    check("and its low half is the 32-bit field", wide[0].signal_id == 5)
+    check("an order reason reads back", reader.read_all_order_events()[0].reason == "why")
     reader.close()
     os.system("rm -rf " + path)
 

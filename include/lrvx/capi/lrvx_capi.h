@@ -1666,6 +1666,15 @@ extern "C"
                                       int64_t strength_raw, const char* name, size_t name_len,
                                       const uint32_t* symbol_ids, size_t symbol_count,
                                       const uint8_t* payload, size_t payload_len);
+  // lrvx_run_recorder_write_signal with the whole 64-bit id, stored as a
+  // captured signal's is: low 32 bits in signal_id, high 32 in the bytes
+  // after it that used to be reserved. An id below 2^32 writes the same
+  // bytes as lrvx_run_recorder_write_signal.
+  void lrvx_run_recorder_write_signal64(LrvxRunRecorderHandle handle, int64_t run_ts_ns,
+                                        int64_t feed_ts_ns, uint64_t signal_id, uint32_t flags,
+                                        int64_t strength_raw, const char* name, size_t name_len,
+                                        const uint32_t* symbol_ids, size_t symbol_count,
+                                        const uint8_t* payload, size_t payload_len);
   void lrvx_run_recorder_write_order_event(LrvxRunRecorderHandle handle, int64_t run_ts_ns,
                                            int64_t feed_ts_ns, uint64_t order_id,
                                            uint64_t parent_signal_id, int64_t price_raw,
