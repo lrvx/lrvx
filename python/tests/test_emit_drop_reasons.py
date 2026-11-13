@@ -170,3 +170,61 @@ def test_every_emit_method_clears_a_stale_reason(tmp_path):
     ]
     strat, _, _ = _run([stale(e) for e in emits], {})
     assert strat.errors == [""] * len(emits)
+
+
+def _backtest(steps, deny_before):
+    """The same script through a BacktestRunner, one step per bar."""
+    import numpy as np
+
+    reg = lrvx.SymbolRegistry()
+    sym = reg.add_symbol("test", "BTCUSDT", tick_size=0.01)
+    runner = lrvx.BacktestRunner(reg, 0.0, 10_000.0)
+    deny = Deny()
+    gates = (Kill(deny), Validator(deny), Risk(deny))
+    runner.set_kill_switch(gates[0])
+    runner.set_order_validator(gates[1])
+    runner.set_risk_manager(gates[2])
+
+    def gated(index, step):
+        def run(s):
+            for name in deny_before.get(index, ()):
+                setattr(deny, name, True)
+            return step(s)
+        return run
+
+    strat = Scripted([sym], [gated(i, step) for i, step in enumerate(steps)])
+    runner.set_strategy(strat)
+    n = len(steps) + 1
+    ts = np.arange(n, dtype=np.int64) * 1_000_000_000 + T0
+    runner.run_ohlcv(ts, np.full(n, 100.0), "BTCUSDT")
+    return strat
+
+
+def test_a_backtest_drop_names_the_gate_and_the_order():
+    """A backtest drop left nothing: the emit returned an id and that was all."""
+    def _buy(s):
+        return s.limit_buy(90.0, 1.0)
+
+    strat = _backtest([_buy, _buy, _buy, _buy],
+                      {1: ("risk",), 2: ("validator",), 3: ("kill",)})
+
+    assert strat.errors[0] == ""
+    for index, gate, token in ((1, "risk manager", "risk_manager"),
+                               (2, "order validator", "order_validator"),
+                               (3, "kill switch", "kill_switch")):
+        why = strat.errors[index]
+        assert why.endswith("[" + token + "]"), why
+        assert "dropped by the " + gate in why, why
+        assert "limit signal for order %d" % strat.ids[index] in why, why
+        assert "it reached no executor" in why, why
+
+
+def test_a_backtest_reduce_only_order_and_a_cancel_are_not_gated():
+    """What the backtest runner's gates leave alone leaves no reason."""
+    strat = _backtest(
+        [lambda s: s.market_buy(1.0), lambda s: s.close_position(),
+         lambda s: s.cancel_order(12345)],
+        {1: ("risk", "validator")})
+
+    assert strat.ids[1] != 0, "there was a position to close"
+    assert strat.errors == ["", "", ""]

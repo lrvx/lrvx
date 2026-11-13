@@ -8,6 +8,7 @@
  */
 
 #include "lrvx/capi/lrvx_capi.h"
+#include "drop_reason.h"
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/log/abstract_logger.h"
@@ -307,6 +308,76 @@ class LrvxBorrowedHandles
 };
 
 }  // namespace
+
+// The names a captured signal carries in a trace, and the ones the reason
+// for a drop uses.
+static const char* signalTypeName(lrvx::SignalType type) noexcept
+{
+  switch (type)
+  {
+    case SignalType::Market:
+      return "market";
+    case SignalType::Limit:
+      return "limit";
+    case SignalType::Cancel:
+      return "cancel";
+    case SignalType::CancelAll:
+      return "cancel_all";
+    case SignalType::Modify:
+      return "modify";
+    case SignalType::StopMarket:
+      return "stop_market";
+    case SignalType::StopLimit:
+      return "stop_limit";
+    case SignalType::TakeProfitMarket:
+      return "take_profit_market";
+    case SignalType::TakeProfitLimit:
+      return "take_profit_limit";
+    case SignalType::TrailingStop:
+      return "trailing_stop";
+    case SignalType::OCO:
+      return "oco";
+    case SignalType::ProvideLiquidity:
+      return "provide_liquidity";
+    case SignalType::WithdrawLiquidity:
+      return "withdraw_liquidity";
+  }
+  return "unknown";
+}
+
+void lrvxCapiNoteDroppedSignal(const lrvx::Signal& sig, std::string_view gate,
+                               std::string_view token, std::string_view detail,
+                               std::string_view outcome) noexcept
+{
+  try
+  {
+    std::string why = std::string(signalTypeName(sig.type)) + " signal for order " +
+                      std::to_string(sig.orderId) + " on symbol " + std::to_string(sig.symbol) +
+                      " was dropped by the ";
+    why += gate;
+    if (!detail.empty())
+    {
+      why += " (";
+      why += detail;
+      why += ")";
+    }
+    why += "; ";
+    why += outcome;
+    why += " [";
+    why += token;
+    why += "]";
+    lrvxCapiNoteException("emit", why.c_str());
+  }
+  catch (...)
+  {
+  }
+}
+
+void lrvxCapiNoteBacktestDrop(const lrvx::BacktestRunner::SignalDrop& drop) noexcept
+{
+  lrvxCapiNoteDroppedSignal(drop.signal, drop.gate, drop.token, drop.detail,
+                            "it reached no executor");
+}
 
 // Every _destroy opens with this. Destroying NULL has always been legal and
 // stays legal -- a binding's finaliser runs on a half-constructed object often
@@ -3988,7 +4059,7 @@ LrvxDataWriterHandle lrvx_data_writer_create(const char* output_dir, uint64_t ma
   LRVX_CAPI_REQUIRE(output_dir);
   replay::WriterConfig cfg;
   cfg.output_dir = output_dir;
-  cfg.max_segment_bytes = max_segment_mb * 1024 * 1024;
+  cfg.max_segment_bytes = replay::segmentBytesFromMb(max_segment_mb);
   cfg.exchange_id = exchange_id;
   return new replay::BinaryLogWriter(cfg);
   LRVX_CAPI_LEAVE;
@@ -5391,13 +5462,14 @@ static replay::CompressionType toCompression(uint8_t c)
 
 // The merge, split and export results carry the counts of what was done
 // before the failure, so they are returned as they are and the reason goes to
-// lrvx_last_error_message beside them.
+// lrvx_last_error_message beside them: every error the operation collected,
+// joined with "; ".
 template <typename Result>
 static void noteSegmentOpFailure(const char* fn, const Result& r)
 {
   if (!r.success)
   {
-    lrvxCapiNoteException(fn, r.errors.empty() ? "failed" : r.errors.front().c_str());
+    lrvxCapiNoteException(fn, r.errors.empty() ? "failed" : joinErrors(r.errors, "; ").c_str());
   }
 }
 
@@ -7310,14 +7382,10 @@ class RunnerSignalHandler : public ISignalHandler
       }
       view.strength_raw = 0;
       view.symbol_ids = {static_cast<uint32_t>(sig.symbol)};
-      view.name = signalName(sig.type);
+      view.name = signalTypeName(sig.type);
       recorder->writeSignal(view);
     }
 
-    if (!_cb)
-    {
-      return;
-    }
     LrvxSignal fs{};
     fs.order_id = sig.orderId;
     fs.symbol = sig.symbol;
@@ -7412,7 +7480,12 @@ class RunnerSignalHandler : public ISignalHandler
       }
     }
 
-    _cb(_ud, &fs);
+    // on_signal observes what passed the gates. Without one the signal is
+    // gated and forwarded just the same.
+    if (_cb != nullptr)
+    {
+      _cb(_ud, &fs);
+    }
 
     // Binding-supplied executor — alternative path for order routing.
     // Runs after the user on_signal so existing on_signal-based wiring
@@ -7528,42 +7601,6 @@ class RunnerSignalHandler : public ISignalHandler
   }
 
  private:
-  // The names a captured signal carries in a trace, and the ones the reason
-  // for a drop uses.
-  static const char* signalName(SignalType type) noexcept
-  {
-    switch (type)
-    {
-      case SignalType::Market:
-        return "market";
-      case SignalType::Limit:
-        return "limit";
-      case SignalType::Cancel:
-        return "cancel";
-      case SignalType::CancelAll:
-        return "cancel_all";
-      case SignalType::Modify:
-        return "modify";
-      case SignalType::StopMarket:
-        return "stop_market";
-      case SignalType::StopLimit:
-        return "stop_limit";
-      case SignalType::TakeProfitMarket:
-        return "take_profit_market";
-      case SignalType::TakeProfitLimit:
-        return "take_profit_limit";
-      case SignalType::TrailingStop:
-        return "trailing_stop";
-      case SignalType::OCO:
-        return "oco";
-      case SignalType::ProvideLiquidity:
-        return "provide_liquidity";
-      case SignalType::WithdrawLiquidity:
-        return "withdraw_liquidity";
-    }
-    return "unknown";
-  }
-
   // The tokens a drop's reason ends in, as a refused Modify's ends in
   // [unknown_order].
   static constexpr const char* kDroppedByKillSwitch = "kill_switch";
@@ -7572,17 +7609,8 @@ class RunnerSignalHandler : public ISignalHandler
 
   static void noteDropped(const Signal& sig, const char* gate, const char* token) noexcept
   {
-    try
-    {
-      const std::string why = std::string(signalName(sig.type)) + " signal for order " +
-                              std::to_string(sig.orderId) + " on symbol " +
-                              std::to_string(sig.symbol) + " was dropped by the " + gate +
-                              "; it reached neither on_signal nor the executor [" + token + "]";
-      lrvxCapiNoteException("emit", why.c_str());
-    }
-    catch (...)
-    {
-    }
+    lrvxCapiNoteDroppedSignal(sig, gate, token, {},
+                              "it reached neither on_signal nor the executor");
   }
 
   // Market orders and IOC / FOK orders are answered at once and never rest.
@@ -8508,6 +8536,7 @@ struct LrvxBacktestRunnerImpl
     fill.applyTo(cfg);
     runner = std::make_unique<BacktestRunner>(cfg);
     runner->setSymbolRegistry(reg);
+    runner->setSignalDropHandler(&lrvxCapiNoteBacktestDrop);
   }
 
   // VOLUME_IMPACT reads the visible level size; bar and trade-only replays
@@ -9026,7 +9055,7 @@ lrvx_binary_log_recorder_hook_create_ex(const char* output_dir,
   LRVX_CAPI_ENTER_NOHANDLE;
   lrvx::replay::BinaryLogRecorderHookConfig cfg{};
   cfg.output_dir = output_dir ? output_dir : "";
-  cfg.max_segment_bytes = max_segment_mb * 1024ull * 1024ull;
+  cfg.max_segment_bytes = replay::segmentBytesFromMb(max_segment_mb);
   cfg.exchange_id = exchange_id;
   cfg.compression = static_cast<lrvx::replay::CompressionType>(compression);
 

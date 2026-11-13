@@ -232,7 +232,19 @@ Every `emit.*` function clears `lrvx.lastError()` on entry. Read it right after 
 | `[risk_manager]` | `riskManager.allow` returned `false` |
 | `[unknown_order]` | an `emit.modify` named an order the runner's executor record does not hold |
 
-A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached neither on_signal nor the executor [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned; a drop used to leave nothing behind.
+A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; <outcome> [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned.
+
+What is put to the gates depends on what runs the strategy:
+
+| | `Runner` and `LiveEngine` | `BacktestRunner` |
+|---|---|---|
+| Signals asked | every signal: orders, cancel, cancel-all, modify, the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
+| Pass unasked | nothing | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
+| A drop skips | `onSignal`, the executor and the PnL / storage observers | the simulator or the attached executor |
+| `<outcome>` | `it reached neither on_signal nor the executor` | `it reached no executor` |
+| Kill switch | asked again for every signal | stays triggered for the rest of the run once it said no |
+
+`onSignal` is an observer: a runner created without one gates and forwards its signals the same way.
 
 #### Argument checks
 

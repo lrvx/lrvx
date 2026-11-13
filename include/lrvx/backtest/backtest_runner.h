@@ -33,6 +33,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -195,6 +196,23 @@ class BacktestRunner : public ISignalHandler
   void setKillSwitch(IKillSwitch* ks) noexcept { _killSwitch = ks; }
   void setPnLTracker(IPnLTracker* tracker) noexcept { _pnlTracker = tracker; }
 
+  /// A signal a pre-trade gate dropped. `gate` reads "kill switch", "order
+  /// validator" or "risk manager"; `token` is the same with an underscore;
+  /// `detail` is the reason the order validator gave, empty otherwise.
+  struct SignalDrop
+  {
+    const Signal& signal;
+    std::string_view gate;
+    std::string_view token;
+    std::string_view detail;
+  };
+  using SignalDropHandler = std::function<void(const SignalDrop&)>;
+
+  /// Called once for every signal a gate drops, on the thread that emitted
+  /// it, before onSignal returns. An OCO whose either leg is refused is one
+  /// drop. Unset: a drop is silent.
+  void setSignalDropHandler(SignalDropHandler handler) { _onSignalDrop = std::move(handler); }
+
   // ========== Non-interactive mode ==========
 
   /// Run backtest synchronously from start to end
@@ -356,7 +374,8 @@ class BacktestRunner : public ISignalHandler
   // side and type, so the executor still finds it under the id the strategy
   // holds.
   Order modifiedOrder(const Signal& sig);
-  bool passesPreTradeGate(const Order& order);
+  bool passesPreTradeGate(const Order& order, const Signal& signal);
+  SignalDropHandler _onSignalDrop;
   // Routes an executor's order events into the position tracker, PnL
   // tracker and listener chain. Applied to the built-in executor in the
   // constructor and to a venue executor in setSimulatedExecutor().

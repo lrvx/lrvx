@@ -183,7 +183,10 @@ this.closePosition()
 Every order method above, from `marketBuy` to `closePosition`, clears the last error on entry.
 `lrvx.lastError()`, read right after one inside the callback that called it, is `''` unless that
 call left a reason; a reason an earlier call left (a `recompressSegment` that failed, say) is not
-read as the order's.
+read as the order's. A reason ending in `[kill_switch]`, `[order_validator]` or `[risk_manager]` says a
+pre-trade gate dropped the signal, on a live runner and in a backtest alike; which signals each of
+them puts to the gates is listed under
+[Reading why a signal went nowhere](../python/strategy.md#reading-why-a-signal-went-nowhere).
 
 ---
 

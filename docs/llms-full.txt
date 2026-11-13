@@ -12595,7 +12595,19 @@ Every emit method (`market_buy`, `limit_sell`, `stop_market`, `cancel_order`, `m
 | `[risk_manager]` | `RiskManager.allow` returned `False` |
 | `[unknown_order]` | a `modify_order` named an order the runner's executor record does not hold |
 
-A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached neither on_signal nor the executor [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned; a drop used to leave nothing behind.
+A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; <outcome> [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned.
+
+What is put to the gates depends on what runs the strategy:
+
+| | `Runner` and `LiveEngine` | `BacktestRunner` (and `PaperBroker`, which runs one) |
+|---|---|---|
+| Signals asked | every signal: orders, cancel, cancel-all, modify, the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
+| Pass unasked | nothing | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
+| A drop skips | `on_signal`, the executor and the PnL / storage observers | the simulator or the attached executor |
+| `<outcome>` | `it reached neither on_signal nor the executor` | `it reached no executor` |
+| Kill switch | asked again for every signal | stays triggered for the rest of the run once it said no |
+
+`on_signal` is an observer: a runner created without one gates and forwards its signals the same way.
 
 ```python
 def on_trade(self, ctx, trade):
@@ -12710,11 +12722,13 @@ An empty `symbol` resolves to `"default"`.
 | `set_executor(executor)` | Replace the built-in simulated executor |
 | `add_execution_listener(listener)` | Attach an `ExecutionListener` |
 | `set_pnl_tracker(tracker)` | Attach a PnL tracker; fires `on_signal(signal)` for every fill the simulator dispatches |
-| `set_risk_manager(rm)` | Attach a pre-trade risk manager. Reduce-only orders bypass the gate by design |
-| `set_kill_switch(ks)` | Attach a kill switch. Reduce-only orders bypass, so tightening caps cannot strand a position |
-| `set_order_validator(ov)` | Attach an order validator. Reduce-only orders bypass |
+| `set_risk_manager(rm)` | Attach a pre-trade risk manager |
+| `set_kill_switch(ks)` | Attach a kill switch |
+| `set_order_validator(ov)` | Attach an order validator |
 
-Each setter takes `None` to detach.
+Each setter takes `None` to detach. Which signals the three gates are asked about, which pass unasked
+(cancels, modifies and reduce-only orders) and what a dropped signal leaves in `lrvx.last_error()` are
+in [Reading why a signal went nowhere](#reading-why-a-signal-went-nowhere), next to the live runner's.
 
 ### Stats dict keys
 
@@ -15705,7 +15719,19 @@ Every `emit.*` function clears `lrvx.lastError()` on entry. Read it right after 
 | `[risk_manager]` | `riskManager.allow` returned `false` |
 | `[unknown_order]` | an `emit.modify` named an order the runner's executor record does not hold |
 
-A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached neither on_signal nor the executor [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned; a drop used to leave nothing behind.
+A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; <outcome> [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned.
+
+What is put to the gates depends on what runs the strategy:
+
+| | `Runner` and `LiveEngine` | `BacktestRunner` |
+|---|---|---|
+| Signals asked | every signal: orders, cancel, cancel-all, modify, the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
+| Pass unasked | nothing | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
+| A drop skips | `onSignal`, the executor and the PnL / storage observers | the simulator or the attached executor |
+| `<outcome>` | `it reached neither on_signal nor the executor` | `it reached no executor` |
+| Kill switch | asked again for every signal | stays triggered for the rest of the run once it said no |
+
+`onSignal` is an observer: a runner created without one gates and forwards its signals the same way.
 
 #### Argument checks
 
@@ -16860,7 +16886,10 @@ the value and a `Ptr[u8]` with whether orders are checked against it.
 Every emit method, and the string-symbol forms that call them, clears the last error on entry.
 `last_error()` from `lrvx.abi`, read right after an emit inside the callback that emitted, is `""`
 unless that emit left a reason; a reason an earlier call left (a `validate_segment` that failed, say)
-is not read as the emit's.
+is not read as the emit's. A reason ending in `[kill_switch]`, `[order_validator]` or `[risk_manager]`
+says a pre-trade gate dropped the signal, on a live runner and in a backtest alike; which signals each
+of them puts to the gates is listed under
+[Reading why a signal went nowhere](../python/strategy.md#reading-why-a-signal-went-nowhere).
 
 #### `emit_market_buy(symbol, qty) -> int`
 
@@ -18580,7 +18609,10 @@ this.closePosition()
 Every order method above, from `marketBuy` to `closePosition`, clears the last error on entry.
 `lrvx.lastError()`, read right after one inside the callback that called it, is `''` unless that
 call left a reason; a reason an earlier call left (a `recompressSegment` that failed, say) is not
-read as the order's.
+read as the order's. A reason ending in `[kill_switch]`, `[order_validator]` or `[risk_manager]` says a
+pre-trade gate dropped the signal, on a live runner and in a backtest alike; which signals each of
+them puts to the gates is listed under
+[Reading why a signal went nowhere](../python/strategy.md#reading-why-a-signal-went-nowhere).
 
 ---
 
@@ -19685,7 +19717,7 @@ All return `OrderId` (`uint64_t`), 0 on failure. `cancel` and `modify` return vo
 | `lrvx_emit_cancel_all(s, sym)` | Cancel all orders for symbol |
 | `lrvx_emit_modify(s, order_id, new_price_raw, new_qty_raw)` | Modify order |
 
-On a runner or a live engine a signal can be refused after the emit has assigned its order id. The
+On a runner, a live engine or a backtest runner a signal can be refused after the emit has assigned its order id. The
 reason is then in the last error of the thread that emitted: call `lrvx_clear_last_error()` before
 the emit and read `lrvx_last_error_code()` / `lrvx_last_error_message()` after it.
 
@@ -19696,10 +19728,21 @@ the emit and read `lrvx_last_error_code()` / `lrvx_last_error_message()` after i
 | `[risk_manager]` | the risk manager's `allow` returned 0 |
 | `[unknown_order]` | a modify named an order the executor record does not hold |
 
-A drop reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached
-neither on_signal nor the executor [<token>]`; the gates are asked in the order kill switch, order
-validator, risk manager. A drop used to leave nothing behind. The Python, Node, QuickJS and Codon
-emit methods clear the last error on entry themselves.
+A drop reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; <outcome> [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned.
+
+What is put to the gates depends on what runs the strategy:
+
+| | `lrvx_runner_*` and `lrvx_live_engine_*` | `lrvx_backtest_runner_*` |
+|---|---|---|
+| Signals asked | every signal: orders, cancel, cancel-all, modify, the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
+| Pass unasked | nothing | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
+| A drop skips | `on_signal`, the executor and the PnL / storage observers | the simulator or the attached executor |
+| `<outcome>` | `it reached neither on_signal nor the executor` | `it reached no executor` |
+| Kill switch | asked again for every signal | stays triggered for the rest of the run once it said no |
+
+`on_signal` is an observer: a runner created without one gates and forwards its signals the same way.
+
+The Python, Node, QuickJS and Codon emit methods clear the last error on entry themselves.
 
 The record a runner or a live engine keeps of the orders it forwarded to an executor treats the two
 legs of an OCO as one: a cancel of either leg, or `lrvx_runner_order_closed` /

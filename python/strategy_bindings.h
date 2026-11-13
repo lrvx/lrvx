@@ -12,6 +12,7 @@
 
 #include "backtest_bindings.h"
 #include "callback_guard.h"
+#include "drop_reason.h"
 #include "hook_bindings.h"
 #include "lrvx/backtest/backtest_config.h"
 #include "lrvx/backtest/backtest_result.h"
@@ -2069,6 +2070,8 @@ class PyBacktestRunner
     }
     _runner = std::make_unique<BacktestRunner>(cfg);
     _runner->setSymbolRegistry(reg);
+    // The reason for a drop goes where a live Runner leaves it.
+    _runner->setSignalDropHandler(&lrvxCapiNoteBacktestDrop);
   }
 
   void set_strategy(PyStrategyBase* strat)

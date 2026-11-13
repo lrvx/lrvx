@@ -303,7 +303,19 @@ Every emit method (`market_buy`, `limit_sell`, `stop_market`, `cancel_order`, `m
 | `[risk_manager]` | `RiskManager.allow` returned `False` |
 | `[unknown_order]` | a `modify_order` named an order the runner's executor record does not hold |
 
-A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached neither on_signal nor the executor [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned; a drop used to leave nothing behind.
+A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; <outcome> [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned.
+
+What is put to the gates depends on what runs the strategy:
+
+| | `Runner` and `LiveEngine` | `BacktestRunner` (and `PaperBroker`, which runs one) |
+|---|---|---|
+| Signals asked | every signal: orders, cancel, cancel-all, modify, the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
+| Pass unasked | nothing | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
+| A drop skips | `on_signal`, the executor and the PnL / storage observers | the simulator or the attached executor |
+| `<outcome>` | `it reached neither on_signal nor the executor` | `it reached no executor` |
+| Kill switch | asked again for every signal | stays triggered for the rest of the run once it said no |
+
+`on_signal` is an observer: a runner created without one gates and forwards its signals the same way.
 
 ```python
 def on_trade(self, ctx, trade):
@@ -418,11 +430,13 @@ An empty `symbol` resolves to `"default"`.
 | `set_executor(executor)` | Replace the built-in simulated executor |
 | `add_execution_listener(listener)` | Attach an `ExecutionListener` |
 | `set_pnl_tracker(tracker)` | Attach a PnL tracker; fires `on_signal(signal)` for every fill the simulator dispatches |
-| `set_risk_manager(rm)` | Attach a pre-trade risk manager. Reduce-only orders bypass the gate by design |
-| `set_kill_switch(ks)` | Attach a kill switch. Reduce-only orders bypass, so tightening caps cannot strand a position |
-| `set_order_validator(ov)` | Attach an order validator. Reduce-only orders bypass |
+| `set_risk_manager(rm)` | Attach a pre-trade risk manager |
+| `set_kill_switch(ks)` | Attach a kill switch |
+| `set_order_validator(ov)` | Attach an order validator |
 
-Each setter takes `None` to detach.
+Each setter takes `None` to detach. Which signals the three gates are asked about, which pass unasked
+(cancels, modifies and reduce-only orders) and what a dropped signal leaves in `lrvx.last_error()` are
+in [Reading why a signal went nowhere](#reading-why-a-signal-went-nowhere), next to the live runner's.
 
 ### Stats dict keys
 

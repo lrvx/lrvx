@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <mutex>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,24 @@ using RotationCallback = std::filesystem::path (*)(void* user_data,
                                                    uint32_t segment_number);
 
 inline constexpr uint64_t kDefaultMaxSegmentBytes = 256ull << 20;
+
+// The largest segment size, in MiB, whose byte count fits in 64 bits.
+inline constexpr uint64_t kMaxSegmentMb = ~0ull >> 20;
+
+// A segment size given in MiB, as bytes. Throws std::invalid_argument above
+// kMaxSegmentMb: the product would wrap to a small number, some unrelated
+// segment size.
+inline uint64_t segmentBytesFromMb(uint64_t mb)
+{
+  if (mb > kMaxSegmentMb)
+  {
+    throw std::invalid_argument("max_segment_mb " + std::to_string(mb) +
+                                " is too large: the size in bytes does not fit in 64 bits "
+                                "(the largest accepted is " +
+                                std::to_string(kMaxSegmentMb) + ")");
+  }
+  return mb << 20;
+}
 
 struct WriterConfig
 {

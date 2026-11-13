@@ -1015,12 +1015,21 @@ BacktestResult BacktestRunner::extractResult()
 // caps tighten you do not want to be stuck in a position; the live
 // runner is conventionally wired this way and `lookup_symbol`
 // surfaces a gotcha entry pointing at this contract.
-bool BacktestRunner::passesPreTradeGate(const Order& order)
+bool BacktestRunner::passesPreTradeGate(const Order& order, const Signal& signal)
 {
   if (order.flags.reduceOnly)
   {
     return true;
   }
+  const auto dropped = [this, &signal](std::string_view gate, std::string_view token,
+                                       std::string_view detail = {})
+  {
+    if (_onSignalDrop)
+    {
+      _onSignalDrop(SignalDrop{signal, gate, token, detail});
+    }
+    return false;
+  };
   if (_killSwitch != nullptr)
   {
     // Engine contract: check(order) may flip state; isTriggered()
@@ -1030,7 +1039,7 @@ bool BacktestRunner::passesPreTradeGate(const Order& order)
     _killSwitch->check(order);
     if (_killSwitch->isTriggered())
     {
-      return false;
+      return dropped("kill switch", "kill_switch");
     }
   }
   if (_orderValidator != nullptr)
@@ -1038,12 +1047,12 @@ bool BacktestRunner::passesPreTradeGate(const Order& order)
     std::string reason;
     if (!_orderValidator->validate(order, reason))
     {
-      return false;
+      return dropped("order validator", "order_validator", reason);
     }
   }
   if (_riskManager != nullptr && !_riskManager->allow(order))
   {
-    return false;
+    return dropped("risk manager", "risk_manager");
   }
   return true;
 }
@@ -1069,7 +1078,7 @@ void BacktestRunner::onSignal(const Signal& signal)
     case SignalType::TrailingStop:
     {
       Order order = signalToOrder(signal);
-      if (!passesPreTradeGate(order))
+      if (!passesPreTradeGate(order, signal))
       {
         return;
       }
@@ -1122,7 +1131,7 @@ void BacktestRunner::onSignal(const Signal& signal)
                    .flags = {.reduceOnly = signal.reduceOnly, .postOnly = signal.postOnly}};
 
       // Both legs of an OCO need to pass; rejecting either drops the pair.
-      if (!passesPreTradeGate(order1) || !passesPreTradeGate(order2))
+      if (!passesPreTradeGate(order1, signal) || !passesPreTradeGate(order2, signal))
       {
         return;
       }

@@ -45,7 +45,7 @@ class PyBinaryLogRecorderHook
   {
     lrvx::replay::BinaryLogRecorderHookConfig cfg{};
     cfg.output_dir = outputDir;
-    cfg.max_segment_bytes = maxSegmentMb * (1024ull * 1024ull);
+    cfg.max_segment_bytes = lrvx::replay::segmentBytesFromMb(maxSegmentMb);
     cfg.exchange_id = exchangeId;
     if (compression == "none" || compression.empty())
     {
@@ -251,7 +251,7 @@ inline WriterConfig makeWriterConfig(const std::string& outputDir, uint64_t maxS
 {
   WriterConfig cfg;
   cfg.output_dir = outputDir;
-  cfg.max_segment_bytes = maxSegmentMb * (1024ull * 1024ull);
+  cfg.max_segment_bytes = lrvx::replay::segmentBytesFromMb(maxSegmentMb);
   cfg.exchange_id = exchangeId;
 
   if (compression == "lz4")

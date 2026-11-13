@@ -15281,6 +15281,11 @@
         },
         {
           "kind": "method",
+          "name": "setSignalDropHandler",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "setSimulatedExecutor",
           "parent": "BacktestRunner"
         },
