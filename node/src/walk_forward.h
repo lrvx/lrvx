@@ -106,9 +106,9 @@ class WalkForwardRunnerNode
       : Napi::ObjectWrap<WalkForwardRunnerNode>(info)
   {
     _reg = SymbolRegistryNode::of(info[0], "WalkForwardRunner: registry");
-    _fee = argNumber(info[1], "WalkForwardRunner: argument 2");
-    _cap = argNumber(info[2], "WalkForwardRunner: argument 3");
-    auto cfg = argObject(info[3], "WalkForwardRunner: argument 4");
+    _fee = argNumber(info[1], "WalkForwardRunner: feeRate");
+    _cap = argNumber(info[2], "WalkForwardRunner: initialCapital");
+    auto cfg = argObject(info[3], "WalkForwardRunner: config");
     std::string mode = given(cfg.Get("mode"))
                            ? argString(cfg.Get("mode"), "WalkForwardRunner: mode")
                            : "anchored";
@@ -136,7 +136,7 @@ class WalkForwardRunnerNode
 
   Napi::Value setStrategyFactory(const Napi::CallbackInfo& info)
   {
-    _factory = Napi::Persistent(argFunction(info[0], "setStrategyFactory: argument 1"));
+    _factory = Napi::Persistent(argFunction(info[0], "setStrategyFactory: factory"));
     return info.Env().Undefined();
   }
 
@@ -151,8 +151,8 @@ class WalkForwardRunnerNode
             "E_RUN_001",
             "WalkForwardRunner.runCsv called before setStrategyFactory.");
       }
-      std::string path = argString(info[0], "runCsv: argument 1");
-      std::string symbol = argString(info[1], "runCsv: argument 2");
+      std::string path = argString(info[0], "runCsv: path");
+      std::string symbol = argString(info[1], "runCsv: symbol");
 
       WalkForwardCallContext ctx{env,
                                  Napi::FunctionReference(),

@@ -46,58 +46,58 @@ inline uint8_t parseType(const std::string& s)
 
 }  // namespace detail_exec
 
-#define LRVX_EXEC_INSTANCE_METHODS(Cls)                                            \
-  Napi::Value Step(const Napi::CallbackInfo& info)                                 \
-  {                                                                                \
-    lrvx_exec_step(_h, toInt64Ns(info[0], "step: argument 1"));                    \
-    auto env = info.Env();                                                         \
-    const size_t n = lrvx_exec_pending_count(_h);                                  \
-    Napi::Array out = Napi::Array::New(env, n);                                    \
-    for (size_t i = 0; i < n; ++i)                                                 \
-    {                                                                              \
-      LrvxExecChildOrder c{};                                                      \
-      if (lrvx_exec_pending_at(_h, i, &c))                                         \
-      {                                                                            \
-        out.Set(static_cast<uint32_t>(i), detail_exec::childToJs(env, c));         \
-      }                                                                            \
-    }                                                                              \
-    lrvx_exec_clear_pending(_h);                                                   \
-    return out;                                                                    \
-  }                                                                                \
-  void ReportFill(const Napi::CallbackInfo& info)                                  \
-  {                                                                                \
-    lrvx_exec_report_fill(_h, argNumber(info[0], "reportFill: argument 1"));       \
-  }                                                                                \
-  void ObserveVolume(const Napi::CallbackInfo& info)                               \
-  {                                                                                \
-    lrvx_exec_observe_volume(_h, argNumber(info[0], "observeVolume: argument 1")); \
-  }                                                                                \
-  Napi::Value SubmittedQty(const Napi::CallbackInfo& info)                         \
-  {                                                                                \
-    return Napi::Number::New(info.Env(), lrvx_exec_submitted_qty(_h));             \
-  }                                                                                \
-  Napi::Value FilledQty(const Napi::CallbackInfo& info)                            \
-  {                                                                                \
-    return Napi::Number::New(info.Env(), lrvx_exec_filled_qty(_h));                \
-  }                                                                                \
-  Napi::Value RemainingQty(const Napi::CallbackInfo& info)                         \
-  {                                                                                \
-    return Napi::Number::New(info.Env(), lrvx_exec_remaining_qty(_h));             \
-  }                                                                                \
-  Napi::Value IsDone(const Napi::CallbackInfo& info)                               \
-  {                                                                                \
-    return Napi::Boolean::New(info.Env(), lrvx_exec_is_done(_h) != 0);             \
-  }                                                                                \
-  static Napi::Function InitClass(Napi::Env env, const char* name)                 \
-  {                                                                                \
-    return DefineClass(env, name,                                                  \
-                       {InstanceMethod("step", &Cls::Step),                        \
-                        InstanceMethod("reportFill", &Cls::ReportFill),            \
-                        InstanceMethod("observeVolume", &Cls::ObserveVolume),      \
-                        InstanceMethod("submittedQty", &Cls::SubmittedQty),        \
-                        InstanceMethod("filledQty", &Cls::FilledQty),              \
-                        InstanceMethod("remainingQty", &Cls::RemainingQty),        \
-                        InstanceMethod("isDone", &Cls::IsDone)});                  \
+#define LRVX_EXEC_INSTANCE_METHODS(Cls)                                       \
+  Napi::Value Step(const Napi::CallbackInfo& info)                            \
+  {                                                                           \
+    lrvx_exec_step(_h, toInt64Ns(info[0], "step: nowNs"));                    \
+    auto env = info.Env();                                                    \
+    const size_t n = lrvx_exec_pending_count(_h);                             \
+    Napi::Array out = Napi::Array::New(env, n);                               \
+    for (size_t i = 0; i < n; ++i)                                            \
+    {                                                                         \
+      LrvxExecChildOrder c{};                                                 \
+      if (lrvx_exec_pending_at(_h, i, &c))                                    \
+      {                                                                       \
+        out.Set(static_cast<uint32_t>(i), detail_exec::childToJs(env, c));    \
+      }                                                                       \
+    }                                                                         \
+    lrvx_exec_clear_pending(_h);                                              \
+    return out;                                                               \
+  }                                                                           \
+  void ReportFill(const Napi::CallbackInfo& info)                             \
+  {                                                                           \
+    lrvx_exec_report_fill(_h, argNumber(info[0], "reportFill: qty"));         \
+  }                                                                           \
+  void ObserveVolume(const Napi::CallbackInfo& info)                          \
+  {                                                                           \
+    lrvx_exec_observe_volume(_h, argNumber(info[0], "observeVolume: qty"));   \
+  }                                                                           \
+  Napi::Value SubmittedQty(const Napi::CallbackInfo& info)                    \
+  {                                                                           \
+    return Napi::Number::New(info.Env(), lrvx_exec_submitted_qty(_h));        \
+  }                                                                           \
+  Napi::Value FilledQty(const Napi::CallbackInfo& info)                       \
+  {                                                                           \
+    return Napi::Number::New(info.Env(), lrvx_exec_filled_qty(_h));           \
+  }                                                                           \
+  Napi::Value RemainingQty(const Napi::CallbackInfo& info)                    \
+  {                                                                           \
+    return Napi::Number::New(info.Env(), lrvx_exec_remaining_qty(_h));        \
+  }                                                                           \
+  Napi::Value IsDone(const Napi::CallbackInfo& info)                          \
+  {                                                                           \
+    return Napi::Boolean::New(info.Env(), lrvx_exec_is_done(_h) != 0);        \
+  }                                                                           \
+  static Napi::Function InitClass(Napi::Env env, const char* name)            \
+  {                                                                           \
+    return DefineClass(env, name,                                             \
+                       {InstanceMethod("step", &Cls::Step),                   \
+                        InstanceMethod("reportFill", &Cls::ReportFill),       \
+                        InstanceMethod("observeVolume", &Cls::ObserveVolume), \
+                        InstanceMethod("submittedQty", &Cls::SubmittedQty),   \
+                        InstanceMethod("filledQty", &Cls::FilledQty),         \
+                        InstanceMethod("remainingQty", &Cls::RemainingQty),   \
+                        InstanceMethod("isDone", &Cls::IsDone)});             \
   }
 
 #define LRVX_EXEC_THROW_BAD_ARGS(name)                                   \
@@ -114,18 +114,18 @@ class TWAPWrap : public Napi::ObjectWrap<TWAPWrap>
  public:
   TWAPWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<TWAPWrap>(info)
   {
-    auto opts = argObject(info[0], "TWAP: argument 1");
-    double target_qty = argNumber(opts.Get("targetQty"), "TWAP: targetQty");
-    uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "TWAP: side"));
+    auto opts = argObject(info[0], "TWAPExecutor: opts");
+    double target_qty = argNumber(opts.Get("targetQty"), "TWAPExecutor: targetQty");
+    uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "TWAPExecutor: side"));
     uint32_t symbol =
-        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "TWAP: symbol") : 0;
+        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "TWAPExecutor: symbol") : 0;
     uint8_t type = opts.Has("type")
-                       ? detail_exec::parseType(argString(opts.Get("type"), "TWAP: type"))
+                       ? detail_exec::parseType(argString(opts.Get("type"), "TWAPExecutor: type"))
                        : 0;
     double limit_price =
-        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "TWAP: limitPrice") : 0.0;
-    int64_t duration_ns = argInteger(opts.Get("durationNs"), "TWAP: durationNs");
-    uint32_t slice_count = argUint32(opts.Get("sliceCount"), "TWAP: sliceCount");
+        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "TWAPExecutor: limitPrice") : 0.0;
+    int64_t duration_ns = argInteger(opts.Get("durationNs"), "TWAPExecutor: durationNs");
+    uint32_t slice_count = argUint32(opts.Get("sliceCount"), "TWAPExecutor: sliceCount");
     // A clock reading, not a duration: read it the way every other ns
     // argument in the addon is read.
     int64_t start_time_ns = toInt64Ns(opts.Get("startTimeNs"), "TWAPExecutor: startTimeNs");
@@ -154,17 +154,17 @@ class IcebergWrap : public Napi::ObjectWrap<IcebergWrap>
  public:
   IcebergWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<IcebergWrap>(info)
   {
-    auto opts = argObject(info[0], "Iceberg: argument 1");
-    double target_qty = argNumber(opts.Get("targetQty"), "Iceberg: targetQty");
-    uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "Iceberg: side"));
+    auto opts = argObject(info[0], "IcebergExecutor: opts");
+    double target_qty = argNumber(opts.Get("targetQty"), "IcebergExecutor: targetQty");
+    uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "IcebergExecutor: side"));
     uint32_t symbol =
-        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "Iceberg: symbol") : 0;
+        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "IcebergExecutor: symbol") : 0;
     uint8_t type = opts.Has("type")
-                       ? detail_exec::parseType(argString(opts.Get("type"), "Iceberg: type"))
+                       ? detail_exec::parseType(argString(opts.Get("type"), "IcebergExecutor: type"))
                        : 0;
     double limit_price =
-        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "Iceberg: limitPrice") : 0.0;
-    double visible_qty = argNumber(opts.Get("visibleQty"), "Iceberg: visibleQty");
+        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "IcebergExecutor: limitPrice") : 0.0;
+    double visible_qty = argNumber(opts.Get("visibleQty"), "IcebergExecutor: visibleQty");
     _h = lrvx_exec_iceberg_create(target_qty, side, symbol, type, limit_price, visible_qty);
     if (!_h)
     {
@@ -189,19 +189,19 @@ class POVWrap : public Napi::ObjectWrap<POVWrap>
  public:
   POVWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<POVWrap>(info)
   {
-    auto opts = argObject(info[0], "POV: argument 1");
-    double target_qty = argNumber(opts.Get("targetQty"), "POV: targetQty");
-    uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "POV: side"));
+    auto opts = argObject(info[0], "POVExecutor: opts");
+    double target_qty = argNumber(opts.Get("targetQty"), "POVExecutor: targetQty");
+    uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "POVExecutor: side"));
     uint32_t symbol =
-        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "POV: symbol") : 0;
+        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "POVExecutor: symbol") : 0;
     uint8_t type = opts.Has("type")
-                       ? detail_exec::parseType(argString(opts.Get("type"), "POV: type"))
+                       ? detail_exec::parseType(argString(opts.Get("type"), "POVExecutor: type"))
                        : 0;
     double limit_price =
-        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "POV: limitPrice") : 0.0;
-    double rate = argNumber(opts.Get("participationRate"), "POV: participationRate");
+        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "POVExecutor: limitPrice") : 0.0;
+    double rate = argNumber(opts.Get("participationRate"), "POVExecutor: participationRate");
     double min_slice =
-        opts.Has("minSliceQty") ? argNumber(opts.Get("minSliceQty"), "POV: minSliceQty") : 0.0;
+        opts.Has("minSliceQty") ? argNumber(opts.Get("minSliceQty"), "POVExecutor: minSliceQty") : 0.0;
     _h = lrvx_exec_pov_create(target_qty, side, symbol, type, limit_price, rate, min_slice);
     if (!_h)
     {
@@ -226,18 +226,18 @@ class VWAPWrap : public Napi::ObjectWrap<VWAPWrap>
  public:
   VWAPWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<VWAPWrap>(info)
   {
-    auto opts = argObject(info[0], "VWAP: argument 1");
-    double target_qty = argNumber(opts.Get("targetQty"), "VWAP: targetQty");
-    uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "VWAP: side"));
+    auto opts = argObject(info[0], "VWAPExecutor: opts");
+    double target_qty = argNumber(opts.Get("targetQty"), "VWAPExecutor: targetQty");
+    uint8_t side = detail_exec::parseSide(argString(opts.Get("side"), "VWAPExecutor: side"));
     uint32_t symbol =
-        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "VWAP: symbol") : 0;
+        opts.Has("symbol") ? argUint32(opts.Get("symbol"), "VWAPExecutor: symbol") : 0;
     uint8_t type = opts.Has("type")
-                       ? detail_exec::parseType(argString(opts.Get("type"), "VWAP: type"))
+                       ? detail_exec::parseType(argString(opts.Get("type"), "VWAPExecutor: type"))
                        : 0;
     double limit_price =
-        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "VWAP: limitPrice") : 0.0;
+        opts.Has("limitPrice") ? argNumber(opts.Get("limitPrice"), "VWAPExecutor: limitPrice") : 0.0;
 
-    Napi::Array curve = argArray(opts.Get("volumeCurve"), "VWAP: volumeCurve");
+    Napi::Array curve = argArray(opts.Get("volumeCurve"), "VWAPExecutor: volumeCurve");
     std::vector<int64_t> ts;
     std::vector<double> vol;
     for (uint32_t i = 0; i < curve.Length(); ++i)

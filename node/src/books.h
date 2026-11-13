@@ -26,7 +26,7 @@ class OrderBookWrap : public Napi::ObjectWrap<OrderBookWrap>
                         InstanceMethod("clear", &OrderBookWrap::Clear)});
   }
   OrderBookWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<OrderBookWrap>(info),
-                                                  _h(lrvx_book_create(argNumber(info[0], "OrderBook: argument 1")))
+                                                  _h(lrvx_book_create(argNumber(info[0], "OrderBook: tickSize")))
   {
     if (!_h)
     {
@@ -43,13 +43,13 @@ class OrderBookWrap : public Napi::ObjectWrap<OrderBookWrap>
   }
 
  private:
-  void applyUpdate(const Napi::CallbackInfo& info,
+  void applyUpdate(const Napi::CallbackInfo& info, const std::string& method,
                    void (*fn)(LrvxBookHandle, const double*, const double*, size_t, const double*, const double*, size_t))
   {
-    auto bp = argFloat64Array(info[0], "OrderBook: argument 1");
-    auto bq = argFloat64Array(info[1], "OrderBook: argument 2");
-    auto ap = argFloat64Array(info[2], "OrderBook: argument 3");
-    auto aq = argFloat64Array(info[3], "OrderBook: argument 4");
+    auto bp = argFloat64Array(info[0], (method + ": bidPrices").c_str());
+    auto bq = argFloat64Array(info[1], (method + ": bidQtys").c_str());
+    auto ap = argFloat64Array(info[2], (method + ": askPrices").c_str());
+    auto aq = argFloat64Array(info[3], (method + ": askQtys").c_str());
     // The C ABI takes one length per side, so it assumes price and qty
     // arrays for that side already match. A caller passing mismatched
     // arrays used to have the qty side read out of bounds at whatever
@@ -63,8 +63,8 @@ class OrderBookWrap : public Napi::ObjectWrap<OrderBookWrap>
     }
     fn(_h, bp.Data(), bq.Data(), bp.ElementLength(), ap.Data(), aq.Data(), ap.ElementLength());
   }
-  void ApplySnapshot(const Napi::CallbackInfo& info) { applyUpdate(info, lrvx_book_apply_snapshot); }
-  void ApplyDelta(const Napi::CallbackInfo& info) { applyUpdate(info, lrvx_book_apply_delta); }
+  void ApplySnapshot(const Napi::CallbackInfo& info) { applyUpdate(info, "applySnapshot", lrvx_book_apply_snapshot); }
+  void ApplyDelta(const Napi::CallbackInfo& info) { applyUpdate(info, "applyDelta", lrvx_book_apply_delta); }
 
   Napi::Value optDouble(const Napi::CallbackInfo& info, uint8_t (*fn)(LrvxBookHandle, double*))
   {
@@ -82,9 +82,10 @@ class OrderBookWrap : public Napi::ObjectWrap<OrderBookWrap>
   Napi::Value IsCrossed(const Napi::CallbackInfo& info) { return Napi::Boolean::New(info.Env(), lrvx_book_is_crossed(_h)); }
   void Clear(const Napi::CallbackInfo&) { lrvx_book_clear(_h); }
 
-  Napi::Value getLevels(const Napi::CallbackInfo& info, uint32_t (*fn)(LrvxBookHandle, double*, double*, uint32_t))
+  Napi::Value getLevels(const Napi::CallbackInfo& info, const std::string& method,
+                        uint32_t (*fn)(LrvxBookHandle, double*, double*, uint32_t))
   {
-    uint32_t n = argUint32(info[0], "clear: argument 1");
+    uint32_t n = argUint32(info[0], (method + ": n").c_str());
     if (n > 100)
     {
       n = 100;
@@ -101,8 +102,8 @@ class OrderBookWrap : public Napi::ObjectWrap<OrderBookWrap>
     }
     return arr;
   }
-  Napi::Value GetBids(const Napi::CallbackInfo& info) { return getLevels(info, lrvx_book_get_bids); }
-  Napi::Value GetAsks(const Napi::CallbackInfo& info) { return getLevels(info, lrvx_book_get_asks); }
+  Napi::Value GetBids(const Napi::CallbackInfo& info) { return getLevels(info, "getBids", lrvx_book_get_bids); }
+  Napi::Value GetAsks(const Napi::CallbackInfo& info) { return getLevels(info, "getAsks", lrvx_book_get_asks); }
 
   LrvxBookHandle _h;
 };
@@ -133,13 +134,13 @@ class L3BookWrap : public Napi::ObjectWrap<L3BookWrap>
  private:
   Napi::Value AddOrder(const Napi::CallbackInfo& info)
   {
-    std::string side = argString(info[3], "addOrder: argument 4");
+    std::string side = argString(info[3], "addOrder: side");
     return Napi::Number::New(info.Env(), lrvx_l3_book_add_order(_h,
-                                                                argInteger(info[0], "addOrder: argument 1"), argNumber(info[1], "addOrder: argument 2"),
-                                                                argNumber(info[2], "addOrder: argument 3"), side == "buy" ? 0 : 1));
+                                                                argInteger(info[0], "addOrder: orderId"), argNumber(info[1], "addOrder: price"),
+                                                                argNumber(info[2], "addOrder: qty"), side == "buy" ? 0 : 1));
   }
-  Napi::Value RemoveOrder(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_l3_book_remove_order(_h, argInteger(info[0], "removeOrder: argument 1"))); }
-  Napi::Value ModifyOrder(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_l3_book_modify_order(_h, argInteger(info[0], "modifyOrder: argument 1"), argNumber(info[1], "modifyOrder: argument 2"))); }
+  Napi::Value RemoveOrder(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_l3_book_remove_order(_h, argInteger(info[0], "removeOrder: orderId"))); }
+  Napi::Value ModifyOrder(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_l3_book_modify_order(_h, argInteger(info[0], "modifyOrder: orderId"), argNumber(info[1], "modifyOrder: newQty"))); }
   Napi::Value BestBid(const Napi::CallbackInfo& info)
   {
     double v;
@@ -158,8 +159,8 @@ class L3BookWrap : public Napi::ObjectWrap<L3BookWrap>
     }
     return info.Env().Null();
   }
-  Napi::Value BidAtPrice(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_l3_book_bid_at_price(_h, argNumber(info[0], "bidAtPrice: argument 1"))); }
-  Napi::Value AskAtPrice(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_l3_book_ask_at_price(_h, argNumber(info[0], "askAtPrice: argument 1"))); }
+  Napi::Value BidAtPrice(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_l3_book_bid_at_price(_h, argNumber(info[0], "bidAtPrice: price"))); }
+  Napi::Value AskAtPrice(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_l3_book_ask_at_price(_h, argNumber(info[0], "askAtPrice: price"))); }
   LrvxL3BookHandle _h;
 };
 
@@ -188,16 +189,16 @@ class CompositeBookMatrixWrap : public Napi::ObjectWrap<CompositeBookMatrixWrap>
 
  private:
   // exchange, symbol, bidPx, bidQty, askPx, askQty, recvNs.
-  void applyUpdate(const Napi::CallbackInfo& info,
+  void applyUpdate(const Napi::CallbackInfo& info, const std::string& method,
                    void (*fn)(LrvxCompositeBookHandle, uint32_t, uint32_t, const double*, const double*,
                               size_t, const double*, const double*, size_t, int64_t))
   {
-    uint32_t exchange = argUint32(info[0], "CompositeBookMatrix: argument 1");
-    uint32_t symbol = argUint32(info[1], "CompositeBookMatrix: argument 2");
-    auto bp = argFloat64Array(info[2], "CompositeBookMatrix: argument 3");
-    auto bq = argFloat64Array(info[3], "CompositeBookMatrix: argument 4");
-    auto ap = argFloat64Array(info[4], "CompositeBookMatrix: argument 5");
-    auto aq = argFloat64Array(info[5], "CompositeBookMatrix: argument 6");
+    uint32_t exchange = argUint32(info[0], (method + ": exchange").c_str());
+    uint32_t symbol = argUint32(info[1], (method + ": symbol").c_str());
+    auto bp = argFloat64Array(info[2], (method + ": bidPrices").c_str());
+    auto bq = argFloat64Array(info[3], (method + ": bidQtys").c_str());
+    auto ap = argFloat64Array(info[4], (method + ": askPrices").c_str());
+    auto aq = argFloat64Array(info[5], (method + ": askQtys").c_str());
     // Same guard as OrderBookWrap::applyUpdate: the C ABI takes one length
     // per side and trusts price/qty to already match.
     if (bp.ElementLength() != bq.ElementLength() || ap.ElementLength() != aq.ElementLength())
@@ -207,17 +208,17 @@ class CompositeBookMatrixWrap : public Napi::ObjectWrap<CompositeBookMatrixWrap>
           .ThrowAsJavaScriptException();
       return;
     }
-    int64_t recvNs = info.Length() > 6 ? toInt64Ns(info[6], "CompositeBookMatrix: recvNs") : 0;
+    int64_t recvNs = info.Length() > 6 ? toInt64Ns(info[6], (method + ": recvNs").c_str()) : 0;
     fn(_h, exchange, symbol, bp.Data(), bq.Data(), bp.ElementLength(), ap.Data(), aq.Data(),
        ap.ElementLength(), recvNs);
   }
-  void ApplySnapshot(const Napi::CallbackInfo& info) { applyUpdate(info, lrvx_composite_book_apply_snapshot); }
-  void ApplyDelta(const Napi::CallbackInfo& info) { applyUpdate(info, lrvx_composite_book_apply_delta); }
+  void ApplySnapshot(const Napi::CallbackInfo& info) { applyUpdate(info, "applySnapshot", lrvx_composite_book_apply_snapshot); }
+  void ApplyDelta(const Napi::CallbackInfo& info) { applyUpdate(info, "applyDelta", lrvx_composite_book_apply_delta); }
 
   Napi::Value BestBid(const Napi::CallbackInfo& info)
   {
     double p = 0, q = 0;
-    if (lrvx_composite_book_best_bid(_h, argUint32(info[0], "bestBid: argument 1"), &p, &q))
+    if (lrvx_composite_book_best_bid(_h, argUint32(info[0], "bestBid: symbol"), &p, &q))
     {
       auto o = Napi::Object::New(info.Env());
       o.Set("price", p);
@@ -229,7 +230,7 @@ class CompositeBookMatrixWrap : public Napi::ObjectWrap<CompositeBookMatrixWrap>
   Napi::Value BestAsk(const Napi::CallbackInfo& info)
   {
     double p = 0, q = 0;
-    if (lrvx_composite_book_best_ask(_h, argUint32(info[0], "bestAsk: argument 1"), &p, &q))
+    if (lrvx_composite_book_best_ask(_h, argUint32(info[0], "bestAsk: symbol"), &p, &q))
     {
       auto o = Napi::Object::New(info.Env());
       o.Set("price", p);
@@ -238,9 +239,9 @@ class CompositeBookMatrixWrap : public Napi::ObjectWrap<CompositeBookMatrixWrap>
     }
     return info.Env().Null();
   }
-  Napi::Value HasArb(const Napi::CallbackInfo& info) { return Napi::Boolean::New(info.Env(), lrvx_composite_book_has_arb(_h, argUint32(info[0], "hasArb: argument 1"))); }
-  void MarkStale(const Napi::CallbackInfo& info) { lrvx_composite_book_mark_stale(_h, argUint32(info[0], "markStale: argument 1"), argUint32(info[1], "markStale: argument 2")); }
-  void CheckStaleness(const Napi::CallbackInfo& info) { lrvx_composite_book_check_staleness(_h, toInt64Ns(info[0], "checkStaleness: argument 1"), toInt64Ns(info[1], "checkStaleness: argument 2")); }
+  Napi::Value HasArb(const Napi::CallbackInfo& info) { return Napi::Boolean::New(info.Env(), lrvx_composite_book_has_arb(_h, argUint32(info[0], "hasArbitrage: symbol"))); }
+  void MarkStale(const Napi::CallbackInfo& info) { lrvx_composite_book_mark_stale(_h, argUint32(info[0], "markStale: exchange"), argUint32(info[1], "markStale: symbol")); }
+  void CheckStaleness(const Napi::CallbackInfo& info) { lrvx_composite_book_check_staleness(_h, toInt64Ns(info[0], "checkStaleness: nowNs"), toInt64Ns(info[1], "checkStaleness: thresholdNs")); }
   LrvxCompositeBookHandle _h;
 };
 

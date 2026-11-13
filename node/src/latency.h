@@ -93,7 +93,7 @@ inline double getDouble(const Napi::Object& o, const char* key, double fallback)
     uint64_t seed = 0;                                                           \
     if (given(info[0]))                                                          \
     {                                                                            \
-      seed = static_cast<uint64_t>(argInteger(info[0], "reset: argument 1"));    \
+      seed = static_cast<uint64_t>(argInteger(info[0], "reset: seed"));          \
     }                                                                            \
     lrvx_latency_reset(_h, seed);                                                \
   }                                                                              \
@@ -128,7 +128,7 @@ class ConstantLatencyWrap : public Napi::ObjectWrap<ConstantLatencyWrap>
     int64_t feed = 0, order = 0, fill = 0;
     if (given(info[0]))
     {
-      auto opts = argObject(info[0], "ConstantLatency: argument 1");
+      auto opts = argObject(info[0], "ConstantLatency: opts");
       feed = detail::getInt64(opts, "feedNs", 0);
       order = detail::getInt64(opts, "orderNs", 0);
       fill = detail::getInt64(opts, "fillNs", 0);
@@ -166,7 +166,7 @@ class GaussianLatencyWrap : public Napi::ObjectWrap<GaussianLatencyWrap>
     uint64_t seed = 0;
     if (given(info[0]))
     {
-      auto opts = argObject(info[0], "GaussianLatency: argument 1");
+      auto opts = argObject(info[0], "GaussianLatency: opts");
       fm = detail::getDouble(opts, "feedMeanNs", 0.0);
       fs = detail::getDouble(opts, "feedStddevNs", 0.0);
       om = detail::getDouble(opts, "orderMeanNs", 0.0);
@@ -208,7 +208,7 @@ class ExponentialLatencyWrap : public Napi::ObjectWrap<ExponentialLatencyWrap>
     uint64_t seed = 0;
     if (given(info[0]))
     {
-      auto opts = argObject(info[0], "ExponentialLatency: argument 1");
+      auto opts = argObject(info[0], "ExponentialLatency: opts");
       fm = detail::getDouble(opts, "feedMeanNs", 0.0);
       om = detail::getDouble(opts, "orderMeanNs", 0.0);
       lm = detail::getDouble(opts, "fillMeanNs", 0.0);
@@ -247,7 +247,7 @@ class EmpiricalLatencyWrap : public Napi::ObjectWrap<EmpiricalLatencyWrap>
     uint64_t seed = 0;
     if (given(info[0]))
     {
-      auto opts = argObject(info[0], "EmpiricalLatency: argument 1");
+      auto opts = argObject(info[0], "EmpiricalLatency: opts");
       if (opts.Has("feedSamples"))
       {
         feed = detail::readInt64Array(opts.Get("feedSamples"), "EmpiricalLatency: feedSamples");

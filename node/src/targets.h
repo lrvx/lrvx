@@ -28,9 +28,9 @@ inline Napi::Float64Array vecToFloat64Array(Napi::Env env, const std::vector<dou
 }
 
 template <typename Target>
-Napi::Value computeTarget(const Napi::CallbackInfo& info, Target t)
+Napi::Value computeTarget(const Napi::CallbackInfo& info, const char* fn, Target t)
 {
-  auto in = argFloat64Array(info[0], "argument 1");
+  auto in = argFloat64Array(info[0], (std::string(fn) + ": input").c_str());
   size_t n = in.ElementLength();
   std::vector<double> out(n);
   t.compute(std::span<const double>(in.Data(), n), std::span<double>(out.data(), n));
@@ -39,20 +39,20 @@ Napi::Value computeTarget(const Napi::CallbackInfo& info, Target t)
 
 inline Napi::Value batch_future_return(const Napi::CallbackInfo& info)
 {
-  size_t h = argUint32(info[1], "batch_future_return: argument 2");
-  return computeTarget(info, lrvx::target::FutureReturn(h));
+  size_t h = argUint32(info[1], "targets.future_return: horizon");
+  return computeTarget(info, "targets.future_return", lrvx::target::FutureReturn(h));
 }
 
 inline Napi::Value batch_future_ctc_volatility(const Napi::CallbackInfo& info)
 {
-  size_t h = argUint32(info[1], "batch_future_ctc_volatility: argument 2");
-  return computeTarget(info, lrvx::target::FutureCTCVolatility(h));
+  size_t h = argUint32(info[1], "targets.future_ctc_volatility: horizon");
+  return computeTarget(info, "targets.future_ctc_volatility", lrvx::target::FutureCTCVolatility(h));
 }
 
 inline Napi::Value batch_future_linear_slope(const Napi::CallbackInfo& info)
 {
-  size_t h = argUint32(info[1], "batch_future_linear_slope: argument 2");
-  return computeTarget(info, lrvx::target::FutureLinearSlope(h));
+  size_t h = argUint32(info[1], "targets.future_linear_slope: horizon");
+  return computeTarget(info, "targets.future_linear_slope", lrvx::target::FutureLinearSlope(h));
 }
 
 }  // namespace

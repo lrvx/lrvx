@@ -22,7 +22,7 @@ class VolumeProfileWrap : public Napi::ObjectWrap<VolumeProfileWrap>
                         InstanceMethod("clear", &VolumeProfileWrap::Clear)});
   }
   VolumeProfileWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<VolumeProfileWrap>(info),
-                                                      _h(lrvx_volume_profile_create(argNumber(info[0], "VolumeProfile: argument 1"))) {}
+                                                      _h(lrvx_volume_profile_create(argNumber(info[0], "VolumeProfile: tickSize"))) {}
   ~VolumeProfileWrap()
   {
     if (_h)
@@ -32,7 +32,7 @@ class VolumeProfileWrap : public Napi::ObjectWrap<VolumeProfileWrap>
   }
 
  private:
-  void AddTrade(const Napi::CallbackInfo& info) { lrvx_volume_profile_add_trade(_h, argNumber(info[0], "addTrade: argument 1"), argNumber(info[1], "addTrade: argument 2"), argBool(info[2], "addTrade: argument 3") ? 1 : 0); }
+  void AddTrade(const Napi::CallbackInfo& info) { lrvx_volume_profile_add_trade(_h, argNumber(info[0], "addTrade: price"), argNumber(info[1], "addTrade: qty"), argBool(info[2], "addTrade: isBuy") ? 1 : 0); }
   Napi::Value Poc(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_volume_profile_poc(_h)); }
   Napi::Value Vah(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_volume_profile_vah(_h)); }
   Napi::Value Val(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_volume_profile_val(_h)); }
@@ -58,8 +58,8 @@ class MarketProfileWrap : public Napi::ObjectWrap<MarketProfileWrap>
                         InstanceMethod("clear", &MarketProfileWrap::Clear)});
   }
   MarketProfileWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<MarketProfileWrap>(info),
-                                                      _h(lrvx_market_profile_create(argNumber(info[0], "MarketProfile: argument 1"),
-                                                                                    argUint32(info[1], "MarketProfile: argument 2"), toInt64Ns(info[2], "MarketProfile: argument 3"))) {}
+                                                      _h(lrvx_market_profile_create(argNumber(info[0], "MarketProfile: tickSize"),
+                                                                                    argUint32(info[1], "MarketProfile: periodMinutes"), toInt64Ns(info[2], "MarketProfile: sessionStartNs"))) {}
   ~MarketProfileWrap()
   {
     if (_h)
@@ -69,7 +69,7 @@ class MarketProfileWrap : public Napi::ObjectWrap<MarketProfileWrap>
   }
 
  private:
-  void AddTrade(const Napi::CallbackInfo& info) { lrvx_market_profile_add_trade(_h, toInt64Ns(info[0], "addTrade: argument 1"), argNumber(info[1], "addTrade: argument 2"), argNumber(info[2], "addTrade: argument 3"), argBool(info[3], "addTrade: argument 4") ? 1 : 0); }
+  void AddTrade(const Napi::CallbackInfo& info) { lrvx_market_profile_add_trade(_h, toInt64Ns(info[0], "addTrade: timestampNs"), argNumber(info[1], "addTrade: price"), argNumber(info[2], "addTrade: qty"), argBool(info[3], "addTrade: isBuy") ? 1 : 0); }
   Napi::Value Poc(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_market_profile_poc(_h)); }
   Napi::Value Vah(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_market_profile_vah(_h)); }
   Napi::Value Val(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_market_profile_val(_h)); }
@@ -94,7 +94,7 @@ class FootprintBarWrap : public Napi::ObjectWrap<FootprintBarWrap>
                         InstanceMethod("clear", &FootprintBarWrap::Clear)});
   }
   FootprintBarWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<FootprintBarWrap>(info),
-                                                     _h(lrvx_footprint_create(argNumber(info[0], "FootprintBar: argument 1"))) {}
+                                                     _h(lrvx_footprint_create(argNumber(info[0], "FootprintBar: tickSize"))) {}
   ~FootprintBarWrap()
   {
     if (_h)
@@ -104,7 +104,7 @@ class FootprintBarWrap : public Napi::ObjectWrap<FootprintBarWrap>
   }
 
  private:
-  void AddTrade(const Napi::CallbackInfo& info) { lrvx_footprint_add_trade(_h, argNumber(info[0], "addTrade: argument 1"), argNumber(info[1], "addTrade: argument 2"), argBool(info[2], "addTrade: argument 3") ? 1 : 0); }
+  void AddTrade(const Napi::CallbackInfo& info) { lrvx_footprint_add_trade(_h, argNumber(info[0], "addTrade: price"), argNumber(info[1], "addTrade: qty"), argBool(info[2], "addTrade: isBuy") ? 1 : 0); }
   Napi::Value Delta(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_footprint_total_delta(_h)); }
   Napi::Value Volume(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_footprint_total_volume(_h)); }
   Napi::Value Levels(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_footprint_num_levels(_h)); }

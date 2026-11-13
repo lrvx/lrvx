@@ -44,19 +44,19 @@ console.log('=== clock readings ===');
   ex.advanceClock(5n);
   ex.advanceClock(6);
   check(true, 'a Number and a BigInt in range are taken');
-  throwsNaming(() => ex.advanceClock(2n ** 63n), RangeError, 'advanceClock: argument 1',
+  throwsNaming(() => ex.advanceClock(2n ** 63n), RangeError, 'advanceClock: timestampNs',
                'a BigInt of 2^63 is a RangeError');
-  throwsNaming(() => ex.advanceClock(-(2n ** 63n) - 1n), RangeError, 'advanceClock: argument 1',
+  throwsNaming(() => ex.advanceClock(-(2n ** 63n) - 1n), RangeError, 'advanceClock: timestampNs',
                'a BigInt below -2^63 is a RangeError');
-  throwsNaming(() => ex.advanceClock('7'), TypeError, 'advanceClock: argument 1',
+  throwsNaming(() => ex.advanceClock('7'), TypeError, 'advanceClock: timestampNs',
                'a string is a TypeError naming the argument');
-  throwsNaming(() => ex.advanceClock(NaN), TypeError, 'advanceClock: argument 1',
+  throwsNaming(() => ex.advanceClock(NaN), TypeError, 'advanceClock: timestampNs',
                'NaN is a TypeError naming the argument');
-  throwsNaming(() => ex.advanceClock(), TypeError, 'advanceClock: argument 1',
+  throwsNaming(() => ex.advanceClock(), TypeError, 'advanceClock: timestampNs',
                'a missing reading is a TypeError naming the argument');
 
   const acct = new lrvx.Account(1, 1000);
-  throwsNaming(() => acct.hasStaleMarks(10n, 2n ** 64n), RangeError, 'hasStaleMarks: argument 2',
+  throwsNaming(() => acct.hasStaleMarks(10n, 2n ** 64n), RangeError, 'hasStaleMarks: budgetNs',
                'a count read like a clock refuses a BigInt past 64 bits');
 }
 
@@ -106,12 +106,12 @@ console.log('=== typed arrays ===');
   reg.addSymbol('binance', 'BTCUSDT', 0.01);
   const r = new lrvx.BacktestRunner(reg, 0, 1000);
   throwsNaming(() => r.runOhlcv(new BigInt64Array([1n]), new Float32Array([1]), 'BTCUSDT'),
-               TypeError, 'runOhlcv: argument 2',
+               TypeError, 'runOhlcv: closes',
                'a Float32Array where a Float64Array is read');
   throwsNaming(() => r.runOhlcv([1n], new Float64Array([1]), 'BTCUSDT'), TypeError,
-               'runOhlcv: argument 1', 'a plain array where a BigInt64Array is read');
+               'runOhlcv: timestamps', 'a plain array where a BigInt64Array is read');
   throwsNaming(() => r.runOhlcv(new BigInt64Array([1n]), new Float64Array([1]), 3), TypeError,
-               'runOhlcv: argument 3', 'a Number where a symbol name is read');
+               'runOhlcv: symbol', 'a Number where a symbol name is read');
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

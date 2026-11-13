@@ -50,17 +50,17 @@ class BarDispatchRecorderWrap : public Napi::ObjectWrap<BarDispatchRecorderWrap>
  private:
   Napi::Value AddTimeIntervalSeconds(const Napi::CallbackInfo& info)
   {
-    uint32_t seconds = argUint32(info[0], "addTimeIntervalSeconds: argument 1");
+    uint32_t seconds = argUint32(info[0], "addTimeIntervalSeconds: seconds");
     return Napi::Number::New(info.Env(),
                              lrvx_bar_dispatch_recorder_add_time_seconds(_h, seconds));
   }
 
   void OnTrade(const Napi::CallbackInfo& info)
   {
-    uint32_t symbol = argUint32(info[0], "onTrade: argument 1");
-    double price = argNumber(info[1], "onTrade: argument 2");
-    double qty = argNumber(info[2], "onTrade: argument 3");
-    int64_t ts_ns = toInt64Ns(info[3], "onTrade: argument 4");
+    uint32_t symbol = argUint32(info[0], "onTrade: symbol");
+    double price = argNumber(info[1], "onTrade: price");
+    double qty = argNumber(info[2], "onTrade: qty");
+    int64_t ts_ns = toInt64Ns(info[3], "onTrade: tsNs");
     lrvx_bar_dispatch_recorder_on_trade(_h, symbol, price, qty, ts_ns);
   }
 
@@ -73,13 +73,13 @@ class BarDispatchRecorderWrap : public Napi::ObjectWrap<BarDispatchRecorderWrap>
 
   Napi::Value TypeAt(const Napi::CallbackInfo& info)
   {
-    uint32_t i = argUint32(info[0], "typeAt: argument 1");
+    uint32_t i = argUint32(info[0], "typeAt: index");
     return Napi::Number::New(info.Env(), lrvx_bar_dispatch_recorder_type_at(_h, i));
   }
 
   Napi::Value ParamAt(const Napi::CallbackInfo& info)
   {
-    uint32_t i = argUint32(info[0], "paramAt: argument 1");
+    uint32_t i = argUint32(info[0], "paramAt: index");
     return Napi::Number::New(info.Env(),
                              static_cast<double>(lrvx_bar_dispatch_recorder_param_at(_h, i)));
   }

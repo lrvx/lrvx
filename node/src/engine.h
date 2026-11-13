@@ -277,22 +277,22 @@ class SignalBuilderWrap : public Napi::ObjectWrap<SignalBuilderWrap>
 
   Napi::Value Buy(const Napi::CallbackInfo& info)
   {
-    add(toInt64Ns(info[0], "buy: argument 1"), 0, argNumber(info[1], "buy: argument 2"), 0, 0, getSym(info, 2, "buy: argument 3"));
+    add(toInt64Ns(info[0], "buy: ts"), 0, argNumber(info[1], "buy: qty"), 0, 0, getSym(info, 2, "buy: symbol"));
     return info.This();
   }
   Napi::Value Sell(const Napi::CallbackInfo& info)
   {
-    add(toInt64Ns(info[0], "sell: argument 1"), 1, argNumber(info[1], "sell: argument 2"), 0, 0, getSym(info, 2, "sell: argument 3"));
+    add(toInt64Ns(info[0], "sell: ts"), 1, argNumber(info[1], "sell: qty"), 0, 0, getSym(info, 2, "sell: symbol"));
     return info.This();
   }
   Napi::Value LimitBuy(const Napi::CallbackInfo& info)
   {
-    add(toInt64Ns(info[0], "limitBuy: argument 1"), 0, argNumber(info[2], "limitBuy: argument 3"), argNumber(info[1], "limitBuy: argument 2"), 1, getSym(info, 3, "limitBuy: argument 4"));
+    add(toInt64Ns(info[0], "limitBuy: ts"), 0, argNumber(info[2], "limitBuy: qty"), argNumber(info[1], "limitBuy: price"), 1, getSym(info, 3, "limitBuy: symbol"));
     return info.This();
   }
   Napi::Value LimitSell(const Napi::CallbackInfo& info)
   {
-    add(toInt64Ns(info[0], "limitSell: argument 1"), 1, argNumber(info[2], "limitSell: argument 3"), argNumber(info[1], "limitSell: argument 2"), 1, getSym(info, 3, "limitSell: argument 4"));
+    add(toInt64Ns(info[0], "limitSell: ts"), 1, argNumber(info[2], "limitSell: qty"), argNumber(info[1], "limitSell: price"), 1, getSym(info, 3, "limitSell: symbol"));
     return info.This();
   }
   Napi::Value Length(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), _signals.size()); }
@@ -330,8 +330,8 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
 
   EngineWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<EngineWrap>(info)
   {
-    _config.initialCapital = info.Length() > 0 ? argNumber(info[0], "Engine: argument 1") : 100000.0;
-    _config.feeRate = info.Length() > 1 ? argNumber(info[1], "Engine: argument 2") : 0.0001;
+    _config.initialCapital = info.Length() > 0 ? argNumber(info[0], "Engine: initialCapital") : 100000.0;
+    _config.feeRate = info.Length() > 1 ? argNumber(info[1], "Engine: feeRate") : 0.0001;
     _config.usePercentageFee = true;
   }
 
@@ -383,8 +383,8 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
   {
     return tryLrvx(info.Env(), [&]() -> Napi::Value
                    {
-      std::string path = argString(info[0], "loadCsv: argument 1");
-      std::string sym = given(info[1]) ? argString(info[1], "loadCsv: argument 2") : inferSymbol(path);
+      std::string path = argString(info[0], "loadCsv: path");
+      std::string sym = given(info[1]) ? argString(info[1], "loadCsv: symbol") : inferSymbol(path);
       getOrCreate(sym).bars = parseCsv(path);
       return info.Env().Undefined(); });
   }
@@ -393,8 +393,8 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
   {
     return tryLrvx(info.Env(), [&]() -> Napi::Value
                    {
-      auto obj = argObject(info[0], "loadOhlcv: argument 1");
-      std::string sym = given(info[1]) ? argString(info[1], "loadOhlcv: argument 2") : "default";
+      auto obj = argObject(info[0], "loadOhlcv: bars");
+      std::string sym = given(info[1]) ? argString(info[1], "loadOhlcv: symbol") : "default";
       auto ts = argFloat64Array(obj.Get("ts"), "loadOhlcv: ts");
       auto op = argFloat64Array(obj.Get("open"), "loadOhlcv: open");
       auto hi = argFloat64Array(obj.Get("high"), "loadOhlcv: high");
@@ -418,9 +418,9 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
   {
     return tryLrvx(info.Env(), [&]() -> Napi::Value
                    {
-      std::string src = argString(info[0], "resample: argument 1");
-      std::string dst = argString(info[1], "resample: argument 2");
-      std::string interval = argString(info[2], "resample: argument 3");
+      std::string src = argString(info[0], "resample: src");
+      std::string dst = argString(info[1], "resample: dst");
+      std::string interval = argString(info[2], "resample: interval");
       auto it = _syms.find(src);
       if (it == _syms.end())
       {
@@ -434,7 +434,7 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
 
   Napi::Value Run(const Napi::CallbackInfo& info)
   {
-    auto* builder = argInstance<SignalBuilderWrap>(info[0], "run: argument 1");
+    auto* builder = argInstance<SignalBuilderWrap>(info[0], "run: signals");
     auto sigs = builder->signals();
     const auto& names = builder->symbolNames();
 

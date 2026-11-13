@@ -85,10 +85,10 @@ inline std::string opOut(Napi::Env env,
 inline Napi::Value ammCurveConstantProduct(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  const std::string r0 = detail_curve::bigintToDecimal(env, argBigInt(info[0], "ammCurveConstantProduct: argument 1"));
-  const std::string r1 = detail_curve::bigintToDecimal(env, argBigInt(info[1], "ammCurveConstantProduct: argument 2"));
-  const auto feeNum = argInteger(info[2], "ammCurveConstantProduct: argument 3");
-  const auto feeDen = argInteger(info[3], "ammCurveConstantProduct: argument 4");
+  const std::string r0 = detail_curve::bigintToDecimal(env, argBigInt(info[0], "ammCurveConstantProduct: reserve0"));
+  const std::string r1 = detail_curve::bigintToDecimal(env, argBigInt(info[1], "ammCurveConstantProduct: reserve1"));
+  const auto feeNum = argInteger(info[2], "ammCurveConstantProduct: feeNum");
+  const auto feeDen = argInteger(info[3], "ammCurveConstantProduct: feeDen");
   return detail_curve::wrapHandle(
       env, lrvx_curve_constant_product(r0.c_str(), r1.c_str(), static_cast<uint64_t>(feeNum),
                                        static_cast<uint64_t>(feeDen)));
@@ -97,11 +97,11 @@ inline Napi::Value ammCurveConstantProduct(const Napi::CallbackInfo& info)
 inline Napi::Value ammCurveRaydiumCp(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  const std::string r0 = detail_curve::bigintToDecimal(env, argBigInt(info[0], "ammCurveRaydiumCp: argument 1"));
-  const std::string r1 = detail_curve::bigintToDecimal(env, argBigInt(info[1], "ammCurveRaydiumCp: argument 2"));
-  const auto tradeFee = argInteger(info[2], "ammCurveRaydiumCp: argument 3");
-  const auto creatorFee = info.Length() > 3 ? argInteger(info[3], "ammCurveRaydiumCp: argument 4") : 0;
-  const bool onInput = info.Length() > 4 ? argBool(info[4], "ammCurveRaydiumCp: argument 5") : true;
+  const std::string r0 = detail_curve::bigintToDecimal(env, argBigInt(info[0], "ammCurveRaydiumCp: reserve0"));
+  const std::string r1 = detail_curve::bigintToDecimal(env, argBigInt(info[1], "ammCurveRaydiumCp: reserve1"));
+  const auto tradeFee = argInteger(info[2], "ammCurveRaydiumCp: tradeFeeRate");
+  const auto creatorFee = info.Length() > 3 ? argInteger(info[3], "ammCurveRaydiumCp: creatorFeeRate") : 0;
+  const bool onInput = info.Length() > 4 ? argBool(info[4], "ammCurveRaydiumCp: creatorFeeOnInput") : true;
   return detail_curve::wrapHandle(
       env, lrvx_curve_raydium_cp(r0.c_str(), r1.c_str(), static_cast<uint64_t>(tradeFee),
                                  static_cast<uint64_t>(creatorFee), onInput ? 1 : 0));
@@ -110,9 +110,9 @@ inline Napi::Value ammCurveRaydiumCp(const Napi::CallbackInfo& info)
 inline Napi::Value ammCurveUniswapV3(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  const std::string sqrtP = detail_curve::bigintToDecimal(env, argBigInt(info[0], "ammCurveUniswapV3: argument 1"));
-  const std::string liq = detail_curve::bigintToDecimal(env, argBigInt(info[1], "ammCurveUniswapV3: argument 2"));
-  const auto feePips = argUint32(info[2], "ammCurveUniswapV3: argument 3");
+  const std::string sqrtP = detail_curve::bigintToDecimal(env, argBigInt(info[0], "ammCurveUniswapV3: sqrtPriceX96"));
+  const std::string liq = detail_curve::bigintToDecimal(env, argBigInt(info[1], "ammCurveUniswapV3: liquidity"));
+  const auto feePips = argUint32(info[2], "ammCurveUniswapV3: feePips");
 
   // ticks: an array of [sqrtRatio: bigint, liquidityNet: bigint]; signed net rides in
   // i256, so its sign is the BigInt's sign.
@@ -120,7 +120,7 @@ inline Napi::Value ammCurveUniswapV3(const Napi::CallbackInfo& info)
   std::vector<std::string> netStore;
   if (given(info[3]))
   {
-    Napi::Array arr = argArray(info[3], "ammCurveUniswapV3: argument 4");
+    Napi::Array arr = argArray(info[3], "ammCurveUniswapV3: ticks");
     for (uint32_t k = 0; k < arr.Length(); ++k)
     {
       Napi::Array pair = argArray(arr.Get(k), "a [sqrtPrice, liquidityNet] pair");
@@ -162,9 +162,9 @@ inline Napi::Value ammCurveAmountOut(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   LrvxCurveHandle c = detail_curve::unwrapHandle(info[0]);
-  const size_t i = argUint32(info[1], "ammCurveAmountOut: argument 2");
-  const size_t j = argUint32(info[2], "ammCurveAmountOut: argument 3");
-  const std::string amt = detail_curve::bigintToDecimal(env, argBigInt(info[3], "ammCurveAmountOut: argument 4"));
+  const size_t i = argUint32(info[1], "ammCurveAmountOut: i");
+  const size_t j = argUint32(info[2], "ammCurveAmountOut: j");
+  const std::string amt = detail_curve::bigintToDecimal(env, argBigInt(info[3], "ammCurveAmountOut: amountIn"));
   return detail_curve::decimalToBigint(
       env, detail_curve::opOut(env, &lrvx_curve_amount_out, c, i, j, amt).c_str());
 }
@@ -173,9 +173,9 @@ inline Napi::Value ammCurveApplySwap(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   LrvxCurveHandle c = detail_curve::unwrapHandle(info[0]);
-  const size_t i = argUint32(info[1], "ammCurveApplySwap: argument 2");
-  const size_t j = argUint32(info[2], "ammCurveApplySwap: argument 3");
-  const std::string amt = detail_curve::bigintToDecimal(env, argBigInt(info[3], "ammCurveApplySwap: argument 4"));
+  const size_t i = argUint32(info[1], "ammCurveApplySwap: i");
+  const size_t j = argUint32(info[2], "ammCurveApplySwap: j");
+  const std::string amt = detail_curve::bigintToDecimal(env, argBigInt(info[3], "ammCurveApplySwap: amountIn"));
   return detail_curve::decimalToBigint(
       env, detail_curve::opOut(env, &lrvx_curve_apply_swap, c, i, j, amt).c_str());
 }
@@ -184,7 +184,7 @@ inline Napi::Value ammCurveBalance(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   LrvxCurveHandle c = detail_curve::unwrapHandle(info[0]);
-  const size_t i = argUint32(info[1], "ammCurveBalance: argument 2");
+  const size_t i = argUint32(info[1], "ammCurveBalance: i");
   char out[96] = {0};
   if (!lrvx_curve_balance(c, i, out, sizeof(out)))
   {

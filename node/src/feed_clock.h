@@ -37,7 +37,7 @@ class MultiFeedClockWrap : public Napi::ObjectWrap<MultiFeedClockWrap>
           .ThrowAsJavaScriptException();
       return;
     }
-    auto opts = argObject(info[0], "MultiFeedClock: argument 1");
+    auto opts = argObject(info[0], "MultiFeedClock: opts");
     if (!opts.Has("symbols") || !opts.Get("symbols").IsArray())
     {
       Napi::TypeError::New(info.Env(), "options.symbols must be an array")
@@ -114,8 +114,8 @@ class MultiFeedClockWrap : public Napi::ObjectWrap<MultiFeedClockWrap>
 
   Napi::Value Tick(const Napi::CallbackInfo& info)
   {
-    int64_t ts = toInt64Ns(info[0], "tick: argument 1");
-    uint32_t sym = argUint32(info[1], "tick: argument 2");
+    int64_t ts = toInt64Ns(info[0], "tick: tsNs");
+    uint32_t sym = argUint32(info[1], "tick: symbol");
     uint8_t fired = lrvx_feed_clock_tick(_h, ts, sym);
     Napi::Object out = Napi::Object::New(info.Env());
     out.Set("fired", Napi::Boolean::New(info.Env(), fired != 0));

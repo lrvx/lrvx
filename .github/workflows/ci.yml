@@ -87,6 +87,8 @@ jobs:
       run: python3 scripts/check_dts_exports.py
     - name: Verify node/index.d.ts class members cover every NAPI wrap method
       run: python3 scripts/check_dts_class_members.py
+    - name: Verify node/src names checked arguments as node/index.d.ts does
+      run: python3 scripts/check_node_argument_names.py
     - name: Verify cross-binding parity (pybind11/napi/codon/quickjs)
       # --require-quickjs is the script's default and is passed explicitly
       # here: the flag used to exist and never be passed, which left 59 of the

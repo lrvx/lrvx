@@ -68,25 +68,25 @@ class LiveQueuePositionEstimatorWrap
   void SetConfidenceHalfLifeNs(const Napi::CallbackInfo& info)
   {
     lrvx_live_queue_position_set_confidence_half_life_ns(
-        _h, argInteger(info[0], "setConfidenceHalfLifeNs: argument 1"));
+        _h, argInteger(info[0], "setConfidenceHalfLifeNs: halfLifeNs"));
   }
 
   void SetShrinkAttributionFactor(const Napi::CallbackInfo& info)
   {
     lrvx_live_queue_position_set_shrink_factor(
-        _h, argNumber(info[0], "setShrinkAttributionFactor: argument 1"));
+        _h, argNumber(info[0], "setShrinkAttributionFactor: factor"));
   }
 
   void OnOrderPlaced(const Napi::CallbackInfo& info)
   {
-    uint32_t symbol = argUint32(info[0], "onOrderPlaced: argument 1");
-    uint8_t side = static_cast<uint8_t>(argUint32(info[1], "onOrderPlaced: argument 2"));
-    double price = argNumber(info[2], "onOrderPlaced: argument 3");
+    uint32_t symbol = argUint32(info[0], "onOrderPlaced: symbol");
+    uint8_t side = static_cast<uint8_t>(argUint32(info[1], "onOrderPlaced: side"));
+    double price = argNumber(info[2], "onOrderPlaced: price");
     uint64_t order_id =
-        static_cast<uint64_t>(argInteger(info[3], "onOrderPlaced: argument 4"));
-    double order_qty = argNumber(info[4], "onOrderPlaced: argument 5");
-    double level_qty = argNumber(info[5], "onOrderPlaced: argument 6");
-    int64_t ts_ns = info.Length() > 6 ? toInt64Ns(info[6], "onOrderPlaced: argument 7") : 0;
+        static_cast<uint64_t>(argInteger(info[3], "onOrderPlaced: orderId"));
+    double order_qty = argNumber(info[4], "onOrderPlaced: orderQty");
+    double level_qty = argNumber(info[5], "onOrderPlaced: levelQtyNow");
+    int64_t ts_ns = info.Length() > 6 ? toInt64Ns(info[6], "onOrderPlaced: tsNs") : 0;
     lrvx_live_queue_position_on_order_placed(
         _h, symbol, side, lrvx_price_from_double(price), order_id,
         lrvx_quantity_from_double(order_qty), lrvx_quantity_from_double(level_qty),
@@ -96,38 +96,38 @@ class LiveQueuePositionEstimatorWrap
   void OnOrderCancelled(const Napi::CallbackInfo& info)
   {
     uint64_t order_id =
-        static_cast<uint64_t>(argInteger(info[0], "onOrderCancelled: argument 1"));
-    int64_t ts_ns = info.Length() > 1 ? toInt64Ns(info[1], "onOrderCancelled: argument 2") : 0;
+        static_cast<uint64_t>(argInteger(info[0], "onOrderCancelled: orderId"));
+    int64_t ts_ns = info.Length() > 1 ? toInt64Ns(info[1], "onOrderCancelled: tsNs") : 0;
     lrvx_live_queue_position_on_order_cancelled(_h, order_id, ts_ns);
   }
 
   void OnOrderFilled(const Napi::CallbackInfo& info)
   {
     uint64_t order_id =
-        static_cast<uint64_t>(argInteger(info[0], "onOrderFilled: argument 1"));
-    double cum = argNumber(info[1], "onOrderFilled: argument 2");
-    int64_t ts_ns = info.Length() > 2 ? toInt64Ns(info[2], "onOrderFilled: argument 3") : 0;
+        static_cast<uint64_t>(argInteger(info[0], "onOrderFilled: orderId"));
+    double cum = argNumber(info[1], "onOrderFilled: cumulativeFill");
+    int64_t ts_ns = info.Length() > 2 ? toInt64Ns(info[2], "onOrderFilled: tsNs") : 0;
     lrvx_live_queue_position_on_order_filled(_h, order_id,
                                              lrvx_quantity_from_double(cum), ts_ns);
   }
 
   void OnTrade(const Napi::CallbackInfo& info)
   {
-    uint32_t symbol = argUint32(info[0], "onTrade: argument 1");
-    double price = argNumber(info[1], "onTrade: argument 2");
-    double qty = argNumber(info[2], "onTrade: argument 3");
-    int64_t ts_ns = info.Length() > 3 ? toInt64Ns(info[3], "onTrade: argument 4") : 0;
+    uint32_t symbol = argUint32(info[0], "onTrade: symbol");
+    double price = argNumber(info[1], "onTrade: price");
+    double qty = argNumber(info[2], "onTrade: qty");
+    int64_t ts_ns = info.Length() > 3 ? toInt64Ns(info[3], "onTrade: tsNs") : 0;
     lrvx_live_queue_position_on_trade(_h, symbol, lrvx_price_from_double(price),
                                       lrvx_quantity_from_double(qty), ts_ns);
   }
 
   void OnTradeWithFlag(const Napi::CallbackInfo& info)
   {
-    uint32_t symbol = argUint32(info[0], "onTradeWithFlag: argument 1");
-    double price = argNumber(info[1], "onTradeWithFlag: argument 2");
-    double qty = argNumber(info[2], "onTradeWithFlag: argument 3");
-    int64_t ts_ns = toInt64Ns(info[3], "onTradeWithFlag: argument 4");
-    bool is_hidden = argBool(info[4], "onTradeWithFlag: argument 5");
+    uint32_t symbol = argUint32(info[0], "onTradeWithFlag: symbol");
+    double price = argNumber(info[1], "onTradeWithFlag: price");
+    double qty = argNumber(info[2], "onTradeWithFlag: qty");
+    int64_t ts_ns = toInt64Ns(info[3], "onTradeWithFlag: tsNs");
+    bool is_hidden = argBool(info[4], "onTradeWithFlag: isHidden");
     lrvx_live_queue_position_on_trade_with_flag(
         _h, symbol, lrvx_price_from_double(price), lrvx_quantity_from_double(qty),
         ts_ns, is_hidden ? 1 : 0);
@@ -135,7 +135,7 @@ class LiveQueuePositionEstimatorWrap
 
   void SetHiddenOrderPolicy(const Napi::CallbackInfo& info)
   {
-    std::string s = argString(info[0], "setHiddenOrderPolicy: argument 1");
+    std::string s = argString(info[0], "setHiddenOrderPolicy: policy");
     uint8_t p = 0;
     if (s == "trust_trade_flag")
     {
@@ -150,11 +150,11 @@ class LiveQueuePositionEstimatorWrap
 
   void OnLevelUpdate(const Napi::CallbackInfo& info)
   {
-    uint32_t symbol = argUint32(info[0], "onLevelUpdate: argument 1");
-    uint8_t side = static_cast<uint8_t>(argUint32(info[1], "onLevelUpdate: argument 2"));
-    double price = argNumber(info[2], "onLevelUpdate: argument 3");
-    double new_qty = argNumber(info[3], "onLevelUpdate: argument 4");
-    int64_t ts_ns = info.Length() > 4 ? toInt64Ns(info[4], "onLevelUpdate: argument 5") : 0;
+    uint32_t symbol = argUint32(info[0], "onLevelUpdate: symbol");
+    uint8_t side = static_cast<uint8_t>(argUint32(info[1], "onLevelUpdate: side"));
+    double price = argNumber(info[2], "onLevelUpdate: price");
+    double new_qty = argNumber(info[3], "onLevelUpdate: newQty");
+    int64_t ts_ns = info.Length() > 4 ? toInt64Ns(info[4], "onLevelUpdate: tsNs") : 0;
     lrvx_live_queue_position_on_level_update(_h, symbol, side,
                                              lrvx_price_from_double(price),
                                              lrvx_quantity_from_double(new_qty), ts_ns);
@@ -164,8 +164,8 @@ class LiveQueuePositionEstimatorWrap
   {
     auto env = info.Env();
     uint64_t order_id =
-        static_cast<uint64_t>(argInteger(info[0], "snapshot: argument 1"));
-    int64_t now_ns = info.Length() > 1 ? toInt64Ns(info[1], "snapshot: argument 2") : 0;
+        static_cast<uint64_t>(argInteger(info[0], "snapshot: orderId"));
+    int64_t now_ns = info.Length() > 1 ? toInt64Ns(info[1], "snapshot: nowNs") : 0;
     int64_t slots[6] = {0};
     uint8_t ok = lrvx_live_queue_position_snapshot(_h, order_id, now_ns, slots);
     if (!ok)

@@ -27,7 +27,7 @@ inline Napi::Value heatmapHtml(const Napi::CallbackInfo& info)
           "E_LEN_002",
           "heatmapHtml: first argument must be a 2D array of numbers.");
     }
-    auto outer = argArray(info[0], "heatmapHtml: argument 1");
+    auto outer = argArray(info[0], "report.heatmapHtml: z");
     const uint32_t rows = outer.Length();
     if (rows == 0)
     {
@@ -78,7 +78,7 @@ inline Napi::Value heatmapHtml(const Napi::CallbackInfo& info)
     std::string title, xAxis, yAxis, metric;
     if (given(info[1]))
     {
-      auto opts = argObject(info[1], "heatmapHtml: argument 2");
+      auto opts = argObject(info[1], "report.heatmapHtml: opts");
       getStringArr(opts, "rowLabels", rowLabels);
       getStringArr(opts, "colLabels", colLabels);
       title = getString(opts, "title");

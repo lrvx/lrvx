@@ -60,7 +60,7 @@ inline Napi::Value u256Roundtrip(const Napi::CallbackInfo& info)
   }
   uint64_t words[4];
   int sign = 0;
-  if (!detail_dex::bigintToWords(argBigInt(info[0], "u256Roundtrip: argument 1"), words, &sign) || sign != 0)
+  if (!detail_dex::bigintToWords(argBigInt(info[0], "u256Roundtrip: value"), words, &sign) || sign != 0)
   {
     throw Napi::RangeError::New(env, "u256Roundtrip: value must be in [0, 2^256)");
   }
@@ -85,7 +85,7 @@ inline Napi::Value i256Roundtrip(const Napi::CallbackInfo& info)
   }
   uint64_t words[4];
   int sign = 0;
-  if (!detail_dex::bigintToWords(argBigInt(info[0], "i256Roundtrip: argument 1"), words, &sign))
+  if (!detail_dex::bigintToWords(argBigInt(info[0], "i256Roundtrip: value"), words, &sign))
   {
     throw Napi::RangeError::New(env, "i256Roundtrip: magnitude must be < 2^256");
   }

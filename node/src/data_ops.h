@@ -28,9 +28,9 @@ class DataWriterWrap : public Napi::ObjectWrap<DataWriterWrap>
   }
   DataWriterWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DataWriterWrap>(info)
   {
-    std::string dir = argString(info[0], "DataWriter: argument 1");
-    uint64_t maxMb = info.Length() > 1 ? argInteger(info[1], "DataWriter: argument 2") : 256;
-    uint8_t exId = info.Length() > 2 ? argUint32(info[2], "DataWriter: argument 3") : 0;
+    std::string dir = argString(info[0], "DataWriter: outputDir");
+    uint64_t maxMb = info.Length() > 1 ? argInteger(info[1], "DataWriter: maxSegmentMb") : 256;
+    uint8_t exId = info.Length() > 2 ? argUint32(info[2], "DataWriter: exchangeId") : 0;
     _h = lrvx_data_writer_create(dir.c_str(), maxMb, exId);
   }
   ~DataWriterWrap()
@@ -51,14 +51,14 @@ class DataWriterWrap : public Napi::ObjectWrap<DataWriterWrap>
     // already used toInt64Ns; a real ns timestamp does not survive a double
     // (1765615835519000000 comes back as ...064), which is why bigint is the
     // documented form.
-    const int64_t exchTs = toInt64Ns(info[0], "writeTrade: argument 1");
-    const int64_t recvTs = toInt64Ns(info[1], "writeTrade: argument 2");
-    const int64_t tradeId = toInt64Ns(info[4], "writeTrade: argument 5");
+    const int64_t exchTs = toInt64Ns(info[0], "writeTrade: exchangeTsNs");
+    const int64_t recvTs = toInt64Ns(info[1], "writeTrade: recvTsNs");
+    const int64_t tradeId = toInt64Ns(info[4], "writeTrade: tradeId");
 
     uint32_t side = 0;
     if (info[6].IsString())
     {
-      const std::string s = argString(info[6], "writeTrade: argument 7");
+      const std::string s = argString(info[6], "writeTrade: side");
       if (s == "buy")
       {
         side = 0;
@@ -77,33 +77,33 @@ class DataWriterWrap : public Napi::ObjectWrap<DataWriterWrap>
     }
     else
     {
-      side = argUint32(info[6], "writeTrade: argument 7");
+      side = argUint32(info[6], "writeTrade: side");
     }
 
     return Napi::Boolean::New(
         info.Env(),
         lrvx_data_writer_write_trade(_h, exchTs, recvTs,
-                                     argNumber(info[2], "writeTrade: argument 3"),
-                                     argNumber(info[3], "writeTrade: argument 4"),
+                                     argNumber(info[2], "writeTrade: price"),
+                                     argNumber(info[3], "writeTrade: qty"),
                                      tradeId,
-                                     argUint32(info[5], "writeTrade: argument 6"),
+                                     argUint32(info[5], "writeTrade: symbolId"),
                                      side));
   }
   // bids/asks are flat BigInt64Array: [price_raw, qty_raw, price_raw, qty_raw, ...].
   // Reinterpret the buffer as LrvxBookLevel* — layout matches (two int64 per level).
   Napi::Value WriteBook(const Napi::CallbackInfo& info)
   {
-    int64_t exchTs = toInt64Ns(info[0], "writeBook: argument 1");
-    int64_t recvTs = toInt64Ns(info[1], "writeBook: argument 2");
-    int64_t seq = toInt64Ns(info[2], "writeBook: argument 3");
-    uint32_t symId = argUint32(info[3], "writeBook: argument 4");
+    int64_t exchTs = toInt64Ns(info[0], "writeBook: exchangeTsNs");
+    int64_t recvTs = toInt64Ns(info[1], "writeBook: recvTsNs");
+    int64_t seq = toInt64Ns(info[2], "writeBook: seq");
+    uint32_t symId = argUint32(info[3], "writeBook: symbolId");
     // The C writer takes the recorder's byte (1 snapshot, 0 delta, 2 top);
     // updateType is the record byte the readers return (0, 1, 2).
-    uint8_t isSnap = argBool(info[4], "writeBook: argument 5") ? 1u : 0u;
+    uint8_t isSnap = argBool(info[4], "writeBook: isSnapshot") ? 1u : 0u;
     if (info.Length() > 7 && !info[7].IsUndefined())
     {
       // Exactly 0, 1 or 2: no truncation of 1.9, no NaN read as 0.
-      const double raw = info[7].IsNumber() ? argNumber(info[7], "writeBook: argument 8") : -1.0;
+      const double raw = info[7].IsNumber() ? argNumber(info[7], "writeBook: updateType") : -1.0;
       const int32_t updateType = (raw == 0.0 || raw == 1.0 || raw == 2.0) ? static_cast<int32_t>(raw) : -1;
       if (updateType < 0)
       {
@@ -122,8 +122,8 @@ class DataWriterWrap : public Napi::ObjectWrap<DataWriterWrap>
       static constexpr uint8_t kRecorderByte[] = {1u, 0u, 2u};
       isSnap = kRecorderByte[updateType];
     }
-    auto bidsArr = argBigInt64Array(info[5], "writeBook: argument 6");
-    auto asksArr = argBigInt64Array(info[6], "writeBook: argument 7");
+    auto bidsArr = argBigInt64Array(info[5], "writeBook: bids");
+    auto asksArr = argBigInt64Array(info[6], "writeBook: asks");
     const LrvxBookLevel* bids =
         reinterpret_cast<const LrvxBookLevel*>(bidsArr.Data());
     const LrvxBookLevel* asks =
@@ -170,7 +170,7 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
   }
   DataReaderWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DataReaderWrap>(info)
   {
-    std::string dir = argString(info[0], "DataReader: argument 1");
+    std::string dir = argString(info[0], "DataReader: dataDir");
     int64_t from = given(info[1]) ? toInt64Ns(info[1], "DataReader: fromNs") : 0;
     int64_t to = given(info[2]) ? toInt64Ns(info[2], "DataReader: toNs") : 0;
     // TODO: symbol filter array
@@ -180,7 +180,7 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
     int32_t skipSegmentsByTime = 1;
     if (given(info[3]))
     {
-      Napi::Object opts = argObject(info[3], "DataReader: argument 4");
+      Napi::Object opts = argObject(info[3], "DataReader: options");
       if (opts.Has("reorderWindowNs"))
       {
         Napi::Value v = opts.Get("reorderWindowNs");
@@ -249,30 +249,30 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
   Napi::Value ReadTrades(const Napi::CallbackInfo& info)
   {
     uint64_t maxTrades = given(info[0])
-                             ? argInteger(info[0], "readTrades: argument 1")
+                             ? argInteger(info[0], "readTrades: max")
                              : 0;
     return readTradesImpl(info.Env(), /*startTsNs=*/0, /*useFrom=*/false, maxTrades);
   }
   Napi::Value ReadTradesFrom(const Napi::CallbackInfo& info)
   {
-    int64_t startTsNs = toInt64Ns(info[0], "readTradesFrom: argument 1");
+    int64_t startTsNs = toInt64Ns(info[0], "readTradesFrom: startTsNs");
     uint64_t maxTrades = given(info[1])
-                             ? argInteger(info[1], "readTradesFrom: argument 2")
+                             ? argInteger(info[1], "readTradesFrom: max")
                              : 0;
     return readTradesImpl(info.Env(), startTsNs, /*useFrom=*/true, maxTrades);
   }
   Napi::Value ReadBBO(const Napi::CallbackInfo& info)
   {
     uint64_t maxEvents = given(info[0])
-                             ? argInteger(info[0], "readBBO: argument 1")
+                             ? argInteger(info[0], "readBBO: max")
                              : 0;
     return readBboImpl(info.Env(), /*startTsNs=*/0, /*useFrom=*/false, maxEvents);
   }
   Napi::Value ReadBBOFrom(const Napi::CallbackInfo& info)
   {
-    int64_t startTsNs = toInt64Ns(info[0], "readBBOFrom: argument 1");
+    int64_t startTsNs = toInt64Ns(info[0], "readBBOFrom: startTsNs");
     uint64_t maxEvents = given(info[1])
-                             ? argInteger(info[1], "readBBOFrom: argument 2")
+                             ? argInteger(info[1], "readBBOFrom: max")
                              : 0;
     return readBboImpl(info.Env(), startTsNs, /*useFrom=*/true, maxEvents);
   }
@@ -419,7 +419,7 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
   }
   Napi::Value ReadBookUpdatesFrom(const Napi::CallbackInfo& info)
   {
-    int64_t startTsNs = toInt64Ns(info[0], "readBookUpdatesFrom: argument 1");
+    int64_t startTsNs = toInt64Ns(info[0], "readBookUpdatesFrom: startTsNs");
     return readBookUpdatesImpl(info.Env(), startTsNs, /*useFrom=*/true);
   }
 
@@ -514,7 +514,7 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
           .ThrowAsJavaScriptException();
       return env.Null();
     }
-    auto js_arr = argArray(info[0], "run: argument 1");
+    auto js_arr = argArray(info[0], "run: aggregators");
     std::vector<LrvxAggregatorHandle> handles;
     if (!collectAggregatorHandles(env, js_arr, handles))
     {
@@ -528,12 +528,12 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
     {
       if (info[1].IsNumber())
       {
-        const int32_t v = argInt32(info[1], "run: argument 2");
+        const int32_t v = argInt32(info[1], "run: options");
         n_threads = (v < 0) ? 0u : static_cast<uint32_t>(v);
       }
       else if (given(info[1]))
       {
-        auto opts = argObject(info[1], "run: argument 2");
+        auto opts = argObject(info[1], "run: options");
         if (opts.Has("nThreads"))
         {
           const int32_t v = argInt32(opts.Get("nThreads"), "run: nThreads");
@@ -639,17 +639,17 @@ class BinaryLogRecorderHookWrap : public Napi::ObjectWrap<BinaryLogRecorderHookW
       : Napi::ObjectWrap<BinaryLogRecorderHookWrap>(info)
   {
     auto env = info.Env();
-    std::string dir = argString(info[0], "BinaryLogRecorderHook: argument 1");
+    std::string dir = argString(info[0], "BinaryLogRecorderHook: outputDir");
     uint64_t maxMb = given(info[1])
-                         ? argInteger(info[1], "BinaryLogRecorderHook: argument 2")
+                         ? argInteger(info[1], "BinaryLogRecorderHook: maxSegmentMb")
                          : 256;
     uint8_t exId = given(info[2])
-                       ? argUint32(info[2], "BinaryLogRecorderHook: argument 3")
+                       ? argUint32(info[2], "BinaryLogRecorderHook: exchangeId")
                        : 0;
     uint8_t compression = 0;
     if (given(info[3]))
     {
-      auto s = argString(info[3], "BinaryLogRecorderHook: argument 4");
+      auto s = argString(info[3], "BinaryLogRecorderHook: compression");
       if (s == "none")
       {
         compression = 0;
@@ -669,11 +669,11 @@ class BinaryLogRecorderHookWrap : public Napi::ObjectWrap<BinaryLogRecorderHookW
     std::string instrumentType;
     if (given(info[4]))
     {
-      exchangeName = argString(info[4], "BinaryLogRecorderHook: argument 5");
+      exchangeName = argString(info[4], "BinaryLogRecorderHook: exchangeName");
     }
     if (given(info[5]))
     {
-      instrumentType = argString(info[5], "BinaryLogRecorderHook: argument 6");
+      instrumentType = argString(info[5], "BinaryLogRecorderHook: instrumentType");
     }
     _h = lrvx_binary_log_recorder_hook_create_ex(
         dir.c_str(), maxMb, exId, compression,
@@ -699,12 +699,12 @@ class BinaryLogRecorderHookWrap : public Napi::ObjectWrap<BinaryLogRecorderHookW
   {
     lrvx_binary_log_recorder_hook_add_symbol(
         _h,
-        argUint32(info[0], "addSymbol: argument 1"),
-        argString(info[1], "addSymbol: argument 2").c_str(),
-        info.Length() > 2 ? argString(info[2], "addSymbol: argument 3").c_str() : "",
-        info.Length() > 3 ? argString(info[3], "addSymbol: argument 4").c_str() : "",
-        static_cast<int8_t>(info.Length() > 4 ? argInt32(info[4], "addSymbol: argument 5") : 8),
-        static_cast<int8_t>(info.Length() > 5 ? argInt32(info[5], "addSymbol: argument 6") : 8));
+        argUint32(info[0], "addSymbol: symbolId"),
+        argString(info[1], "addSymbol: name").c_str(),
+        info.Length() > 2 ? argString(info[2], "addSymbol: base").c_str() : "",
+        info.Length() > 3 ? argString(info[3], "addSymbol: quote").c_str() : "",
+        static_cast<int8_t>(info.Length() > 4 ? argInt32(info[4], "addSymbol: pricePrecision") : 8),
+        static_cast<int8_t>(info.Length() > 5 ? argInt32(info[5], "addSymbol: qtyPrecision") : 8));
   }
   void Flush(const Napi::CallbackInfo&) { lrvx_binary_log_recorder_hook_flush(_h); }
   Napi::Value Stats(const Napi::CallbackInfo& info)
@@ -754,7 +754,7 @@ class MergedTapeReaderWrap : public Napi::ObjectWrap<MergedTapeReaderWrap>
           .ThrowAsJavaScriptException();
       return;
     }
-    auto pathsArr = argArray(info[0], "MergedTapeReader: argument 1");
+    auto pathsArr = argArray(info[0], "MergedTapeReader: paths");
     uint32_t n = pathsArr.Length();
     _pathStorage.reserve(n);
     std::vector<const char*> ptrs;
@@ -777,7 +777,7 @@ class MergedTapeReaderWrap : public Napi::ObjectWrap<MergedTapeReaderWrap>
     std::vector<uint32_t> filter;
     if (given(info[1]))
     {
-      auto opts = argObject(info[1], "MergedTapeReader: argument 2");
+      auto opts = argObject(info[1], "MergedTapeReader: options");
       if (opts.Has("fromNs"))
       {
         auto v = opts.Get("fromNs");
@@ -981,7 +981,7 @@ class MergedTapeReaderWrap : public Napi::ObjectWrap<MergedTapeReaderWrap>
           .ThrowAsJavaScriptException();
       return env.Null();
     }
-    auto js_arr = argArray(info[0], "run: argument 1");
+    auto js_arr = argArray(info[0], "run: aggregators");
     std::vector<LrvxAggregatorHandle> handles;
     if (!collectAggregatorHandles(env, js_arr, handles))
     {
@@ -993,7 +993,7 @@ class MergedTapeReaderWrap : public Napi::ObjectWrap<MergedTapeReaderWrap>
     uint32_t n_threads = 0;  // 0 = auto: min(segments, hardware_concurrency)
     if (given(info[1]))
     {
-      const int32_t v = argInt32(info[1], "run: argument 2");
+      const int32_t v = argInt32(info[1], "run: nThreads");
       // Negative or zero from JS → auto (0). Otherwise clamp to uint32.
       n_threads = (v < 0) ? 0u : static_cast<uint32_t>(v);
     }
@@ -1027,7 +1027,7 @@ class PartitionerWrap : public Napi::ObjectWrap<PartitionerWrap>
   }
   PartitionerWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<PartitionerWrap>(info)
   {
-    _h = lrvx_partitioner_create(argString(info[0], "Partitioner: argument 1").c_str());
+    _h = lrvx_partitioner_create(argString(info[0], "Partitioner: dataDir").c_str());
   }
   ~PartitionerWrap()
   {
@@ -1056,8 +1056,8 @@ class PartitionerWrap : public Napi::ObjectWrap<PartitionerWrap>
   }
   Napi::Value ByTime(const Napi::CallbackInfo& info)
   {
-    uint32_t n = argUint32(info[0], "byTime: argument 1");
-    int64_t warmup = info.Length() > 1 ? toInt64Ns(info[1], "byTime: argument 2") : 0;
+    uint32_t n = argUint32(info[0], "byTime: numPartitions");
+    int64_t warmup = info.Length() > 1 ? toInt64Ns(info[1], "byTime: warmupNs") : 0;
     uint32_t count = lrvx_partitioner_by_time(_h, n, warmup, nullptr, 0);
     std::vector<LrvxPartition> parts(count);
     lrvx_partitioner_by_time(_h, n, warmup, parts.data(), count);
@@ -1065,8 +1065,8 @@ class PartitionerWrap : public Napi::ObjectWrap<PartitionerWrap>
   }
   Napi::Value ByDuration(const Napi::CallbackInfo& info)
   {
-    int64_t dur = toInt64Ns(info[0], "byDuration: argument 1");
-    int64_t warmup = info.Length() > 1 ? toInt64Ns(info[1], "byDuration: argument 2") : 0;
+    int64_t dur = toInt64Ns(info[0], "byDuration: durationNs");
+    int64_t warmup = info.Length() > 1 ? toInt64Ns(info[1], "byDuration: warmupNs") : 0;
     uint32_t count = lrvx_partitioner_by_duration(_h, dur, warmup, nullptr, 0);
     std::vector<LrvxPartition> parts(count);
     lrvx_partitioner_by_duration(_h, dur, warmup, parts.data(), count);
@@ -1086,7 +1086,7 @@ class PartitionerWrap : public Napi::ObjectWrap<PartitionerWrap>
           .ThrowAsJavaScriptException();
       return info.Env().Undefined();
     }
-    std::string u = argString(info[0], "byCalendar: argument 1");
+    std::string u = argString(info[0], "byCalendar: unit");
     uint8_t unit = 0;
     if (u == "hour")
     {
@@ -1112,7 +1112,7 @@ class PartitionerWrap : public Napi::ObjectWrap<PartitionerWrap>
           .ThrowAsJavaScriptException();
       return info.Env().Undefined();
     }
-    int64_t warmup = info.Length() > 1 ? toInt64Ns(info[1], "byCalendar: argument 2") : 0;
+    int64_t warmup = info.Length() > 1 ? toInt64Ns(info[1], "byCalendar: warmupNs") : 0;
     uint32_t count = lrvx_partitioner_by_calendar(_h, unit, warmup, nullptr, 0);
     std::vector<LrvxPartition> parts(count);
     lrvx_partitioner_by_calendar(_h, unit, warmup, parts.data(), count);
@@ -1120,7 +1120,7 @@ class PartitionerWrap : public Napi::ObjectWrap<PartitionerWrap>
   }
   Napi::Value BySymbol(const Napi::CallbackInfo& info)
   {
-    uint32_t n = argUint32(info[0], "bySymbol: argument 1");
+    uint32_t n = argUint32(info[0], "bySymbol: numPartitions");
     uint32_t count = lrvx_partitioner_by_symbol(_h, n, nullptr, 0);
     std::vector<LrvxPartition> parts(count);
     lrvx_partitioner_by_symbol(_h, n, parts.data(), count);
@@ -1135,7 +1135,7 @@ class PartitionerWrap : public Napi::ObjectWrap<PartitionerWrap>
   }
   Napi::Value ByEventCount(const Napi::CallbackInfo& info)
   {
-    uint32_t n = argUint32(info[0], "byEventCount: argument 1");
+    uint32_t n = argUint32(info[0], "byEventCount: numPartitions");
     uint32_t count = lrvx_partitioner_by_event_count(_h, n, nullptr, 0);
     std::vector<LrvxPartition> parts(count);
     lrvx_partitioner_by_event_count(_h, n, parts.data(), count);
@@ -1149,7 +1149,7 @@ class PartitionerWrap : public Napi::ObjectWrap<PartitionerWrap>
 inline Napi::Value seg_validate(const Napi::CallbackInfo& info)
 {
   lrvx_clear_last_error();
-  return Napi::Boolean::New(info.Env(), lrvx_segment_validate(argString(info[0], "seg_validate: argument 1").c_str()));
+  return Napi::Boolean::New(info.Env(), lrvx_segment_validate(argString(info[0], "validateSegment: path").c_str()));
 }
 
 inline Napi::Value seg_validate_full(const Napi::CallbackInfo& info)
@@ -1159,9 +1159,9 @@ inline Napi::Value seg_validate_full(const Napi::CallbackInfo& info)
   // and anything else is refused rather than read as on.
   const auto flag = [&info](size_t i, const char* what) -> uint8_t
   { return (given(info[i]) && !argBool(info[i], what)) ? 0 : 1; };
-  auto r = lrvx_segment_validate_full(argString(info[0], "seg_validate_full: argument 1").c_str(),
-                                      flag(1, "seg_validate_full: argument 2"),
-                                      flag(2, "seg_validate_full: argument 3"));
+  auto r = lrvx_segment_validate_full(argString(info[0], "validate: path").c_str(),
+                                      flag(1, "validate: verifyCrc"),
+                                      flag(2, "validate: verifyTimestamps"));
   auto o = Napi::Object::New(info.Env());
   o.Set("valid", (bool)r.valid);
   o.Set("headerValid", (bool)r.header_valid);
@@ -1179,7 +1179,7 @@ inline Napi::Value seg_validate_full(const Napi::CallbackInfo& info)
 inline Napi::Value seg_validate_dataset(const Napi::CallbackInfo& info)
 {
   lrvx_clear_last_error();
-  auto r = lrvx_dataset_validate(argString(info[0], "seg_validate_dataset: argument 1").c_str());
+  auto r = lrvx_dataset_validate(argString(info[0], "validateDataset: dir").c_str());
   auto o = Napi::Object::New(info.Env());
   o.Set("valid", (bool)r.valid);
   o.Set("totalSegments", r.total_segments);
@@ -1196,8 +1196,8 @@ inline Napi::Value seg_merge(const Napi::CallbackInfo& info)
 {
   lrvx_clear_last_error();
   return Napi::Boolean::New(info.Env(), lrvx_segment_merge(
-                                            argString(info[0], "seg_merge: argument 1").c_str(),
-                                            argString(info[1], "seg_merge: argument 2").c_str()));
+                                            argString(info[0], "mergeSegments: inputPath").c_str(),
+                                            argString(info[1], "mergeSegments: outputPath").c_str()));
 }
 
 inline Napi::Value seg_merge_dir(const Napi::CallbackInfo& info)
@@ -1206,8 +1206,8 @@ inline Napi::Value seg_merge_dir(const Napi::CallbackInfo& info)
   std::vector<char> path(4096);
   std::vector<char> errors(65536);
   lrvx_clear_last_error();
-  lrvx_segment_merge_dir_report(argString(info[0], "seg_merge_dir: argument 1").c_str(),
-                                argString(info[1], "seg_merge_dir: argument 2").c_str(), &r, path.data(),
+  lrvx_segment_merge_dir_report(argString(info[0], "mergeDir: dir").c_str(),
+                                argString(info[1], "mergeDir: outputPath").c_str(), &r, path.data(),
                                 path.size(), errors.data(), errors.size());
   auto env = info.Env();
   auto o = Napi::Object::New(env);
@@ -1237,7 +1237,7 @@ inline Napi::Value seg_merge_dir(const Napi::CallbackInfo& info)
 inline Napi::Value seg_split(const Napi::CallbackInfo& info)
 {
   uint8_t mode = 0;  // time
-  std::string m = info.Length() > 2 ? argString(info[2], "seg_split: argument 3") : "time";
+  std::string m = info.Length() > 2 ? argString(info[2], "split: mode") : "time";
   if (m == "event_count")
   {
     mode = 1;
@@ -1251,11 +1251,11 @@ inline Napi::Value seg_split(const Napi::CallbackInfo& info)
     mode = 3;
   }
   auto r = lrvx_segment_split(
-      argString(info[0], "seg_split: argument 1").c_str(),
-      argString(info[1], "seg_split: argument 2").c_str(),
+      argString(info[0], "split: inputPath").c_str(),
+      argString(info[1], "split: outputDir").c_str(),
       mode,
-      info.Length() > 3 ? toInt64Ns(info[3], "seg_split: argument 4") : 3600000000000LL,
-      info.Length() > 4 ? toInt64Ns(info[4], "seg_split: argument 5") : 1000000);
+      info.Length() > 3 ? toInt64Ns(info[3], "split: splitArg") : 3600000000000LL,
+      info.Length() > 4 ? toInt64Ns(info[4], "split: bufferSize") : 1000000);
   auto o = Napi::Object::New(info.Env());
   o.Set("success", (bool)r.success);
   o.Set("segmentsCreated", r.segments_created);
@@ -1268,7 +1268,7 @@ inline Napi::Value seg_export(const Napi::CallbackInfo& info)
   uint8_t fmt = 0;
   if (given(info[2]))
   {
-    std::string f = argString(info[2], "seg_export: argument 3");
+    std::string f = argString(info[2], "exportData: format");
     if (f == "json")
     {
       fmt = 1;
@@ -1283,11 +1283,11 @@ inline Napi::Value seg_export(const Napi::CallbackInfo& info)
     }
   }
   auto r = lrvx_segment_export(
-      argString(info[0], "seg_export: argument 1").c_str(),
-      argString(info[1], "seg_export: argument 2").c_str(),
+      argString(info[0], "exportData: inputPath").c_str(),
+      argString(info[1], "exportData: outputPath").c_str(),
       fmt,
-      given(info[3]) ? toInt64Ns(info[3], "seg_export: argument 4") : 0,
-      given(info[4]) ? toInt64Ns(info[4], "seg_export: argument 5") : 0,
+      given(info[3]) ? toInt64Ns(info[3], "exportData: fromNs") : 0,
+      given(info[4]) ? toInt64Ns(info[4], "exportData: toNs") : 0,
       nullptr, 0);
   auto o = Napi::Object::New(info.Env());
   o.Set("success", (bool)r.success);
@@ -1301,7 +1301,7 @@ inline Napi::Value seg_recompress(const Napi::CallbackInfo& info)
   uint8_t c = 1;  // lz4
   if (info.Length() > 2)
   {
-    std::string s = argString(info[2], "seg_recompress: argument 3");
+    std::string s = argString(info[2], "recompress: codec");
     if (s == "none")
     {
       c = 0;
@@ -1309,17 +1309,17 @@ inline Napi::Value seg_recompress(const Napi::CallbackInfo& info)
   }
   lrvx_clear_last_error();
   return Napi::Boolean::New(info.Env(), lrvx_segment_recompress(
-                                            argString(info[0], "seg_recompress: argument 1").c_str(),
-                                            argString(info[1], "seg_recompress: argument 2").c_str(), c));
+                                            argString(info[0], "recompress: inputPath").c_str(),
+                                            argString(info[1], "recompress: outputPath").c_str(), c));
 }
 
 inline Napi::Value seg_extract_symbols(const Napi::CallbackInfo& info)
 {
-  auto syms = argUint32Array(info[2], "seg_extract_symbols: argument 3");
+  auto syms = argUint32Array(info[2], "extractSymbols: symbols");
   lrvx_clear_last_error();
   return Napi::Number::New(info.Env(), (double)lrvx_segment_extract_symbols(
-                                           argString(info[0], "seg_extract_symbols: argument 1").c_str(),
-                                           argString(info[1], "seg_extract_symbols: argument 2").c_str(),
+                                           argString(info[0], "extractSymbols: inputPath").c_str(),
+                                           argString(info[1], "extractSymbols: outputPath").c_str(),
                                            syms.Data(), syms.ElementLength()));
 }
 
@@ -1327,17 +1327,17 @@ inline Napi::Value seg_extract_time_range(const Napi::CallbackInfo& info)
 {
   lrvx_clear_last_error();
   return Napi::Number::New(info.Env(), (double)lrvx_segment_extract_time_range(
-                                           argString(info[0], "seg_extract_time_range: argument 1").c_str(),
-                                           argString(info[1], "seg_extract_time_range: argument 2").c_str(),
-                                           toInt64Ns(info[2], "seg_extract_time_range: argument 3"),
-                                           toInt64Ns(info[3], "seg_extract_time_range: argument 4")));
+                                           argString(info[0], "extractTimeRange: inputPath").c_str(),
+                                           argString(info[1], "extractTimeRange: outputPath").c_str(),
+                                           toInt64Ns(info[2], "extractTimeRange: fromNs"),
+                                           toInt64Ns(info[3], "extractTimeRange: toNs")));
 }
 
 // ── Registration ────────────────────────────────────────────────────
 
 inline Napi::Value seg_inspect(const Napi::CallbackInfo& info)
 {
-  auto h = lrvx_data_reader_create(argString(info[0], "seg_inspect: argument 1").c_str());
+  auto h = lrvx_data_reader_create(argString(info[0], "inspect: path").c_str());
   auto s = lrvx_data_reader_summary(h);
   lrvx_data_reader_destroy(h);
   auto o = Napi::Object::New(info.Env());

@@ -75,7 +75,7 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
     double initial_equity = 0.0;
     if (given(info[0]))
     {
-      auto opts = argObject(info[0], "PortfolioRisk: argument 1");
+      auto opts = argObject(info[0], "PortfolioRiskAggregator: opts");
       if (given(opts.Get("rules")))
       {
         auto r = argObject(opts.Get("rules"), "PortfolioRisk: rules");
@@ -120,8 +120,8 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
     {
       throw Napi::TypeError::New(info.Env(), "update(name, fields) expected");
     }
-    std::string name = argString(info[0], "update: argument 1");
-    auto fields = argObject(info[1], "update: argument 2");
+    std::string name = argString(info[0], "update: name");
+    auto fields = argObject(info[1], "update: fields");
     LrvxStrategyAccountFields f{};
     uint8_t mask = 0;
     auto putDouble = [&](const char* js_key, uint8_t bit, double& out)
@@ -151,7 +151,7 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
 
   void Remove(const Napi::CallbackInfo& info)
   {
-    std::string name = argString(info[0], "remove: argument 1");
+    std::string name = argString(info[0], "remove: name");
     lrvx_portfolio_risk_remove(_h, name.c_str());
   }
 
@@ -162,9 +162,9 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
 
   Napi::Value CheckOrder(const Napi::CallbackInfo& info)
   {
-    std::string strategy = argString(info[0], "checkOrder: argument 1");
-    double notional = argNumber(info[1], "checkOrder: argument 2");
-    std::string side = argString(info[2], "checkOrder: argument 3");
+    std::string strategy = argString(info[0], "checkOrder: strategy");
+    double notional = argNumber(info[1], "checkOrder: notional");
+    std::string side = argString(info[2], "checkOrder: side");
     LrvxBreach b{};
     if (!lrvx_portfolio_risk_check_order(_h, strategy.c_str(), notional,
                                          side.c_str(), &b))
