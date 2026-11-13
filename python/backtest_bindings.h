@@ -134,6 +134,7 @@ class PySimulatedExecutor
   // For other bindings that need to wire the same executor into
   // their own subsystem (e.g. LiquidationEngine::setExecutor).
   SimulatedExecutor& executor() { return _executor; }
+  SimulatedClock& clock() { return _clock; }
 
   void setSymbolRegistry(const SymbolRegistry* registry) { _executor.setSymbolRegistry(registry); }
 

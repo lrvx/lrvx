@@ -2640,6 +2640,10 @@ class Runner:
         """
         Atomically swap the strategy instance at `index` for a new one. The old strategy's on_stop fires, the bridge's internal state survives, the new strategy's on_start fires afterwards. WebSocket / gRPC connections are unaffected.
         """
+    def replay_tape(self, path: str, simulator: SimulatedExecutor, *, tape_symbol_id: typing.Any = None, symbol: typing.Any = None, lock: typing.Any = None, after_event: typing.Any = None) -> dict:
+        """
+        Replay a `.lrvx` tape into this runner's strategies with `simulator` (a SimulatedExecutor) standing in for the venue, through the loop BacktestRunner.run_tape uses: every trade, book snapshot, book delta and top-of-book frame, in the tape's time order, moves the simulator's clock and reaches the simulator before the strategies, so an order resting in the simulator fills from the books as in a backtest of the same tape. The simulator is reset first, as at the start of a backtest run. With tape_symbol_id and symbol, only that tape symbol is replayed and its events are delivered under the registered `symbol`. `lock` (anything with acquire / release) is held while the simulator is shown an event and released before the strategies see it; `after_event()` is called after each event. The strategies receive trades, book snapshots and tops; a live runner has no delta entry, so deltas reach the simulator only. Returns a dict: events, trades, books, book_deltas_not_delivered, skipped_option_quotes, skipped_pool_states.
+        """
     def set_executor(self, executor: Executor) -> None:
         ...
     def set_kill_switch(self, ks: KillSwitch) -> None:

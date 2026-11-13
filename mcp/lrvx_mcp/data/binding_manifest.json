@@ -25759,6 +25759,11 @@
         },
         {
           "kind": "method",
+          "name": "symbolRegistry",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "timestampsFor",
           "parent": "SimulatedExecutor"
         },
@@ -39066,6 +39071,11 @@
         {
           "kind": "method",
           "name": "replace_strategy",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
+          "name": "replay_tape",
           "parent": "Runner"
         },
         {

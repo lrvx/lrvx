@@ -1891,6 +1891,227 @@ class PyRunner
     }
   }
 
+  // Replays a `.lrvx` tape into this runner with `sim` standing in for the
+  // venue. The loop is BacktestRunner's own tape loop (run / processEvent),
+  // pointed at `sim` in place of its built-in executor: each trade, book
+  // snapshot, book delta and top-of-book frame moves the simulator's clock
+  // and reaches the simulator first, then this runner's strategies, in the
+  // tape's time order. So an order resting in `sim` fills from the books as
+  // it would in a backtest of the same tape, not from trades alone.
+  py::dict replay_tape(const std::string& path, PySimulatedExecutor& sim,
+                       std::optional<uint32_t> tape_symbol, std::optional<uint32_t> symbol,
+                       py::object lock, py::object after_event)
+  {
+    namespace fs = std::filesystem;
+    if (!fs::is_directory(fs::path(path)))
+    {
+      throw py::value_error("Runner.replay_tape: not a directory: " + path);
+    }
+    if (symbol.has_value() != tape_symbol.has_value())
+    {
+      throw py::value_error(
+          "Runner.replay_tape: tape_symbol_id and symbol go together: the tape's id and the "
+          "registered id its events are delivered under");
+    }
+    replay::ReaderFilter filter;
+    if (tape_symbol)
+    {
+      filter.symbols.insert(*tape_symbol);
+    }
+    auto inner = replay::createMultiSegmentReader(fs::path(path), filter);
+    if (!inner)
+    {
+      throw std::runtime_error("Runner.replay_tape: cannot open `.lrvx` directory: " + path);
+    }
+
+    // Holds `lock` (anything with acquire / release) while the simulator is
+    // shown an event, so that whoever else submits to it under the same lock
+    // never does so mid-event.
+    struct Held
+    {
+      py::object lock;
+      bool held{false};
+      void acquire()
+      {
+        if (!lock.is_none() && !held)
+        {
+          lock.attr("acquire")();
+          held = true;
+        }
+      }
+      void release()
+      {
+        if (held)
+        {
+          held = false;
+          lock.attr("release")();
+        }
+      }
+    } held{std::move(lock)};
+
+    // The tape's events with the chosen symbol's id rewritten to the
+    // registered one.
+    struct Remapped final : replay::IMultiSegmentReader
+    {
+      replay::IMultiSegmentReader& inner;
+      std::optional<uint32_t> to;
+      Held& held;
+      py::object& afterEvent;
+
+      Remapped(replay::IMultiSegmentReader& r, std::optional<uint32_t> id, Held& h,
+               py::object& after)
+          : inner(r), to(id), held(h), afterEvent(after)
+      {
+      }
+
+      bool one(const replay::ReplayEvent& event, const EventCallback& callback)
+      {
+        held.acquire();
+        bool more = true;
+        try
+        {
+          if (to)
+          {
+            replay::ReplayEvent copy = event;
+            copy.trade.symbol_id = *to;
+            copy.book_header.symbol_id = *to;
+            copy.option_quote.symbol_id = *to;
+            copy.pool_state_header.symbol_id = *to;
+            more = callback(copy);
+          }
+          else
+          {
+            more = callback(event);
+          }
+        }
+        catch (...)
+        {
+          held.release();
+          throw;
+        }
+        held.release();
+        if (!afterEvent.is_none())
+        {
+          afterEvent();
+        }
+        return more;
+      }
+      uint64_t forEach(EventCallback callback) override
+      {
+        return inner.forEach([&](const replay::ReplayEvent& e)
+                             { return one(e, callback); });
+      }
+      uint64_t forEachFrom(int64_t start, EventCallback callback) override
+      {
+        return inner.forEachFrom(start, [&](const replay::ReplayEvent& e)
+                                 { return one(e, callback); });
+      }
+      const std::vector<replay::SegmentInfo>& segments() const override
+      {
+        return inner.segments();
+      }
+      uint64_t totalEvents() const override { return inner.totalEvents(); }
+    } reader{*inner, symbol, held, after_event};
+
+    // The runner's side of the loop: what a backtest hands its strategy goes
+    // to this runner instead. The simulator has seen the event by now, so
+    // the lock is given back before a strategy can submit under it.
+    struct Feed final : IMarketDataSubscriber
+    {
+      PyRunner& runner;
+      Held& held;
+      uint64_t trades{0};
+      uint64_t books{0};
+      uint64_t deltas{0};
+
+      Feed(PyRunner& r, Held& h) : runner(r), held(h) {}
+      SubscriberId id() const override { return 0xFEFEFEFDu; }
+
+      void onTrade(const TradeEvent& ev) override
+      {
+        held.release();
+        ++trades;
+        runner.on_trade(ev.trade.symbol, ev.trade.price.toDouble(), ev.trade.quantity.toDouble(),
+                        ev.trade.isBuy, ev.trade.exchangeTsNs.raw());
+      }
+      void onBookUpdate(const BookUpdateEvent& ev) override
+      {
+        held.release();
+        const int64_t ts = ev.update.exchangeTsNs.raw();
+        if (ev.update.type == BookUpdateType::TOP_OF_BOOK)
+        {
+          const auto side = [](const auto& levels) -> std::optional<std::pair<double, double>>
+          {
+            if (levels.empty())
+            {
+              return std::nullopt;
+            }
+            return std::make_pair(levels.front().price.toDouble(),
+                                  levels.front().quantity.toDouble());
+          };
+          ++books;
+          runner.on_book_top(ev.update.symbol, side(ev.update.bids), side(ev.update.asks), ts);
+          return;
+        }
+        if (ev.update.type != BookUpdateType::SNAPSHOT)
+        {
+          // A live runner takes whole books and tops; the simulator has
+          // applied the delta, the strategies do not see it.
+          ++deltas;
+          return;
+        }
+        std::vector<double> bp, bq, ap, aq;
+        for (const auto& l : ev.update.bids)
+        {
+          bp.push_back(l.price.toDouble());
+          bq.push_back(l.quantity.toDouble());
+        }
+        for (const auto& l : ev.update.asks)
+        {
+          ap.push_back(l.price.toDouble());
+          aq.push_back(l.quantity.toDouble());
+        }
+        ++books;
+        runner.on_book_snapshot(ev.update.symbol, bp, bq, ap, aq, ts);
+      }
+    } feed{*this, held};
+
+    SimulatedExecutor& executor = sim.executor();
+    BacktestRunner driver{BacktestConfig{}};
+    driver.setSymbolRegistry(executor.symbolRegistry());
+    driver.setSimulatedExecutor(&executor, &sim.clock());
+    driver.addMarketDataSubscriber(&feed);
+    // The driver's order-event callback sits in the simulator until here.
+    struct Detach
+    {
+      SimulatedExecutor& executor;
+      Held& held;
+      ~Detach()
+      {
+        executor.setOrderEventCallback({});
+        try
+        {
+          held.release();
+        }
+        catch (...)
+        {
+        }
+      }
+    } detach{executor, held};
+
+    driver.run(reader);
+
+    const BacktestState state = driver.state();
+    py::dict out;
+    out["events"] = state.eventCount;
+    out["trades"] = feed.trades;
+    out["books"] = feed.books;
+    out["book_deltas_not_delivered"] = feed.deltas;
+    out["skipped_option_quotes"] = state.optionQuoteCount;
+    out["skipped_pool_states"] = state.poolStateCount;
+    return out;
+  }
+
   // One order event a venue reported, in the words a strategy's on_fill and
   // on_order_update read them back in.
   void on_order_event(uint64_t order_id, uint32_t symbol, const std::string& side,
@@ -3593,6 +3814,26 @@ inline void bindStrategy(py::module_& m)
            "that is not on record is ignored; market, IOC and FOK orders are never kept. A "
            "modify that names an id not on record is not sent to the executor, and "
            "lrvx.last_error() then says why, ending in [unknown_order].")
+      .def("replay_tape", [](PyRunner& r, const std::string& path, PySimulatedExecutor& simulator, py::object tape_symbol_id, py::object symbol, py::object lock, py::object after_event)
+           { return r.replay_tape(
+                 path, simulator,
+                 tape_symbol_id.is_none() ? std::nullopt
+                                          : std::optional<uint32_t>(tape_symbol_id.cast<uint32_t>()),
+                 symbol.is_none() ? std::nullopt : std::optional<uint32_t>(symId(symbol)),
+                 std::move(lock), std::move(after_event)); }, py::arg("path"), py::arg("simulator"), py::kw_only(), py::arg("tape_symbol_id") = py::none(), py::arg("symbol") = py::none(), py::arg("lock") = py::none(), py::arg("after_event") = py::none(),
+           "Replay a `.lrvx` tape into this runner's strategies with `simulator` (a "
+           "SimulatedExecutor) standing in for the venue, through the loop BacktestRunner.run_tape "
+           "uses: every trade, book snapshot, book delta and top-of-book frame, in the tape's time "
+           "order, moves the simulator's clock and reaches the simulator before the strategies, "
+           "so an order resting in the simulator fills from the books as in a backtest of the "
+           "same tape. The simulator is reset first, as at the start of a backtest run. With "
+           "tape_symbol_id and symbol, only that tape symbol is replayed and its events are "
+           "delivered under the registered `symbol`. `lock` (anything with acquire / release) is "
+           "held while the simulator is shown an event and released before the strategies see "
+           "it; `after_event()` is called after each event. The strategies receive trades, book "
+           "snapshots and tops; a live runner has no delta entry, so deltas reach the simulator "
+           "only. Returns a dict: events, trades, books, book_deltas_not_delivered, "
+           "skipped_option_quotes, skipped_pool_states.")
       .def("on_order_event", [](PyRunner& r, uint64_t order_id, py::object sym, const std::string& side, const std::string& status, const std::string& order_type, double fill_qty, double fill_price, int64_t ts_ns, const std::string& reject_reason, bool is_maker)
            { r.on_order_event(order_id, symId(sym), side, status, order_type, fill_qty,
                               fill_price, ts_ns, reject_reason, is_maker); }, py::arg("order_id"), py::arg("symbol"), py::arg("side"), py::arg("status"), py::arg("order_type") = "limit", py::arg("fill_qty") = 0.0, py::arg("fill_price") = 0.0, py::arg("ts_ns") = 0, py::arg("reject_reason") = "", py::arg("is_maker") = false,
