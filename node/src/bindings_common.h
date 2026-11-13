@@ -297,6 +297,40 @@ inline T* argInstance(const Napi::Value& v, const char* what)
                              std::string(what) + " must be " + (vowel ? "an " : "a ") + cls);
 }
 
+// An opaque C handle JavaScript holds as a Napi::External. Every External
+// is the same JavaScript type, so As<External>() took a handle of one kind
+// where another was read and handed its pointer to the C API as the other C
+// type; anything else threw a bare "Invalid argument". Each kind tags the
+// Externals it makes, and argHandle reads only an External with its tag.
+struct HandleKind
+{
+  napi_type_tag tag;
+  const char* name;  // the type index.d.ts declares, with its article
+};
+
+inline Napi::External<void> newHandle(Napi::Env env, const HandleKind& kind, void* h,
+                                      void (*destroy)(void*))
+{
+  Napi::External<void> ext =
+      Napi::External<void>::New(env, h, [destroy](Napi::Env, void* d)
+                                { destroy(d); });
+  ext.TypeTag(&kind.tag);
+  return ext;
+}
+
+inline void* argHandle(const Napi::Value& v, const HandleKind& kind, const char* what)
+{
+  if (v.IsExternal())
+  {
+    Napi::External<void> ext = v.As<Napi::External<void>>();
+    if (ext.CheckTypeTag(&kind.tag))
+    {
+      return ext.Data();
+    }
+  }
+  throw Napi::TypeError::New(v.Env(), std::string(what) + " must be " + kind.name);
+}
+
 // A typed array of exactly the element type the native side reads. As<>()
 // does not look: a Float32Array taken for a Float64Array hands back a
 // pointer to 4-byte elements with a count of them, and the native loop reads
