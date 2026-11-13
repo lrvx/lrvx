@@ -292,6 +292,74 @@ TEST_F(CapiPathErrors, AnExtractThatMatchesNothingIsNotAnError)
   expectReason("taken.lrvx");
 }
 
+// validate and merge returned a bare 0: a file that is not there read the
+// same as a segment that failed its checks, and a merge that found nothing to
+// merge the same as one that could not write.
+TEST_F(CapiPathErrors, ValidateSaysWhenItCouldNotReadTheFile)
+{
+  EXPECT_EQ(lrvx_segment_validate(_missing.c_str()), 0);
+  expectReason(_missing);
+  expectReason("lrvx_segment_validate");
+
+  lrvx_clear_last_error();
+  const LrvxSegmentValidation full = lrvx_segment_validate_full(_missing.c_str(), 1, 1);
+  EXPECT_EQ(full.valid, 0);
+  expectReason(_missing);
+  expectReason("lrvx_segment_validate_full");
+}
+
+TEST_F(CapiPathErrors, AnInvalidSegmentIsAnAnswerNotAnError)
+{
+  const std::string garbage = writeCsv("garbage.lrvx", std::string(256, 'x'));
+  EXPECT_EQ(lrvx_segment_validate(garbage.c_str()), 0);
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+  const LrvxSegmentValidation full = lrvx_segment_validate_full(garbage.c_str(), 1, 1);
+  EXPECT_EQ(full.valid, 0);
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+}
+
+TEST_F(CapiPathErrors, MergeSaysWhyNothingWasMerged)
+{
+  const std::string out = (_root / "merged").string();
+
+  EXPECT_EQ(lrvx_segment_merge(_missing.c_str(), out.c_str()), 0);
+  expectReason(_missing);
+  expectReason("lrvx_segment_merge");
+
+  lrvx_clear_last_error();
+  const auto empty = _root / "empty";
+  std::filesystem::create_directories(empty);
+  EXPECT_EQ(lrvx_segment_merge(empty.string().c_str(), out.c_str()), 0);
+  expectReason(empty.string());
+}
+
+TEST_F(CapiPathErrors, AMergeThatWorkedLeavesNoError)
+{
+  const auto dir = _root / "tape";
+  LrvxDataWriterHandle w = lrvx_data_writer_create(dir.string().c_str(), 16, 1);
+  ASSERT_NE(w, nullptr);
+  for (int i = 0; i < 5; ++i)
+  {
+    ASSERT_EQ(lrvx_data_writer_write_trade(w, (10 + i) * kSec, (10 + i) * kSec, 100.0 + i, 1.0,
+                                           static_cast<uint64_t>(i + 1), 1, 0),
+              1);
+  }
+  lrvx_data_writer_close(w);
+  lrvx_data_writer_destroy(w);
+  lrvx_clear_last_error();
+
+  EXPECT_EQ(lrvx_segment_merge(dir.string().c_str(), (_root / "merged").string().c_str()), 1);
+  EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+  for (const auto& entry : std::filesystem::directory_iterator(dir))
+  {
+    if (entry.path().extension() != ".idx")
+    {
+      EXPECT_EQ(lrvx_segment_validate(entry.path().string().c_str()), 1);
+      EXPECT_EQ(lrvx_last_error_code(), 0) << lastError();
+    }
+  }
+}
+
 TEST_F(CapiPathErrors, PartitionerNeedsADirectoryArgument)
 {
   EXPECT_EQ(lrvx_partitioner_create(nullptr), nullptr);

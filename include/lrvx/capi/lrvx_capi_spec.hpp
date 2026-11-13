@@ -221,6 +221,15 @@ extern "C"
   LRVX_EXPORT(group = "symbol_registry")
   uint32_t lrvx_registry_add_symbol(LrvxRegistryHandle registry, const char* exchange,
                                     const char* name, double tick_size);
+  // The same, with the venue's order-quantity step. A positive lot_size is
+  // declared: a simulated venue refuses an order whose quantity is not a
+  // whole number of it (reject reason "quantity_off_lot"), as it refuses a
+  // price off the tick. Zero or less declares none and quantities are not
+  // checked, which is what lrvx_registry_add_symbol does.
+  LRVX_EXPORT(group = "symbol_registry")
+  uint32_t lrvx_registry_add_symbol_with_lot(LrvxRegistryHandle registry, const char* exchange,
+                                             const char* name, double tick_size,
+                                             double lot_size);
 
   // Symbol name resolution
   LRVX_EXPORT(group = "symbol_registry")
@@ -1581,6 +1590,10 @@ extern "C"
   // Segment operations
   // ============================================================
 
+  // validate returns 0 for a segment that fails its checks and for a file it
+  // could not read; only the unreadable file leaves a reason in
+  // lrvx_last_error_message. merge returns 0 when no segment was merged, with
+  // the reason there. Call lrvx_clear_last_error first to tell the cases apart.
   LRVX_EXPORT(group = "segment")
   uint8_t lrvx_segment_validate(const char* path);
   LRVX_EXPORT(group = "segment")

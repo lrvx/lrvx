@@ -858,6 +858,7 @@ from C import lrvx_streaming_indicator_reset(cobj)
 from C import lrvx_registry_create() -> cobj
 from C import lrvx_registry_destroy(cobj)
 from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+from C import lrvx_registry_add_symbol_with_lot(cobj, cobj, cobj, float, float) -> u32
 from C import lrvx_registry_get_symbol_id(cobj, cobj, cobj, Ptr[u32]) -> u8
 from C import lrvx_registry_get_symbol_name(cobj, u32, cobj, int, cobj, int) -> u8
 from C import lrvx_registry_symbol_count(cobj) -> u32

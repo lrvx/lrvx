@@ -2081,6 +2081,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 
 - *property* `exchange: str`
 - *property* `id: int`
+- *property* `lot_size: float | None`
 - *property* `name: str`
 - *property* `tick_size: float`
 
@@ -2124,7 +2125,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 
 **Members**
 
-- `add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol`
+- `add_symbol(self, exchange: str, symbol: str, tick_size: typing.SupportsFloat | typing.SupportsIndex | None = None, lot_size: typing.SupportsFloat | typing.SupportsIndex | None = None) -> Symbol`
 - `symbol_count(self) -> int`
 
 ### `class TEMA`

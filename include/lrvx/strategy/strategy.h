@@ -94,7 +94,9 @@ class Strategy : public IStrategy
   };
 
   Strategy(SubscriberId id, std::vector<SymbolId> symbols, const SymbolRegistry& registry)
-      : _id(id), _symbols(std::move(symbols)), _venueTicks(registry.venueTickLog())
+      : _id(orderIdSubscriber(id)),
+        _symbols(std::move(symbols)),
+        _venueTicks(registry.venueTickLog())
   {
     _symbolSet.insert(_symbols.begin(), _symbols.end());
     // Read before the entries: a tick applied in between moves the revision
@@ -124,7 +126,9 @@ class Strategy : public IStrategy
   // Before the strategy is attached to a bus or a runner, and before it has
   // emitted: order ids carry the subscriber id, and the ones already issued
   // keep the old one.
-  void setSubscriberId(SubscriberId id) noexcept { _id = id; }
+  // Throws std::invalid_argument, and keeps the id it has, for an id of 2^32
+  // or more (see orderIdSubscriber).
+  void setSubscriberId(SubscriberId id) { _id = orderIdSubscriber(id); }
 
   // Each symbol's entry as the registry held it when the strategy was built, in
   // symbols() order. A copy, so the registry need not outlive the strategy.
@@ -573,6 +577,20 @@ class Strategy : public IStrategy
   // 2^32-1 would reach the range MultiModePositionTracker reserves for its
   // explicit fills.
   static constexpr int kOrderIdStrategyShift = 32;
+
+  // The id, or std::invalid_argument when it has bits the shift would drop:
+  // 2^32 + 5 would issue the order ids of subscriber 5.
+  static SubscriberId orderIdSubscriber(SubscriberId id)
+  {
+    if ((id >> kOrderIdStrategyShift) != 0)
+    {
+      throw std::invalid_argument(
+          "subscriber id " + std::to_string(id) +
+          " does not fit an order id: order ids are (subscriber id << 32) + n, so the id must "
+          "be below 4294967296");
+    }
+    return id;
+  }
 
   OrderId nextOrderId() noexcept
   {

@@ -219,3 +219,95 @@ TEST(CapiRegistryTest, ZeroTickChecksNothing)
 {
   EXPECT_EQ(rejectReasonForTick(0.0), "");
 }
+
+namespace
+{
+
+struct LotProbe
+{
+  LrvxStrategyHandle strategy{nullptr};
+  uint32_t symbol{0};
+  int64_t qtyRaw{0};
+  int bars{0};
+  std::string rejectReason;
+};
+
+void lotProbeOnBar(void* ud, const LrvxSymbolContext*, const LrvxBarData*)
+{
+  auto* st = static_cast<LotProbe*>(ud);
+  if (st->bars++ == 0)
+  {
+    lrvx_emit_limit_buy(st->strategy, st->symbol, 9'900'000'000LL, st->qtyRaw);
+  }
+}
+
+void lotProbeOnOrderUpdate(void* ud, const LrvxSymbolContext*, const LrvxOrderEventData* ev)
+{
+  auto* st = static_cast<LotProbe*>(ud);
+  if (ev->reject_reason != nullptr && ev->reject_reason[0] != '\0')
+  {
+    st->rejectReason = ev->reject_reason;
+  }
+}
+
+// Registers BTC with `lot` (through the plain add when lot < 0) and sends one
+// limit buy of qtyRaw.
+std::string rejectReasonForLot(double lot, int64_t qtyRaw)
+{
+  LrvxRegistryHandle reg = lrvx_registry_create();
+  LotProbe probe;
+  probe.qtyRaw = qtyRaw;
+  probe.symbol = lot < 0.0 ? lrvx_registry_add_symbol(reg, "test", "BTC", 0.01)
+                           : lrvx_registry_add_symbol_with_lot(reg, "test", "BTC", 0.01, lot);
+  LrvxStrategyCallbacks cb{};
+  cb.on_bar = lotProbeOnBar;
+  cb.on_order_update = lotProbeOnOrderUpdate;
+  cb.user_data = &probe;
+  const uint32_t syms[] = {probe.symbol};
+  probe.strategy = lrvx_strategy_create(1, syms, 1, reg, cb);
+  auto* runner = lrvx_backtest_runner_create(reg, 0.0, 10000.0);
+  lrvx_backtest_runner_set_strategy(runner, probe.strategy);
+
+  constexpr int64_t kMin = 60'000'000'000LL;
+  const int64_t starts[2] = {0, kMin};
+  const int64_t ends[2] = {kMin, 2 * kMin};
+  const double opens[2] = {100.0, 100.0};
+  const double highs[2] = {100.5, 100.5};
+  const double lows[2] = {99.5, 99.5};
+  const double closes[2] = {100.0, 100.0};
+  const double volumes[2] = {10.0, 10.0};
+  LrvxBacktestStats stats{};
+  lrvx_backtest_runner_run_bars(runner, starts, ends, opens, highs, lows, closes, volumes, 2,
+                                "BTC", 0, 0, &stats);
+
+  lrvx_strategy_destroy(probe.strategy);
+  lrvx_backtest_runner_destroy(runner);
+  lrvx_registry_destroy(reg);
+  return probe.rejectReason;
+}
+
+}  // namespace
+
+TEST(CapiRegistryTest, ADeclaredLotIsChecked)
+{
+  // 0.0015 against a lot of 0.001.
+  EXPECT_EQ(rejectReasonForLot(0.001, 150'000), "quantity_off_lot");
+  EXPECT_EQ(rejectReasonForLot(0.001, 200'000), "");
+}
+
+TEST(CapiRegistryTest, NoLotChecksNoQuantity)
+{
+  EXPECT_EQ(rejectReasonForLot(0.0, 150'000), "");
+  EXPECT_EQ(rejectReasonForLot(-1.0, 150'000), "") << "lrvx_registry_add_symbol declares none";
+}
+
+TEST(CapiRegistryTest, ALotBelowTheQuantityScaleIsRefused)
+{
+  LrvxRegistryHandle reg = lrvx_registry_create();
+  lrvx_clear_last_error();
+  lrvx_registry_add_symbol_with_lot(reg, "test", "BTC", 0.01, 1e-12);
+  EXPECT_NE(lrvx_last_error_code(), 0);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("lot_size"), std::string::npos);
+  EXPECT_EQ(lrvx_registry_symbol_count(reg), 0u);
+  lrvx_registry_destroy(reg);
+}

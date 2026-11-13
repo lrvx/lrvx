@@ -14,6 +14,9 @@ struct SymbolInfo
   // refuses order prices off a known tick. Any tickSize other than the default
   // counts as known without this flag; set it to have an explicit 0.01 checked.
   bool tickSizeKnown{false};
+  // The venue's order-quantity increment; zero (the default) when none is
+  // declared. A simulated venue refuses an order quantity off a declared lot.
+  Quantity lotSize{};
   ExchangeId exchangeId{InvalidExchangeId};
 
   std::optional<Price> strike;
@@ -67,6 +70,7 @@ public:
 
   // A venue's tick for an entry registered before the venue was read
   VenueTickResult applyVenueTick(SymbolId id, Price venueTick);
+  VenueLotResult applyVenueLot(SymbolId id, Quantity venueLot);
   std::shared_ptr<const VenueTickLog> venueTickLog() const noexcept;
 
   // Symbol registration (ExchangeId-based API)
@@ -121,7 +125,8 @@ public:
 | `getSymbolInfo`        | Returns `std::optional<SymbolInfo>` for the given ID.               |
 | `getExchangeForSymbol` | Returns `ExchangeId` for a given symbol.                            |
 | `applyVenueTick`       | Writes a venue's tick into an existing entry whose tick is not declared, or was applied by an earlier call (see below). |
-| `venueTickLog`         | The ticks `applyVenueTick` wrote, shared with copies taken earlier.  |
+| `applyVenueLot`        | The same for the venue's quantity step: writes it into an entry that declares no lot, or whose lot an earlier call applied. |
+| `venueTickLog`         | The ticks `applyVenueTick` and the lots `applyVenueLot` wrote, shared with copies taken earlier. |
 
 ## The venue's tick for an entry registered first
 
@@ -157,6 +162,27 @@ A copy taken earlier does not: `Strategy` sizes each symbol's book on the tick i
 constructor, so it keeps the shared `venueTickLog()` and rebuilds a symbol's book on the applied
 tick at that symbol's next event. The log is a `shared_ptr`, so a strategy may outlive the
 registry. `clear()`, `loadFromFile` and `deserialize` reset it.
+
+### The venue's lot
+
+`applyVenueLot(id, lot)` does for `lotSize` what `applyVenueTick` does for the tick, and changes
+nothing else in the entry. It returns a `VenueLotResult` with the same outcomes and the lot the
+entry holds after the call:
+
+| Entry's lot before the call | Outcome | Entry after |
+| --- | --- | --- |
+| None declared (`lotSize` zero) | `Applied` | The venue's lot |
+| A lot an earlier `applyVenueLot` applied, now different from the venue's | `Applied` | The venue's new lot |
+| Declared, equal to the venue's | `Unchanged` | Unchanged |
+| Declared, different | `Conflict` | Unchanged: the declared lot is kept |
+| No entry with this id | `UnknownSymbol` | - |
+| Venue lot not positive | `InvalidTick` | Unchanged |
+
+An applied lot is recorded in `venueTickLog()` (`lotFor(id)`), which is how the registry tells it
+from a declared one on the next call. It does not move the log's revision: nothing is sized on a
+lot, so no copy has to follow it. A `SymbolInfo` copied before the call (a strategy's
+`symbolInfos()`) keeps the lot it was copied with. A lot read back from a saved registry is a
+declared one.
 
 ## Symbol Equivalence
 
@@ -203,6 +229,15 @@ declared with the flag. A registry saved with a declared 0.01 tick before the fl
 loads it unchecked; register it again with `tickSizeKnown`, or save it again, to have it checked.
 A reader that predates the flag ignores the bit and the key, and loads the symbol without it.
 
+A declared lot is kept too. The JSON file writes `"lot_size": <raw quantity>` on an entry that
+declares one and nothing on one that does not, so an entry without a lot is written exactly as
+before and a file from before lots loads with none declared. The binary form writes version 5,
+with the lot as eight bytes at the end of each entry whose flags byte has bit `0x20`, only when
+some entry declares a lot; a registry without one serializes to the same version-4 bytes as before.
+Versions 1 to 4 load with no lot. A build that predates lots refuses version 5 (`deserialize`
+returns false) instead of reading the extra bytes as the next entry; its JSON loader ignores the
+key.
+
 Both formats also keep the per-symbol `priceScale` and `qtyScale`. The binary form has carried them
 since version 4; the JSON file writes `"price_scale"` / `"qty_scale"` only on an entry whose scale is
 not the 1e8 default, so a default-scale entry is written exactly as before. A JSON file without the
@@ -242,7 +277,12 @@ when a symbol is registered, and a loaded symbol carries `InvalidExchangeId`.
   checks order prices against it is decided by `orderTickRaw` in `execution/order_price_rule.h`: a
   tick is checked when `tickSizeKnown` is set or the tick is not the 0.01 default, and never when it
   is zero. See [SimulatedExecutor](../backtest/simulated_executor.md#order-prices-and-the-tick).
-* `registerSymbol(info)` stores a copy of the whole `SymbolInfo`, flag included. The name-only
-  overloads declare no tick.
+* `lotSize` is the venue's order-quantity step. It is zero unless set, and then order quantities
+  are not checked; a positive value is declared, and a backtest refuses an order whose quantity is
+  not a whole number of it (`orderLotRaw` / `offLotReason` in `execution/order_price_rule.h`). It
+  is the step only: `SymbolInfo` has no minimum order size. See
+  [SimulatedExecutor](../backtest/simulated_executor.md#order-quantities-and-the-lot).
+* `registerSymbol(info)` stores a copy of the whole `SymbolInfo`, flag and lot included. The
+  name-only overloads declare no tick and no lot.
 * `exchangeId` links symbol directly to its exchange for O(1) access.
 * Persistence methods are useful for storing symbol mappings alongside recorded market data.

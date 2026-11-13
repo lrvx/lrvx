@@ -3020,6 +3020,11 @@ static JSValue js_account_position_count(JSContext* ctx, JSValueConst, int,
       ctx, lrvx_account_position_count(
                static_cast<LrvxAccountHandle>(getHandle(ctx, argv[0]))));
 }
+// An optional clock-reading argument that was given: a Number or a BigInt.
+static bool isClockReading(JSContext* ctx, JSValueConst v)
+{
+  return JS_IsNumber(v) || JS_IsBigInt(ctx, v);
+}
 static JSValue js_account_set_mark(JSContext* ctx, JSValueConst, int argc,
                                    JSValueConst* argv)
 {
@@ -3027,7 +3032,7 @@ static JSValue js_account_set_mark(JSContext* ctx, JSValueConst, int argc,
   double px = 0.0;
   JS_ToUint32(ctx, &sym, argv[1]);
   JS_ToFloat64(ctx, &px, argv[2]);
-  if (argc >= 4 && JS_IsNumber(argv[3]))
+  if (argc >= 4 && isClockReading(ctx, argv[3]))
   {
     int64_t ts = 0;
     JS_ToInt64Ext(ctx, &ts, argv[3]);
@@ -3046,7 +3051,7 @@ static JSValue js_account_mark_ts(JSContext* ctx, JSValueConst, int,
 {
   uint32_t sym = 0;
   JS_ToUint32(ctx, &sym, argv[1]);
-  return JS_NewInt64(
+  return JS_NewBigInt64(
       ctx, lrvx_account_mark_ts(
                static_cast<LrvxAccountHandle>(getHandle(ctx, argv[0])), sym));
 }
@@ -3084,7 +3089,7 @@ static JSValue js_liquidation_engine_on_marks(JSContext* ctx, JSValueConst,
     JS_FreeValue(ctx, pair);
   }
   int64_t ts = 0;
-  if (argc >= 3 && JS_IsNumber(argv[2]))
+  if (argc >= 3 && isClockReading(ctx, argv[2]))
   {
     JS_ToInt64Ext(ctx, &ts, argv[2]);
   }
@@ -7137,8 +7142,8 @@ static JSValue js_dataset_validate(JSContext* c, JSValueConst, int, JSValueConst
   JS_SetPropertyStr(c, o, "corruptedSegments", JS_NewUint32(c, r.corrupted_segments));
   JS_SetPropertyStr(c, o, "totalEvents", JS_NewInt64(c, static_cast<int64_t>(r.total_events)));
   JS_SetPropertyStr(c, o, "totalBytes", JS_NewInt64(c, static_cast<int64_t>(r.total_bytes)));
-  JS_SetPropertyStr(c, o, "firstTimestamp", JS_NewInt64(c, r.first_timestamp));
-  JS_SetPropertyStr(c, o, "lastTimestamp", JS_NewInt64(c, r.last_timestamp));
+  JS_SetPropertyStr(c, o, "firstTimestamp", JS_NewBigInt64(c, r.first_timestamp));
+  JS_SetPropertyStr(c, o, "lastTimestamp", JS_NewBigInt64(c, r.last_timestamp));
   return o;
 }
 
@@ -8027,12 +8032,14 @@ bool registerLrvxBindings(JSContext* ctx)
   addGlobalFunc(ctx, "__lrvx_segment_validate", [](JSContext* c, JSValueConst, int, JSValueConst* a) -> JSValue
                 {
                   LRVX_JS_CSTRING_OR_THROW(path, c, a[0]);
+                  lrvx_clear_last_error();
                   uint8_t r = lrvx_segment_validate(path);
                   return JS_NewBool(c, r); }, 1);
   addGlobalFunc(ctx, "__lrvx_segment_merge", [](JSContext* c, JSValueConst, int, JSValueConst* a) -> JSValue
                 {
                   LRVX_JS_CSTRING_OR_THROW(dir, c, a[0]);
                   LRVX_JS_CSTRING_OR_THROW(out, c, a[1]);
+                  lrvx_clear_last_error();
                   uint8_t r = lrvx_segment_merge(dir, out);
                   return JS_NewBool(c, r); }, 2);
 

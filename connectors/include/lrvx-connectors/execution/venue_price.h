@@ -33,6 +33,15 @@ inline const char* offTickReason(const Order& order, const SymbolInfo& info) noe
   return lrvx::offTickReason(order, orderTickRaw(info));
 }
 
+// The quantity rule beside it, also the simulator's: when the symbol declares
+// a lot (the venue's, applied at start(), or the caller's), an order quantity
+// that is not a whole number of lots is refused here with quantity_off_lot.
+// With no lot declared the quantity is sent as given.
+inline const char* offLotReason(const Order& order, const SymbolInfo& info) noexcept
+{
+  return lrvx::offLotReason(order, orderLotRaw(info));
+}
+
 // Off-tick check for a single price the caller passes outside an Order (a
 // position stop-loss or take-profit trigger). Same rule: false when on tick
 // or when the tick is not known.

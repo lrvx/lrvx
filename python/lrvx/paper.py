@@ -19,7 +19,8 @@ approximation of them:
   inside ``on_fill`` is the position after the fill, as in a backtest;
 * the registry's ticks are applied: an order priced off a declared tick
   is rejected with ``price_off_tick`` / ``trigger_off_tick`` /
-  ``trailing_offset_off_tick``.
+  ``trailing_offset_off_tick``, and one sized off a declared lot with
+  ``quantity_off_lot``.
 
 Wiring::
 

@@ -39,6 +39,10 @@ from lrvx.abi import check_abi_version
 from C import lrvx_registry_create() -> cobj
 from C import lrvx_registry_destroy(cobj)
 from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+# The same with the venue's quantity step as the last argument: a backtest
+# rejects an order whose quantity is not a whole number of a positive lot
+# (reject_reason "quantity_off_lot"); 0.0 declares none.
+from C import lrvx_registry_add_symbol_with_lot(cobj, cobj, cobj, float, float) -> u32
 
 from C import lrvx_runner_create(cobj, cobj, cobj) -> cobj
 from C import lrvx_runner_destroy(cobj)

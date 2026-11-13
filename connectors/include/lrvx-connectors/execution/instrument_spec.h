@@ -32,8 +32,9 @@ struct InstrumentSpec
   // The price increment. On Hyperliquid, which has no fixed tick, the finest
   // increment the venue accepts at any price (see hyperliquidPerpTick).
   Price tickSize{};
-  // The size increment. SymbolInfo has no field for it, so it stays here; the
-  // connector exposes it through instrumentSpec().
+  // The size increment; zero when the venue's response does not carry one
+  // (Polymarket's tick-size answer has no size field). It reaches the
+  // registry entry as SymbolInfo::lotSize the way the tick does.
   Quantity lotSize{};
 };
 
@@ -133,7 +134,8 @@ class InstrumentSpecTable
     putIssue(Issue::Kind::NotLoaded, symbol, reason);
   }
 
-  // The registry declares a tick for this symbol that is not the venue's.
+  // The registry declares a tick or a lot for this symbol that is not the
+  // venue's.
   void setConflict(const std::string& symbol, const std::string& text)
   {
     std::lock_guard lock(_mutex);
@@ -228,7 +230,11 @@ class InstrumentSpecTable
   std::vector<Issue> _issues;
 };
 
-// Registers a venue symbol, with the venue's tick when the table has one.
+// Registers a venue symbol, with the venue's tick and lot when the table has
+// them. What follows about the tick holds for the lot, which goes in through
+// SymbolRegistry::applyVenueLot: an entry that declares no lot takes the
+// venue's, one that declares a different lot keeps it and the disagreement is
+// reported the same way.
 // The tick goes into the entry through SymbolRegistry::applyVenueTick, for a
 // symbol registered here and for one already in the registry, which keeps
 // its id and entry: an entry whose tick was not declared takes the venue's,

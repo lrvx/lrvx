@@ -592,6 +592,8 @@ export interface Symbol {
   readonly name: string;
   readonly exchange: string;
   readonly tickSize: number;
+  /** The quantity step the symbol was registered with, or `null`. */
+  readonly lotSize: number | null;
   toString(): string;
   valueOf(): number;
 }
@@ -599,8 +601,12 @@ export interface Symbol {
 export class SymbolRegistry {
   constructor();
   /** `tickSize` is the venue's price increment; a backtest rejects orders
-   *  priced off it. Omitted, the book uses 0.01 and prices are not checked. */
-  addSymbol(exchange: string, name: string, tickSize?: number): Symbol;
+   *  priced off it. Omitted, the book uses 0.01 and prices are not checked.
+   *  `lotSize` is the venue's quantity step; a backtest rejects an order whose
+   *  quantity is not a whole number of it (`rejectReason`
+   *  `"quantity_off_lot"`). Omitted, quantities are not checked. A `lotSize`
+   *  that is not positive throws a `RangeError`. */
+  addSymbol(exchange: string, name: string, tickSize?: number, lotSize?: number): Symbol;
   symbolCount(): number;
 }
 

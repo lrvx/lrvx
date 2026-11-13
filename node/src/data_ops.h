@@ -1148,11 +1148,13 @@ class PartitionerWrap : public Napi::ObjectWrap<PartitionerWrap>
 
 inline Napi::Value seg_validate(const Napi::CallbackInfo& info)
 {
+  lrvx_clear_last_error();
   return Napi::Boolean::New(info.Env(), lrvx_segment_validate(info[0].As<Napi::String>().Utf8Value().c_str()));
 }
 
 inline Napi::Value seg_validate_full(const Napi::CallbackInfo& info)
 {
+  lrvx_clear_last_error();
   auto r = lrvx_segment_validate_full(info[0].As<Napi::String>().Utf8Value().c_str(), 1, 1);
   auto o = Napi::Object::New(info.Env());
   o.Set("valid", (bool)r.valid);
@@ -1185,6 +1187,7 @@ inline Napi::Value seg_validate_dataset(const Napi::CallbackInfo& info)
 
 inline Napi::Value seg_merge(const Napi::CallbackInfo& info)
 {
+  lrvx_clear_last_error();
   return Napi::Boolean::New(info.Env(), lrvx_segment_merge(
                                             info[0].As<Napi::String>().Utf8Value().c_str(),
                                             info[1].As<Napi::String>().Utf8Value().c_str()));

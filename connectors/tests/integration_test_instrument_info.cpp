@@ -192,8 +192,8 @@ void expectVenueTick(const Connector& connector, const SymbolRegistry& registry,
   ASSERT_TRUE(spec);
   std::cout << "[" << exchange << " " << symbol.substr(0, 24) << "] registered tick "
             << info->tickSize.toString() << " (known=" << info->tickSizeKnown << "), lot "
-            << spec->lotSize.toString() << "; venue publishes tick "
-            << Price::fromRaw(tickRaw).toString() << ", lot "
+            << info->lotSize.toString() << " (spec " << spec->lotSize.toString()
+            << "); venue publishes tick " << Price::fromRaw(tickRaw).toString() << ", lot "
             << (lotRaw ? Quantity::fromRaw(*lotRaw).toString() : std::string("n/a")) << "\n";
   EXPECT_TRUE(info->tickSizeKnown);
   EXPECT_EQ(info->tickSize.raw(), tickRaw);
@@ -201,6 +201,14 @@ void expectVenueTick(const Connector& connector, const SymbolRegistry& registry,
   if (lotRaw)
   {
     EXPECT_EQ(spec->lotSize.raw(), *lotRaw);
+    EXPECT_EQ(info->lotSize.raw(), *lotRaw) << "the venue's lot reaches the registry entry";
+    EXPECT_EQ(orderLotRaw(*info), *lotRaw);
+  }
+  else
+  {
+    // The venue's response states no quantity step: none is declared.
+    EXPECT_EQ(info->lotSize.raw(), 0);
+    EXPECT_EQ(orderLotRaw(*info), 0);
   }
 }
 
@@ -219,6 +227,7 @@ void expectTickUnknown(const Connector& connector, const SymbolRegistry& registr
   ASSERT_TRUE(info);
   EXPECT_FALSE(info->tickSizeKnown);
   EXPECT_EQ(orderTickRaw(*info), 0) << "an unknown tick must not be declared as the placeholder";
+  EXPECT_EQ(orderLotRaw(*info), 0) << "and no lot is declared for it";
   EXPECT_FALSE(connector.instrumentSpec(symbol));
 }
 

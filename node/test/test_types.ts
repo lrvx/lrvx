@@ -123,6 +123,9 @@ const ib = new Uint8Array([1, 0, 1, 0, 1]);
 // ── Strategy / Runner ──────────────────────────────────────────────────
 const registry = new SymbolRegistry();
 const sym = registry.addSymbol("binance", "BTCUSDT", 0.01);
+const symWithLot = registry.addSymbol("binance", "ETHUSDT", 0.01, 0.001);
+const symLot: number | null = symWithLot.lotSize;
+void symLot;
 const _symId: number = sym.id;
 const _symName: string = sym.name;
 const _symCount: number = registry.symbolCount();

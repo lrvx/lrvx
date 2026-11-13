@@ -546,6 +546,7 @@ lrvx_rate_limit_policy_destroy|void|LrvxRateLimitPolicyHandle
 lrvx_rate_limit_policy_load_profile|int|LrvxRateLimitPolicyHandle|const char *
 lrvx_rate_limit_policy_set_ban|void|LrvxRateLimitPolicyHandle|uint32_t|int64_t
 lrvx_registry_add_symbol|uint32_t|LrvxRegistryHandle|const char *|const char *|double
+lrvx_registry_add_symbol_with_lot|uint32_t|LrvxRegistryHandle|const char *|const char *|double|double
 lrvx_registry_create|LrvxRegistryHandle
 lrvx_registry_destroy|void|LrvxRegistryHandle
 lrvx_registry_get_symbol_id|uint8_t|LrvxRegistryHandle|const char *|const char *|uint32_t *

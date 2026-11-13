@@ -334,6 +334,11 @@ void BitgetOrderExecutorT<Policies>::sendSubmitOrderWithLeverage(const Order& or
           publishRejection(order, offTick);
           return;
         }
+        if (const char* offLot = venue_price::offLotReason(order, *info2))
+        {
+          publishRejection(order, offLot);
+          return;
+        }
         const Price slPx = slPrice > 0 ? Price::fromDouble(slPrice) : Price{};
         const Price tpPx = tpPrice > 0 ? Price::fromDouble(tpPrice) : Price{};
         if (venue_price::isOffTick(slPx, *info2) || venue_price::isOffTick(tpPx, *info2))
@@ -518,6 +523,11 @@ void BitgetOrderExecutorT<Policies>::sendSubmitOrder(const Order& order)
   if (const char* offTick = venue_price::offTickReason(order, *info))
   {
     publishRejection(order, offTick);
+    return;
+  }
+  if (const char* offLot = venue_price::offLotReason(order, *info))
+  {
+    publishRejection(order, offLot);
     return;
   }
 
@@ -837,6 +847,11 @@ void BitgetOrderExecutorT<Policies>::sendReplaceOrder(OrderId oldId, const Order
   if (venue_price::isOffTick(newOrd.price, *info))
   {
     publishReplaceRejected(target, newOrd, kRejectPriceOffTick);
+    return;
+  }
+  if (const char* offLot = venue_price::offLotReason(newOrd, *info))
+  {
+    publishReplaceRejected(target, newOrd, offLot);
     return;
   }
 

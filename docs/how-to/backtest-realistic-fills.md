@@ -13,6 +13,7 @@ Six rules hold in every backtest, with or without a slippage profile or a queue 
 | A triggered stop or target cannot fill better than its trigger | It may fill worse — a sell stop armed at 95 on a bar that traded to 90 still books 90 — but a take-profit armed at 105 books 105, not the bar's high. |
 | A queue model fills on bars | A bar that trades strictly through a resting limit's price consumes that level's queue, per the configured model. A bar that only touches the price fills nothing. |
 | An order priced off the tick is rejected | A limit price, stop or take-profit trigger, or trailing distance that is not a whole number of the symbol's ticks is refused at submit with `REJECTED` and a reason (`price_off_tick`, `trigger_off_tick`, `trailing_offset_off_tick`), as a venue refuses it. A symbol registered without a tick is not checked. |
+| An order sized off the lot is rejected | When the symbol was registered with a quantity step (`lot_size` / `lotSize`), an order whose quantity is not a whole number of it is refused at submit with `REJECTED` and reason `quantity_off_lot`, and a modify with `REPLACE_REJECTED`. A symbol registered without a lot is not checked. |
 | Each run starts clean | A second `run()` / `run_bars()` on the same runner reports that run, not the sum of every run so far. Configuration survives; state does not. |
 
 A strategy that prices an exit from its fill, such as a take-profit at `entry * 1.005`, rounds the

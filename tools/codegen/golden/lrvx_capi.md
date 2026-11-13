@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 770 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
+**Surface:** 771 functions, 59 handles, 59 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
 
 ## Opaque handles
 
@@ -1806,6 +1806,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `LrvxRegistryHandle lrvx_registry_create(void)`
 - `void lrvx_registry_destroy(LrvxRegistryHandle registry)`
 - `uint32_t lrvx_registry_add_symbol(LrvxRegistryHandle registry, const char * exchange, const char * name, double tick_size)`
+- `uint32_t lrvx_registry_add_symbol_with_lot(LrvxRegistryHandle registry, const char * exchange, const char * name, double tick_size, double lot_size)`
 - `uint8_t lrvx_registry_get_symbol_id(LrvxRegistryHandle registry, const char * exchange, const char * name, uint32_t * id_out)`
 - `uint8_t lrvx_registry_get_symbol_name(LrvxRegistryHandle registry, uint32_t symbol_id, char * exchange_out, size_t exchange_len, char * name_out, size_t name_len)`
 - `uint32_t lrvx_registry_symbol_count(LrvxRegistryHandle registry)`

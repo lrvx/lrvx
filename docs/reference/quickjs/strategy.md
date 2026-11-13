@@ -166,6 +166,11 @@ against one. Other bindings register the venue's tick and a backtest rejects pri
 `rejectReason` `price_off_tick`, `trigger_off_tick` or `trailing_offset_off_tick`; see
 [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
 
+The same holds for quantities: the symbols declare no quantity step, so no order is rejected with
+`quantity_off_lot`. A host that registers the symbol itself before loading the script, with a tick
+or a lot, has both checked; see
+[SimulatedExecutor](../api/backtest/simulated_executor.md#order-quantities-and-the-lot).
+
 ### Order management
 
 ```javascript

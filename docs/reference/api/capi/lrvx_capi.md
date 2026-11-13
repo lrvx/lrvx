@@ -438,6 +438,12 @@ void               lrvx_registry_destroy(LrvxRegistryHandle registry);
 uint32_t lrvx_registry_add_symbol(LrvxRegistryHandle registry,
                                   const char* exchange, const char* name,
                                   double tick_size);
+// The same with the venue's quantity step. lot_size > 0 is declared and a
+// backtest rejects an order whose quantity is not a whole number of it
+// ("quantity_off_lot"); 0 declares none.
+uint32_t lrvx_registry_add_symbol_with_lot(LrvxRegistryHandle registry,
+                                           const char* exchange, const char* name,
+                                           double tick_size, double lot_size);
 
 uint8_t  lrvx_registry_get_symbol_id(LrvxRegistryHandle registry,
                                      const char* exchange, const char* name,
@@ -1262,7 +1268,10 @@ void lrvx_binary_log_recorder_hook_stats_p(void* hook, void* out);
 ## Segment operations
 
 ```c
-// Quick validate/merge
+// Quick validate/merge. validate returns 0 for a segment that fails its
+// checks and for a file it could not read; only the second leaves a reason in
+// lrvx_last_error_message. merge returns 0 when no segment was merged, with
+// the reason there.
 uint8_t lrvx_segment_validate(const char* path);
 uint8_t lrvx_segment_merge(const char* input_dir, const char* output_path);
 

@@ -14,7 +14,7 @@ const registry = new lrvx.SymbolRegistry();
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `addSymbol(exchange, name, tickSize?)` | `Symbol` | Register a symbol. `tickSize` is the venue's price increment and a backtest rejects orders priced off it; left out, the book uses 0.01 and order prices are not checked |
+| `addSymbol(exchange, name, tickSize?, lotSize?)` | `Symbol` | Register a symbol. `tickSize` is the venue's price increment and a backtest rejects orders priced off it; left out, the book uses 0.01 and order prices are not checked. `lotSize` is the venue's quantity step and a backtest rejects an order whose quantity is not a whole number of it; left out, quantities are not checked |
 | `symbolCount()` | `number` | Number of registered symbols |
 
 ### Symbol
@@ -27,6 +27,7 @@ Returned by `addSymbol`. Coerces to a number wherever a symbol ID is expected.
 | `name` | `string` | Symbol name |
 | `exchange` | `string` | Exchange name |
 | `tickSize` | `number` | Tick size |
+| `lotSize` | `number \| null` | Quantity step the symbol was registered with, `null` when none was given |
 
 ```javascript
 const btc = registry.addSymbol('binance', 'BTCUSDT', 0.01);
@@ -156,6 +157,8 @@ onBar(ctx, bar, emit) {
 ```
 
 In a backtest, a `limitBuy` / `limitSell` price that is not a whole number of the symbol's `tickSize` is rejected: `onOrderUpdate` receives `status` `"REJECTED"` with `rejectReason` `"price_off_tick"`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
+
+A quantity is checked when the symbol was registered with a quantity step, the fourth argument of `registry.addSymbol(exchange, name, tickSize, lotSize)`: an order whose quantity is not a whole number of `lotSize` is rejected with `rejectReason` `"quantity_off_lot"`, and an `emit.modify` to such a quantity gets `"REPLACE_REJECTED"`. Without `lotSize` quantities are not checked. The returned symbol carries it as `lotSize` (`null` when not given); a `lotSize` that is not positive throws a `RangeError`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-quantities-and-the-lot).
 
 ---
 

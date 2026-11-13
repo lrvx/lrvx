@@ -253,6 +253,9 @@ TEST(InstrumentInfoLoad, BybitRegistersTheVenueTick)
   EXPECT_EQ(info->tickSize.raw(), Price::fromDouble(0.1).raw());
   EXPECT_EQ(orderTickRaw(*info), Price::fromDouble(0.1).raw());
   EXPECT_EQ(connector.instrumentSpec("BTCUSDT")->lotSize.raw(), Quantity::fromDouble(0.001).raw());
+  EXPECT_EQ(info->lotSize.raw(), Quantity::fromDouble(0.001).raw())
+      << "the venue's qtyStep reaches the registry entry";
+  EXPECT_EQ(orderLotRaw(*info), Quantity::fromDouble(0.001).raw());
 }
 
 TEST(InstrumentInfoLoad, BitgetReadsFuturesAndSpotFromTheirOwnEndpoints)
@@ -485,6 +488,52 @@ TEST(InstrumentInfoLoad, ALoadedTickRefusesOffTickPricesLikeTheSimulator)
   EXPECT_EQ(rec.events[1].rejectReason, kRejectTriggerOffTick);
 }
 
+// The lot the same way: with it loaded, a quantity off the venue's step is
+// refused with the simulator's reason and an on-lot one goes out.
+TEST(InstrumentInfoLoad, ALoadedLotRefusesOffLotQuantitiesLikeTheSimulator)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  FixtureFetch fetch;
+  fetch.answers.push_back({"symbol=BTCUSDT", fixture("bybit_linear_btc.json")});
+
+  BybitConfig cfg;
+  cfg.publicEndpoint = "wss://unused.invalid";
+  cfg.instrumentInfoUrl = "https://fixture.invalid";
+  cfg.instrumentFetch = fetch.fn();
+  cfg.symbols = {{"BTCUSDT", InstrumentType::Future, BybitConfig::BookDepth::Top50}};
+  BybitExchangeConnector connector(cfg, &buses.book, &buses.trade, nullptr, &registry,
+                                   makeLogger("bybit_lot.log"));
+  connector.loadInstrumentSpecs();
+  const SymbolId sym = *registry.getSymbolId("bybit", "BTCUSDT");
+
+  BodyTransport transport;
+  auto client =
+      std::make_unique<AuthenticatedRestClient>("k", "s", "https://unused.invalid", &transport);
+  OrderTracker tracker;
+  OrderExecutionBus bus;
+  Rejections rec;
+  bus.subscribe(&rec);
+  bus.start();
+  BybitOrderExecutorT<NoPolicies> ex(std::move(client), &registry, &tracker);
+  ex.setOrderBus(&bus);
+
+  Order off = limitBuy(1, sym, 60000.1);
+  off.quantity = Quantity::fromDouble(0.0015);
+  ex.submitOrder(off);
+  Order on = limitBuy(2, sym, 60000.1);
+  on.quantity = Quantity::fromDouble(0.002);
+  ex.submitOrder(on);
+  bus.flush();
+  bus.stop();
+
+  ASSERT_EQ(transport.bodies.size(), 1u);
+  EXPECT_NE(transport.bodies[0].find(R"("orderLinkId":"2")"), std::string::npos);
+  ASSERT_EQ(rec.events.size(), 1u);
+  EXPECT_EQ(rec.events[0].status, OrderEventStatus::REJECTED);
+  EXPECT_EQ(rec.events[0].rejectReason, kRejectQuantityOffLot);
+}
+
 // ------------------------------------------------------------------ registered before start()
 
 namespace
@@ -645,6 +694,75 @@ TEST(InstrumentInfoPreRegistered, EveryVenueAppliesItsTick)
   EXPECT_EQ(orderTickRaw(*registry.getSymbolInfo(hlBtc)), Price::fromDouble(0.1).raw());
   EXPECT_EQ(orderTickRaw(*registry.getSymbolInfo(pmFine)), 100000);
   EXPECT_EQ(*registry.getSymbolId("polymarket", "FINE"), pmFine);
+
+  // And its lot, where the same response states one: Bitget's sizeMultiplier,
+  // Hyperliquid's 10^-szDecimals. Polymarket's tick-size answer has no size
+  // field, so that entry declares no lot.
+  EXPECT_EQ(orderLotRaw(*registry.getSymbolInfo(bitgetDoge)), Quantity::fromDouble(1).raw());
+  EXPECT_EQ(orderLotRaw(*registry.getSymbolInfo(hlBtc)), Quantity::fromDouble(0.00001).raw());
+  EXPECT_EQ(orderLotRaw(*registry.getSymbolInfo(pmFine)), 0);
+}
+
+// A declared lot equal to the venue's is left alone; one that differs is
+// kept and reported, naming both values.
+TEST(InstrumentInfoPreRegistered, ADeclaredLotIsKeptAndADifferenceReported)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  SymbolInfo info;
+  info.exchange = "bybit";
+  info.symbol = "BTCUSDT";
+  info.type = InstrumentType::Future;
+  info.lotSize = Quantity::fromDouble(0.001);
+  const SymbolId id = registry.registerSymbol(info);
+  {
+    FixtureFetch fetch;
+    BybitExchangeConnector connector(bybitBtcConfig(fetch), &buses.book, &buses.trade, nullptr,
+                                     &registry, makeLogger("bybit_prereg_lot_same.log"));
+    connector.loadInstrumentSpecs();
+    EXPECT_TRUE(connector.instrumentInfoError().empty()) << connector.instrumentInfoError();
+    EXPECT_EQ(registry.getSymbolInfo(id)->lotSize.raw(), Quantity::fromDouble(0.001).raw());
+  }
+
+  SymbolRegistry other;
+  info.lotSize = Quantity::fromDouble(0.01);
+  const SymbolId otherId = other.registerSymbol(info);
+  FixtureFetch fetch;
+  BybitExchangeConnector connector(bybitBtcConfig(fetch), &buses.book, &buses.trade, nullptr,
+                                   &other, makeLogger("bybit_prereg_lot_diff.log"));
+  connector.loadInstrumentSpecs();
+  EXPECT_EQ(other.getSymbolInfo(otherId)->lotSize.raw(), Quantity::fromDouble(0.01).raw());
+  EXPECT_EQ(orderTickRaw(*other.getSymbolInfo(otherId)), Price::fromDouble(0.1).raw())
+      << "the undeclared tick still takes the venue's";
+  const std::string err = connector.instrumentInfoError();
+  EXPECT_NE(err.find("BTCUSDT"), std::string::npos) << err;
+  EXPECT_NE(err.find("lot 0.010000"), std::string::npos) << err;
+  EXPECT_NE(err.find("0.001000"), std::string::npos) << err;
+  EXPECT_EQ(err.find("tick"), std::string::npos) << "only the lot disagrees: " << err;
+  EXPECT_EQ(connector.instrumentSpec("BTCUSDT")->lotSize.raw(), Quantity::fromDouble(0.001).raw());
+}
+
+// A tick and a lot that both disagree are one entry naming both.
+TEST(InstrumentInfoPreRegistered, ATickAndALotThatBothDifferShareOneEntry)
+{
+  Buses buses;
+  SymbolRegistry registry;
+  SymbolInfo info;
+  info.exchange = "bybit";
+  info.symbol = "BTCUSDT";
+  info.type = InstrumentType::Future;
+  info.tickSize = Price::fromDouble(0.5);
+  info.tickSizeKnown = true;
+  info.lotSize = Quantity::fromDouble(0.01);
+  registry.registerSymbol(info);
+  FixtureFetch fetch;
+  BybitExchangeConnector connector(bybitBtcConfig(fetch), &buses.book, &buses.trade, nullptr,
+                                   &registry, makeLogger("bybit_prereg_both.log"));
+  connector.loadInstrumentSpecs();
+  const std::string err = connector.instrumentInfoError();
+  EXPECT_NE(err.find("declares tick 0.500000"), std::string::npos) << err;
+  EXPECT_NE(err.find("declares lot 0.010000"), std::string::npos) << err;
+  EXPECT_EQ(err.find("BTCUSDT"), err.rfind("BTCUSDT")) << "one entry for the symbol: " << err;
 }
 
 // A declared tick equal to the venue's: nothing to do, nothing to report.

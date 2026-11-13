@@ -151,6 +151,12 @@ with the C function's name and names the file. Each of the three clears it on en
 the call did not fail; an extract that matched nothing returns `0` with `''`.
 `FundingSchedule.loadTape(path)` reports a file it could not open the same way.
 
+`validateSegment(path)`, `validate(path)` and `mergeSegments(inputDir, outputPath)` clear it on
+entry as well. `validateSegment` returns `false`, and `validate` returns `valid: false`, both for a
+segment that fails its checks and for a file that could not be read; only the unreadable file
+leaves a reason, so `''` means the segment was read and is not valid. `mergeSegments` returns
+`false` when no segment was merged, and `lastError()` says why.
+
 ```javascript
 if (!lrvx.recompress('in.lrvx', 'out.lrvx', 'lz4')) {
   console.error(lrvx.lastError());

@@ -171,6 +171,9 @@ add_codon_executable(codon_runner_strategy_ids_smoke
 add_codon_executable(codon_last_error_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/last_error_smoke.codon)
 
+add_codon_executable(codon_order_quantity_lot_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/order_quantity_lot_smoke.codon)
+
 # The documented backtest-and-live walkthrough. Built here because it was
 # broken for as long as nothing compiled it: it passed List[u32] where
 # Strategy.__init__ wants List[int], and its on_trade handed a Price to an

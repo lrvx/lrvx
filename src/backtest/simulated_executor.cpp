@@ -55,12 +55,14 @@ SimulatedExecutor::SimulatedExecutor(IClock& clock) : _clock(clock)
   _compositeLogic.setExecutor(this);
   _slippageSetFlat.fill(false);
   _orderTickFlat.fill(-1);
+  _orderLotFlat.fill(-1);
 }
 
 void SimulatedExecutor::setSymbolRegistry(const SymbolRegistry* registry)
 {
   _registry = registry;
   _orderTickFlat.fill(-1);
+  _orderLotFlat.fill(-1);
 }
 
 int64_t SimulatedExecutor::orderTickRaw(SymbolId symbol) const
@@ -86,6 +88,29 @@ int64_t SimulatedExecutor::orderTickRaw(SymbolId symbol) const
     _orderTickFlat[symbol] = tick;
   }
   return tick;
+}
+
+int64_t SimulatedExecutor::orderLotRaw(SymbolId symbol) const
+{
+  if (_registry == nullptr)
+  {
+    return 0;
+  }
+  if (symbol < kMaxSymbols && _orderLotFlat[symbol] >= 0)
+  {
+    return _orderLotFlat[symbol];
+  }
+  const auto info = _registry->getSymbolInfo(symbol);
+  if (!info)
+  {
+    return 0;
+  }
+  const int64_t lot = lrvx::orderLotRaw(*info);
+  if (symbol < kMaxSymbols)
+  {
+    _orderLotFlat[symbol] = lot;
+  }
+  return lot;
 }
 
 void SimulatedExecutor::emitRejected(const Order& order, const char* reason)
@@ -496,6 +521,12 @@ void SimulatedExecutor::submitOrder(const Order& order)
 
   // A venue refuses a price that is not a whole number of ticks.
   if (const char* why = offTickReason(order, orderTickRaw(accepted.symbol)))
+  {
+    emitRejected(accepted, why);
+    return;
+  }
+  // And a quantity that is not a whole number of lots.
+  if (const char* why = offLotReason(order, orderLotRaw(accepted.symbol)))
   {
     emitRejected(accepted, why);
     return;
@@ -1150,7 +1181,8 @@ void SimulatedExecutor::cancelAllOrdersAsync(SymbolId symbol)
 
 void SimulatedExecutor::replaceOrder(OrderId oldOrderId, const Order& newOrder)
 {
-  // An off-tick replacement is refused and the original order stays as it was.
+  // An off-tick or off-lot replacement is refused and the original order stays
+  // as it was.
   const int64_t tickRaw = orderTickRaw(newOrder.symbol);
   const char* why = offTickReason(newOrder, tickRaw);
   // A trailing stop is placed with an offset and no trigger; a replacement
@@ -1159,6 +1191,10 @@ void SimulatedExecutor::replaceOrder(OrderId oldOrderId, const Order& newOrder)
       newOrder.triggerPrice.raw() % tickRaw != 0)
   {
     why = kRejectTriggerOffTick;
+  }
+  if (why == nullptr)
+  {
+    why = offLotReason(newOrder, orderLotRaw(newOrder.symbol));
   }
   if (why != nullptr)
   {

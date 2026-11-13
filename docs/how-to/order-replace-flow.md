@@ -24,6 +24,7 @@ A replace is also refused, with or without an ack delay, when:
   filled or cancelled: reject_reason "unknown_order"
 - its price or trigger is off the symbol's tick: "price_off_tick" /
   "trigger_off_tick"
+- its quantity is off the symbol's declared lot: "quantity_off_lot"
 - it would turn an order still waiting on its trigger into another
   order type: "replace_changes_order_type"
 - the order triggered inside the ack window: "late_replace_after_trigger".

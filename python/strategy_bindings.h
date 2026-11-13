@@ -3003,6 +3003,8 @@ struct PySymbol
   std::string exchange;
   std::string name;
   double tick_size;
+  // The declared quantity step; None when the symbol was registered without.
+  std::optional<double> lot_size;
 
   std::string repr() const
   {
@@ -3018,6 +3020,7 @@ inline void bindStrategy(py::module_& m)
       .def_readonly("exchange", &PySymbol::exchange)
       .def_readonly("name", &PySymbol::name)
       .def_readonly("tick_size", &PySymbol::tick_size)
+      .def_readonly("lot_size", &PySymbol::lot_size, "The quantity step the symbol was registered with, or None.")
       .def("__repr__", &PySymbol::repr)
       .def("__str__", &PySymbol::repr)
       .def("__int__", [](const PySymbol& s)
@@ -3033,8 +3036,10 @@ inline void bindStrategy(py::module_& m)
       .def(py::init<>())
       // tick_size is the venue's price increment; a backtest refuses orders
       // priced off it. Left out, the symbol gets a 0.01 tick for its book and
-      // order prices are not checked.
-      .def("add_symbol", [](SymbolRegistry& reg, const std::string& exchange, const std::string& symbol, std::optional<double> tick_size) -> PySymbol
+      // order prices are not checked. lot_size is the venue's quantity step;
+      // a backtest refuses an order whose quantity is not a whole number of
+      // it. Left out, quantities are not checked.
+      .def("add_symbol", [](SymbolRegistry& reg, const std::string& exchange, const std::string& symbol, std::optional<double> tick_size, std::optional<double> lot_size) -> PySymbol
            {
              lrvx::SymbolInfo info;
              info.exchange  = exchange;
@@ -3044,8 +3049,16 @@ inline void bindStrategy(py::module_& m)
                info.tickSize = Price::fromDouble(*tick_size);
                info.tickSizeKnown = true;
              }
+             if (lot_size)
+             {
+               info.lotSize = Quantity::fromDouble(*lot_size);
+               if (info.lotSize.raw() <= 0)
+               {
+                 throw py::value_error("add_symbol: lot_size must be a positive quantity, got " + std::to_string(*lot_size));
+               }
+             }
              uint32_t id = static_cast<uint32_t>(reg.registerSymbol(info));
-             return PySymbol{id, exchange, symbol, info.tickSize.toDouble()}; }, py::arg("exchange"), py::arg("symbol"), py::arg("tick_size") = py::none())
+             return PySymbol{id, exchange, symbol, info.tickSize.toDouble(), lot_size ? std::optional<double>(info.lotSize.toDouble()) : std::nullopt}; }, py::arg("exchange"), py::arg("symbol"), py::arg("tick_size") = py::none(), py::arg("lot_size") = py::none(), "Register a symbol. tick_size is the venue's price increment and lot_size its quantity step; a backtest rejects an order priced off a given tick (price_off_tick) or sized off a given lot (quantity_off_lot). Left out, that side of the order is not checked.")
       .def("symbol_count", &SymbolRegistry::size);
 
   py::class_<PyTradeData>(m, "TradeData")

@@ -698,10 +698,11 @@ inline void bindBacktest(py::module_& m)
       .def(py::init<>())
       .def("set_symbol_registry", &PySimulatedExecutor::setSymbolRegistry, py::arg("registry"),
            py::keep_alive<1, 2>(),
-           "Read each symbol's tick from this registry. An order priced off a "
-           "known tick is rejected (reason price_off_tick, trigger_off_tick or "
-           "trailing_offset_off_tick), and slipped fills are snapped onto the "
-           "tick against the order's owner. Pass None to stop checking.")
+           "Read each symbol's tick and lot from this registry. An order priced "
+           "off a known tick is rejected (reason price_off_tick, trigger_off_tick "
+           "or trailing_offset_off_tick), one sized off a declared lot is rejected "
+           "(quantity_off_lot), and slipped fills are snapped onto the tick "
+           "against the order's owner. Pass None to stop checking.")
       .def("submit_order", &PySimulatedExecutor::submitOrder,
            "Submit an order to the simulated exchange. type: one of "
            "lrvx.ORDER_TYPE_NAMES (market|limit|stop_market|stop_limit|"

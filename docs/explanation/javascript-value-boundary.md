@@ -83,7 +83,10 @@ records listed above, these read as `BigInt`:
 - `Account.markTsFor()`
 
 In QuickJS the payments `__lrvx_funding_schedule_tick` returns carry
-`timestampNs` as a `BigInt` too.
+`timestampNs` as a `BigInt` too, `__lrvx_account_mark_ts` returns a `BigInt`,
+and `lrvx.validateDataset()` reports `firstTimestamp` and `lastTimestamp` as
+`BigInt`. `__lrvx_account_set_mark` and `__lrvx_liquidation_engine_on_marks`
+take their timestamp as a `BigInt` or a `Number`.
 
 On the write side the addon takes a `BigInt` or a `Number` wherever the
 argument is a clock reading, and uses a `BigInt` to the nanosecond:
