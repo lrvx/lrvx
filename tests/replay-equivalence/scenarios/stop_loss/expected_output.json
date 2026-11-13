@@ -1,4 +1,5 @@
 {
+  "cancel_count": 0,
   "fill_count": 2,
   "fills": [
     {
@@ -14,6 +15,7 @@
       "symbol": 1
     }
   ],
+  "modify_count": 0,
   "total_filled_quantity": 0.5,
   "trade_count": 7
 }
