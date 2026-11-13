@@ -2626,6 +2626,10 @@ class Runner:
         """
         Inject a touch-only frame. bid / ask are (price, qty) tuples; None means that side of the book is empty
         """
+    def on_order_event(self, order_id: typing.SupportsInt | typing.SupportsIndex, symbol: typing.Any, side: str, status: str, order_type: str = 'limit', fill_qty: typing.SupportsFloat | typing.SupportsIndex = 0.0, fill_price: typing.SupportsFloat | typing.SupportsIndex = 0.0, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0, reject_reason: str = '', is_maker: bool = False) -> None:
+        """
+        Report one order event a venue sent (a broker's order update or fill) to the strategy that issued the order, through the callbacks a backtest uses: PARTIALLY_FILLED and FILLED reach Strategy.on_fill(ctx, event) and only on_fill, every other status reaches Strategy.on_order_update(ctx, event). The runner's position tracker sees the event first, so ctx.position inside on_fill counts the fill. side is 'buy' or 'sell'; status and order_type are the names OrderEventData carries ('ACCEPTED', 'CANCELED', 'limit', ...); fill_qty and fill_price are this fill's own, not the order's running totals. An order id from no attached strategy's block goes to every strategy subscribed to the symbol. The callbacks run on the calling thread. ValueError for an unknown side, status or order type.
+        """
     def on_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
         ...
     def order_closed(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> None:

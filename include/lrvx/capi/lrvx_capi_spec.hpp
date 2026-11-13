@@ -3336,6 +3336,12 @@ extern "C"
   LRVX_EXPORT(group = "execution")
   void lrvx_live_engine_order_closed(LrvxLiveEngineHandle engine, uint64_t order_id);
 
+  // The engine's counterpart of lrvx_runner_on_order_event. The callbacks
+  // run on the calling thread, not on a strategy's consumer thread.
+  LRVX_EXPORT(group = "execution")
+  void lrvx_live_engine_on_order_event(LrvxLiveEngineHandle engine,
+                                       const LrvxOrderEventData* event);
+
   LRVX_EXPORT(group = "lrvxliveengine_disruptor")
   void lrvx_live_engine_start(LrvxLiveEngineHandle engine);
   LRVX_EXPORT(group = "lrvxliveengine_disruptor")
@@ -3482,6 +3488,27 @@ extern "C"
   // lrvx_clear_last_error first and read lrvx_last_error_code after.
   LRVX_EXPORT(group = "execution")
   void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id);
+
+  // Reports one order event a venue sent (a broker's order update or fill)
+  // to the strategies of this runner, the way the backtest runner delivers
+  // its simulator's: the runner's position tracker sees it first, then the
+  // strategy's on_fill for PARTIALLY_FILLED and FILLED (and only on_fill),
+  // on_order_update for every other status, with the same LrvxSymbolContext
+  // and LrvxOrderEventData. So the position an on_fill reads already counts
+  // the fill, and a strategy written for a backtest hears of its live orders
+  // through the same callbacks.
+  //
+  // event->status is an lrvx::OrderEventStatus code and event->order_type an
+  // lrvx::OrderType code, as in the events a strategy receives; fill_qty_raw
+  // and fill_price_raw are this fill's own quantity and price, not the
+  // order's running totals. The strategy that issued the order (its id is
+  // order_id >> 32) receives the event; an id from no attached strategy's
+  // block goes to every strategy subscribed to the symbol. Runs the
+  // callbacks on the calling thread. A status, side or order type outside
+  // its range is refused: nothing is delivered and the reason is in
+  // lrvx_last_error_message.
+  LRVX_EXPORT(group = "execution")
+  void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventData* event);
 
   LRVX_EXPORT(group = "strategyrunner_synchronous")
   void lrvx_runner_start(LrvxRunnerHandle runner);

@@ -68,8 +68,12 @@ class __PROJECT_SLUG___strategy(lrvx.Strategy):
         elif f < s and ctx.is_long():
             self.market_sell(self.qty)
 
-    def on_order_update(self, sym, status, filled, avg):
-        logger.info("order %s %s filled=%s avg=%s", sym, status, filled, avg)
+    def on_fill(self, ctx, event):
+        logger.info("order %s %s %s @ %s position=%s", event.order_id, event.status,
+                    event.fill_qty, event.fill_price, ctx.position)
+
+    def on_order_update(self, ctx, event):
+        logger.info("order %s %s", event.order_id, event.status)
 
     def on_initial_position(self, sym, qty, avg):
         logger.warning("starting with non-zero position on %s: qty=%s avg=%s",

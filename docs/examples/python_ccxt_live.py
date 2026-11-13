@@ -64,8 +64,12 @@ class SMAStrategy(lrvx.Strategy):
         elif f < s and ctx.is_long():
             self.market_sell(0.001)
 
-    def on_order_update(self, sym, status, filled, avg):
-        print(f"  order {sym} status={status} filled={filled} avg={avg}")
+    def on_fill(self, ctx, event):
+        print(f"  order {event.order_id} {event.status} {event.fill_qty} @ {event.fill_price}"
+              f" position={ctx.position}")
+
+    def on_order_update(self, ctx, event):
+        print(f"  order {event.order_id} status={event.status}")
 
     def on_initial_position(self, sym, qty, avg):
         print(f"  starting position on {sym}: qty={qty} avg={avg}")
@@ -84,7 +88,8 @@ async def main():
         btc = await broker.add_symbol("BTC/USDT")
         broker.add_strategy(SMAStrategy([btc]))
         try:
-            await broker.run(streams=("trades", "orders") if not DRY_RUN else ("trades",))
+            # The broker opens the orders stream itself when it places an order.
+            await broker.run(streams=("trades",))
         except (KeyboardInterrupt, asyncio.CancelledError):
             pass
 

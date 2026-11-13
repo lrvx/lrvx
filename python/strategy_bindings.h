@@ -170,9 +170,47 @@ struct PyOrderEventData
   int32_t distance_to_best_ticks{0};
 };
 
+// Anything but "buy" used to be a sell, and anything but "ioc", "fok" or
+// "post_only" a GTC order: a typo placed an order nobody asked for.
 inline Side parseSide(const std::string& s)
 {
-  return (s == "buy") ? Side::BUY : Side::SELL;
+  if (s == "buy")
+  {
+    return Side::BUY;
+  }
+  if (s == "sell")
+  {
+    return Side::SELL;
+  }
+  throw py::value_error("unknown side '" + s + "'; expected 'buy' or 'sell'");
+}
+
+inline TimeInForce parseTimeInForce(const std::string& tif)
+{
+  if (tif == "gtc")
+  {
+    return TimeInForce::GTC;
+  }
+  if (tif == "ioc")
+  {
+    return TimeInForce::IOC;
+  }
+  if (tif == "fok")
+  {
+    return TimeInForce::FOK;
+  }
+  if (tif == "post_only")
+  {
+    return TimeInForce::POST_ONLY;
+  }
+  if (tif == "gtd")
+  {
+    throw py::value_error(
+        "tif 'gtd' needs an expiry time, which this method does not take; "
+        "expected 'gtc', 'ioc', 'fok' or 'post_only'");
+  }
+  throw py::value_error("unknown tif '" + tif +
+                        "'; expected 'gtc', 'ioc', 'fok' or 'post_only'");
 }
 
 class PyStrategyBase
@@ -353,19 +391,7 @@ class PyStrategyBase
     {
       return 0;
     }
-    TimeInForce t = TimeInForce::GTC;
-    if (tif == "ioc")
-    {
-      t = TimeInForce::IOC;
-    }
-    else if (tif == "fok")
-    {
-      t = TimeInForce::FOK;
-    }
-    else if (tif == "post_only")
-    {
-      t = TimeInForce::POST_ONLY;
-    }
+    const TimeInForce t = parseTimeInForce(tif);
     return emitting()->publicEmitLimitBuyTif(symbol, Price::fromDouble(price),
                                              Quantity::fromDouble(qty), t);
   }
@@ -376,19 +402,7 @@ class PyStrategyBase
     {
       return 0;
     }
-    TimeInForce t = TimeInForce::GTC;
-    if (tif == "ioc")
-    {
-      t = TimeInForce::IOC;
-    }
-    else if (tif == "fok")
-    {
-      t = TimeInForce::FOK;
-    }
-    else if (tif == "post_only")
-    {
-      t = TimeInForce::POST_ONLY;
-    }
+    const TimeInForce t = parseTimeInForce(tif);
     return emitting()->publicEmitLimitSellTif(symbol, Price::fromDouble(price),
                                               Quantity::fromDouble(qty), t);
   }
@@ -1383,6 +1397,7 @@ class PyStrategyRunner
   }
 
   void order_closed(uint64_t order_id) { lrvx_runner_order_closed(_runner, order_id); }
+  void on_order_event(const LrvxOrderEventData& ev) { lrvx_runner_on_order_event(_runner, &ev); }
 
   void set_executor(std::shared_ptr<lrvx::PyExecutor> exec)
   {
@@ -1726,6 +1741,10 @@ class PyLiveEngine
   }
 
   void order_closed(uint64_t order_id) { lrvx_live_engine_order_closed(_engine, order_id); }
+  void on_order_event(const LrvxOrderEventData& ev)
+  {
+    lrvx_live_engine_on_order_event(_engine, &ev);
+  }
 
   void set_executor(std::shared_ptr<lrvx::PyExecutor> exec)
   {
@@ -1869,6 +1888,69 @@ class PyRunner
     else
     {
       _sync->order_closed(order_id);
+    }
+  }
+
+  // One order event a venue reported, in the words a strategy's on_fill and
+  // on_order_update read them back in.
+  void on_order_event(uint64_t order_id, uint32_t symbol, const std::string& side,
+                      const std::string& status, const std::string& order_type, double fill_qty,
+                      double fill_price, int64_t ts_ns, const std::string& reject_reason,
+                      bool is_maker)
+  {
+    LrvxOrderEventData ev{};
+    ev.order_id = order_id;
+    ev.symbol_id = symbol;
+    ev.side = parseSide(side) == Side::BUY ? 0 : 1;
+    if (!lrvx::capi::orderTypeCodeFromName(order_type, &ev.order_type))
+    {
+      throw py::value_error("Runner.on_order_event: " +
+                            lrvx::capi::unknownOrderTypeMessage(order_type));
+    }
+    bool known = false;
+    std::string names;
+    for (uint8_t code = 0; code <= static_cast<uint8_t>(OrderEventStatus::REPLACED_GAS); ++code)
+    {
+      const char* name = PyStrategyHost::orderStatusName(code);
+      if (status == name && status != "UNKNOWN")
+      {
+        ev.status = code;
+        known = true;
+        break;
+      }
+      if (std::string(name) != "UNKNOWN")
+      {
+        names += names.empty() ? "" : ", ";
+        names += name;
+      }
+    }
+    if (!known)
+    {
+      throw py::value_error("Runner.on_order_event: unknown status '" + status +
+                            "'; expected one of: " + names);
+    }
+    ev.fill_qty_raw = Quantity::fromDouble(fill_qty).raw();
+    ev.fill_price_raw = Price::fromDouble(fill_price).raw();
+    ev.exchange_ts_ns = ts_ns;
+    ev.reject_reason = reject_reason.empty() ? nullptr : reject_reason.c_str();
+    ev.is_maker = is_maker ? 1 : 0;
+    const bool fill = status == "FILLED" || status == "PARTIALLY_FILLED";
+    if (fill)
+    {
+      ev.last_fill_at_ns = ts_ns;
+    }
+    lrvx_clear_last_error();
+    if (_live)
+    {
+      _live->on_order_event(ev);
+    }
+    else
+    {
+      _sync->on_order_event(ev);
+    }
+    if (lrvx_last_error_code() != 0)
+    {
+      throw std::runtime_error(std::string("Runner.on_order_event: ") + lrvx_last_error_message());
     }
   }
 
@@ -3511,6 +3593,19 @@ inline void bindStrategy(py::module_& m)
            "that is not on record is ignored; market, IOC and FOK orders are never kept. A "
            "modify that names an id not on record is not sent to the executor, and "
            "lrvx.last_error() then says why, ending in [unknown_order].")
+      .def("on_order_event", [](PyRunner& r, uint64_t order_id, py::object sym, const std::string& side, const std::string& status, const std::string& order_type, double fill_qty, double fill_price, int64_t ts_ns, const std::string& reject_reason, bool is_maker)
+           { r.on_order_event(order_id, symId(sym), side, status, order_type, fill_qty,
+                              fill_price, ts_ns, reject_reason, is_maker); }, py::arg("order_id"), py::arg("symbol"), py::arg("side"), py::arg("status"), py::arg("order_type") = "limit", py::arg("fill_qty") = 0.0, py::arg("fill_price") = 0.0, py::arg("ts_ns") = 0, py::arg("reject_reason") = "", py::arg("is_maker") = false,
+           "Report one order event a venue sent (a broker's order update or fill) to the "
+           "strategy that issued the order, through the callbacks a backtest uses: "
+           "PARTIALLY_FILLED and FILLED reach Strategy.on_fill(ctx, event) and only on_fill, "
+           "every other status reaches Strategy.on_order_update(ctx, event). The runner's "
+           "position tracker sees the event first, so ctx.position inside on_fill counts the "
+           "fill. side is 'buy' or 'sell'; status and order_type are the names OrderEventData "
+           "carries ('ACCEPTED', 'CANCELED', 'limit', ...); fill_qty and fill_price are this "
+           "fill's own, not the order's running totals. An order id from no attached "
+           "strategy's block goes to every strategy subscribed to the symbol. The callbacks run "
+           "on the calling thread. ValueError for an unknown side, status or order type.")
       .def("attach_trace_recorder", [](PyRunner& r, py::object recorder)
            {
              // Accepts a lrvx.TraceRecorder or None. The TraceRecorder

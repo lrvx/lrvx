@@ -673,6 +673,17 @@ What is put to the gates depends on what runs the strategy:
 
 The Python, Node, QuickJS and Codon emit methods clear the last error on entry themselves.
 
+`lrvx_runner_on_order_event(runner, event)` and `lrvx_live_engine_on_order_event(engine, event)`
+report one order event a venue sent (a broker's order update or fill) to the strategies, the way the
+backtest runner delivers its simulator's. The runner's position tracker sees the event first; then
+`on_fill` fires for `PARTIALLY_FILLED` and `FILLED` (and only `on_fill`) and `on_order_update` for
+every other status, with the same `LrvxSymbolContext` and `LrvxOrderEventData` a backtest passes, so
+the position an `on_fill` reads counts the fill. `event->status` is an `lrvx::OrderEventStatus` code
+and `event->order_type` an `lrvx::OrderType` code; `fill_qty_raw` / `fill_price_raw` are this fill's
+own. The strategy whose id is `order_id >> 32` receives the event; an id from no attached strategy's
+block goes to every strategy subscribed to the symbol. The callbacks run on the calling thread. A
+status, side or order type out of range delivers nothing and leaves the reason in the last error.
+
 The record a runner or a live engine keeps of the orders it forwarded to an executor treats the two
 legs of an OCO as one: a cancel of either leg, or `lrvx_runner_order_closed` /
 `lrvx_live_engine_order_closed` with either leg's id, drops both, because the venue cancels the other

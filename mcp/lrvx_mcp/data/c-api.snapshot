@@ -370,6 +370,7 @@ lrvx_liquidation_engine_ticks_to_first_adl|uint64_t|LrvxLiquidationEngineHandle
 lrvx_live_engine_add_strategy|void|LrvxLiveEngineHandle|LrvxStrategyHandle|LrvxOnSignalCallback|void *
 lrvx_live_engine_create|LrvxLiveEngineHandle|LrvxRegistryHandle
 lrvx_live_engine_destroy|void|LrvxLiveEngineHandle
+lrvx_live_engine_on_order_event|void|LrvxLiveEngineHandle|const LrvxOrderEventData *
 lrvx_live_engine_order_closed|void|LrvxLiveEngineHandle|uint64_t
 lrvx_live_engine_publish_bar|void|LrvxLiveEngineHandle|uint32_t|uint8_t|uint64_t|double|double|double|double|double|double|int64_t|int64_t|uint8_t
 lrvx_live_engine_publish_book_snapshot|void|LrvxLiveEngineHandle|uint32_t|const double *|const double *|uint32_t|const double *|const double *|uint32_t|int64_t
@@ -598,6 +599,7 @@ lrvx_runner_destroy|void|LrvxRunnerHandle
 lrvx_runner_on_bar|void|LrvxRunnerHandle|uint32_t|uint8_t|uint64_t|double|double|double|double|double|double|int64_t|int64_t|uint8_t
 lrvx_runner_on_book_snapshot|void|LrvxRunnerHandle|uint32_t|const double *|const double *|uint32_t|const double *|const double *|uint32_t|int64_t
 lrvx_runner_on_book_top|void|LrvxRunnerHandle|uint32_t|uint8_t|double|double|uint8_t|double|double|int64_t
+lrvx_runner_on_order_event|void|LrvxRunnerHandle|const LrvxOrderEventData *
 lrvx_runner_on_trade|void|LrvxRunnerHandle|uint32_t|double|double|uint8_t|int64_t
 lrvx_runner_order_closed|void|LrvxRunnerHandle|uint64_t
 lrvx_runner_set_executor|void|LrvxRunnerHandle|LrvxExecutorHandle

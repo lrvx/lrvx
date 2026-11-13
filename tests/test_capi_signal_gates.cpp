@@ -14,6 +14,7 @@
 
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/common.h"
+#include "lrvx/execution/events/order_event.h"
 
 #include <gtest/gtest.h>
 
@@ -402,5 +403,167 @@ TEST(SegmentSize, AMegabyteCountThatOverflowsIsRefused)
   }
   std::filesystem::remove_all(dir);
 }
+
+// What a strategy heard of its orders, per callback.
+struct Heard
+{
+  struct Event
+  {
+    uint64_t order;
+    uint8_t status;
+    int64_t qty;
+    int64_t position;
+  };
+  std::vector<Event> fills;
+  std::vector<Event> updates;
+
+  static void onFill(void* ud, const LrvxSymbolContext* ctx, const LrvxOrderEventData* ev)
+  {
+    static_cast<Heard*>(ud)->fills.push_back(
+        {ev->order_id, ev->status, ev->fill_qty_raw, ctx->position_raw});
+  }
+  static void onUpdate(void* ud, const LrvxSymbolContext* ctx, const LrvxOrderEventData* ev)
+  {
+    static_cast<Heard*>(ud)->updates.push_back(
+        {ev->order_id, ev->status, ev->fill_qty_raw, ctx->position_raw});
+  }
+};
+
+// A runner and a live engine had no way to tell a strategy of a live order's
+// fill: on_fill and on_order_update fired in a backtest only.
+class ReportedOrderEvent : public ::testing::TestWithParam<bool>
+{
+ protected:
+  void SetUp() override
+  {
+    registry = lrvx_registry_create();
+    symbol = lrvx_registry_add_symbol(registry, "test", "BTC", 0.01);
+    uint32_t syms[] = {symbol};
+    for (int i = 0; i < 2; ++i)
+    {
+      LrvxStrategyCallbacks scb{};
+      scb.on_fill = &Heard::onFill;
+      scb.on_order_update = &Heard::onUpdate;
+      scb.user_data = &heard[i];
+      strategies[i] = lrvx_strategy_create(static_cast<uint32_t>(i + 1), syms, 1, registry, scb);
+    }
+    if (GetParam())
+    {
+      engine = lrvx_live_engine_create(registry);
+      lrvx_live_engine_add_strategy(engine, strategies[0], nullptr, nullptr);
+      lrvx_live_engine_add_strategy(engine, strategies[1], nullptr, nullptr);
+    }
+    else
+    {
+      runner = lrvx_runner_create(registry, nullptr, nullptr);
+      lrvx_runner_add_strategy(runner, strategies[0]);
+      lrvx_runner_add_strategy(runner, strategies[1]);
+    }
+    lrvx_clear_last_error();
+  }
+  void TearDown() override
+  {
+    if (runner != nullptr)
+    {
+      lrvx_runner_destroy(runner);
+    }
+    if (engine != nullptr)
+    {
+      lrvx_live_engine_destroy(engine);
+    }
+    // After the runner: a strategy keeps the position tracker it was given.
+    EXPECT_EQ(lrvx_position_raw(strategies[1], symbol), positionAtTheEnd);
+    lrvx_strategy_destroy(strategies[0]);
+    lrvx_strategy_destroy(strategies[1]);
+    lrvx_registry_destroy(registry);
+    lrvx_clear_last_error();
+  }
+
+  void report(uint64_t order, lrvx::OrderEventStatus status, int64_t qty = 0)
+  {
+    LrvxOrderEventData ev{};
+    ev.order_id = order;
+    ev.symbol_id = symbol;
+    ev.side = 0;
+    ev.order_type = static_cast<uint8_t>(lrvx::OrderType::LIMIT);
+    ev.status = static_cast<uint8_t>(status);
+    ev.fill_qty_raw = qty;
+    ev.fill_price_raw = kPrice;
+    deliver(ev);
+  }
+  void deliver(const LrvxOrderEventData& ev)
+  {
+    if (engine != nullptr)
+    {
+      lrvx_live_engine_on_order_event(engine, &ev);
+    }
+    else
+    {
+      lrvx_runner_on_order_event(runner, &ev);
+    }
+  }
+
+  Heard heard[2];
+  LrvxStrategyHandle strategies[2]{nullptr, nullptr};
+  LrvxRegistryHandle registry{nullptr};
+  LrvxRunnerHandle runner{nullptr};
+  LrvxLiveEngineHandle engine{nullptr};
+  uint32_t symbol{0};
+  int64_t positionAtTheEnd{0};
+};
+
+TEST_P(ReportedOrderEvent, ReachesTheStrategyThatIssuedTheOrderThroughTheBacktestCallbacks)
+{
+  using Status = lrvx::OrderEventStatus;
+  const uint64_t ofSecond = lrvx_emit_limit_buy(strategies[1], symbol, kPrice, kQty);
+  ASSERT_EQ(ofSecond >> 32, 2u);
+
+  report(ofSecond, Status::ACCEPTED);
+  report(ofSecond, Status::PARTIALLY_FILLED, 100000000LL);
+  report(ofSecond, Status::FILLED, 200000000LL);
+
+  EXPECT_TRUE(heard[0].fills.empty() && heard[0].updates.empty())
+      << "the other strategy's order is not this one's";
+  ASSERT_EQ(heard[1].updates.size(), 1u);
+  EXPECT_EQ(heard[1].updates[0].status, static_cast<uint8_t>(Status::ACCEPTED));
+  ASSERT_EQ(heard[1].fills.size(), 2u) << "fills reach on_fill and only on_fill";
+  EXPECT_EQ(heard[1].fills[0].qty, 100000000LL);
+  EXPECT_EQ(heard[1].fills[0].position, 100000000LL) << "the context counts the fill";
+  EXPECT_EQ(heard[1].fills[1].position, 300000000LL);
+
+  // An order no attached strategy issued goes to every subscriber.
+  report(77, Status::CANCELED);
+  EXPECT_EQ(heard[0].updates.size(), 1u);
+  EXPECT_EQ(heard[1].updates.size(), 2u);
+  positionAtTheEnd = 300000000LL;
+}
+
+TEST_P(ReportedOrderEvent, AStatusSideOrTypeOutOfRangeIsRefused)
+{
+  LrvxOrderEventData ev{};
+  ev.order_id = (uint64_t{1} << 32) + 1;
+  ev.symbol_id = symbol;
+  ev.status = 200;
+  deliver(ev);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("status 200"), std::string::npos)
+      << lrvx_last_error_message();
+
+  ev.status = static_cast<uint8_t>(lrvx::OrderEventStatus::FILLED);
+  ev.side = 7;
+  lrvx_clear_last_error();
+  deliver(ev);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("side 7"), std::string::npos)
+      << lrvx_last_error_message();
+
+  ev.side = 1;
+  ev.order_type = 99;
+  lrvx_clear_last_error();
+  deliver(ev);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("order_type 99"), std::string::npos)
+      << lrvx_last_error_message();
+  EXPECT_TRUE(heard[0].fills.empty() && heard[0].updates.empty());
+}
+
+INSTANTIATE_TEST_SUITE_P(RunnerAndLiveEngine, ReportedOrderEvent, ::testing::Bool());
 
 }  // namespace

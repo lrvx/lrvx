@@ -7794,6 +7794,21 @@
     },
     {
       "group": "execution",
+      "name": "lrvx_live_engine_on_order_event",
+      "params": [
+        {
+          "name": "engine",
+          "type": "LrvxLiveEngineHandle"
+        },
+        {
+          "name": "event",
+          "type": "const LrvxOrderEventData *"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "execution",
       "name": "lrvx_live_engine_order_closed",
       "params": [
         {
@@ -12042,6 +12057,21 @@
         {
           "name": "exchange_ts_ns",
           "type": "int64_t"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "execution",
+      "name": "lrvx_runner_on_order_event",
+      "params": [
+        {
+          "name": "runner",
+          "type": "LrvxRunnerHandle"
+        },
+        {
+          "name": "event",
+          "type": "const LrvxOrderEventData *"
         }
       ],
       "return_type": "void"
