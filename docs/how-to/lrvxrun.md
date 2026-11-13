@@ -240,6 +240,15 @@ parameter). The id is stored the way a captured one is, and an id below 2^32 wri
 bytes as before. Python used to raise `TypeError` for an id of 2^32 or more; Node, QuickJS and
 Codon wrote its low 32 bits.
 
+The QuickJS writers check what they are given at the native boundary, as the Node ones do. An id
+(`signalId`, `orderId`, `parentSignalId`, `fillId`) is a non-negative integer Number, exact up to
+2^53, or a BigInt below 2^64; a raw value or a clock reading (`priceRaw`, `qtyRaw`, `feeRaw`,
+`strengthRaw`, `runTsNs`, `feedTsNs`) is an integer Number within 2^53 or a BigInt that fits 64
+signed bits; `symbolId`, `flags`, `side`, `eventKind`, `orderType` and `liquidity` are integers
+from 0 to 2^32 - 1. Anything else throws a `TypeError` naming the member (`writeFill: orderId must
+be ...`) and no record is written. `NaN` and a string used to be written as 0, a fraction
+truncated, a negative id as an id near 2^64 and a BigInt past 64 bits wrapped.
+
 The Codon reader returns the same records: `read_all_signals()`, `read_all_order_events()` and
 `read_all_fills()` give lists of `TraceSignal`, `TraceOrderEvent` and `TraceFill` with the fields
 above as attributes, next to `strategy_id()`, `strategy_hash()`, `tape_ref_paths()` and `counts()`.

@@ -18800,6 +18800,12 @@ this.lastPrice()
 this.orderStatus(orderId)   // -1 if not found
 ```
 
+`orderStatus`, like `cancel` and `modify`, takes the order id an order method returned, as a
+Number or a BigInt, and throws a `TypeError` for anything else. The check is made natively as well
+as in the wrapper: the `__lrvx_emit_cancel`, `__lrvx_emit_modify` and `__lrvx_get_order_status`
+globals under these methods used to take `NaN`, a fraction, a negative or a string for whatever
+integer it converted to.
+
 `bestBid`, `bestAsk` and `midPrice` return `null` for an empty side, never a
 number. A price below zero is a quote -- WTI settled at -37.63 in April 2020,
 day-ahead power clears below zero -- and so is a price of exactly 0, so no
