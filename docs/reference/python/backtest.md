@@ -72,6 +72,21 @@ Cancel an order by ID.
 
 Cancel all orders for a symbol.
 
+#### `modify_order(order_id, new_price, new_quantity, symbol)`
+
+Replace a working order with a new price and quantity, the way a Modify signal
+does in `BacktestRunner`. A `stop_market`, `tp_market` or `trailing_stop` order
+gets `new_price` as its trigger; any other order gets it as its limit.
+`new_quantity` is what is left to work. An off-tick replacement, or an id that
+is no longer working, is refused and the order is left as it was. `symbol` is
+used only when the simulator does not hold the order.
+
+#### `order_is_live(order_id)`
+
+`True` while the simulator still holds the order: resting, waiting on its
+trigger, or held for the next bar. `False` once it is filled, cancelled,
+rejected or expired, and for an id it never saw.
+
 #### `on_bar(symbol, close_price)`
 
 Feed a bar close price for order matching. Limit orders are matched against this price.

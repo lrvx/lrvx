@@ -39535,6 +39535,11 @@
         },
         {
           "kind": "method",
+          "name": "modify_order",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
           "name": "on_bar",
           "parent": "SimulatedExecutor"
         },
@@ -39566,6 +39571,11 @@
         {
           "kind": "method",
           "name": "on_trade_qty",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "order_is_live",
           "parent": "SimulatedExecutor"
         },
         {

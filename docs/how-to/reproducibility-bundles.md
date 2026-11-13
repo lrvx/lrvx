@@ -66,7 +66,7 @@ Replay plus a strict comparison against the recorded `expected_output.json`. Exi
 
 ## What's compared
 
-The validator checks `trade_count`, `fill_count`, the per-fill `(symbol, side, price, quantity)` tuples in order, and `total_filled_quantity`. The JSON summary carries no order ids; for a bundle packed now they are compared in the trace (below).
+The validator checks `trade_count`, `fill_count`, the per-fill `(symbol, side, price, quantity)` tuples in order, and `total_filled_quantity`, plus `cancel_count` and `modify_count` for a bundle that replays cancels and modifies (see [Cancels and modifies](#cancels-and-modifies)). The JSON summary carries no order ids; for a bundle packed now they are compared in the trace (below).
 
 It also recomputes `strategy_sha256` and `tape_sha256` from what was actually extracted and re-hashes the running engine's version, then compares all three against the values the manifest recorded at pack time. This catches a bundle whose `strategy.py` or tape changed after packing, even if `expected_output.json` was re-recorded to match the new content. It is not a substitute for signing: the manifest lives unsigned in the same archive it describes, so a party who edits the strategy can recompute these hashes too. What it does catch is accidental drift and an engine-version mismatch, which is the common case this format exists for.
 
@@ -74,7 +74,7 @@ When the bundle ships an `expected.lrvxrun/` trace, the validator also compares 
 
 | Bundle | Expected trace holds | Compared | `lrvxrun_compared` |
 |--------|----------------------|----------|--------------------|
-| Manifest has `lrvxrun_records_comparable: true` (every bundle packed now) | one signal and one submit order event per order the strategy sent, one fill per fill | the three counts below, and every record in order, field by field, except `run_ts_ns`: `lrvxrun_signals`, `lrvxrun_order_events`, `lrvxrun_fills` | `signal, order event and fill records` |
+| Manifest has `lrvxrun_records_comparable: true` (every bundle packed now) | one signal and one submit order event per order the strategy sent, the cancel and modify records of a bundle with `cancels_and_modifies_routed` (see [Cancels and modifies](#cancels-and-modifies)), one fill per fill | the three counts below, and every record in order, field by field, except `run_ts_ns`: `lrvxrun_signals`, `lrvxrun_order_events`, `lrvxrun_fills` | `signal, order event and fill records` |
 | Manifest has `lrvxrun_signals_recorded: true` but not `lrvxrun_records_comparable` | the same three record kinds | `lrvxrun_signal_count`, `lrvxrun_order_count`, `lrvxrun_fill_count` | `signals, order events, fills` |
 | No `lrvxrun_signals_recorded`, and the trace has at least one signal or order event | the same three record kinds | the same three counts | `signals, order events, fills` |
 | No `lrvxrun_signals_recorded`, and the trace has no signal and no order event | fills only | `lrvxrun_fill_count` | `fills` |
@@ -120,9 +120,22 @@ class MyStrategy(lrvx.Strategy):
 
 Strategy state should reset every run (no global side effects, no clock dependencies, no random-without-seed). If your strategy uses `random`, seed it from the trade timestamp or pin a seed in the strategy code.
 
+## Cancels and modifies
+
+A strategy's `cancel_order`, `cancel_all_orders` and `modify_order` reach the simulator in a bundle the same way they do in `BacktestRunner`: a cancel goes to `SimulatedExecutor.cancel_order`, a cancel-all to `cancel_all` for the bundle's symbol, and a modify to `modify_order`. For a modify, the new price becomes the trigger of a `stop_market`, `tp_market` or `trailing_stop` order and the limit of any other order, and the new quantity is what is left to work. An off-tick modify, or one naming an order that is no longer working, is refused and leaves the order as it was. A cancelled order no longer fills, and a modified one fills at its new price and size, at pack and at every replay.
+
+Each one is recorded in the trace beside the run's submits:
+
+- a signal named `cancel`, `cancel_all` or `modify`, whose `signal_id64` is the order's id (0 for a cancel-all);
+- an order event with the order's id for each order the signal acted on: `CANCEL` for each order the simulator still held when a cancel or cancel-all came, with the order's side, type, price and quantity as last sent; `MODIFY` with the new price and quantity when the simulator took the replacement. A cancel of an order that has already filled or been cancelled, and a refused modify, write the signal and no order event.
+
+`expected_output.json` counts them as `cancel_count` (orders cancelled, by a cancel or a cancel-all) and `modify_count` (replacements the simulator took), and validate compares both, along with the records.
+
+The manifest of a bundle packed this way has `cancels_and_modifies_routed: true`. A bundle packed before that has no such key: it was packed with its cancels and modifies dropped, so its fills and trace show none of them. Its replay drops them again, so it validates exactly as it did, on the comparison its other markers give it.
+
 ## What's not handled
 
-- `CANCEL` / `CANCEL_ALL` / `MODIFY` signals. Pack routes `market`, `limit`, `stop_market`, `stop_limit`, `tp_market`, `tp_limit`, and `trailing_stop` into `SimulatedExecutor.submit_order`; anything else is dropped, so a strategy that cancels or replaces will not reproduce those actions in the bundle.
+- OCO signals and the DEX liquidity signals (`provide_liquidity`, `withdraw_liquidity`). Pack sends the order types `market`, `limit`, `stop_market`, `stop_limit`, `tp_market`, `tp_limit` and `trailing_stop`, and cancels, cancel-alls and modifies (see [Cancels and modifies](#cancels-and-modifies)), to the simulator; any other signal is dropped.
 - Multi-strategy ensembles. Pack supports one strategy per bundle.
 - Network or exchange-stub bundles. The tape is the only input source.
 

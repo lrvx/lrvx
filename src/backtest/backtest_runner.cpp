@@ -10,6 +10,7 @@
 #include "lrvx/backtest/backtest_runner.h"
 
 #include "lrvx/aggregator/policies/time_bar_policy.h"
+#include "lrvx/backtest/modified_order.h"
 #include "lrvx/book/events/book_update_event.h"
 #include "lrvx/book/events/trade_event.h"
 #include "lrvx/log/log.h"
@@ -1177,23 +1178,7 @@ Order BacktestRunner::modifiedOrder(const Signal& sig)
       order.symbol = it->second;
     }
   }
-  // The one price a Modify carries is the price the order works at: the
-  // trigger of a stop, take-profit or trailing order that fills at market,
-  // the limit of everything else (a stop-limit keeps its trigger).
-  switch (order.type)
-  {
-    case OrderType::STOP_MARKET:
-    case OrderType::TAKE_PROFIT_MARKET:
-    case OrderType::TRAILING_STOP:
-      order.triggerPrice = sig.newPrice;
-      break;
-    default:
-      order.price = sig.newPrice;
-      break;
-  }
-  order.quantity = sig.newQuantity;
-  // The replacement is a fresh order: newQuantity is what is left to work.
-  order.filledQuantity = Quantity{};
+  applyModify(order, sig.newPrice, sig.newQuantity);
   return order;
 }
 
