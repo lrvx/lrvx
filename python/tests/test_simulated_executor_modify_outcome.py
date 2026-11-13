@@ -56,3 +56,16 @@ def test_an_off_tick_replacement_is_refused():
     sim.submit_order(1, "buy", 100.0, 1.0, type="limit", symbol=sid)
     assert sim.modify_order(1, 99.3, 1.0, sid) == "refused"
     assert sim.modify_order(1, 99.5, 1.0, sid) == "accepted"
+
+
+def test_a_pending_replacement_lands_after_the_ack_with_nobody_listening():
+    sim = _sim()
+    sim.set_replace_ack_latency(5_000_000)
+    sim.submit_order(1, "buy", 100.0, 1.0, type="limit", symbol=1)
+    assert sim.modify_order(1, 90.0, 2.0, 1) == "pending"
+    sim.advance_clock(1_000_000_000 + 10_000_000)
+    sim.on_bar(1, 95.0)
+    assert sim.fills_list() == []
+    sim.on_bar(1, 89.0)
+    fills = sim.fills_list()
+    assert [(f["order_id"], f["price"], f["quantity"]) for f in fills] == [(1, 90.0, 2.0)]
