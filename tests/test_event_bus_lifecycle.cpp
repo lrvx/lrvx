@@ -999,4 +999,94 @@ TEST(EventBusLifecycle, AShortRunOnALargeRingLeavesItEmpty)
   }
 }
 
+// The constructor stamps slot 0 alone: it is the one slot a reader can ask
+// for sequence 0, which is what every other stamp starts as. A bus that has
+// published nothing must have nothing for a consumer, at construction and
+// after any number of runs, and what it then publishes must arrive once, in
+// order, from sequence 0.
+template <size_t Capacity>
+void expectNothingBeforeTheFirstPublish()
+{
+  SCOPED_TRACE("capacity " + std::to_string(Capacity));
+  using Bus = EventBus<CountedEvent, Capacity, 2>;
+  auto bus = std::make_unique<Bus>();
+  CountedListener listener;
+  bus->setOwnConsumerThreads(false);
+  ASSERT_TRUE(bus->subscribe(&listener, /*required=*/true));
+  CountedEvent::alive.store(0, std::memory_order_relaxed);
+
+  // Runs that publish nothing, then runs that end exactly on slot 0, one
+  // slot past it and well past it, each followed by an empty run.
+  for (const size_t published :
+       {size_t{0}, size_t{0}, size_t{1}, size_t{0}, Capacity, size_t{0}, Capacity + 1, size_t{0},
+        2 * Capacity + 3, size_t{0}})
+  {
+    SCOPED_TRACE("a run of " + std::to_string(published) + " events");
+    listener.values.clear();
+    listener.sequences.clear();
+    bus->start();
+    EXPECT_FALSE(bus->consumerHasPending(0)) << "nothing is published yet";
+    EXPECT_FALSE(bus->pollConsumer(0));
+    EXPECT_TRUE(listener.values.empty()) << "an event nobody published was delivered";
+
+    CountedEvent ev;
+    for (size_t i = 0; i < published; ++i)
+    {
+      ev.value = static_cast<int>(i);
+      ASSERT_EQ(bus->publish(ev), static_cast<int64_t>(i));
+      // Stepped after every publish, so the ring never fills.
+      ASSERT_TRUE(bus->consumerHasPending(0));
+      ASSERT_TRUE(bus->pollConsumer(0));
+      ASSERT_FALSE(bus->consumerHasPending(0));
+    }
+    bus->stop();
+
+    ASSERT_EQ(listener.values.size(), published);
+    for (size_t i = 0; i < published; ++i)
+    {
+      ASSERT_EQ(listener.values[i], static_cast<int>(i));
+      ASSERT_EQ(listener.sequences[i], i);
+    }
+    EXPECT_EQ(CountedEvent::alive.load(std::memory_order_relaxed), 0);
+  }
+}
+
+TEST(EventBusLifecycle, ABusThatPublishedNothingHasNothingAtSequenceZero)
+{
+  expectNothingBeforeTheFirstPublish<2>();
+  expectNothingBeforeTheFirstPublish<8>();
+  expectNothingBeforeTheFirstPublish<64>();
+  expectNothingBeforeTheFirstPublish<1 << 12>();
+}
+
+// The same with consumer threads: a thread started on a fresh bus waits; it
+// does not deliver from slot 0.
+TEST(EventBusLifecycle, AConsumerThreadOnAFreshBusDeliversOnlyWhatIsPublished)
+{
+  using Bus = EventBus<CountedEvent, 16, 2>;
+  for (int round = 0; round < 50; ++round)
+  {
+    auto bus = std::make_unique<Bus>();
+    CountedListener listener;
+    ASSERT_TRUE(bus->subscribe(&listener, /*required=*/true));
+    bus->enableDrainOnStop();
+    bus->start();
+    std::this_thread::sleep_for(std::chrono::microseconds(200));
+    const size_t published = static_cast<size_t>(round % 3);
+    CountedEvent ev;
+    for (size_t i = 0; i < published; ++i)
+    {
+      ev.value = static_cast<int>(i) + 1000;
+      ASSERT_EQ(bus->publish(ev), static_cast<int64_t>(i));
+    }
+    bus->flush();
+    bus->stop();
+    ASSERT_EQ(listener.values.size(), published) << "round " << round;
+    for (size_t i = 0; i < published; ++i)
+    {
+      EXPECT_EQ(listener.values[i], static_cast<int>(i) + 1000);
+    }
+  }
+}
+
 }  // namespace

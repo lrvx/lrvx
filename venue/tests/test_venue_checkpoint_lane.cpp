@@ -396,8 +396,9 @@ TEST(VenueCheckpointLane, WithNoLaneAnAutomaticCheckpointStillDoesNotWaitForTheD
     // ask for while the previous snapshot is still being written.
     for (int i = 0; i < 16; ++i)
     {
+      const OrderId order = id++;
       s->submit(InboundCommand{
-          limit(1, id++, Side::BUY, 51.0 + static_cast<double>(id % 4000) * 0.01, 1.0, 1)});
+          limit(1, order, Side::BUY, 51.0 + static_cast<double>(order % 4000) * 0.01, 1.0, 1)});
     }
     s->flush();
   }
