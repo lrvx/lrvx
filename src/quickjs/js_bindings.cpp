@@ -282,13 +282,12 @@ static int64_t toInt64(JSContext* ctx, JSValueConst val)
 // wraps without saying so.
 static bool bigIntDigits(JSContext* ctx, JSValueConst val, std::string& out)
 {
-  const char* text = JS_ToCString(ctx, val);
-  if (text == nullptr)
+  lrvx::JsCString text(ctx, val);
+  if (!text.ok())
   {
     return false;
   }
-  out = text;
-  JS_FreeCString(ctx, text);
+  out = text.get();
   return true;
 }
 
