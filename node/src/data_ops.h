@@ -181,26 +181,23 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
     if (given(info[3]))
     {
       Napi::Object opts = argObject(info[3], "DataReader: options");
-      if (opts.Has("reorderWindowNs"))
+      Napi::Value v = opts.Get("reorderWindowNs");
+      if (given(v))
       {
-        Napi::Value v = opts.Get("reorderWindowNs");
-        if (given(v))
+        reorderWindowNs = toInt64Ns(v, "DataReader: reorderWindowNs");
+      }
+      // A flag is a boolean: read with ToBoolean, the string 'false' was true.
+      const auto flag = [&](const char* key, const char* what, int32_t& out)
+      {
+        Napi::Value f = opts.Get(key);
+        if (given(f))
         {
-          reorderWindowNs = toInt64Ns(v, "DataReader: reorderWindowNs");
+          out = argBool(f, what) ? 1 : 0;
         }
-      }
-      if (opts.Has("strictOrdering"))
-      {
-        strictOrdering = opts.Get("strictOrdering").ToBoolean().Value() ? 1 : 0;
-      }
-      if (opts.Has("orderSegmentsByTime") && !opts.Get("orderSegmentsByTime").IsUndefined())
-      {
-        orderSegmentsByTime = opts.Get("orderSegmentsByTime").ToBoolean().Value() ? 1 : 0;
-      }
-      if (opts.Has("skipSegmentsByTime") && !opts.Get("skipSegmentsByTime").IsUndefined())
-      {
-        skipSegmentsByTime = opts.Get("skipSegmentsByTime").ToBoolean().Value() ? 1 : 0;
-      }
+      };
+      flag("strictOrdering", "DataReader: strictOrdering", strictOrdering);
+      flag("orderSegmentsByTime", "DataReader: orderSegmentsByTime", orderSegmentsByTime);
+      flag("skipSegmentsByTime", "DataReader: skipSegmentsByTime", skipSegmentsByTime);
     }
     _h = lrvx_data_reader_create_ex(dir.c_str(), from, to, nullptr, 0, reorderWindowNs,
                                     strictOrdering, orderSegmentsByTime, skipSegmentsByTime);
