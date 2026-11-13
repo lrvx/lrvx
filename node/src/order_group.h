@@ -56,7 +56,7 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
   {
     uint64_t parent = 0;
     uint8_t policy = 0;
-    if (info.Length() > 0 && info[0].IsObject())
+    if (given(info[0]))
     {
       auto opts = argObject(info[0], "OrderGroup: argument 1");
       if (opts.Has("parentSignalId"))
@@ -277,7 +277,7 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
     auto env = info.Env();
     double equity = 0.0;
     std::vector<int64_t> ref_prices;
-    if (info.Length() > 0 && info[0].IsObject())
+    if (given(info[0]))
     {
       auto opts = argObject(info[0], "precheckSubmission: argument 1");
       if (opts.Has("equity"))

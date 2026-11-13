@@ -384,7 +384,7 @@ inline Napi::Value batch_adf(const Napi::CallbackInfo& info)
   size_t n = in.ElementLength();
   size_t maxLag = info.Length() > 1 ? argUint32(info[1], "batch_adf: argument 2") : 4u;
   std::string regression =
-      info.Length() > 2 && info[2].IsString() ? argString(info[2], "batch_adf: argument 3") : "c";
+      given(info[2]) ? argString(info[2], "batch_adf: argument 3") : "c";
   lrvx::indicator::AdfResult r =
       lrvx::indicator::adf(std::span<const double>(in.Data(), n), maxLag, regression);
   auto o = Napi::Object::New(info.Env());

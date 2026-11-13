@@ -171,20 +171,20 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
   DataReaderWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<DataReaderWrap>(info)
   {
     std::string dir = argString(info[0], "DataReader: argument 1");
-    int64_t from = info.Length() > 1 && (info[1].IsNumber() || info[1].IsBigInt()) ? toInt64Ns(info[1], "DataReader: fromNs") : 0;
-    int64_t to = info.Length() > 2 && (info[2].IsNumber() || info[2].IsBigInt()) ? toInt64Ns(info[2], "DataReader: toNs") : 0;
+    int64_t from = given(info[1]) ? toInt64Ns(info[1], "DataReader: fromNs") : 0;
+    int64_t to = given(info[2]) ? toInt64Ns(info[2], "DataReader: toNs") : 0;
     // TODO: symbol filter array
     int64_t reorderWindowNs = 0;
     int32_t strictOrdering = 0;
     int32_t orderSegmentsByTime = 1;
     int32_t skipSegmentsByTime = 1;
-    if (info.Length() > 3 && info[3].IsObject())
+    if (given(info[3]))
     {
       Napi::Object opts = argObject(info[3], "DataReader: argument 4");
       if (opts.Has("reorderWindowNs"))
       {
         Napi::Value v = opts.Get("reorderWindowNs");
-        if (v.IsNumber() || v.IsBigInt())
+        if (given(v))
         {
           reorderWindowNs = toInt64Ns(v, "DataReader: reorderWindowNs");
         }
@@ -248,7 +248,7 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
   }
   Napi::Value ReadTrades(const Napi::CallbackInfo& info)
   {
-    uint64_t maxTrades = info.Length() > 0 && info[0].IsNumber()
+    uint64_t maxTrades = given(info[0])
                              ? argInteger(info[0], "readTrades: argument 1")
                              : 0;
     return readTradesImpl(info.Env(), /*startTsNs=*/0, /*useFrom=*/false, maxTrades);
@@ -256,14 +256,14 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
   Napi::Value ReadTradesFrom(const Napi::CallbackInfo& info)
   {
     int64_t startTsNs = toInt64Ns(info[0], "readTradesFrom: argument 1");
-    uint64_t maxTrades = info.Length() > 1 && info[1].IsNumber()
+    uint64_t maxTrades = given(info[1])
                              ? argInteger(info[1], "readTradesFrom: argument 2")
                              : 0;
     return readTradesImpl(info.Env(), startTsNs, /*useFrom=*/true, maxTrades);
   }
   Napi::Value ReadBBO(const Napi::CallbackInfo& info)
   {
-    uint64_t maxEvents = info.Length() > 0 && info[0].IsNumber()
+    uint64_t maxEvents = given(info[0])
                              ? argInteger(info[0], "readBBO: argument 1")
                              : 0;
     return readBboImpl(info.Env(), /*startTsNs=*/0, /*useFrom=*/false, maxEvents);
@@ -271,7 +271,7 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
   Napi::Value ReadBBOFrom(const Napi::CallbackInfo& info)
   {
     int64_t startTsNs = toInt64Ns(info[0], "readBBOFrom: argument 1");
-    uint64_t maxEvents = info.Length() > 1 && info[1].IsNumber()
+    uint64_t maxEvents = given(info[1])
                              ? argInteger(info[1], "readBBOFrom: argument 2")
                              : 0;
     return readBboImpl(info.Env(), startTsNs, /*useFrom=*/true, maxEvents);
@@ -531,7 +531,7 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
         const int32_t v = argInt32(info[1], "run: argument 2");
         n_threads = (v < 0) ? 0u : static_cast<uint32_t>(v);
       }
-      else if (info[1].IsObject() && !info[1].IsNull())
+      else if (given(info[1]))
       {
         auto opts = argObject(info[1], "run: argument 2");
         if (opts.Has("nThreads"))
@@ -539,7 +539,7 @@ class DataReaderWrap : public Napi::ObjectWrap<DataReaderWrap>
           const int32_t v = argInt32(opts.Get("nThreads"), "run: nThreads");
           n_threads = (v < 0) ? 0u : static_cast<uint32_t>(v);
         }
-        if (opts.Has("onProgress") && opts.Get("onProgress").IsFunction())
+        if (given(opts.Get("onProgress")))
         {
           on_progress = argFunction(opts.Get("onProgress"), "run: onProgress");
           has_progress = true;
@@ -640,14 +640,14 @@ class BinaryLogRecorderHookWrap : public Napi::ObjectWrap<BinaryLogRecorderHookW
   {
     auto env = info.Env();
     std::string dir = argString(info[0], "BinaryLogRecorderHook: argument 1");
-    uint64_t maxMb = info.Length() > 1 && info[1].IsNumber()
+    uint64_t maxMb = given(info[1])
                          ? argInteger(info[1], "BinaryLogRecorderHook: argument 2")
                          : 256;
-    uint8_t exId = info.Length() > 2 && info[2].IsNumber()
+    uint8_t exId = given(info[2])
                        ? argUint32(info[2], "BinaryLogRecorderHook: argument 3")
                        : 0;
     uint8_t compression = 0;
-    if (info.Length() > 3 && info[3].IsString())
+    if (given(info[3]))
     {
       auto s = argString(info[3], "BinaryLogRecorderHook: argument 4");
       if (s == "none")
@@ -667,11 +667,11 @@ class BinaryLogRecorderHookWrap : public Napi::ObjectWrap<BinaryLogRecorderHookW
     }
     std::string exchangeName;
     std::string instrumentType;
-    if (info.Length() > 4 && info[4].IsString())
+    if (given(info[4]))
     {
       exchangeName = argString(info[4], "BinaryLogRecorderHook: argument 5");
     }
-    if (info.Length() > 5 && info[5].IsString())
+    if (given(info[5]))
     {
       instrumentType = argString(info[5], "BinaryLogRecorderHook: argument 6");
     }
@@ -775,7 +775,7 @@ class MergedTapeReaderWrap : public Napi::ObjectWrap<MergedTapeReaderWrap>
     int64_t fromNs = -1;
     int64_t toNs = -1;
     std::vector<uint32_t> filter;
-    if (info.Length() > 1 && info[1].IsObject())
+    if (given(info[1]))
     {
       auto opts = argObject(info[1], "MergedTapeReader: argument 2");
       if (opts.Has("fromNs"))
@@ -797,9 +797,9 @@ class MergedTapeReaderWrap : public Napi::ObjectWrap<MergedTapeReaderWrap>
       if (opts.Has("symbols"))
       {
         auto v = opts.Get("symbols");
-        if (v.IsArray())
+        if (given(v))
         {
-          auto sa = v.As<Napi::Array>();
+          auto sa = argArray(v, "MergedTapeReader: symbols");
           uint32_t m = sa.Length();
           filter.reserve(m);
           for (uint32_t i = 0; i < m; ++i)
@@ -991,7 +991,7 @@ class MergedTapeReaderWrap : public Napi::ObjectWrap<MergedTapeReaderWrap>
     // partitioning gets symbol-rekey tangled across workers); accept
     // and pass through but the C ABI ignores it for the merged path.
     uint32_t n_threads = 0;  // 0 = auto: min(segments, hardware_concurrency)
-    if (info.Length() > 1 && info[1].IsNumber())
+    if (given(info[1]))
     {
       const int32_t v = argInt32(info[1], "run: argument 2");
       // Negative or zero from JS → auto (0). Otherwise clamp to uint32.
@@ -1155,14 +1155,13 @@ inline Napi::Value seg_validate(const Napi::CallbackInfo& info)
 inline Napi::Value seg_validate_full(const Napi::CallbackInfo& info)
 {
   lrvx_clear_last_error();
-  // A check that is not named is on; a boolean that is given is honoured.
-  const auto flag = [&info](size_t i) -> uint8_t
-  {
-    return (info.Length() > i && info[i].IsBoolean() && !info[i].As<Napi::Boolean>().Value()) ? 0
-                                                                                              : 1;
-  };
-  auto r = lrvx_segment_validate_full(argString(info[0], "seg_validate_full: argument 1").c_str(), flag(1),
-                                      flag(2));
+  // A check that is not named is on; a boolean that is given is honoured,
+  // and anything else is refused rather than read as on.
+  const auto flag = [&info](size_t i, const char* what) -> uint8_t
+  { return (given(info[i]) && !argBool(info[i], what)) ? 0 : 1; };
+  auto r = lrvx_segment_validate_full(argString(info[0], "seg_validate_full: argument 1").c_str(),
+                                      flag(1, "seg_validate_full: argument 2"),
+                                      flag(2, "seg_validate_full: argument 3"));
   auto o = Napi::Object::New(info.Env());
   o.Set("valid", (bool)r.valid);
   o.Set("headerValid", (bool)r.header_valid);
@@ -1267,7 +1266,7 @@ inline Napi::Value seg_split(const Napi::CallbackInfo& info)
 inline Napi::Value seg_export(const Napi::CallbackInfo& info)
 {
   uint8_t fmt = 0;
-  if (info.Length() > 2 && info[2].IsString())
+  if (given(info[2]))
   {
     std::string f = argString(info[2], "seg_export: argument 3");
     if (f == "json")
@@ -1287,8 +1286,8 @@ inline Napi::Value seg_export(const Napi::CallbackInfo& info)
       argString(info[0], "seg_export: argument 1").c_str(),
       argString(info[1], "seg_export: argument 2").c_str(),
       fmt,
-      info.Length() > 3 && (info[3].IsNumber() || info[3].IsBigInt()) ? toInt64Ns(info[3], "seg_export: argument 4") : 0,
-      info.Length() > 4 && (info[4].IsNumber() || info[4].IsBigInt()) ? toInt64Ns(info[4], "seg_export: argument 5") : 0,
+      given(info[3]) ? toInt64Ns(info[3], "seg_export: argument 4") : 0,
+      given(info[4]) ? toInt64Ns(info[4], "seg_export: argument 5") : 0,
       nullptr, 0);
   auto o = Napi::Object::New(info.Env());
   o.Set("success", (bool)r.success);

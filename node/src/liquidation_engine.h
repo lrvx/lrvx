@@ -107,27 +107,8 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
   }
   void SetAdlRanking(const Napi::CallbackInfo& info)
   {
-    uint8_t code = 0;
-    if (info.Length() >= 1 && info[0].IsString())
-    {
-      const std::string name = argString(info[0], "setAdlRanking: argument 1");
-      if (name == "binance")
-      {
-        code = 1;
-      }
-      else if (name == "bybit")
-      {
-        code = 2;
-      }
-      else if (name == "position_size")
-      {
-        code = 3;
-      }
-    }
-    else if (info.Length() >= 1 && info[0].IsNumber())
-    {
-      code = static_cast<uint8_t>(argUint32(info[0], "setAdlRanking: argument 1"));
-    }
+    const uint8_t code = static_cast<uint8_t>(argNamedCode(
+        info[0], "setAdlRanking: argument 1", {"pnl_ratio", "binance", "bybit", "position_size"}));
     lrvx_liquidation_engine_set_adl_ranking(_h, code);
   }
   Napi::Value AdlRanking(const Napi::CallbackInfo& info)
@@ -191,7 +172,7 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
       symbols[i] = argUint32(pair.Get(uint32_t{0}), "a [symbol, price] pair's symbol");
       prices[i] = argNumber(pair.Get(uint32_t{1}), "a [symbol, price] pair's price");
     }
-    const int64_t tsNs = info.Length() >= 2 && (info[1].IsNumber() || info[1].IsBigInt())
+    const int64_t tsNs = given(info[1])
                              ? toInt64Ns(info[1], "onMarks: argument 2")
                              : 0;
     const uint32_t total = lrvx_liquidation_engine_on_marks(
@@ -297,25 +278,10 @@ class LiquidationEngineWrap : public Napi::ObjectWrap<LiquidationEngineWrap>
   }
   void SetMarkImpactModel(const Napi::CallbackInfo& info)
   {
-    uint8_t code = 0;
-    if (info.Length() >= 1 && info[0].IsString())
-    {
-      const std::string name = argString(info[0], "setMarkImpactModel: argument 1");
-      if (name == "book_anchored")
-      {
-        code = 1;
-      }
-      else if (name == "book_only")
-      {
-        code = 2;
-      }
-    }
-    else if (info.Length() >= 1 && info[0].IsNumber())
-    {
-      code = static_cast<uint8_t>(argUint32(info[0], "setMarkImpactModel: argument 1"));
-    }
+    const uint8_t code = static_cast<uint8_t>(argNamedCode(
+        info[0], "setMarkImpactModel: argument 1", {"none", "book_anchored", "book_only"}));
     double weight = 0.3;
-    if (info.Length() >= 2 && info[1].IsNumber())
+    if (given(info[1]))
     {
       weight = argNumber(info[1], "setMarkImpactModel: argument 2");
     }

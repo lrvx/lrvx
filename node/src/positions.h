@@ -160,7 +160,7 @@ class OrderJourneyTracerWrap : public Napi::ObjectWrap<OrderJourneyTracerWrap>
     uint64_t maxRecordsPerOrder = 64;
     double sampleRate = 1.0;
     uint64_t sampleSalt = 0x9E3779B97F4A7C15ULL;
-    if (info.Length() > 0 && info[0].IsObject())
+    if (given(info[0]))
     {
       Napi::Object cfg = argObject(info[0], "OrderJourneyTracer: argument 1");
       if (cfg.Has("maxOrders"))

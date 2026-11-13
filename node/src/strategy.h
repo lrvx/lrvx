@@ -223,6 +223,23 @@ inline uint32_t symId(const Napi::Value& v)
   return argUint32(v, "symbol: a Symbol or a symbol id");
 }
 
+// The `symbols` a strategy object lists, Symbols or symbol ids; none when it
+// is left out. A value that was not an array used to be taken as none too.
+inline std::vector<uint32_t> strategySymbols(const Napi::Object& strategy, const char* what)
+{
+  std::vector<uint32_t> syms;
+  auto v = strategy.Get("symbols");
+  if (given(v))
+  {
+    auto arr = argArray(v, what);
+    for (uint32_t i = 0; i < arr.Length(); ++i)
+    {
+      syms.push_back(symId(arr.Get(i)));
+    }
+  }
+  return syms;
+}
+
 // The arguments of an emit.* call. A missing argument or one of the wrong
 // type is a TypeError that names the call, thrown before anything is
 // emitted; reading it unchecked either threw a bare "A number was expected"
@@ -465,15 +482,16 @@ struct NodeStrategyHost : TsfnHost
   // from the handler bitmask instead of touching the references themselves.
   void replaceStrategy(Napi::Object new_strategy_obj)
   {
-    auto get = [&](const char* name) -> Napi::FunctionReference
+    auto get = [&](const char* name)
+    { return lrvx_node::takeFn(new_strategy_obj, name); };
+    // A callback that is not a function is refused before the running
+    // strategy is stopped or any of its callbacks replaced.
+    for (const char* name : {"onTrade", "onBookUpdate", "onBar", "onStart", "onStop", "onFill",
+                             "onOrderUpdate", "onQueuePositionChange", "onMarketPositionChange",
+                             "onTouch"})
     {
-      auto val = new_strategy_obj.Get(name);
-      if (val.IsFunction())
-      {
-        return Napi::Persistent(val.As<Napi::Function>());
-      }
-      return {};
-    };
+      get(name);
+    }
 
     if (on_stop_fn)
     {
@@ -501,15 +519,8 @@ struct NodeStrategyHost : TsfnHost
                    const std::vector<uint32_t>& syms_)
       : TsfnHost(env_), env(env_), syms(syms_)
   {
-    auto get = [&](const char* name) -> Napi::FunctionReference
-    {
-      auto val = strategy_obj.Get(name);
-      if (val.IsFunction())
-      {
-        return Napi::Persistent(val.As<Napi::Function>());
-      }
-      return {};
-    };
+    auto get = [&](const char* name)
+    { return lrvx_node::takeFn(strategy_obj, name); };
     on_trade_fn = get("onTrade");
     on_book_fn = get("onBookUpdate");
     on_bar_fn = get("onBar");
@@ -1399,7 +1410,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
       return env.Undefined();
     }
     std::string symbol;
-    if (info.Length() > 2 && info[2].IsString())
+    if (given(info[2]))
     {
       symbol = argString(info[2], "runTapeBarsOnTicks: argument 3");
     }
@@ -1417,17 +1428,8 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
   {
     auto env = info.Env();
     auto obj = argObject(info[0], "setStrategy: argument 1");
-    std::vector<uint32_t> syms;
-    auto symsV = obj.Get("symbols");
-    if (symsV.IsArray())
-    {
-      auto arr = symsV.As<Napi::Array>();
-      for (uint32_t i = 0; i < arr.Length(); ++i)
-      {
-        syms.push_back(symId(arr.Get(i)));
-      }
-    }
-    _host = std::make_unique<NodeStrategyHost>(env, obj, _reg, 1, syms);
+    _host = std::make_unique<NodeStrategyHost>(env, obj, _reg, 1,
+                                               strategySymbols(obj, "setStrategy: symbols"));
     lrvx_backtest_runner_set_strategy(_handle,
                                       static_cast<LrvxStrategyHandle>(_host->bridge.get()));
     return env.Undefined();
@@ -1744,10 +1746,6 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
   Napi::Value addExecutionListener(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
-    if (info.Length() == 0 || !info[0].IsObject())
-    {
-      return env.Undefined();
-    }
     auto host =
         std::make_unique<lrvx_node::ExecutionListenerHost>(env, argObject(info[0], "addExecutionListener: argument 1"));
     lrvx_backtest_runner_add_execution_listener(_handle, host->handle);
@@ -1872,27 +1870,13 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
 
   std::vector<std::unique_ptr<NodeStrategyHost>> _hosts;
 
-  std::vector<uint32_t> extractSyms(Napi::Object obj)
-  {
-    std::vector<uint32_t> syms;
-    auto symsV = obj.Get("symbols");
-    if (symsV.IsArray())
-    {
-      auto arr = symsV.As<Napi::Array>();
-      for (uint32_t i = 0; i < arr.Length(); ++i)
-      {
-        syms.push_back(symId(arr.Get(i)));
-      }
-    }
-    return syms;
-  }
-
   Napi::Value addStrategy(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
     auto obj = argObject(info[0], "addStrategy: argument 1");
     uint32_t id = static_cast<uint32_t>(_hosts.size()) + 1;
-    auto host = std::make_unique<NodeStrategyHost>(env, obj, _reg, id, extractSyms(obj));
+    auto host = std::make_unique<NodeStrategyHost>(env, obj, _reg, id,
+                                                   strategySymbols(obj, "addStrategy: symbols"));
     if (_mode == Mode::Threaded)
     {
       host->enableThreaded();
@@ -2094,10 +2078,12 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
   {
     uint32_t sym = symId(info[0]);
     auto opts = argObject(info[1], "onBar: argument 2");
+    const auto what = [](const char* k)
+    { return std::string("onBar: ") + k; };
     auto getNum = [&](const char* k, double dflt) -> double
     {
       auto v = opts.Get(k);
-      return v.IsNumber() ? v.As<Napi::Number>().DoubleValue() : dflt;
+      return given(v) ? argNumber(v, what(k).c_str()) : dflt;
     };
     // A BigInt is the type onBar hands back, so it has to be the type onBar
     // takes: the old `IsNumber()` guard silently substituted the default for
@@ -2106,16 +2092,12 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     auto getInt = [&](const char* k, int64_t dflt) -> int64_t
     {
       auto v = opts.Get(k);
-      if (v.IsBigInt() || v.IsNumber())
-      {
-        return toInt64Ns(v, "onBar: timestamp");
-      }
-      return dflt;
+      return given(v) ? toInt64Ns(v, what(k).c_str()) : dflt;
     };
     auto getU8 = [&](const char* k, uint8_t dflt) -> uint8_t
     {
       auto v = opts.Get(k);
-      return v.IsNumber() ? static_cast<uint8_t>(v.As<Napi::Number>().Uint32Value()) : dflt;
+      return given(v) ? static_cast<uint8_t>(argUint32(v, what(k).c_str())) : dflt;
     };
     uint8_t bt = getU8("barType", 0);
     uint64_t btp = static_cast<uint64_t>(getInt("barTypeParam", 0));

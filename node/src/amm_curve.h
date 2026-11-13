@@ -118,7 +118,7 @@ inline Napi::Value ammCurveUniswapV3(const Napi::CallbackInfo& info)
   // i256, so its sign is the BigInt's sign.
   std::vector<std::string> sqrtStore;
   std::vector<std::string> netStore;
-  if (info.Length() > 3 && info[3].IsArray())
+  if (given(info[3]))
   {
     Napi::Array arr = argArray(info[3], "ammCurveUniswapV3: argument 4");
     for (uint32_t k = 0; k < arr.Length(); ++k)

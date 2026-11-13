@@ -67,23 +67,8 @@ class RateLimitPolicyWrap : public Napi::ObjectWrap<RateLimitPolicyWrap>
   void AddFamilyBucket(const Napi::CallbackInfo& info)
   {
     // (family, name, windowNs, capacity, queryWeight=1)
-    uint8_t family = 0;
-    if (info[0].IsString())
-    {
-      const std::string f = argString(info[0], "addFamilyBucket: argument 1");
-      if (f == "market_data")
-      {
-        family = 1;
-      }
-      else if (f == "account")
-      {
-        family = 2;
-      }
-    }
-    else if (info[0].IsNumber())
-    {
-      family = static_cast<uint8_t>(argUint32(info[0], "addFamilyBucket: argument 1"));
-    }
+    const uint8_t family = static_cast<uint8_t>(argNamedCode(
+        info[0], "addFamilyBucket: argument 1", {"trading", "market_data", "account"}));
     std::string name = argString(info[1], "addFamilyBucket: argument 2");
     int64_t window_ns = argInteger(info[2], "addFamilyBucket: argument 3");
     uint32_t capacity = argUint32(info[3], "addFamilyBucket: argument 4");

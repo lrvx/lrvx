@@ -41,6 +41,7 @@
 
 #include <napi.h>
 
+#include "bindings_common.h"
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/capi/order_type_names.hpp"
 #include "tsfn_util.h"
@@ -57,14 +58,17 @@ namespace lrvx_node
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
+// The callback `name` of a hook or strategy object, or none when it is left
+// out (or null). A value that is not a function used to be taken as no
+// callback, so `onFill: 'log'` ran without one and said nothing.
 inline Napi::FunctionReference takeFn(Napi::Object obj, const char* name)
 {
   auto val = obj.Get(name);
-  if (val.IsFunction())
+  if (val.IsUndefined() || val.IsNull())
   {
-    return Napi::Persistent(val.As<Napi::Function>());
+    return {};
   }
-  return {};
+  return Napi::Persistent(node_lrvx::argFunction(val, name));
 }
 
 // Build a JS object mirroring LrvxSignal for the user callback.
@@ -664,11 +668,42 @@ struct ExecutorHost
     }
     // Same boundary as the gates: this is called through a C function
     // pointer, so a throw out of it is reported rather than unwound. An
-    // executor that cannot say what it supports supports nothing.
-    Napi::Value result;
+    // executor that cannot say what it supports supports nothing. So does
+    // one that answers with something other than an object of booleans,
+    // which is reported too: a flag of another type used to read as false
+    // without a word.
+    LrvxExchangeCapabilities caps{};
     try
     {
-      result = self->capabilities_fn.Call({});
+      Napi::Value result = self->capabilities_fn.Call({});
+      if (result.IsUndefined())
+      {
+        return;
+      }
+      auto obj = node_lrvx::argObject(result, "capabilities: what it returns");
+      auto getBool = [&](const char* k) -> uint8_t
+      {
+        auto v = obj.Get(k);
+        return node_lrvx::given(v) &&
+                       node_lrvx::argBool(v, (std::string("capabilities: ") + k).c_str())
+                   ? 1u
+                   : 0u;
+      };
+      caps.supports_stop_market = getBool("stopMarket");
+      caps.supports_stop_limit = getBool("stopLimit");
+      caps.supports_take_profit_market = getBool("takeProfitMarket");
+      caps.supports_take_profit_limit = getBool("takeProfitLimit");
+      caps.supports_trailing_stop = getBool("trailingStop");
+      caps.supports_iceberg = getBool("iceberg");
+      caps.supports_oco = getBool("oco");
+      caps.supports_gtc = getBool("gtc");
+      caps.supports_ioc = getBool("ioc");
+      caps.supports_fok = getBool("fok");
+      caps.supports_gtd = getBool("gtd");
+      caps.supports_post_only = getBool("postOnly");
+      caps.supports_reduce_only = getBool("reduceOnly");
+      caps.supports_close_position = getBool("closePosition");
+      caps.supports_batch_submit = getBool("batchSubmit");
     }
     catch (const Napi::Error& e)
     {
@@ -680,31 +715,7 @@ struct ExecutorHost
       reportHookError(self->errors, "executor", "capabilities", e.what());
       return;
     }
-    if (!result.IsObject())
-    {
-      return;
-    }
-    auto obj = result.As<Napi::Object>();
-    auto getBool = [&](const char* k) -> uint8_t
-    {
-      auto v = obj.Get(k);
-      return (v.IsBoolean() && v.As<Napi::Boolean>().Value()) ? 1u : 0u;
-    };
-    out->supports_stop_market = getBool("stopMarket");
-    out->supports_stop_limit = getBool("stopLimit");
-    out->supports_take_profit_market = getBool("takeProfitMarket");
-    out->supports_take_profit_limit = getBool("takeProfitLimit");
-    out->supports_trailing_stop = getBool("trailingStop");
-    out->supports_iceberg = getBool("iceberg");
-    out->supports_oco = getBool("oco");
-    out->supports_gtc = getBool("gtc");
-    out->supports_ioc = getBool("ioc");
-    out->supports_fok = getBool("fok");
-    out->supports_gtd = getBool("gtd");
-    out->supports_post_only = getBool("postOnly");
-    out->supports_reduce_only = getBool("reduceOnly");
-    out->supports_close_position = getBool("closePosition");
-    out->supports_batch_submit = getBool("batchSubmit");
+    *out = caps;
   }
   static void onStartBridge(void* ud)
   {

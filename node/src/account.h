@@ -50,10 +50,10 @@ class AccountWrap : public Napi::ObjectWrap<AccountWrap>
   AccountWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<AccountWrap>(info)
   {
-    const uint64_t id = info.Length() > 0 && info[0].IsNumber()
+    const uint64_t id = given(info[0])
                             ? argInteger(info[0], "Account: argument 1")
                             : 0;
-    const double eq = info.Length() > 1 && info[1].IsNumber()
+    const double eq = given(info[1])
                           ? argNumber(info[1], "Account: argument 2")
                           : 0.0;
     _h = lrvx_account_create(id, eq);
@@ -92,19 +92,8 @@ class AccountWrap : public Napi::ObjectWrap<AccountWrap>
   }
   void SetMarginMode(const Napi::CallbackInfo& info)
   {
-    uint8_t code = 0;
-    if (info.Length() >= 1 && info[0].IsString())
-    {
-      const std::string name = argString(info[0], "setMarginMode: argument 1");
-      if (name == "isolated")
-      {
-        code = 1;
-      }
-    }
-    else if (info.Length() >= 1 && info[0].IsNumber())
-    {
-      code = static_cast<uint8_t>(argUint32(info[0], "setMarginMode: argument 1"));
-    }
+    const uint8_t code = static_cast<uint8_t>(
+        argNamedCode(info[0], "setMarginMode: argument 1", {"cross", "isolated"}));
     lrvx_account_set_margin_mode(_h, code);
   }
   void OpenPosition(const Napi::CallbackInfo& info)
@@ -112,7 +101,7 @@ class AccountWrap : public Napi::ObjectWrap<AccountWrap>
     const uint32_t sym = argUint32(info[0], "openPosition: argument 1");
     const double qty = argNumber(info[1], "openPosition: argument 2");
     const double entry = argNumber(info[2], "openPosition: argument 3");
-    if (info.Length() >= 4 && info[3].IsNumber())
+    if (given(info[3]))
     {
       lrvx_account_open_position_isolated(
           _h, sym, qty, entry, argNumber(info[3], "openPosition: argument 4"));
@@ -134,7 +123,7 @@ class AccountWrap : public Napi::ObjectWrap<AccountWrap>
   {
     const uint32_t sym = argUint32(info[0], "setMark: argument 1");
     const double price = argNumber(info[1], "setMark: argument 2");
-    if (info.Length() >= 3 && (info[2].IsNumber() || info[2].IsBigInt()))
+    if (given(info[2]))
     {
       lrvx_account_set_mark_at(_h, sym, price, toInt64Ns(info[2], "setMark: argument 3"));
     }
@@ -167,7 +156,7 @@ class AccountWrap : public Napi::ObjectWrap<AccountWrap>
   {
     const int64_t ts = toInt64Ns(info[0], "recordFill: argument 1");
     const double notional = argNumber(info[1], "recordFill: argument 2");
-    if (info.Length() >= 3 && info[2].IsNumber())
+    if (given(info[2]))
     {
       lrvx_account_record_fill_ex(_h, ts, notional,
                                   argUint32(info[2], "recordFill: argument 3"));

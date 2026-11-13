@@ -29,7 +29,9 @@ inline std::vector<uint32_t> readU32Array(const Napi::Array& arr)
   return out;
 }
 
-inline std::vector<uint8_t> readBytes(const Napi::Value& v)
+// A payload: a Buffer or a string. Anything else used to be written as an
+// empty payload.
+inline std::vector<uint8_t> readBytes(const Napi::Value& v, const char* what)
 {
   if (v.IsBuffer())
   {
@@ -41,7 +43,7 @@ inline std::vector<uint8_t> readBytes(const Napi::Value& v)
     std::string s = v.As<Napi::String>().Utf8Value();
     return std::vector<uint8_t>(s.begin(), s.end());
   }
-  return {};
+  throw Napi::TypeError::New(v.Env(), std::string(what) + " must be a Buffer or a string");
 }
 
 }  // namespace detail_runtrace
@@ -135,7 +137,7 @@ class TraceRecorderWrap : public Napi::ObjectWrap<TraceRecorderWrap>
     std::vector<uint8_t> payload;
     if (opts.Has("payload"))
     {
-      payload = detail_runtrace::readBytes(opts.Get("payload"));
+      payload = detail_runtrace::readBytes(opts.Get("payload"), "writeSignal: payload");
     }
     lrvx_run_recorder_write_signal64(_h, run_ts, feed_ts, sid, flags, strength,
                                      name.empty() ? nullptr : name.data(), name.size(),

@@ -185,7 +185,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     std::string side = argString(info[1], "submitOrder: argument 2");
     double price = argNumber(info[2], "submitOrder: argument 3");
     double qty = argNumber(info[3], "submitOrder: argument 4");
-    std::string type = info.Length() > 4 && info[4].IsString() ? argString(info[4], "submitOrder: argument 5") : "market";
+    std::string type = given(info[4]) ? argString(info[4], "submitOrder: argument 5") : "market";
     uint32_t sym = info.Length() > 5 ? argUint32(info[5], "submitOrder: argument 6") : 1;
     uint8_t s = side == "buy" ? 0 : 1;
     // lrvx_simulated_executor_submit_order takes an order_type in the
@@ -200,7 +200,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
       return;
     }
     // Optional opts object as the 7th argument: { tif, reduceOnly, expiresAtNs }.
-    if (info.Length() > 6 && info[6].IsObject())
+    if (given(info[6]))
     {
       auto opts = argObject(info[6], "submitOrder: argument 7");
       uint8_t tif = 0;
@@ -312,7 +312,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     // made documented code throw at runtime. An unknown name or code throws
     // and leaves the previous profile in place.
     int32_t m = 0;
-    if (info.Length() > 0 && info[0].IsNumber())
+    if (info[0].IsNumber())
     {
       m = argInt32(info[0], "setDefaultSlippage: argument 1");
     }
@@ -349,7 +349,7 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     // Accept either the string name or the exported QUEUE_* constant. An
     // unknown one of either throws and leaves the model installed before.
     int32_t m = 0;
-    if (info.Length() > 0 && info[0].IsNumber())
+    if (info[0].IsNumber())
     {
       m = argInt32(info[0], "setQueueModel: argument 1");
     }

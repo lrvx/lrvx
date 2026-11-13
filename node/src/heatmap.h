@@ -58,35 +58,25 @@ inline Napi::Value heatmapHtml(const Napi::CallbackInfo& info)
     auto getStringArr = [&](Napi::Object opts, const char* key,
                             std::vector<std::string>& out)
     {
-      if (opts.Has(key))
+      auto val = opts.Get(key);
+      if (given(val))
       {
-        auto val = opts.Get(key);
-        if (val.IsArray())
+        auto arr = argArray(val, (std::string("heatmapHtml: ") + key).c_str());
+        for (uint32_t i = 0; i < arr.Length(); ++i)
         {
-          auto arr = val.As<Napi::Array>();
-          for (uint32_t i = 0; i < arr.Length(); ++i)
-          {
-            out.push_back(argString(arr.Get(i), (std::string("heatmapHtml: an entry of ") + key).c_str()));
-          }
+          out.push_back(argString(arr.Get(i), (std::string("heatmapHtml: an entry of ") + key).c_str()));
         }
       }
     };
     auto getString = [&](Napi::Object opts, const char* key) -> std::string
     {
-      if (opts.Has(key))
-      {
-        auto val = opts.Get(key);
-        if (val.IsString())
-        {
-          return val.As<Napi::String>().Utf8Value();
-        }
-      }
-      return "";
+      auto val = opts.Get(key);
+      return given(val) ? argString(val, (std::string("heatmapHtml: ") + key).c_str()) : "";
     };
 
     std::vector<std::string> rowLabels, colLabels;
     std::string title, xAxis, yAxis, metric;
-    if (info.Length() > 1 && info[1].IsObject())
+    if (given(info[1]))
     {
       auto opts = argObject(info[1], "heatmapHtml: argument 2");
       getStringArr(opts, "rowLabels", rowLabels);

@@ -222,6 +222,46 @@ inline Napi::BigInt argBigInt(const Napi::Value& v, const char* what)
   return v.As<Napi::BigInt>();
 }
 
+// Whether an optional argument or option was given. Only undefined -- an
+// argument left off or a key not set -- keeps the default. Reading one only
+// when it had the expected type skipped a value of any other type as if it
+// were absent, so `{ symbols: 'BTCUSDT' }` ran with no symbols at all.
+inline bool given(const Napi::Value& v) { return !v.IsUndefined(); }
+
+// A setting given by name or by code: the name's position in `names` is its
+// code. An unknown name, or a value that is neither a string nor a number,
+// used to be taken as code 0.
+inline uint32_t argNamedCode(const Napi::Value& v, const char* what,
+                             std::initializer_list<const char*> names)
+{
+  if (v.IsNumber())
+  {
+    return argUint32(v, what);
+  }
+  std::string list;
+  for (const char* n : names)
+  {
+    list += (list.empty() ? "'" : ", '") + std::string(n) + "'";
+  }
+  if (v.IsString())
+  {
+    const std::string s = v.As<Napi::String>().Utf8Value();
+    uint32_t code = 0;
+    for (const char* n : names)
+    {
+      if (s == n)
+      {
+        return code;
+      }
+      ++code;
+    }
+    throw Napi::TypeError::New(v.Env(), std::string(what) + " must be one of " + list +
+                                            " or a code; got '" + s + "'");
+  }
+  throw Napi::TypeError::New(v.Env(), std::string(what) + " must be one of " + list +
+                                          " or a code");
+}
+
 // The constructor a wrap class keeps so that argInstance can tell its
 // instances apart: `return keepCtor(Ctor(), DefineClass(...));` in Init.
 inline Napi::Function keepCtor(Napi::FunctionReference& ref, Napi::Function fn)

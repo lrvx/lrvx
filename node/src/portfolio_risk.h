@@ -73,10 +73,10 @@ class PortfolioRiskWrap : public Napi::ObjectWrap<PortfolioRiskWrap>
   {
     LrvxPortfolioRiskRules rules{};
     double initial_equity = 0.0;
-    if (info.Length() > 0 && info[0].IsObject())
+    if (given(info[0]))
     {
       auto opts = argObject(info[0], "PortfolioRisk: argument 1");
-      if (opts.Has("rules") && opts.Get("rules").IsObject())
+      if (given(opts.Get("rules")))
       {
         auto r = argObject(opts.Get("rules"), "PortfolioRisk: rules");
         detail_pr::readOptDouble(r, "maxDrawdownPct",

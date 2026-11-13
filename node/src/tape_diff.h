@@ -49,7 +49,7 @@ inline Napi::Value tapeDiff(const Napi::CallbackInfo& info)
     std::string right = argString(info[1], "tapeDiff: argument 2");
     uint32_t max_mismatches = 16;
     int64_t tolerance_ns = 0;
-    if (info.Length() >= 3 && info[2].IsObject())
+    if (given(info[2]))
     {
       auto opts = argObject(info[2], "tapeDiff: argument 3");
       if (opts.Has("maxMismatches"))

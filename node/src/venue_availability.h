@@ -102,7 +102,7 @@ class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
   {
     int64_t start = toInt64Ns(info[0], "scheduleOutage: argument 1");
     int64_t duration = argInteger(info[1], "scheduleOutage: argument 2");
-    std::string policy = info.Length() > 2 && info[2].IsString()
+    std::string policy = given(info[2])
                              ? argString(info[2], "scheduleOutage: argument 3")
                              : "cancel_all";
     int64_t ttl = info.Length() > 3 ? argInteger(info[3], "scheduleOutage: argument 4") : 0;
@@ -113,7 +113,7 @@ class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
   {
     double perDay = argNumber(info[0], "autoRandomOutages: argument 1");
     int64_t meanDur = argInteger(info[1], "autoRandomOutages: argument 2");
-    std::string policy = info.Length() > 2 && info[2].IsString()
+    std::string policy = given(info[2])
                              ? argString(info[2], "autoRandomOutages: argument 3")
                              : "cancel_all";
     uint64_t seed = info.Length() > 3 ? argInteger(info[3], "autoRandomOutages: argument 4") : 0xC0FFEEULL;
@@ -129,10 +129,10 @@ class VenueAvailabilityWrap : public Napi::ObjectWrap<VenueAvailabilityWrap>
   {
     int64_t start = toInt64Ns(info[0], "scheduleOutageEx: argument 1");
     int64_t duration = argInteger(info[1], "scheduleOutageEx: argument 2");
-    std::string outageType = info.Length() > 2 && info[2].IsString()
+    std::string outageType = given(info[2])
                                  ? argString(info[2], "scheduleOutageEx: argument 3")
                                  : "total";
-    std::string policy = info.Length() > 3 && info[3].IsString()
+    std::string policy = given(info[3])
                              ? argString(info[3], "scheduleOutageEx: argument 4")
                              : "cancel_all";
     int64_t ttl = info.Length() > 4 ? argInteger(info[4], "scheduleOutageEx: argument 5") : 0;

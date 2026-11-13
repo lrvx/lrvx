@@ -270,33 +270,29 @@ class SignalBuilderWrap : public Napi::ObjectWrap<SignalBuilderWrap>
     _names.push_back(sym);
   }
 
-  std::string getSym(const Napi::CallbackInfo& info, int idx)
+  std::string getSym(const Napi::CallbackInfo& info, int idx, const char* what)
   {
-    if (static_cast<int>(info.Length()) > idx && info[idx].IsString())
-    {
-      return info[idx].As<Napi::String>().Utf8Value();
-    }
-    return "";
+    return given(info[idx]) ? argString(info[idx], what) : "";
   }
 
   Napi::Value Buy(const Napi::CallbackInfo& info)
   {
-    add(toInt64Ns(info[0], "buy: argument 1"), 0, argNumber(info[1], "buy: argument 2"), 0, 0, getSym(info, 2));
+    add(toInt64Ns(info[0], "buy: argument 1"), 0, argNumber(info[1], "buy: argument 2"), 0, 0, getSym(info, 2, "buy: argument 3"));
     return info.This();
   }
   Napi::Value Sell(const Napi::CallbackInfo& info)
   {
-    add(toInt64Ns(info[0], "sell: argument 1"), 1, argNumber(info[1], "sell: argument 2"), 0, 0, getSym(info, 2));
+    add(toInt64Ns(info[0], "sell: argument 1"), 1, argNumber(info[1], "sell: argument 2"), 0, 0, getSym(info, 2, "sell: argument 3"));
     return info.This();
   }
   Napi::Value LimitBuy(const Napi::CallbackInfo& info)
   {
-    add(toInt64Ns(info[0], "limitBuy: argument 1"), 0, argNumber(info[2], "limitBuy: argument 3"), argNumber(info[1], "limitBuy: argument 2"), 1, getSym(info, 3));
+    add(toInt64Ns(info[0], "limitBuy: argument 1"), 0, argNumber(info[2], "limitBuy: argument 3"), argNumber(info[1], "limitBuy: argument 2"), 1, getSym(info, 3, "limitBuy: argument 4"));
     return info.This();
   }
   Napi::Value LimitSell(const Napi::CallbackInfo& info)
   {
-    add(toInt64Ns(info[0], "limitSell: argument 1"), 1, argNumber(info[2], "limitSell: argument 3"), argNumber(info[1], "limitSell: argument 2"), 1, getSym(info, 3));
+    add(toInt64Ns(info[0], "limitSell: argument 1"), 1, argNumber(info[2], "limitSell: argument 3"), argNumber(info[1], "limitSell: argument 2"), 1, getSym(info, 3, "limitSell: argument 4"));
     return info.This();
   }
   Napi::Value Length(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), _signals.size()); }
@@ -354,11 +350,7 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
 
   const SymbolData& resolve(const Napi::CallbackInfo& info, int idx = 0) const
   {
-    std::string sym;
-    if (static_cast<int>(info.Length()) > idx && info[idx].IsString())
-    {
-      sym = info[idx].As<Napi::String>().Utf8Value();
-    }
+    const std::string sym = given(info[idx]) ? argString(info[idx], "symbol") : "";
     if (sym.empty())
     {
       if (_order.empty())
@@ -392,7 +384,7 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
     return tryLrvx(info.Env(), [&]() -> Napi::Value
                    {
       std::string path = argString(info[0], "loadCsv: argument 1");
-      std::string sym = (info.Length() > 1 && info[1].IsString()) ? argString(info[1], "loadCsv: argument 2") : inferSymbol(path);
+      std::string sym = given(info[1]) ? argString(info[1], "loadCsv: argument 2") : inferSymbol(path);
       getOrCreate(sym).bars = parseCsv(path);
       return info.Env().Undefined(); });
   }
@@ -402,7 +394,7 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
     return tryLrvx(info.Env(), [&]() -> Napi::Value
                    {
       auto obj = argObject(info[0], "loadOhlcv: argument 1");
-      std::string sym = (info.Length() > 1 && info[1].IsString()) ? argString(info[1], "loadOhlcv: argument 2") : "default";
+      std::string sym = given(info[1]) ? argString(info[1], "loadOhlcv: argument 2") : "default";
       auto ts = argFloat64Array(obj.Get("ts"), "loadOhlcv: ts");
       auto op = argFloat64Array(obj.Get("open"), "loadOhlcv: open");
       auto hi = argFloat64Array(obj.Get("high"), "loadOhlcv: high");
