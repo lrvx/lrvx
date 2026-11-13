@@ -123,8 +123,7 @@ class VenueStackWrap : public Napi::ObjectWrap<VenueStackWrap>
   }
   static Napi::Value FromVenue(const Napi::CallbackInfo& info)
   {
-    const std::string name =
-        info[0].IsString() ? argString(info[0], "fromVenue: name") : "";
+    const std::string name = argString(info[0], "fromVenue: name");
     uint8_t code = 0;
     if (name == "bybit_linear" || name == "bybit")
     {
