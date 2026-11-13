@@ -12,6 +12,7 @@
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/log/abstract_logger.h"
+#include "lrvx/log/console_logger.h"
 #include "lrvx/log/log_stream.h"
 #include "queued_order_event.h"
 #include "tracker_ownership.h"
@@ -9659,20 +9660,22 @@ void lrvx_executor_get_capabilities(LrvxExecutorHandle executor,
 namespace
 {
 
-// The callback lrvx_set_log_callback installed. One adapter is installed as
-// the global logger for the life of the process and never freed, so a thread
-// that loaded it just before a replacement still calls into live memory. The
+// The callback lrvx_set_log_callback installed. One adapter is the global
+// logger from the first call on and is never freed, so a thread that loaded
+// it just before a replacement still calls into live memory; with no
+// callback set it writes to the console, as the default logger does. The
 // callback it forwards to is swapped under a mutex, and a replacement waits
-// for the calls already inside the old callback to return: once
-// lrvx_set_log_callback returns, the old callback is neither running nor
-// called again, and its user data may be freed. The adapter used to be
-// freed right after the swap, while a logging thread could still be in it.
+// for the calls already inside the old callback on other threads to return:
+// once lrvx_set_log_callback returns, the old callback is neither running
+// elsewhere nor called again, and its user data may be freed. The adapter
+// used to be freed right after the swap, while a logging thread could still
+// be in it.
 class CapiCallbackLogger : public lrvx::ILogger
 {
  public:
-  void info(std::string_view msg) override { dispatch(0, msg); }
-  void warn(std::string_view msg) override { dispatch(1, msg); }
-  void error(std::string_view msg) override { dispatch(2, msg); }
+  void info(std::string_view msg) override { dispatch(lrvx::LogLevel::Info, msg); }
+  void warn(std::string_view msg) override { dispatch(lrvx::LogLevel::Warn, msg); }
+  void error(std::string_view msg) override { dispatch(lrvx::LogLevel::Error, msg); }
 
   void set(LrvxLogCallback cb, void* ud)
   {
@@ -9689,10 +9692,11 @@ class CapiCallbackLogger : public lrvx::ILogger
     {
       return;
     }
-    // A callback that replaces or removes itself is one of the calls in
-    // flight; it does not wait for itself.
-    const int self = t_dispatching == old.get() ? 1 : 0;
-    while (old->inFlight.load(std::memory_order_acquire) > self)
+    // A callback that replaces or removes itself, at any depth of logging
+    // from inside itself, has its own calls in flight on this thread; it
+    // waits only for the other threads'.
+    const auto own = static_cast<int>(std::count(t_frames.begin(), t_frames.end(), old.get()));
+    while (old->inFlight.load(std::memory_order_acquire) > own)
     {
       std::this_thread::yield();
     }
@@ -9707,34 +9711,55 @@ class CapiCallbackLogger : public lrvx::ILogger
     std::atomic<int> inFlight{0};
   };
 
-  void dispatch(int32_t level, std::string_view msg)
+  // Ends one call into a target, however the callback leaves: a call left
+  // counted would make every later replacement wait for it forever.
+  struct Frame
+  {
+    explicit Frame(std::shared_ptr<Target> target) : t(std::move(target))
+    {
+      t_frames.push_back(t.get());
+    }
+    ~Frame()
+    {
+      t_frames.pop_back();
+      t->inFlight.fetch_sub(1, std::memory_order_acq_rel);
+    }
+    Frame(const Frame&) = delete;
+    Frame& operator=(const Frame&) = delete;
+    std::shared_ptr<Target> t;
+  };
+
+  void dispatch(lrvx::LogLevel level, std::string_view msg)
   {
     std::shared_ptr<Target> t;
     {
       std::lock_guard<std::mutex> lock(_mutex);
       t = _target;
-      if (t == nullptr)
+      if (t != nullptr)
       {
-        return;
+        t->inFlight.fetch_add(1, std::memory_order_acq_rel);
       }
-      t->inFlight.fetch_add(1, std::memory_order_acq_rel);
     }
-    const Target* outer = t_dispatching;
-    t_dispatching = t.get();
+    if (t == nullptr)
+    {
+      _console.log(level, msg);
+      return;
+    }
+    Frame frame(std::move(t));
     // string_view is not guaranteed null-terminated; the C callback expects
     // const char*. Construct a std::string for the call duration.
-    std::string s(msg);
-    t->cb(t->ud, level, s.c_str());
-    t_dispatching = outer;
-    t->inFlight.fetch_sub(1, std::memory_order_acq_rel);
+    const std::string s(msg);
+    frame.t->cb(frame.t->ud, static_cast<int32_t>(level), s.c_str());
   }
 
   std::mutex _mutex;
   std::shared_ptr<Target> _target;
-  static thread_local const Target* t_dispatching;
+  lrvx::ConsoleLogger _console;
+  // The targets this thread is inside, innermost last.
+  static thread_local std::vector<const Target*> t_frames;
 };
 
-thread_local const CapiCallbackLogger::Target* CapiCallbackLogger::t_dispatching = nullptr;
+thread_local std::vector<const CapiCallbackLogger::Target*> CapiCallbackLogger::t_frames;
 
 CapiCallbackLogger& capiLogger()
 {
@@ -9748,12 +9773,9 @@ void lrvx_set_log_callback(LrvxLogCallback callback, void* user_data)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
   CapiCallbackLogger& logger = capiLogger();
-  if (callback == nullptr)
-  {
-    lrvx::setGlobalLogger(nullptr);
-    logger.set(nullptr, nullptr);
-    return;
-  }
+  // The adapter stays the global logger either way. Swapping the global to
+  // the default and the adapter's target in two steps let two concurrent
+  // calls interleave so that the adapter stayed installed with no target.
   logger.set(callback, user_data);
   lrvx::setGlobalLogger(&logger);
   LRVX_CAPI_LEAVE_VOID;

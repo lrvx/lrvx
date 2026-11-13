@@ -270,3 +270,75 @@ TEST(CapiLogger, ACallbackMayDetachItself)
   LRVX_LOG_INFO("second");
   EXPECT_EQ(calls.load(), 1);
 }
+
+namespace
+{
+
+// How deep the nested callback goes before it detaches itself, and what it
+// saw. It logs from inside itself until it is `detachAt` calls deep.
+struct Nesting
+{
+  int detachAt = 0;
+  int depth = 0;
+  int calls = 0;
+};
+
+void nestingCb(void* ud, int32_t, const char*)
+{
+  auto* n = static_cast<Nesting*>(ud);
+  ++n->calls;
+  ++n->depth;
+  if (n->depth < n->detachAt)
+  {
+    LRVX_LOG_INFO("nested");
+  }
+  else
+  {
+    lrvx_set_log_callback(nullptr, nullptr);
+  }
+  --n->depth;
+}
+
+// Runs one nested self-detach on its own thread. False when it has not
+// returned within two seconds: it waits on its own outer calls.
+bool nestedSelfDetachReturns(Nesting& n)
+{
+  auto done = std::make_shared<std::atomic<bool>>(false);
+  std::thread([&n, done]
+              {
+                lrvx_set_log_callback(nestingCb, &n);
+                LRVX_LOG_INFO("outer");
+                done->store(true); })
+      .detach();
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+  while (!done->load() && std::chrono::steady_clock::now() < deadline)
+  {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  return done->load();
+}
+
+}  // namespace
+
+// A callback that logs from inside itself and detaches in a nested call: the
+// detach waited for the outer calls on its own thread, which cannot return
+// until it does. A thread now never waits for its own frames.
+TEST(CapiLogger, ACallbackMayDetachItselfTwoCallsDeep)
+{
+  static Nesting n;
+  n = Nesting{.detachAt = 2};
+  ASSERT_TRUE(nestedSelfDetachReturns(n)) << "the detach waited on its own outer call";
+  EXPECT_EQ(n.calls, 2);
+  LRVX_LOG_INFO("after");
+  EXPECT_EQ(n.calls, 2) << "detached";
+}
+
+TEST(CapiLogger, ACallbackMayDetachItselfThreeCallsDeep)
+{
+  static Nesting n;
+  n = Nesting{.detachAt = 3};
+  ASSERT_TRUE(nestedSelfDetachReturns(n)) << "the detach waited on its own outer calls";
+  EXPECT_EQ(n.calls, 3);
+  LRVX_LOG_INFO("after");
+  EXPECT_EQ(n.calls, 3) << "detached";
+}

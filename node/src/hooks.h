@@ -1003,9 +1003,14 @@ class LogFanout
           delete s;
         });
     envData(env).logSink = sink;
-    std::lock_guard<std::mutex> lock(mutex());
-    sinks().push_back(sink);
-    if (sinks().size() == 1)
+    std::lock_guard<std::mutex> installing(installMutex());
+    bool first = false;
+    {
+      std::lock_guard<std::mutex> lock(mutex());
+      sinks().push_back(sink);
+      first = sinks().size() == 1;
+    }
+    if (first)
     {
       lrvx_set_log_callback(&LogFanout::bridge, nullptr);
     }
@@ -1026,7 +1031,17 @@ class LogFanout
   }
 
  private:
+  // Guards the list; the bridge takes it for each line.
   static std::mutex& mutex()
+  {
+    static std::mutex m;
+    return m;
+  }
+  // Orders installing and removing the bridge. Removing it waits for the
+  // lines already inside the bridge, and those wait for mutex(), so mutex()
+  // is never held across lrvx_set_log_callback: holding it there let a line
+  // in the bridge and a detach on another thread wait for each other.
+  static std::mutex& installMutex()
   {
     static std::mutex m;
     return m;
@@ -1039,15 +1054,20 @@ class LogFanout
 
   static void remove(LogSink* sink)
   {
-    std::lock_guard<std::mutex> lock(mutex());
-    auto& v = sinks();
-    const auto it = std::find(v.begin(), v.end(), sink);
-    if (it == v.end())
+    std::lock_guard<std::mutex> installing(installMutex());
+    bool last = false;
     {
-      return;
+      std::lock_guard<std::mutex> lock(mutex());
+      auto& v = sinks();
+      const auto it = std::find(v.begin(), v.end(), sink);
+      if (it == v.end())
+      {
+        return;
+      }
+      v.erase(it);
+      last = v.empty();
     }
-    v.erase(it);
-    if (v.empty())
+    if (last)
     {
       lrvx_set_log_callback(nullptr, nullptr);
     }

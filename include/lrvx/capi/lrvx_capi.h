@@ -2229,7 +2229,9 @@ extern "C"
   // logger). Any thread may log while it is replaced or removed: once this
   // returns, the previous callback is no longer running on another thread
   // and is not called again, so its user_data may be freed. A callback may
-  // replace or remove itself.
+  // replace or remove itself, also from a line it logs inside itself. The
+  // wait is for the other threads' calls into the previous callback, so do
+  // not call this while holding a lock that callback takes.
   void lrvx_set_log_callback(LrvxLogCallback callback, void* user_data);
 
   // ============================================================
