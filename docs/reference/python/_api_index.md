@@ -1788,7 +1788,7 @@ Members:
 - `on_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `order_closed(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> None`
 - `replace_strategy(self, index: typing.SupportsInt | typing.SupportsIndex, strategy: Strategy) -> None`
-- `replay_tape(self, path: str, simulator: SimulatedExecutor, *, tape_symbol_id: typing.Any = None, symbol: typing.Any = None, lock: typing.Any = None, after_event: typing.Any = None) -> dict`
+- `replay_tape(self, path: str, simulator: SimulatedExecutor, *, tape_symbol_id: typing.Any = None, symbol: typing.Any = None, lock: typing.Any = None, after_event: typing.Any = None, on_start: typing.Any = None) -> dict`
 - `seed_position(self, strategy: Strategy, symbol: typing.Any, position: typing.SupportsFloat | typing.SupportsIndex, avg_entry_price: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None`
 - `set_executor(self, executor: Executor) -> None`
 - `set_kill_switch(self, ks: KillSwitch) -> None`

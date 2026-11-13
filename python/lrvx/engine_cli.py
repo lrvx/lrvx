@@ -103,27 +103,45 @@ class _KillSwitch:
 # ── Runtime state writer ────────────────────────────────────────────
 
 
+def _empty_account(strategy_name: str) -> Dict[str, Any]:
+    return {
+        "positions": [],
+        "open_orders": [],
+        "pnl": {
+            "by_strategy": [{
+                "strategy": strategy_name,
+                "realized": 0.0,
+                "unrealized": 0.0,
+                "fees": 0.0,
+                "trades": 0,
+            }],
+            "total": {"realized": 0.0, "unrealized": 0.0, "fees": 0.0},
+        },
+    }
+
+
 class _StateWriter:
     """Periodically dumps a runtime snapshot for tier-4 MCP read tools.
 
-    The schema matches ``docs/reference/runtime-state-schema.md`` v1.
-    For v1 of the sim engine, positions / pnl / open_orders are
-    populated as empty arrays — the snapshot's value here is that it
-    *exists with valid schema*, so the read tools always get back an
-    actionable response instead of erroring. Deriving real
-    positions/PnL from the SimulatedExecutor fill stream is a
-    follow-up — tracked separately.
+    Schema version 1, the one the MCP read tools (``get_positions``,
+    ``get_open_orders``, ``get_pnl``) parse. ``account`` is a callable
+    that answers the positions, the open orders and the PnL of the moment
+    (the simulator bridge's ``account``); they used to be written as empty
+    arrays and zeros whatever the simulator held. Without one they still
+    are: a writer with nothing to ask writes a valid, empty account.
     """
 
     def __init__(self, path: Path, kill_switch: _KillSwitch,
                  strategy_name: str, symbol_id: int,
-                 symbol_name: str, period_s: float = 1.0) -> None:
+                 symbol_name: str, period_s: float = 1.0,
+                 account: Any = None) -> None:
         self._path = path
         self._ks = kill_switch
         self._strategy_name = strategy_name
         self._symbol_id = symbol_id
         self._symbol_name = symbol_name
         self._period_s = period_s
+        self._account = account
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         # Serialize writes — the loop thread and explicit out-of-band
@@ -132,6 +150,8 @@ class _StateWriter:
         self._lock = threading.Lock()
 
     def _snapshot(self) -> Dict[str, Any]:
+        account = self._account() if self._account is not None else _empty_account(
+            self._strategy_name)
         return {
             "schema_version": 1,
             "captured_at_ns": time.time_ns(),
@@ -141,18 +161,9 @@ class _StateWriter:
                 "status": "running",
                 "symbols": [self._symbol_id],
             }],
-            "positions": [],
-            "open_orders": [],
-            "pnl": {
-                "by_strategy": [{
-                    "strategy": self._strategy_name,
-                    "realized": 0.0,
-                    "unrealized": 0.0,
-                    "fees": 0.0,
-                    "trades": 0,
-                }],
-                "total": {"realized": 0.0, "unrealized": 0.0, "fees": 0.0},
-            },
+            "positions": account["positions"],
+            "open_orders": account["open_orders"],
+            "pnl": account["pnl"],
         }
 
     def _write_once(self) -> None:
@@ -243,9 +254,16 @@ def _resolve_tape_symbol(tape_path: Path, requested: Optional[int]) -> int:
 
 
 def _feed_tape(runner, tape_path: Path, tape_symbol_id: int,
-               registered_symbol_id: int, sim_bridge: Any = None) -> int:
+               registered_symbol_id: int, sim_bridge: Any = None, *,
+               on_start: Any = None, mark: Any = None) -> int:
     """Drive a Runner from a recorded ``.lrvx`` tape. Returns the
     number of trades dispatched to the strategy.
+
+    ``on_start()`` is called once the replay has reset the simulator and
+    before the first event: the moment from which an order placed in the
+    simulator is kept. ``mark()`` answers the registered symbol's last
+    price; it is asked after each event and is what the bridge's account
+    values an open position at.
 
     With ``sim_bridge`` (see :func:`_make_sim_bridge`) the replay is
     ``Runner.replay_tape``: the loop ``BacktestRunner.run_tape`` uses, with
@@ -255,21 +273,39 @@ def _feed_tape(runner, tape_path: Path, tape_symbol_id: int,
     before the strategy sees it, in time order, so a resting limit order
     fills from the book as it would in a backtest. The bridge's lock is held
     while the simulator takes an event, and the orders the simulator has
-    filled completely are reported to the runner after each one. Trades
-    alone used to be replayed, and a resting order never filled.
+    filled are reported to the runner after each one: every fill to the
+    strategy that placed the order (``Runner.on_order_event``, so its
+    ``on_fill`` runs and its position counts the fill), and an order filled
+    completely to ``Runner.order_closed``. Trades alone used to be replayed,
+    and a resting order never filled.
+
+    On a threaded runner ``Runner.replay_tape`` waits after each event until
+    the strategy thread has been handed it, so an order meets the tape at
+    the same event as on a synchronous runner.
 
     Without a bridge only the runner is fed, trades only, and a simulator
     behind the runner's executor never fills."""
     from . import tape as tape_mod
 
     if sim_bridge is not None:
+        def _started() -> None:
+            sim_bridge.reset_account()
+            if on_start is not None:
+                on_start()
+
+        def _after_event() -> None:
+            if mark is not None:
+                sim_bridge.note_mark(registered_symbol_id, mark())
+            sim_bridge.report_fills(runner)
+
         stats = runner.replay_tape(
             str(tape_path), sim_bridge.simulator,
             tape_symbol_id=tape_symbol_id, symbol=registered_symbol_id,
-            lock=sim_bridge.lock,
-            after_event=lambda: sim_bridge.report_fills(runner))
+            lock=sim_bridge.lock, after_event=_after_event, on_start=_started)
         return int(stats["trades"])
 
+    if on_start is not None:
+        on_start()
     counter = [0]
 
     def _on_trade(ts_ns: int, sym_id: int, price: float,
@@ -316,10 +352,17 @@ def _make_sim_bridge(sim: Any) -> Any:
             # The bridge is called on the runner's thread and the tape replay
             # on the caller's; with a threaded runner those are two threads.
             self._lock = threading.Lock()
-            # order id -> [symbol, quantity still to fill], for the orders
-            # this bridge sent that the simulator has not finished.
-            self._working: Dict[int, list] = {}
+            # order id -> what was sent and how much of it is still to fill,
+            # for the orders this bridge sent that the simulator has not
+            # finished.
+            self._working: Dict[int, Dict[str, Any]] = {}
             self._fills_seen = 0
+            # The account the state file is written from: every fill the
+            # simulator made, and the last price each symbol was seen at.
+            self._positions = lrvx.PositionTracker("average")
+            self._traded: set = set()
+            self._trades = 0
+            self._marks: Dict[int, float] = {}
             # What the ControlServer is given as its executor.
             self.control = _SimControl(self)
 
@@ -357,7 +400,16 @@ def _make_sim_bridge(sim: Any) -> Any:
                 trailing_offset=offset,
                 trailing_bps=bps,
             )
-            self._working[int(order.id)] = [int(order.symbol), float(order.quantity)]
+            self._note_working(order.id, order.symbol, order.side or "buy", order_type,
+                               float(order.price), float(order.quantity))
+
+        def _note_working(self, order_id: int, symbol: int, side: str, order_type: str,
+                          price: float, quantity: float) -> None:
+            self._working[int(order_id)] = {
+                "symbol": int(symbol), "side": side, "type": order_type, "price": price,
+                "quantity": quantity, "remaining": quantity,
+                "submitted_at_ns": time.time_ns(),
+            }
 
         def submit(self, order: Any) -> None:
             with self._lock:
@@ -380,7 +432,8 @@ def _make_sim_bridge(sim: Any) -> Any:
         def cancel_all(self, symbol: int) -> None:
             with self._lock:
                 self._sim.cancel_all(symbol)
-                for order_id in [i for i, w in self._working.items() if w[0] == int(symbol)]:
+                for order_id in [i for i, w in self._working.items()
+                                 if w["symbol"] == int(symbol)]:
                     del self._working[order_id]
 
         # ── orders that come from outside the runner (the ControlServer) ──
@@ -390,7 +443,7 @@ def _make_sim_bridge(sim: Any) -> Any:
             with self._lock:
                 self._sim.submit_order(order_id, side, price, quantity,
                                        type=type, symbol=symbol)
-                self._working[int(order_id)] = [int(symbol), float(quantity)]
+                self._note_working(order_id, symbol, side, type, float(price), float(quantity))
 
         def control_cancel(self, order_id: int) -> bool:
             """True when the order was one this bridge still had working."""
@@ -402,33 +455,122 @@ def _make_sim_bridge(sim: Any) -> Any:
             """The ids that were working on ``symbol``."""
             with self._lock:
                 self._sim.cancel_all(symbol)
-                gone = [i for i, w in self._working.items() if w[0] == int(symbol)]
+                gone = [i for i, w in self._working.items() if w["symbol"] == int(symbol)]
                 for order_id in gone:
                     del self._working[order_id]
                 return gone
 
         def report_fills(self, runner: Any) -> int:
-            """Tell ``runner`` (``Runner.order_closed``) about every order the
-            simulator has filled completely since the last call. Returns how
-            many orders that was."""
-            finished = []
+            """Report what the simulator has filled since the last call.
+
+            Every fill of an order this bridge sent goes to ``runner`` as an
+            order event (``Runner.on_order_event``): ``PARTIALLY_FILLED``, or
+            ``FILLED`` for the one that completes the order, with the fill's
+            own quantity and price, so the strategy's ``on_fill`` runs and
+            its position counts the fill. An order filled completely is then
+            reported closed (``Runner.order_closed``). Only the closing used
+            to be reported. Returns how many orders were completed.
+            """
+            events = []
             with self._lock:
                 if int(self._sim.fill_count) == self._fills_seen:
                     return 0
                 fills = self._sim.fills_list()
                 for fill in fills[self._fills_seen:]:
                     order_id = int(fill["order_id"])
+                    symbol = int(fill["symbol"])
+                    quantity = float(fill["quantity"])
+                    self._positions.on_fill(symbol, fill["side"], float(fill["price"]), quantity)
+                    self._traded.add(symbol)
+                    self._trades += 1
+                    self._marks.setdefault(symbol, float(fill["price"]))
                     working = self._working.get(order_id)
                     if working is None:
                         continue
-                    working[1] -= float(fill["quantity"])
-                    if working[1] <= 1e-12:
+                    working["remaining"] -= quantity
+                    done = working["remaining"] <= 1e-12
+                    if done:
                         del self._working[order_id]
-                        finished.append(order_id)
+                    events.append((order_id, symbol, fill, working["type"], done))
                 self._fills_seen = len(fills)
-            for order_id in finished:
-                runner.order_closed(order_id)
-            return len(finished)
+            finished = 0
+            for order_id, symbol, fill, order_type, done in events:
+                runner.on_order_event(
+                    order_id, symbol, fill["side"], "FILLED" if done else "PARTIALLY_FILLED",
+                    order_type=order_type, fill_qty=float(fill["quantity"]),
+                    fill_price=float(fill["price"]), ts_ns=int(fill["timestamp_ns"]),
+                    is_maker=bool(fill["is_maker"]))
+                if done:
+                    runner.order_closed(order_id)
+                    finished += 1
+            return finished
+
+        # ── the account the state file is written from ──
+
+        def reset_account(self) -> None:
+            """Forget every fill and every working order: the simulator has
+            been reset and holds none of them."""
+            with self._lock:
+                self._working.clear()
+                self._fills_seen = 0
+                self._positions = lrvx.PositionTracker("average")
+                self._traded.clear()
+                self._trades = 0
+                self._marks.clear()
+
+        def note_mark(self, symbol: int, price: float) -> None:
+            """The last price ``symbol`` was seen at; an open position is
+            valued at it. A price of 0 (nothing seen yet) is ignored."""
+            if price and price > 0:
+                with self._lock:
+                    self._marks[int(symbol)] = float(price)
+
+        def account(self, symbol_names: Dict[int, str], strategy_name: str) -> Dict[str, Any]:
+            """Positions, open orders and PnL of the moment, in the shape the
+            runtime state file gives them.
+
+            A position is the net of the simulator's fills in the symbol at
+            its average entry price, valued at the symbol's mark (the last
+            fill's price until a mark is noted). The simulator charges no
+            fee here, so fees are 0.
+            """
+            with self._lock:
+                positions = []
+                realized = 0.0
+                unrealized = 0.0
+                for symbol in sorted(self._traded):
+                    realized += float(self._positions.realized_pnl(symbol))
+                    qty = float(self._positions.position(symbol))
+                    if abs(qty) <= 1e-12:
+                        continue
+                    avg = float(self._positions.avg_entry_price(symbol))
+                    pnl = (self._marks.get(symbol, avg) - avg) * qty
+                    unrealized += pnl
+                    positions.append({
+                        "account": "sim", "strategy": strategy_name, "symbol_id": symbol,
+                        "symbol_name": symbol_names.get(symbol, str(symbol)),
+                        "qty": qty, "avg_price": avg, "unrealized_pnl": pnl,
+                    })
+                open_orders = [{
+                    "order_id": str(order_id), "account": "sim", "strategy": strategy_name,
+                    "symbol_id": w["symbol"],
+                    "symbol_name": symbol_names.get(w["symbol"], str(w["symbol"])),
+                    "side": str(w["side"]).upper(), "type": str(w["type"]).upper(),
+                    "qty": w["remaining"], "price": w["price"],
+                    "submitted_at_ns": w["submitted_at_ns"],
+                } for order_id, w in sorted(self._working.items())]
+                trades = self._trades
+            return {
+                "positions": positions,
+                "open_orders": open_orders,
+                "pnl": {
+                    "by_strategy": [{
+                        "strategy": strategy_name, "realized": realized,
+                        "unrealized": unrealized, "fees": 0.0, "trades": trades,
+                    }],
+                    "total": {"realized": realized, "unrealized": unrealized, "fees": 0.0},
+                },
+            }
 
     return _SimBridge()
 
@@ -489,6 +631,22 @@ def _make_kill_switch_bridge(state: "_KillSwitch") -> Any:
 
 
 def cmd_engine_sim(args: argparse.Namespace) -> int:
+    stop_evt = threading.Event()
+
+    def _on_signal(_signum, _frame):
+        stop_evt.set()
+
+    signal.signal(signal.SIGINT, _on_signal)
+    signal.signal(signal.SIGTERM, _on_signal)
+    # Hold until SIGINT so the user can introspect via MCP after the tape
+    # ends.
+    return _engine_sim(args, lambda _context: stop_evt.wait())
+
+
+def _engine_sim(args: argparse.Namespace, hold: Any) -> int:
+    """Run the sim engine: replay the tape, then call ``hold(context)`` and
+    stop when it returns. ``context`` names the runner, the strategy, the
+    simulator bridge, the control server and the state writer."""
     import lrvx
     from . import control_server as cs_mod
 
@@ -546,48 +704,47 @@ def cmd_engine_sim(args: argparse.Namespace) -> int:
         host=args.host,
         port=args.port,
     )
-    server.start()
-
     writer = _StateWriter(
         path=state_path, kill_switch=ks,
         strategy_name=StratCls.__name__,
         symbol_id=sym_id, symbol_name=args.symbol_name,
+        account=lambda: sim_bridge.account({sym_id: args.symbol_name}, StratCls.__name__),
     )
-    writer.start()
+    serving = []
 
-    _print_banner(
-        strategy_name=StratCls.__name__,
-        strategy_path=strategy_path,
-        symbol_name=args.symbol_name,
-        tape_path=tape_path,
-        state_path=state_path,
-        control_url=server.url,
-        token=token,
-    )
-
-    stop_evt = threading.Event()
-
-    def _on_signal(_signum, _frame):
-        stop_evt.set()
-
-    signal.signal(signal.SIGINT, _on_signal)
-    signal.signal(signal.SIGTERM, _on_signal)
+    def _serve() -> None:
+        # Called by the replay once it has reset the simulator. The server
+        # used to open before that, and an order placed over MCP in between
+        # was wiped by the reset.
+        server.start()
+        writer.start()
+        serving.append(True)
+        _print_banner(
+            strategy_name=StratCls.__name__,
+            strategy_path=strategy_path,
+            symbol_name=args.symbol_name,
+            tape_path=tape_path,
+            state_path=state_path,
+            control_url=server.url,
+            token=token,
+        )
 
     try:
-        n = _feed_tape(runner, tape_path, tape_symbol_id, sym_id, sim_bridge)
+        n = _feed_tape(runner, tape_path, tape_symbol_id, sym_id, sim_bridge,
+                       on_start=_serve, mark=strategy.last_price)
         print(f"tape replay complete: {n} trade(s) dispatched.")
         print("engine still running — Ctrl-C to stop.")
-        # Hold until SIGINT so the user can introspect via MCP after
-        # the tape ends.
-        stop_evt.wait()
+        hold({"runner": runner, "strategy": strategy, "bridge": sim_bridge,
+              "server": server, "writer": writer})
     finally:
         print("\nstopping engine...")
         try:
             runner.stop()
         except Exception:
             pass
-        server.stop()
-        writer.stop()
+        if serving:
+            server.stop()
+            writer.stop()
 
     return 0
 

@@ -1925,7 +1925,7 @@ class PyRunner
   // it would in a backtest of the same tape, not from trades alone.
   py::dict replay_tape(const std::string& path, PySimulatedExecutor& sim,
                        std::optional<uint32_t> tape_symbol, std::optional<uint32_t> symbol,
-                       py::object lock, py::object after_event)
+                       py::object lock, py::object after_event, py::object on_start)
   {
     namespace fs = std::filesystem;
     if (!fs::is_directory(fs::path(path)))
@@ -1982,11 +1982,24 @@ class PyRunner
       std::optional<uint32_t> to;
       Held& held;
       py::object& afterEvent;
+      py::object& onStart;
+      PyRunner& runner;
+      bool started{false};
 
       Remapped(replay::IMultiSegmentReader& r, std::optional<uint32_t> id, Held& h,
-               py::object& after)
-          : inner(r), to(id), held(h), afterEvent(after)
+               py::object& after, py::object& start, PyRunner& owner)
+          : inner(r), to(id), held(h), afterEvent(after), onStart(start), runner(owner)
       {
+      }
+
+      // The driver asks for the events once it has reset the simulator.
+      void begin()
+      {
+        if (!started && !onStart.is_none())
+        {
+          started = true;
+          onStart();
+        }
       }
 
       bool one(const replay::ReplayEvent& event, const EventCallback& callback)
@@ -2015,19 +2028,28 @@ class PyRunner
           throw;
         }
         held.release();
+        // The barrier of a threaded runner: its strategies have been handed
+        // this event, and have sent whatever orders it made them send,
+        // before the hook runs; and they have heard whatever the hook
+        // reported before the simulator is shown the next event. Without it
+        // an order met the tape wherever the strategy thread happened to be.
+        runner.drain();
         if (!afterEvent.is_none())
         {
           afterEvent();
+          runner.drain();
         }
         return more;
       }
       uint64_t forEach(EventCallback callback) override
       {
+        begin();
         return inner.forEach([&](const replay::ReplayEvent& e)
                              { return one(e, callback); });
       }
       uint64_t forEachFrom(int64_t start, EventCallback callback) override
       {
+        begin();
         return inner.forEachFrom(start, [&](const replay::ReplayEvent& e)
                                  { return one(e, callback); });
       }
@@ -2036,7 +2058,7 @@ class PyRunner
         return inner.segments();
       }
       uint64_t totalEvents() const override { return inner.totalEvents(); }
-    } reader{*inner, symbol, held, after_event};
+    } reader{*inner, symbol, held, after_event, on_start, *this};
 
     // The runner's side of the loop: what a backtest hands its strategy goes
     // to this runner instead. The simulator has seen the event by now, so
@@ -3824,13 +3846,13 @@ inline void bindStrategy(py::module_& m)
            "that is not on record is ignored; market, IOC and FOK orders are never kept. A "
            "modify that names an id not on record is not sent to the executor, and "
            "lrvx.last_error() then says why, ending in [unknown_order].")
-      .def("replay_tape", [](PyRunner& r, const std::string& path, PySimulatedExecutor& simulator, py::object tape_symbol_id, py::object symbol, py::object lock, py::object after_event)
+      .def("replay_tape", [](PyRunner& r, const std::string& path, PySimulatedExecutor& simulator, py::object tape_symbol_id, py::object symbol, py::object lock, py::object after_event, py::object on_start)
            { return r.replay_tape(
                  path, simulator,
                  tape_symbol_id.is_none() ? std::nullopt
                                           : std::optional<uint32_t>(tape_symbol_id.cast<uint32_t>()),
                  symbol.is_none() ? std::nullopt : std::optional<uint32_t>(symId(symbol)),
-                 std::move(lock), std::move(after_event)); }, py::arg("path"), py::arg("simulator"), py::kw_only(), py::arg("tape_symbol_id") = py::none(), py::arg("symbol") = py::none(), py::arg("lock") = py::none(), py::arg("after_event") = py::none(),
+                 std::move(lock), std::move(after_event), std::move(on_start)); }, py::arg("path"), py::arg("simulator"), py::kw_only(), py::arg("tape_symbol_id") = py::none(), py::arg("symbol") = py::none(), py::arg("lock") = py::none(), py::arg("after_event") = py::none(), py::arg("on_start") = py::none(),
            "Replay a `.lrvx` tape into this runner's strategies with `simulator` (a "
            "SimulatedExecutor) standing in for the venue, through the loop BacktestRunner.run_tape "
            "uses: every trade, book snapshot, book delta and top-of-book frame, in the tape's time "
@@ -3840,7 +3862,12 @@ inline void bindStrategy(py::module_& m)
            "tape_symbol_id and symbol, only that tape symbol is replayed and its events are "
            "delivered under the registered `symbol`. `lock` (anything with acquire / release) is "
            "held while the simulator is shown an event and released before the strategies see "
-           "it; `after_event()` is called after each event. The strategies receive trades, book "
+           "it; `after_event()` is called after each event. `on_start()` is called once, after "
+           "the simulator has been reset and before it is shown the first event: what is "
+           "submitted to the simulator from then on is not wiped by the reset. On a threaded "
+           "runner the replay waits, after each event, until the strategies have been handed it "
+           "and again after `after_event()`, so an order meets the tape at the same event as on "
+           "a synchronous runner. The strategies receive trades, book "
            "snapshots and tops; a live runner has no delta entry, so deltas reach the simulator "
            "only. Returns a dict: events, trades, books, book_deltas_not_delivered, "
            "skipped_option_quotes, skipped_pool_states.")

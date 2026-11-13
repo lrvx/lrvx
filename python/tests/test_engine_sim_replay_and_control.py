@@ -365,7 +365,7 @@ def test_a_fill_of_a_control_order_is_accounted():
 def test_engine_sim_hands_the_control_server_the_bridge():
     import inspect
 
-    source = inspect.getsource(engine_cli.cmd_engine_sim)
+    source = inspect.getsource(engine_cli._engine_sim)
     assert "executor=sim_bridge.control" in source
     assert "executor=sim," not in source
 
@@ -374,9 +374,11 @@ def test_engine_sim_hands_the_control_server_the_bridge():
 
 
 class WaitsForTheStrategy(RunnerSpy):
-    """The replay does not wait for a threaded runner's strategy thread. So
-    that the test is not a race, the first event's hook waits until the
-    strategy has sent its order."""
+    """Written when the replay did not wait for a threaded runner's strategy
+    thread: the first event's hook waits until the strategy has sent its
+    order. The replay waits by itself now (see
+    test_engine_sim_fills_state_and_order.py), so the wait here returns at
+    once."""
 
     def __init__(self, inner, strategy):
         super().__init__(inner)
