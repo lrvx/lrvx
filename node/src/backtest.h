@@ -310,8 +310,13 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     }
     else
     {
-      const std::string model =
-          info.Length() > 0 ? info[0].ToString().Utf8Value() : std::string("undefined");
+      if (!info[0].IsString())
+      {
+        throw Napi::TypeError::New(info.Env(), "setDefaultSlippage: model must be one of " +
+                                                   lrvx::slippageModelNameList() +
+                                                   " or a SLIPPAGE_* code");
+      }
+      const std::string model = info[0].As<Napi::String>().Utf8Value();
       const auto parsed = lrvx::slippageModelFromName(model);
       if (!parsed)
       {
@@ -347,8 +352,13 @@ class SimulatedExecutorWrap : public Napi::ObjectWrap<SimulatedExecutorWrap>
     }
     else
     {
-      const std::string model =
-          info.Length() > 0 ? info[0].ToString().Utf8Value() : std::string("undefined");
+      if (!info[0].IsString())
+      {
+        throw Napi::TypeError::New(info.Env(), "setQueueModel: model must be one of " +
+                                                   lrvx::queueModelNameList() +
+                                                   " or a QUEUE_* code");
+      }
+      const std::string model = info[0].As<Napi::String>().Utf8Value();
       const auto parsed = lrvx::queueModelFromName(model);
       if (!parsed)
       {
