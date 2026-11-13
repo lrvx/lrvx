@@ -32,8 +32,12 @@ class SMA(lrvx.Strategy):
         elif f < s and ctx.is_long():
             self.market_sell(0.001)
 
-    def on_order_update(self, sym, status, filled, avg):
-        print(f"  {sym} {status} filled={filled} avg={avg}")
+    def on_fill(self, ctx, event):
+        print(f"  order {event.order_id} {event.status} {event.fill_qty} @ {event.fill_price}"
+              f" position={ctx.position}")
+
+    def on_order_update(self, ctx, event):
+        print(f"  order {event.order_id} {event.status}")
 
     def on_initial_position(self, sym, qty, avg):
         print(f"  starting position on {sym}: qty={qty} avg={avg}")
@@ -48,7 +52,7 @@ async def main():
     ) as broker:
         btc = await broker.add_symbol("BTC/USDT")
         broker.add_strategy(SMA([btc]))
-        await broker.run(streams=("trades", "book", "orders"))
+        await broker.run(streams=("trades", "book"))
 
 
 asyncio.run(main())
@@ -73,18 +77,57 @@ Pass any subset of `("trades", "book", "bbo", "orders")` to `run(streams=...)`:
 | `trades`  | `watch_trades(sym)`       | `runner.on_trade(sym_id, price, qty, is_buy, ts_ns)`           |
 | `book`    | `watch_order_book(sym)`   | `runner.on_book_snapshot(sym_id, bids/asks)`                   |
 | `bbo`     | `watch_bids_asks(sym)`    | `runner.on_book_top(sym_id, bid, ask)`                         |
-| `orders`  | `watch_orders()`          | strategy's `on_order_update(ccxt_sym, status, filled, avg)`    |
+| `orders`  | `watch_orders()`          | `runner.on_order_event(...)`: the strategy's `on_fill` / `on_order_update` |
+
+`orders` need not be named. The broker opens it by itself before it places its first order (and
+before a modify), whatever `streams` says: a broker that places orders needs their updates, and
+with the default `("trades", "book")` a resting order used to be never reported filled and never
+left the broker's maps. A broker that only watches market data never opens it, so it runs without
+credentials.
+
+## Order updates and fills
+
+Order updates reach the strategy through the callbacks a backtest and paper mode use, with the same
+arguments, so one strategy class runs in all three:
+
+| The exchange reports | Event `status` | Callback |
+|----------------------|----------------|----------|
+| `open`, the first time the order is seen | `ACCEPTED` | `on_order_update(ctx, event)` |
+| `filled` grew and the order still works | `PARTIALLY_FILLED` | `on_fill(ctx, event)` |
+| `filled` grew and the order is `closed` or has nothing remaining | `FILLED` | `on_fill(ctx, event)` |
+| `canceled`, `expired`, `rejected` | `CANCELED`, `EXPIRED`, `REJECTED` | `on_order_update(ctx, event)` |
+
+`event` is a `lrvx.OrderEventData`. `event.order_id` is the id the emit returned, `event.side` and
+`event.order_type` are the order's. A fill reaches `on_fill` and only `on_fill`, and `ctx.position`
+inside it already counts the fill. ccxt reports an order's running totals; `event.fill_qty` is the
+quantity of this fill alone (how much `filled` grew since the order was last reported) and
+`event.fill_price` its price, worked back from the change in `average`. The answer to a placement,
+the answer to a cancel and the stream may all report the same state of an order: only what is new
+produces an event. An order the broker did not place carries `order_id` 0 and goes to every strategy
+subscribed to its symbol; each of the broker's own goes to the strategy that emitted it.
+
+The broker used to call `strategy.on_order_update(ccxt_sym, status, filled, avg)`. That is not the
+signature `lrvx.Strategy` declares, so a strategy that did not override the method raised
+`TypeError` on every update, and a fill never reached `on_fill`.
+
+**Compatibility.** A strategy whose `on_order_update` takes four arguments, the old form, still
+receives exactly that call (`ccxt_sym`, ccxt's `status`, cumulative `filled`, `average`) for every
+update on the orders stream, and `add_strategy` warns with a `DeprecationWarning`. Its
+`on_order_update` is not called with `(ctx, event)`; its `on_fill` is called like any other
+strategy's. Move to the two-argument form to receive `ACCEPTED` / `CANCELED` / `EXPIRED` /
+`REJECTED` as events.
 
 The broker keeps, for every order it placed that is still open, the exchange's
 order id and what was placed, so that a later `cancel_order` or `modify_order`
 can name it to the exchange. An order leaves those maps when the strategy
-cancels it, when `orders` reports a terminal status for it (`closed`,
+cancels it (a `cancel_all_orders` drops the orders whose cancel the exchange accepted and calls
+`Runner.order_closed` for each; one whose cancel failed stays tracked and the failure goes to
+`on_error`), when `orders` reports a terminal status for it (`closed`,
 `canceled`, `expired`, `rejected`), and at once when the exchange's answer to
 the placement already carries a terminal status, as a market order's usually
 does. `Runner.order_closed` is called for it at the same moment. A
 `cancel_order` or `modify_order` for an order that has left is not sent; it is
-reported through `on_error`. Without the `orders` stream only the last of the
-three applies, so run it when the strategy places orders that rest.
+reported through `on_error`.
 
 `trades` and `book` yield a snapshot per call. `bbo` yields a touch-only
 frame: it lands in the strategy's touch fields without replacing the depth

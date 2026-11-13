@@ -4649,3 +4649,138 @@ TEST(JsIntegrationTest, ModifyOnBacktestRunnerKeepsTheOrderAndFillsAtTheNewPrice
   EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "fillPrice"), 101.0);
   EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "fillQty"), 0.5);
 }
+
+namespace
+{
+struct CountingSignals : ISignalHandler
+{
+  int cancels{0};
+  int modifies{0};
+  void onSignal(const Signal& sig) override
+  {
+    cancels += sig.type == SignalType::Cancel ? 1 : 0;
+    modifies += sig.type == SignalType::Modify ? 1 : 0;
+  }
+};
+}  // namespace
+
+// cancel / modify converted whatever they were given to an integer: NaN and a
+// string became 0, 1.5 became 1, -1 became 2^64 - 1, and a cancel or modify
+// went out for the order that named.
+TEST(JsIntegrationTest, CancelAndModifyRefuseAValueThatIsNotAnOrderId)
+{
+  TempJsFile script(R"(
+    var refused = 0;
+    var wrongKind = 0;
+    var accepted = 0;
+    function attempt(fn) {
+      try { fn(); accepted += 1; }
+      catch (e) {
+        if (e instanceof TypeError && String(e.message).indexOf("orderId") >= 0) refused += 1;
+        else wrongKind += 1;
+      }
+    }
+    class TestStrat extends Strategy {
+      constructor() { super({ exchange: "T", symbols: ["S1"] }); }
+      onTrade(ctx, trade) {
+        var id = this.limitBuy({ symbol: trade.symbol, price: 100.5, qty: 2.0 });
+        var bad = [NaN, 1.5, -1, "7", undefined, null, -1n, 2n ** 64n, 2 ** 53 + 2];
+        for (var i = 0; i < bad.length; i++) {
+          var v = bad[i];
+          attempt(() => this.cancel(v));
+          attempt(() => this.modify(v, { price: 101.0, qty: 1.0 }));
+        }
+        accepted = 0;
+        attempt(() => this.modify(id, { price: 101.0, qty: 1.0 }));
+        attempt(() => this.modify(BigInt(id), { price: 101.5, qty: 1.0 }));
+        attempt(() => this.cancel(BigInt(id)));
+        attempt(() => this.cancel(id));
+      }
+    }
+    lrvx.register(new TestStrat());
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+
+  auto bridge = std::make_unique<BridgeStrategy>(
+      1, std::vector<SymbolId>(symIds.begin(), symIds.end()), registry, callbacks);
+  CountingSignals signals;
+  bridge->setSignalHandler(&signals);
+  jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+
+  LrvxSymbolContext fctx{};
+  fctx.symbol_id = symIds[0];
+  LrvxTradeData ftrade{};
+  ftrade.symbol = symIds[0];
+  ftrade.price_raw = lrvx_price_from_double(100.0);
+  ftrade.quantity_raw = lrvx_quantity_from_double(1.0);
+  callbacks.on_trade(callbacks.user_data, &fctx, &ftrade);
+
+  EXPECT_EQ(readGlobalInt32(jsStrat, "refused"), 18) << "nine values, cancel and modify each";
+  EXPECT_EQ(readGlobalInt32(jsStrat, "wrongKind"), 0);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "accepted"), 4) << "a Number id and a BigInt id are taken";
+  EXPECT_EQ(signals.cancels, 2) << "nothing was emitted for a refused id";
+  EXPECT_EQ(signals.modifies, 2);
+}
+
+// A name the prelude's classes do not know used to read as some default: an
+// unknown outage policy as "cancel_all", anything but "buy" as a sell, an
+// unknown bracket leg type as a limit, an unknown algo side as a buy.
+TEST(JsIntegrationTest, AnUnknownPolicySideOrTypeNameThrows)
+{
+  TempJsFile script(R"(
+    function attempt(name, fn) {
+      try { fn(); globalThis["t_" + name] = 0; }
+      catch (e) { globalThis["t_" + name] = (e instanceof TypeError) ? 1 : 2; }
+    }
+    var va = new VenueAvailability();
+    attempt("outageUnknown", () => va.scheduleOutage(1000, 1000, "pause"));
+    attempt("outageRandomUnknown", () => va.autoRandomOutages(1, 1000, "Hold"));
+    attempt("outageKnown", () => va.scheduleOutage(1000, 1000, "hold"));
+    attempt("outageDefault", () => va.scheduleOutage(5000, 1000));
+    var pt = new PositionTracker();
+    attempt("sideUnknown", () => pt.onFill(1, "byu", 100.0, 1.0));
+    attempt("sideKnown", () => pt.onFill(1, "sell", 100.0, 1.0));
+    var ex = new SimulatedExecutor();
+    attempt("submitSideUnknown", () => ex.submitOrder(1, "SELL", 100.0, 1.0, 1, 1));
+    attempt("icebergSideUnknown", () => ex.submitIceberg(2, "", 100.0, 5.0, 1.0, 1));
+    attempt("bracketTypeUnknown", () => ex.submitBracket({
+      bracketId: 1, symbol: 1, entrySide: "buy", entryType: "lmt", entryPrice: 100.0,
+      quantity: 1.0, tpSide: "sell", tpType: "limit", tpPrice: 110.0,
+      stopSide: "sell", stopType: "stop_market", stopTriggerPrice: 90.0 }));
+    attempt("bracketKnown", () => ex.submitBracket({
+      bracketId: 2, symbol: 1, entrySide: "buy", entryType: "limit", entryPrice: 100.0,
+      quantity: 1.0, tpSide: "sell", tpType: "limit", tpPrice: 110.0,
+      stopSide: "sell", stopType: "stop_market", stopTriggerPrice: 90.0 }));
+    attempt("algoSideUnknown", () => new lrvx.TWAPExecutor({
+      targetQty: 1.0, side: "short", symbol: 1, durationNs: 1000, sliceCount: 2, startTimeNs: 0 }));
+    attempt("algoTypeUnknown", () => new lrvx.TWAPExecutor({
+      targetQty: 1.0, side: "sell", type: "lmt", symbol: 1, durationNs: 1000, sliceCount: 2,
+      startTimeNs: 0 }));
+    attempt("algoKnown", () => new lrvx.TWAPExecutor({
+      targetQty: 1.0, side: "sell", type: "limit", limitPrice: 100.0, symbol: 1,
+      durationNs: 1000, sliceCount: 2, startTimeNs: 0 }));
+    var soldAfter = pt.position(1);
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  const auto thrown = [&jsStrat](const char* name)
+  { return readGlobalInt32(jsStrat, (std::string("t_") + name).c_str()); };
+  for (const char* name : {"outageUnknown", "outageRandomUnknown", "sideUnknown",
+                           "submitSideUnknown", "icebergSideUnknown", "bracketTypeUnknown",
+                           "algoSideUnknown", "algoTypeUnknown"})
+  {
+    EXPECT_EQ(thrown(name), 1) << name << " did not throw a TypeError";
+  }
+  for (const char* name :
+       {"outageKnown", "outageDefault", "sideKnown", "bracketKnown", "algoKnown"})
+  {
+    EXPECT_EQ(thrown(name), 0) << name << " threw";
+  }
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "soldAfter"), -1.0)
+      << "only the fill with a known side was applied";
+}

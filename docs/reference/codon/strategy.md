@@ -157,7 +157,10 @@ the value and a `Ptr[u8]` with whether orders are checked against it.
 Every emit method, and the string-symbol forms that call them, clears the last error on entry.
 `last_error()` from `lrvx.abi`, read right after an emit inside the callback that emitted, is `""`
 unless that emit left a reason; a reason an earlier call left (a `validate_segment` that failed, say)
-is not read as the emit's.
+is not read as the emit's. A reason ending in `[kill_switch]`, `[order_validator]` or `[risk_manager]`
+says a pre-trade gate dropped the signal, on a live runner and in a backtest alike; which signals each
+of them puts to the gates is listed under
+[Reading why a signal went nowhere](../python/strategy.md#reading-why-a-signal-went-nowhere).
 
 #### `emit_market_buy(symbol, qty) -> int`
 

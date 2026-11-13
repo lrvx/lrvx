@@ -16,6 +16,7 @@
 
 #include "lrvx/capi/lrvx_capi.h"
 
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <string>
@@ -40,6 +41,102 @@ inline int64_t toInt64Ns(const Napi::Value& v)
   }
   return v.As<Napi::Number>().Int64Value();
 }
+
+// Arguments read with a check. `v.As<Napi::Number>()` does not look at what
+// `v` is: a string or undefined surfaced as a bare "A number was expected"
+// naming nothing, and a 64-bit id read through Int64Value() took NaN, a
+// fraction or a negative for whatever the conversion made of it and lost the
+// low bits of anything above 2^53. Each of these throws a TypeError that
+// names the argument.
+inline double argNumber(const Napi::Value& v, const char* what)
+{
+  if (!v.IsNumber())
+  {
+    throw Napi::TypeError::New(v.Env(), std::string(what) + " must be a number");
+  }
+  return v.As<Napi::Number>().DoubleValue();
+}
+
+inline uint32_t argUint32(const Napi::Value& v, const char* what)
+{
+  if (v.IsNumber())
+  {
+    const double d = v.As<Napi::Number>().DoubleValue();
+    if (d >= 0.0 && d <= 4294967295.0 && d == std::floor(d))
+    {
+      return static_cast<uint32_t>(d);
+    }
+  }
+  throw Napi::TypeError::New(v.Env(),
+                             std::string(what) + " must be an integer from 0 to 4294967295");
+}
+
+// A 64-bit id (an order id, a signal id, a fill id): a non-negative integer
+// Number, which is exact up to 2^53, or a BigInt that fits 64 unsigned bits.
+inline uint64_t argUint64(const Napi::Value& v, const char* what)
+{
+  if (v.IsBigInt())
+  {
+    bool lossless = false;
+    const uint64_t id = v.As<Napi::BigInt>().Uint64Value(&lossless);
+    if (lossless)
+    {
+      return id;
+    }
+  }
+  else if (v.IsNumber())
+  {
+    const double d = v.As<Napi::Number>().DoubleValue();
+    if (d >= 0.0 && d <= 9007199254740992.0 && d == std::floor(d))
+    {
+      return static_cast<uint64_t>(d);
+    }
+  }
+  throw Napi::TypeError::New(
+      v.Env(), std::string(what) +
+                   " must be a non-negative integer Number (at most 2^53) or a BigInt below 2^64");
+}
+
+// A signed 64-bit value (a raw fixed-point price or quantity): an integer
+// Number within +-2^53, or a BigInt that fits 64 signed bits.
+inline int64_t argInt64(const Napi::Value& v, const char* what)
+{
+  if (v.IsBigInt())
+  {
+    bool lossless = false;
+    const int64_t x = v.As<Napi::BigInt>().Int64Value(&lossless);
+    if (lossless)
+    {
+      return x;
+    }
+  }
+  else if (v.IsNumber())
+  {
+    const double d = v.As<Napi::Number>().DoubleValue();
+    if (d >= -9007199254740992.0 && d <= 9007199254740992.0 && d == std::floor(d))
+    {
+      return static_cast<int64_t>(d);
+    }
+  }
+  throw Napi::TypeError::New(
+      v.Env(), std::string(what) +
+                   " must be an integer Number (within 2^53) or a BigInt that fits 64 bits");
+}
+
+// The options object a method takes as its only argument.
+inline Napi::Object argOptions(const Napi::CallbackInfo& info, const char* method)
+{
+  if (info.Length() < 1 || !info[0].IsObject())
+  {
+    throw Napi::TypeError::New(info.Env(), std::string(method) + ": expected an options object");
+  }
+  return info[0].As<Napi::Object>();
+}
+
+// A 64-bit id handed to JavaScript whole. A Number holds one up to 2^53, and
+// an order id is (subscriber id << 32) + n: with a subscriber id of 2^21 or
+// more it is past that.
+inline Napi::Value idToBigInt(Napi::Env env, uint64_t id) { return Napi::BigInt::New(env, id); }
 
 // An order id as JavaScript sees it everywhere: the Number that order events
 // carry in orderId and that emit.cancel / emit.modify take back.

@@ -251,7 +251,8 @@ bool SegmentValidator::validateEventsUncompressed(std::FILE* file, SegmentValida
       if (computed_crc != frame.crc32)
       {
         addIssue(result, IssueType::FrameCrcMismatch, IssueSeverity::Error,
-                 "CRC mismatch at event " + std::to_string(event_index), current_pos);
+                 "CRC mismatch at event " + std::to_string(event_index), current_pos,
+                 event_index);
         ++result.crc_errors;
 
         if (_config.stop_on_first_error)
@@ -324,13 +325,15 @@ bool SegmentValidator::validateEventsUncompressed(std::FILE* file, SegmentValida
         if (event_ts < last_timestamp)
         {
           addIssue(result, IssueType::TimestampOutOfOrder, IssueSeverity::Warning,
-                   "Timestamp out of order at event " + std::to_string(event_index), current_pos);
+                   "Timestamp out of order at event " + std::to_string(event_index), current_pos,
+                   event_index, event_ts);
           ++result.timestamp_anomalies;
         }
         else if (event_ts - last_timestamp > _config.max_timestamp_jump_ns)
         {
           addIssue(result, IssueType::TimestampJumpTooLarge, IssueSeverity::Warning,
-                   "Large timestamp jump at event " + std::to_string(event_index), current_pos);
+                   "Large timestamp jump at event " + std::to_string(event_index), current_pos,
+                   event_index, event_ts);
           ++result.timestamp_anomalies;
         }
       }
@@ -629,10 +632,14 @@ bool SegmentValidator::validateIndex(std::FILE* file, SegmentValidationResult& r
 
 void SegmentValidator::addIssue(SegmentValidationResult& result, IssueType type,
                                 IssueSeverity severity, const std::string& message,
-                                uint64_t offset)
+                                uint64_t offset, uint64_t eventIndex, int64_t timestampNs)
 {
-  result.issues.push_back(ValidationIssue{
-      .type = type, .severity = severity, .message = message, .file_offset = offset});
+  result.issues.push_back(ValidationIssue{.type = type,
+                                          .severity = severity,
+                                          .message = message,
+                                          .file_offset = offset,
+                                          .event_index = eventIndex,
+                                          .timestamp_ns = timestampNs});
 
   if (severity == IssueSeverity::Critical || severity == IssueSeverity::Error)
   {
@@ -936,7 +943,8 @@ bool SegmentRepairer::createBackup(const std::filesystem::path& path, RepairResu
 
   if (ec)
   {
-    result.errors.push_back("Failed to create backup: " + ec.message());
+    result.errors.push_back("Failed to create backup " + result.backup_path.string() + " of " +
+                            path.string() + ": " + ec.message());
     return false;
   }
 
@@ -951,7 +959,7 @@ bool SegmentRepairer::fixHeaderTimestamps(const std::filesystem::path& path,
   std::FILE* file = std::fopen(path.string().c_str(), "r+b");
   if (!file)
   {
-    result.errors.push_back("Cannot open file for writing");
+    result.errors.push_back("Cannot open file for writing: " + path.string());
     return false;
   }
 
@@ -960,7 +968,7 @@ bool SegmentRepairer::fixHeaderTimestamps(const std::filesystem::path& path,
   if (std::fread(&header, sizeof(header), 1, file) != 1)
   {
     std::fclose(file);
-    result.errors.push_back("Cannot read header");
+    result.errors.push_back("Cannot read header: " + path.string());
     return false;
   }
 
@@ -973,7 +981,7 @@ bool SegmentRepairer::fixHeaderTimestamps(const std::filesystem::path& path,
   if (std::fwrite(&header, sizeof(header), 1, file) != 1)
   {
     std::fclose(file);
-    result.errors.push_back("Cannot write header");
+    result.errors.push_back("Cannot write header: " + path.string());
     return false;
   }
 
@@ -988,7 +996,7 @@ bool SegmentRepairer::fixEventCount(const std::filesystem::path& path,
   std::FILE* file = std::fopen(path.string().c_str(), "r+b");
   if (!file)
   {
-    result.errors.push_back("Cannot open file for writing");
+    result.errors.push_back("Cannot open file for writing: " + path.string());
     return false;
   }
 
@@ -997,7 +1005,7 @@ bool SegmentRepairer::fixEventCount(const std::filesystem::path& path,
   if (std::fread(&header, sizeof(header), 1, file) != 1)
   {
     std::fclose(file);
-    result.errors.push_back("Cannot read header");
+    result.errors.push_back("Cannot read header: " + path.string());
     return false;
   }
 
@@ -1009,7 +1017,7 @@ bool SegmentRepairer::fixEventCount(const std::filesystem::path& path,
   if (std::fwrite(&header, sizeof(header), 1, file) != 1)
   {
     std::fclose(file);
-    result.errors.push_back("Cannot write header");
+    result.errors.push_back("Cannot write header: " + path.string());
     return false;
   }
 

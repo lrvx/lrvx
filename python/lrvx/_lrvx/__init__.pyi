@@ -2626,6 +2626,10 @@ class Runner:
         """
         Inject a touch-only frame. bid / ask are (price, qty) tuples; None means that side of the book is empty
         """
+    def on_order_event(self, order_id: typing.SupportsInt | typing.SupportsIndex, symbol: typing.Any, side: str, status: str, order_type: str = 'limit', fill_qty: typing.SupportsFloat | typing.SupportsIndex = 0.0, fill_price: typing.SupportsFloat | typing.SupportsIndex = 0.0, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0, reject_reason: str = '', is_maker: bool = False) -> None:
+        """
+        Report one order event a venue sent (a broker's order update or fill) to the strategy that issued the order, through the callbacks a backtest uses: PARTIALLY_FILLED and FILLED reach Strategy.on_fill(ctx, event) and only on_fill, every other status reaches Strategy.on_order_update(ctx, event). The runner's position tracker sees the event first, so ctx.position inside on_fill counts the fill. side is 'buy' or 'sell'; status and order_type are the names OrderEventData carries ('ACCEPTED', 'CANCELED', 'limit', ...); fill_qty and fill_price are this fill's own, not the order's running totals. An order id from no attached strategy's block goes to every strategy subscribed to the symbol. The callbacks run on the calling thread. ValueError for an unknown side, status or order type.
+        """
     def on_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
         ...
     def order_closed(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> None:
@@ -2635,6 +2639,10 @@ class Runner:
     def replace_strategy(self, index: typing.SupportsInt | typing.SupportsIndex, strategy: Strategy) -> None:
         """
         Atomically swap the strategy instance at `index` for a new one. The old strategy's on_stop fires, the bridge's internal state survives, the new strategy's on_start fires afterwards. WebSocket / gRPC connections are unaffected.
+        """
+    def replay_tape(self, path: str, simulator: SimulatedExecutor, *, tape_symbol_id: typing.Any = None, symbol: typing.Any = None, lock: typing.Any = None, after_event: typing.Any = None) -> dict:
+        """
+        Replay a `.lrvx` tape into this runner's strategies with `simulator` (a SimulatedExecutor) standing in for the venue, through the loop BacktestRunner.run_tape uses: every trade, book snapshot, book delta and top-of-book frame, in the tape's time order, moves the simulator's clock and reaches the simulator before the strategies, so an order resting in the simulator fills from the books as in a backtest of the same tape. The simulator is reset first, as at the start of a backtest run. With tape_symbol_id and symbol, only that tape symbol is replayed and its events are delivered under the registered `symbol`. `lock` (anything with acquire / release) is held while the simulator is shown an event and released before the strategies see it; `after_event()` is called after each event. The strategies receive trades, book snapshots and tops; a live runner has no delta entry, so deltas reach the simulator only. Returns a dict: events, trades, books, book_deltas_not_delivered, skipped_option_quotes, skipped_pool_states.
         """
     def set_executor(self, executor: Executor) -> None:
         ...

@@ -149,6 +149,7 @@ inline py::list issuesToList(const std::vector<ValidationIssue>& found)
     id["message"] = issue.message;
     id["severity"] = static_cast<int>(issue.severity);
     id["file_offset"] = issue.file_offset;
+    id["event_index"] = issue.event_index;
     id["timestamp_ns"] = issue.timestamp_ns;
     issues.append(id);
   }

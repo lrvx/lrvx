@@ -94,8 +94,8 @@
     {
       "language": "python",
       "path": "docs/examples/python_ccxt_live.py",
-      "sha256": "bba3030ca3673136c7dfcb68ff5021c21cfbcc25e4b4f6a143963ea4522b7b6b",
-      "size_bytes": 3028,
+      "sha256": "fec23815c530cd2c0b05b37602ac65d89d0114a5d34ae54dd988e5c25a1274df",
+      "size_bytes": 3219,
       "topic": "connector"
     },
     {

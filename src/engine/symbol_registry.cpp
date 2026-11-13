@@ -12,6 +12,8 @@
 #include "lrvx/util/performance/profile.h"
 
 #include <algorithm>
+#include <atomic>
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -24,6 +26,14 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#if defined(_WIN32)
+#include <io.h>
+#include <process.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 namespace lrvx
 {
@@ -132,6 +142,10 @@ SymbolId SymbolRegistry::registerSymbol(ExchangeId exchange, std::string_view sy
   }
 
   const SymbolId id = nextSymbolIdLocked();
+  if (id > kMaxSymbolId)
+  {
+    return 0;
+  }
   _map[key] = id;
   setSymbolNameLocked(id, exchangeName, std::string(symbol));
 
@@ -288,6 +302,10 @@ SymbolId SymbolRegistry::registerSymbol(const std::string& exchange, const std::
   }
 
   const SymbolId id = nextSymbolIdLocked();
+  if (id > kMaxSymbolId)
+  {
+    return 0;
+  }
   _map[key] = id;
   setSymbolNameLocked(id, exchange, symbol);
 
@@ -342,6 +360,12 @@ SymbolId SymbolRegistry::registerSymbol(const SymbolInfo& info)
     return 0;
   }
   const SymbolId newId = info.id != 0 ? info.id : nextSymbolIdLocked();
+  // The tables beside the symbol table are indexed by id: an id above the
+  // limit would size them for every id below it.
+  if (newId > kMaxSymbolId)
+  {
+    return 0;
+  }
 
   _map[key] = newId;
 
@@ -611,21 +635,87 @@ class RegistryJsonReader
 
   using Entry = std::unordered_map<std::string, std::string>;
 
-  // False when the text has no "symbols" array of objects.
+  // The whole document: one object holding a "symbols" array of flat objects
+  // and, beside it, scalar members such as "version". False, with the reason
+  // in `why`, for anything else, and for anything but whitespace after the
+  // object's closing brace. `version` is left alone when the document has
+  // none.
+  bool document(std::vector<Entry>& out, std::optional<std::string>& version, std::string& why)
+  {
+    const auto bad = [this, &why](const char* what)
+    {
+      why = std::string(what) + " at byte " + std::to_string(_p);
+      return false;
+    };
+    ws();
+    if (!eat('{'))
+    {
+      return bad("the document is not a JSON object: expected '{'");
+    }
+    bool haveSymbols = false;
+    for (bool first = true;; first = false)
+    {
+      ws();
+      if (eat('}'))
+      {
+        break;
+      }
+      if (!first && !eat(','))
+      {
+        return bad("expected ',' or '}'");
+      }
+      ws();
+      std::string k;
+      if (!string(k))
+      {
+        return bad("expected a member name");
+      }
+      ws();
+      if (!eat(':'))
+      {
+        return bad("expected ':'");
+      }
+      ws();
+      if (k == "symbols")
+      {
+        if (haveSymbols)
+        {
+          return bad("a second \"symbols\" member");
+        }
+        if (!entries(out))
+        {
+          return bad("\"symbols\" is not an array of objects: malformed");
+        }
+        haveSymbols = true;
+        continue;
+      }
+      std::string v;
+      if (!scalar(v))
+      {
+        return bad("expected a string, a number or a literal");
+      }
+      if (k == "version")
+      {
+        version = std::move(v);
+      }
+    }
+    ws();
+    if (_p != _t.size())
+    {
+      return bad("content after the end of the document");
+    }
+    if (!haveSymbols)
+    {
+      why = "the document has no \"symbols\" array";
+      return false;
+    }
+    return true;
+  }
+
+ private:
+  // The array the cursor is at.
   bool entries(std::vector<Entry>& out)
   {
-    const size_t key = _t.find("\"symbols\"");
-    if (key == std::string_view::npos)
-    {
-      return false;
-    }
-    _p = key + 9;
-    ws();
-    if (!eat(':'))
-    {
-      return false;
-    }
-    ws();
     if (!eat('['))
     {
       return false;
@@ -651,7 +741,23 @@ class RegistryJsonReader
     }
   }
 
- private:
+  // A string, or the text of a number or literal.
+  bool scalar(std::string& v)
+  {
+    if (peek() == '"')
+    {
+      return string(v);
+    }
+    const size_t start = _p;
+    while (_p < _t.size() && _t[_p] != ',' && _t[_p] != '}' && _t[_p] != ']' && _t[_p] != '{' &&
+           _t[_p] != '[' && !isSpace(_t[_p]))
+    {
+      ++_p;
+    }
+    v = std::string(_t.substr(start, _p - start));
+    return !v.empty();
+  }
+
   bool object(Entry& e)
   {
     if (!eat('{'))
@@ -890,6 +996,67 @@ std::vector<const SymbolInfo*> entriesById(const std::unordered_map<SymbolId, Sy
   return out;
 }
 
+// A file of a name nothing else has, beside `path`, opened for writing: the
+// path, this process, a counter and ".tmp". The "x" mode refuses a name that
+// exists, so two saves never write through one name, in this process or
+// across processes.
+std::FILE* openUniqueTemp(const std::filesystem::path& path, std::filesystem::path& tmp)
+{
+  static std::atomic<uint64_t> counter{0};
+#if defined(_WIN32)
+  const auto pid = static_cast<unsigned long long>(_getpid());
+#else
+  const auto pid = static_cast<unsigned long long>(::getpid());
+#endif
+  for (int attempt = 0; attempt < 64; ++attempt)
+  {
+    tmp = path;
+    tmp += "." + std::to_string(pid) + "." +
+           std::to_string(counter.fetch_add(1, std::memory_order_relaxed)) + ".tmp";
+    errno = 0;
+    if (std::FILE* f = std::fopen(tmp.string().c_str(), "wbx"))
+    {
+      return f;
+    }
+    if (errno != EEXIST)
+    {
+      return nullptr;
+    }
+  }
+  return nullptr;
+}
+
+// The stream's bytes, already flushed to the OS, forced to the device.
+bool syncToDevice(std::FILE* f)
+{
+#if defined(_WIN32)
+  return _commit(_fileno(f)) == 0;
+#else
+  return ::fsync(fileno(f)) == 0;
+#endif
+}
+
+// The rename is durable once the directory holding the name is synced. Where
+// a directory cannot be opened or synced the rename has still happened.
+void syncDirectoryOf(const std::filesystem::path& path)
+{
+#if !defined(_WIN32)
+  std::filesystem::path dir = path.parent_path();
+  if (dir.empty())
+  {
+    dir = ".";
+  }
+  const int fd = ::open(dir.string().c_str(), O_RDONLY);
+  if (fd >= 0)
+  {
+    (void)::fsync(fd);
+    ::close(fd);
+  }
+#else
+  (void)path;
+#endif
+}
+
 }  // namespace
 
 bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
@@ -903,16 +1070,17 @@ bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
   // modes, so this costs nothing there.
   //
   // Written beside the target and renamed over it at the end, so a save that
-  // fails part-way leaves the file that was there.
-  std::filesystem::path tmp = path;
-  tmp += ".tmp";
-  std::FILE* f = std::fopen(tmp.string().c_str(), "wb");
+  // fails part-way leaves the file that was there. The temporary's name is
+  // this save's alone: two saves to one path each write a whole file and the
+  // later rename wins.
+  std::filesystem::path tmp;
+  std::FILE* f = openUniqueTemp(path, tmp);
   if (!f)
   {
     return false;
   }
 
-  std::fprintf(f, "{\n  \"version\": 1,\n  \"symbols\": [\n");
+  std::fprintf(f, "{\n  \"version\": %u,\n  \"symbols\": [\n", kFileVersion);
 
   size_t count = 0;
   for (const SymbolInfo* entry : entriesById(_symbols))
@@ -985,17 +1153,21 @@ bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
   std::fprintf(f, "  ]\n}\n");
 
   // A write that failed (a full disk) sets the stream's error flag, and the
-  // bytes still buffered are written by the flush and the close: all three
-  // have to succeed before the file may replace the previous one.
+  // bytes still buffered are written by the flush and the close: all of them
+  // have to succeed before the file may replace the previous one. The sync
+  // comes before the rename: renamed first, a crash could leave the new name
+  // on a file whose bytes never reached the device.
   const bool flushed = std::fflush(f) == 0;
   const bool written = std::ferror(f) == 0;
+  const bool synced = flushed && written && syncToDevice(f);
   const bool closed = std::fclose(f) == 0;
   std::error_code ec;
-  if (flushed && written && closed)
+  if (synced && closed)
   {
     std::filesystem::rename(tmp, path, ec);
     if (!ec)
     {
+      syncDirectoryOf(path);
       return true;
     }
   }
@@ -1005,9 +1177,17 @@ bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
 
 bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
 {
+  std::string why;
+  return loadFromFile(path, why);
+}
+
+bool SymbolRegistry::loadFromFile(const std::filesystem::path& path, std::string& why)
+{
+  why.clear();
   std::FILE* f = std::fopen(path.string().c_str(), "rb");
   if (!f)
   {
+    why = "cannot open " + path.string() + ": " + std::strerror(errno);
     return false;
   }
 
@@ -1030,13 +1210,15 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
 
   if (readFailed || content.empty())
   {
+    why = path.string() + (readFailed ? ": the read failed" : ": the file is empty");
     return false;
   }
 
   // A file that does not parse leaves the registry empty, as a failed load
   // always has.
-  const auto fail = [this]()
+  const auto fail = [this, &why, &path](const std::string& reason)
   {
+    why = path.string() + ": " + reason;
     std::lock_guard lock(_mutex);
     _venueTicks->reset();
     _symbols.clear();
@@ -1047,9 +1229,35 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
   };
 
   std::vector<RegistryJsonReader::Entry> entries;
-  if (!RegistryJsonReader(content).entries(entries))
+  std::optional<std::string> version;
+  std::string malformed;
+  if (!RegistryJsonReader(content).document(entries, version, malformed))
   {
-    return fail();
+    return fail(malformed);
+  }
+  // A file with no "version" is read as the one version there has been. A
+  // version this build does not write may mean fields it would misread.
+  if (version)
+  {
+    unsigned long long v = 0;
+    size_t used = 0;
+    try
+    {
+      v = std::stoull(*version, &used);
+    }
+    catch (const std::exception&)
+    {
+      used = 0;
+    }
+    if (used != version->size() || version->front() == '-' || v == 0)
+    {
+      return fail("\"version\" is " + *version + ", not a positive integer");
+    }
+    if (v > kFileVersion)
+    {
+      return fail("the file is version " + *version + ", newer than the version " +
+                  std::to_string(kFileVersion) + " this build reads and writes");
+    }
   }
 
   // A file that is not the shape this expects is a false, not an exception:
@@ -1060,6 +1268,7 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
   // why they are parsed as long long, and a truncated or foreign file can
   // still present something that does not convert.
   std::unordered_map<SymbolId, SymbolInfo> loaded;
+  std::unordered_map<std::string, SymbolId> names;
   try
   {
     for (const auto& e : entries)
@@ -1076,10 +1285,17 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
       {
         // An entry without its id or names makes the file malformed. Ending
         // the list here instead dropped every entry after it.
-        return fail();
+        return fail("entry " + std::to_string(loaded.size()) +
+                    " lacks its \"id\", \"exchange\" or \"symbol\"");
       }
       SymbolInfo info;
-      info.id = static_cast<SymbolId>(std::stoull(*id));
+      const unsigned long long rawId = std::stoull(*id);
+      if (rawId > kMaxSymbolId)
+      {
+        return fail("id " + *id + " of " + *exchange + ":" + *symbol + " is above the largest id " +
+                    std::to_string(kMaxSymbolId));
+      }
+      info.id = static_cast<SymbolId>(rawId);
       info.exchange = *exchange;
       info.symbol = *symbol;
       if (const auto* v = field("type"))
@@ -1148,27 +1364,31 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
         throw std::invalid_argument("symbol registry file: invalid scale");
       }
       // Two entries with one id make the file malformed: the second would
-      // replace the first while both names resolved to the id.
+      // replace the first while both names resolved to the id. So do two
+      // entries with one name: the name would resolve to one of the ids and
+      // the other entry could not be found by it.
       const SymbolId sid = info.id;
+      const std::string name = info.exchange + ":" + info.symbol;
+      if (const auto [it, fresh] = names.emplace(name, sid); !fresh)
+      {
+        return fail("two entries are named " + name + " (ids " + std::to_string(it->second) +
+                    " and " + std::to_string(sid) + ")");
+      }
       if (!loaded.emplace(sid, std::move(info)).second)
       {
-        return fail();
+        return fail("two entries have the id " + std::to_string(sid));
       }
     }
   }
-  catch (const std::exception&)
+  catch (const std::exception& e)
   {
-    return fail();
+    return fail(std::string("an entry does not convert: ") + e.what());
   }
 
   std::lock_guard lock(_mutex);
   _venueTicks->reset();
   _symbols = std::move(loaded);
-  _map.clear();
-  for (const auto& [sid, info] : _symbols)
-  {
-    _map[info.exchange + ":" + info.symbol] = sid;
-  }
+  _map = std::move(names);
   rebuildLoadedIndexes(_symbols, _exchangeNameToId, _reverse, _symbolToExchange);
   return true;
 }
@@ -1351,10 +1571,18 @@ std::vector<std::byte> SymbolRegistry::serialize() const
 
 bool SymbolRegistry::deserialize(std::span<const std::byte> data)
 {
+  std::string why;
+  return deserialize(data, why);
+}
+
+bool SymbolRegistry::deserialize(std::span<const std::byte> data, std::string& why)
+{
+  why.clear();
   // A blob that does not parse leaves the registry empty, as a file that does
   // not parse does in loadFromFile.
-  const auto fail = [this]()
+  const auto fail = [this, &why](const std::string& reason)
   {
+    why = reason;
     std::lock_guard lock(_mutex);
     _venueTicks->reset();
     _symbols.clear();
@@ -1366,7 +1594,7 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
 
   if (data.size() < 12)
   {
-    return fail();  // Minimum header size
+    return fail("the data is shorter than the 12-byte header");
   }
 
   size_t pos = 0;
@@ -1455,13 +1683,15 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
   uint32_t magic = read_u32();
   if (magic != kSymbolRegistryMagic)
   {
-    return fail();
+    return fail("the data does not start with the registry magic \"SREG\"");
   }
 
   uint32_t version = read_u32();
   if (version < 1 || version > kSymbolRegistryVersionWithLots)
   {
-    return fail();
+    return fail("the data is version " + std::to_string(version) +
+                "; this build reads versions 1 to " +
+                std::to_string(kSymbolRegistryVersionWithLots));
   }
 
   uint32_t count = read_u32();
@@ -1469,6 +1699,7 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
   // Parsed into a local table first: the registry is replaced only by a blob
   // that read to the end of its last entry.
   std::unordered_map<SymbolId, SymbolInfo> loaded;
+  std::unordered_map<std::string, SymbolId> names;
   for (uint32_t i = 0; i < count; ++i)
   {
     SymbolInfo info;
@@ -1525,15 +1756,31 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
 
     // A scale registerSymbol would refuse makes the blob malformed, as it
     // does a file.
-    if (truncated || !validateSymbolScale(info))
+    if (truncated)
     {
-      return fail();
+      return fail("the data ends inside entry " + std::to_string(i) + " of " +
+                  std::to_string(count));
     }
-    // So does an id that an earlier entry carries.
+    if (!validateSymbolScale(info))
+    {
+      return fail("entry " + std::to_string(i) + " has an invalid scale");
+    }
     const SymbolId sid = info.id;
+    if (sid > kMaxSymbolId)
+    {
+      return fail("id " + std::to_string(sid) + " of " + info.exchange + ":" + info.symbol +
+                  " is above the largest id " + std::to_string(kMaxSymbolId));
+    }
+    // So do a name and an id that an earlier entry carries.
+    const std::string name = info.exchange + ":" + info.symbol;
+    if (const auto [it, fresh] = names.emplace(name, sid); !fresh)
+    {
+      return fail("two entries are named " + name + " (ids " + std::to_string(it->second) +
+                  " and " + std::to_string(sid) + ")");
+    }
     if (!loaded.emplace(sid, std::move(info)).second)
     {
-      return fail();
+      return fail("two entries have the id " + std::to_string(sid));
     }
   }
 
@@ -1541,18 +1788,13 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
   // the count is wrong or the data is something else.
   if (pos != data.size())
   {
-    return fail();
+    return fail(std::to_string(data.size() - pos) + " byte(s) follow the last entry");
   }
 
   std::lock_guard lock(_mutex);
   _venueTicks->reset();
   _symbols = std::move(loaded);
-  _map.clear();
-  // order: not observable -- fills a keyed map
-  for (const auto& [sid, info] : _symbols)
-  {
-    _map[info.exchange + ":" + info.symbol] = sid;
-  }
+  _map = std::move(names);
   rebuildLoadedIndexes(_symbols, _exchangeNameToId, _reverse, _symbolToExchange);
 
   return true;

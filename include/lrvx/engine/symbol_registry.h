@@ -263,8 +263,16 @@ class SymbolRegistry : public ISubsystem
   // that is already registered returns the id it has.
   //
   // registerSymbol(info) uses info.id when it is not 0. It returns 0 and
-  // changes nothing when that id belongs to a symbol with another name, and
-  // when the info's scales are not valid.
+  // changes nothing when that id belongs to a symbol with another name, when
+  // it is above kMaxSymbolId, and when the info's scales are not valid.
+  //
+  // kMaxSymbolId is the largest id a symbol may have, explicit or assigned.
+  // The name and exchange tables are indexed by id, which is what keeps
+  // getSymbolName and getExchangeForSymbol an array read; an id of four
+  // thousand million sized them for every id below it, some gigabytes. Every
+  // registerSymbol overload returns 0 for an id above the limit, and a load
+  // that holds one fails.
+  static constexpr SymbolId kMaxSymbolId = 1'048'575;
   SymbolId registerSymbol(const std::string& exchange, const std::string& symbol);
   SymbolId registerSymbol(const SymbolInfo& info);
   std::optional<SymbolId> getSymbolId(const std::string& exchange,
@@ -313,21 +321,33 @@ class SymbolRegistry : public ISubsystem
 
   // Persistence
   //
-  // saveToFile writes a temporary file beside `path` and renames it over
-  // `path` once every byte is written and the file is closed. It returns
-  // false when the temporary cannot be created, a write or the close fails
-  // (a full disk), or the rename fails; the file that was at `path` is then
-  // untouched and the temporary is removed.
+  // saveToFile writes a temporary file beside `path`, syncs it to the device
+  // (fsync; _commit on Windows) and renames it over `path`. The temporary is
+  // named `<path>.<pid>.<n>.tmp`, a name no other save uses, so saves to one
+  // path from several threads or processes each write a whole file and the
+  // last rename wins. It returns false when the temporary cannot be created,
+  // a write, the sync or the close fails (a full disk), or the rename fails;
+  // the file that was at `path` is then untouched and the temporary is
+  // removed.
   //
   // loadFromFile and deserialize return false and leave the registry empty
   // for input that is not a whole registry: malformed or truncated data, an
-  // entry with an invalid scale, two entries with one id, and, for
-  // deserialize, bytes after the last entry.
+  // entry with an invalid scale or an id above kMaxSymbolId, two entries
+  // with one id, two entries with one exchange and symbol, and anything
+  // after the end (bytes after the last entry; for a file, anything but
+  // whitespace after the closing brace of the document). A file's "version"
+  // is read: one above kFileVersion, the version saveToFile writes, fails
+  // the load, since a later format may hold fields this build would misread;
+  // a file with no "version" is read as version 1. The overloads taking
+  // `why` set it to the reason for a false, and to "" for a true.
+  static constexpr uint32_t kFileVersion = 1;
   bool saveToFile(const std::filesystem::path& path) const;
   bool loadFromFile(const std::filesystem::path& path);
+  bool loadFromFile(const std::filesystem::path& path, std::string& why);
 
   std::vector<std::byte> serialize() const;
   bool deserialize(std::span<const std::byte> data);
+  bool deserialize(std::span<const std::byte> data, std::string& why);
 
   void clear();
   // In registration order (ascending id): front() is the first symbol

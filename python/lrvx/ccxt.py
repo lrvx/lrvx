@@ -35,7 +35,7 @@ Quick start
         async with CcxtBroker("binance") as broker:
             btc = await broker.add_symbol("BTC/USDT")
             broker.add_strategy(SMA([btc]))
-            await broker.run(streams=("trades", "book", "orders"))
+            await broker.run(streams=("trades", "book"))
 
     asyncio.run(main())
 
@@ -52,9 +52,17 @@ What the broker does
 - ``run(streams=...)`` spawns one asyncio task per (symbol × stream)
   pair. ``"trades"`` and ``"book"`` forward into ``runner.on_trade`` /
   ``runner.on_book_snapshot``; ``"bbo"`` forwards ``watch_bids_asks``
-  into ``runner.on_book_top``. ``"orders"`` dispatches to
-  ``strategy.on_order_update(ccxt_sym, status, filled, avg_price)``
-  when the strategy defines that method.
+  into ``runner.on_book_top``. ``"orders"`` watches the account's order
+  updates; the broker starts it by itself before it places its first
+  order, so it need not be named.
+- Order updates and fills reach the strategy through the callbacks a
+  backtest and paper mode use: ``on_fill(ctx, event)`` for every fill
+  (``event.status`` ``"PARTIALLY_FILLED"`` or ``"FILLED"``, and only
+  ``on_fill``), ``on_order_update(ctx, event)`` for ``"ACCEPTED"``,
+  ``"CANCELED"``, ``"EXPIRED"`` and ``"REJECTED"``. ``event`` is a
+  ``lrvx.OrderEventData``; ``event.order_id`` is the id the emit
+  returned, and ``ctx.position`` inside ``on_fill`` counts the fill. See
+  "Order updates" below.
 - Before streams start, the broker calls ``fetch_balance()`` and
   ``fetch_positions()`` and dispatches
   ``strategy.on_initial_position(ccxt_sym, qty, avg_price)`` for any
@@ -96,14 +104,50 @@ relevant ``_place_*`` method.
 
 Order types outside the table dispatch to ``on_error`` as
 ``UnsupportedOrderType``. The exchange call is skipped.
+
+Order updates
+-------------
+
+Every order the exchange reports -- in the answer to a placement or a
+cancel, and on the orders stream -- is turned into the events a backtest
+produces and handed to ``Runner.on_order_event``:
+
+  ccxt ``status`` ``open``, first time seen      → ``ACCEPTED``  → ``on_order_update``
+  ``filled`` grew, order still working           → ``PARTIALLY_FILLED`` → ``on_fill``
+  ``filled`` grew, ``closed`` or nothing remains → ``FILLED``    → ``on_fill``
+  ``canceled`` / ``expired`` / ``rejected``      → ``CANCELED`` / ``EXPIRED`` / ``REJECTED`` → ``on_order_update``
+
+ccxt reports an order's running totals. ``event.fill_qty`` is the
+quantity of this fill alone (the growth of ``filled`` since the last
+report of the order) and ``event.fill_price`` its price, worked back
+from the change in ``average``. An update that changes nothing produces
+no event, so the answer to a placement and the stream may both report an
+order. The strategy that emitted the order receives its events; an order
+the broker did not place (it carries ``order_id`` 0) goes to every
+strategy subscribed to its symbol.
+
+The orders stream starts before the first order is placed, whatever
+``run(streams=...)`` named: without it a resting order was never
+reported filled or closed. A broker that only watches market data never
+opens it, so it needs no credentials.
+
+Compatibility: a strategy whose ``on_order_update`` takes four arguments,
+``(ccxt_sym, status, filled, avg_price)``, the form this broker used to
+call, keeps receiving exactly that call for every update on the orders
+stream, with a ``DeprecationWarning`` when it is attached. Its
+``on_order_update`` is not called with ``(ctx, event)``; its ``on_fill``
+is called like any other strategy's.
 """
 
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import math
 import time
+import warnings
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable, Mapping, Optional
 
@@ -226,6 +270,26 @@ _CCXT_ORDER_TYPE = {
 # ccxt's unified statuses for an order that will not trade again.
 _TERMINAL_ORDER_STATUSES = frozenset({"closed", "canceled", "expired", "rejected"})
 
+# The order-event status each of ccxt's terminal statuses other than
+# "closed" is reported as. "closed" is the last fill, not a status of its own.
+_ENDED_WITHOUT_FILL = {"canceled": "CANCELED", "expired": "EXPIRED", "rejected": "REJECTED"}
+
+# The lrvx order type name (as OrderEventData.order_type spells it) of a
+# ccxt `type`, for an order the broker did not place.
+_LRVX_ORDER_TYPE = {
+    "market": "market",
+    "limit": "limit",
+    "stop_market": "stop_market",
+    "stop_limit": "stop_limit",
+    "take_profit_market": "take_profit_market",
+    "take_profit_limit": "take_profit_limit",
+    "trailing_stop_market": "trailing_stop",
+}
+
+# How many finished ccxt order ids are remembered, so a late repeat of an
+# order's last update is not reported twice.
+_FINISHED_ORDERS_KEPT = 4096
+
 # Types with a trigger and no limit price.
 _TRIGGER_AT_MARKET_TYPES = frozenset(
     {"stop_market", "take_profit_market", "trailing_stop_market"})
@@ -237,6 +301,35 @@ class _PlacedOrder:
     side: str
     ccxt_type: str
     trigger_price: float
+
+
+@dataclass
+class _OrderProgress:
+    """What has been reported of one exchange order so far."""
+
+    lrvx_id: int
+    symbol: Optional[str]
+    side: str
+    order_type: str
+    filled: float = 0.0
+    cost: float = 0.0
+    accepted: bool = False
+
+
+def _takes_legacy_order_update(strategy: Any) -> bool:
+    """True for a strategy whose ``on_order_update`` has the four-argument
+    form ``(ccxt_sym, status, filled, avg_price)`` this broker used to call,
+    not ``lrvx.Strategy``'s ``(ctx, event)``."""
+    fn = getattr(type(strategy), "on_order_update", None)
+    if fn is None or not inspect.isfunction(fn):
+        return False
+    try:
+        params = list(inspect.signature(fn).parameters.values())
+    except (TypeError, ValueError):
+        return False
+    positional = [p for p in params
+                  if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
+    return len(positional) == 5
 
 
 # Per-exchange override for ccxt's order-book depth. ccxt.pro's default
@@ -315,6 +408,13 @@ class CcxtBroker:
     # carries the id alone, has to tell the exchange about the order.
     _placed_orders: dict = field(default_factory=dict, init=False, repr=False)
     _ccxt_orders_by_sym: dict = field(default_factory=dict, init=False, repr=False)
+    # ccxt order id -> _OrderProgress, for every order seen and not finished.
+    _order_progress: dict = field(default_factory=dict, init=False, repr=False)
+    # ccxt ids of finished orders, oldest first, at most _FINISHED_ORDERS_KEPT.
+    _finished_orders: Any = field(default_factory=OrderedDict, init=False, repr=False)
+    _orders_task: Any = field(default=None, init=False, repr=False)
+    # Bound four-argument on_order_update methods (see "Compatibility").
+    _legacy_order_updates: list = field(default_factory=list, init=False, repr=False)
     _tasks: list = field(default_factory=list, init=False, repr=False)
     _loop: Optional[asyncio.AbstractEventLoop] = field(default=None, init=False, repr=False)
     _markets_loaded: bool = field(default=False, init=False, repr=False)
@@ -400,6 +500,7 @@ class CcxtBroker:
         if self._tasks:
             await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks.clear()
+        self._orders_task = None
 
     # ── Symbol registration ──────────────────────────────────────────
 
@@ -458,6 +559,24 @@ class CcxtBroker:
     def add_strategy(self, strategy: Any) -> None:
         """Queue a strategy to attach when ``run()`` starts the runner."""
         self._strategies.append(strategy)
+        if _takes_legacy_order_update(strategy):
+            warnings.warn(
+                f"{type(strategy).__name__}.on_order_update(ccxt_sym, status, filled, "
+                "avg_price) is the form CcxtBroker used to call; it is still called for "
+                "every update of the orders stream, but lrvx.Strategy's form is "
+                "on_order_update(ctx, event), with fills in on_fill(ctx, event), as in a "
+                "backtest. See 'Order updates' in lrvx.ccxt.",
+                DeprecationWarning, stacklevel=2)
+            legacy = strategy.on_order_update
+            self._legacy_order_updates.append(legacy)
+
+            # The runner calls on_order_update(ctx, event); the old form has
+            # no place for that call.
+            def _old_form_only(*args: Any) -> None:
+                if len(args) == 4:
+                    legacy(*args)
+
+            strategy.on_order_update = _old_form_only
 
     def set_market_data_recorder(self, recorder: Any) -> None:
         """Attach a ``MarketDataRecorderHook`` subclass to capture
@@ -567,9 +686,7 @@ class CcxtBroker:
                     name=f"ccxt-bbo-{ccxt_sym}",
                 ))
         if "orders" in streams:
-            self._tasks.append(asyncio.create_task(
-                self._orders_loop(), name="ccxt-orders",
-            ))
+            self._ensure_orders_stream()
 
         try:
             await asyncio.gather(*self._tasks)
@@ -676,6 +793,18 @@ class CcxtBroker:
             for o in orders:
                 self._dispatch_order_update(o)
 
+    def _ensure_orders_stream(self) -> None:
+        """Start the orders stream unless it is running.
+
+        Called for ``streams=(..., "orders")`` and before the first order
+        is placed: a broker that places orders needs their updates, or a
+        resting order is never reported filled and never leaves its maps.
+        """
+        if self._orders_task is not None and not self._orders_task.done():
+            return
+        self._orders_task = asyncio.create_task(self._orders_loop(), name="ccxt-orders")
+        self._tasks.append(self._orders_task)
+
     # ── Outbound: signal → exchange order ─────────────────────────────
 
     def _on_signal(self, sig: Any) -> None:
@@ -725,6 +854,8 @@ class CcxtBroker:
         order_type = (getattr(sig, "order_type", "") or "").upper()
         side = (getattr(sig, "side", "") or "").lower()
         try:
+            if order_type in _CCXT_ORDER_TYPE or order_type == "MODIFY":
+                self._ensure_orders_stream()
             if order_type == "MARKET":
                 await self._place_market(ccxt_sym, side, sig)
             elif order_type == "LIMIT":
@@ -785,6 +916,19 @@ class CcxtBroker:
         lrvx_id = int(getattr(sig, "order_id", 0) or 0)
         if not ccxt_id:
             return
+        order_type = (getattr(sig, "order_type", "") or "").upper()
+        # The stream may have reported the order before this answer arrived;
+        # what it reported then stays reported, under the id known now.
+        progress = self._order_progress.get(str(ccxt_id))
+        if progress is None and str(ccxt_id) not in self._finished_orders:
+            progress = self._order_progress[str(ccxt_id)] = _OrderProgress(
+                lrvx_id=lrvx_id, symbol=ccxt_sym,
+                side=(getattr(sig, "side", "") or "").lower(),
+                order_type=_LRVX_ORDER_TYPE.get(_CCXT_ORDER_TYPE.get(order_type, "limit"),
+                                                "limit"))
+        elif progress is not None:
+            progress.lrvx_id = lrvx_id
+        self._report_order(res)
         if str(res.get("status", "")) in _TERMINAL_ORDER_STATUSES:
             # Finished in the answer to its placement (a market order
             # usually is): there is nothing left to cancel or modify, and no
@@ -794,7 +938,6 @@ class CcxtBroker:
             return
         if lrvx_id:
             self._lrvx_to_ccxt_order[lrvx_id] = str(ccxt_id)
-            order_type = (getattr(sig, "order_type", "") or "").upper()
             self._placed_orders[lrvx_id] = _PlacedOrder(
                 symbol=ccxt_sym,
                 side=(getattr(sig, "side", "") or "").lower(),
@@ -903,10 +1046,13 @@ class CcxtBroker:
         placed = self._placed_orders.pop(lrvx_id, None)
         if not sym and placed is not None:
             sym = placed.symbol
-        await self.exchange.cancel_order(ccxt_id, sym)
+        res = await self.exchange.cancel_order(ccxt_id, sym)
         self._lrvx_to_ccxt_order.pop(lrvx_id, None)
         if sym and sym in self._ccxt_orders_by_sym:
             self._ccxt_orders_by_sym[sym].discard(ccxt_id)
+        self._report_cancelled(ccxt_id, res)
+        if self._runner is not None:
+            self._runner.order_closed(lrvx_id)
 
     async def _cancel_all(self, sym: Optional[str]) -> None:
         if not sym:
@@ -914,17 +1060,32 @@ class CcxtBroker:
         ids = list(self._ccxt_orders_by_sym.get(sym, set()))
         if not ids:
             return
+        cancelled = []
         for ccxt_id in ids:
             try:
-                await self.exchange.cancel_order(ccxt_id, sym)
+                res = await self.exchange.cancel_order(ccxt_id, sym)
+            except asyncio.CancelledError:
+                raise
             except BaseException as e:
+                # Still on the exchange as far as anyone knows: it stays
+                # tracked, so a later cancel or the orders stream can end it.
                 if self.on_error:
                     self.on_error(sym, e)
-        self._ccxt_orders_by_sym.pop(sym, None)
-        # Drop reverse-lookup entries that pointed at this symbol's ids.
-        for fid in [f for f, c in self._lrvx_to_ccxt_order.items() if c in ids]:
+                continue
+            cancelled.append(ccxt_id)
+            self._report_cancelled(ccxt_id, res)
+        remaining = self._ccxt_orders_by_sym.get(sym)
+        if remaining is not None:
+            remaining.difference_update(cancelled)
+            if not remaining:
+                del self._ccxt_orders_by_sym[sym]
+        # Drop reverse-lookup entries that pointed at the cancelled ids, and
+        # tell the runner each of those orders is finished.
+        for fid in [f for f, c in self._lrvx_to_ccxt_order.items() if c in cancelled]:
             self._lrvx_to_ccxt_order.pop(fid, None)
             self._placed_orders.pop(fid, None)
+            if self._runner is not None:
+                self._runner.order_closed(fid)
 
     async def _modify(self, sym: Optional[str], side: str, sig: Any) -> None:
         lrvx_id = int(getattr(sig, "order_id", 0) or 0)
@@ -965,6 +1126,11 @@ class CcxtBroker:
         new_id = res.get("id") if isinstance(res, dict) else None
         if new_id and str(new_id) != ccxt_id:
             self._lrvx_to_ccxt_order[lrvx_id] = str(new_id)
+            progress = self._order_progress.pop(ccxt_id, None)
+            if progress is not None:
+                # A new order on the exchange: nothing of it is filled yet.
+                progress.filled = progress.cost = 0.0
+                self._order_progress[str(new_id)] = progress
             if sym and sym in self._ccxt_orders_by_sym:
                 self._ccxt_orders_by_sym[sym].discard(ccxt_id)
                 self._ccxt_orders_by_sym[sym].add(str(new_id))
@@ -1019,21 +1185,99 @@ class CcxtBroker:
     # ── Order updates ─────────────────────────────────────────────────
 
     def _dispatch_order_update(self, o: Mapping[str, Any]) -> None:
-        ccxt_sym = str(o.get("symbol", ""))
-        status = str(o.get("status", ""))
-        filled = float(o.get("filled") or 0.0)
-        avg = float(o.get("average") or o.get("price") or 0.0)
-        if status in _TERMINAL_ORDER_STATUSES:
-            self._note_order_closed(o)
-        for strat in self._strategies:
-            fn = getattr(strat, "on_order_update", None)
-            if callable(fn):
+        """One update of the orders stream: to the strategies, then, when
+        the order is finished, out of the broker's maps."""
+        if self._legacy_order_updates:
+            ccxt_sym = str(o.get("symbol", ""))
+            status = str(o.get("status", ""))
+            filled = float(o.get("filled") or 0.0)
+            avg = float(o.get("average") or o.get("price") or 0.0)
+            for fn in self._legacy_order_updates:
                 try:
                     fn(ccxt_sym, status, filled, avg)
                 except BaseException as e:
                     if self.on_error:
                         self.on_error(ccxt_sym, e)
+        self._report_order(o)
+        if str(o.get("status", "")) in _TERMINAL_ORDER_STATUSES:
+            self._note_order_closed(o)
 
+    def _report_cancelled(self, ccxt_id: str, res: Any) -> None:
+        """Report the answer to a cancel. An exchange that answers with no
+        status has still cancelled the order."""
+        update = dict(res) if isinstance(res, dict) else {}
+        update["id"] = ccxt_id
+        if not update.get("status") or update["status"] == "open":
+            update["status"] = "canceled"
+        self._report_order(update)
+
+    def _report_order(self, o: Mapping[str, Any]) -> None:
+        """Turn what the exchange says of one order into order events and
+        hand them to the runner (see "Order updates" in the module
+        docstring). Reports only what is new since the last call for the
+        order, so the same state arriving twice produces nothing."""
+        if not isinstance(o, Mapping):
+            return
+        ccxt_id = str(o.get("id") or "")
+        if ccxt_id and ccxt_id in self._finished_orders:
+            return
+        progress = self._order_progress.get(ccxt_id) if ccxt_id else None
+        if progress is None:
+            progress = _OrderProgress(
+                lrvx_id=0, symbol=o.get("symbol"),
+                side=str(o.get("side") or "").lower(),
+                order_type=_LRVX_ORDER_TYPE.get(str(o.get("type") or ""), "limit"))
+            if ccxt_id:
+                self._order_progress[ccxt_id] = progress
+        status = str(o.get("status") or "")
+        events = []  # (status, fill_qty, fill_price, reject_reason)
+
+        filled = float(o.get("filled") or 0.0)
+        grew = filled - progress.filled
+        if grew > 1e-12:
+            avg = float(o.get("average") or o.get("price") or 0.0)
+            cost = avg * filled
+            price = (cost - progress.cost) / grew if avg > 0 else 0.0
+            if price <= 0:
+                price = avg
+            progress.filled, progress.cost = filled, cost
+            remaining = o.get("remaining")
+            done = status == "closed" or (remaining is not None and float(remaining) <= 0)
+            events.append(("FILLED" if done else "PARTIALLY_FILLED", grew, price, ""))
+        elif status == "open" and not progress.accepted:
+            events.append(("ACCEPTED", 0.0, 0.0, ""))
+        if status:
+            progress.accepted = True
+        if status in _ENDED_WITHOUT_FILL:
+            reason = str(o.get("reason") or "") if status == "rejected" else ""
+            events.append((_ENDED_WITHOUT_FILL[status], 0.0, 0.0, reason))
+
+        if status in _TERMINAL_ORDER_STATUSES and ccxt_id:
+            self._order_progress.pop(ccxt_id, None)
+            self._finished_orders[ccxt_id] = None
+            while len(self._finished_orders) > _FINISHED_ORDERS_KEPT:
+                self._finished_orders.popitem(last=False)
+
+        ccxt_sym = progress.symbol or o.get("symbol")
+        sym = self._ccxt_to_sym.get(ccxt_sym)
+        if not events or sym is None or self._runner is None:
+            return
+        if progress.side not in ("buy", "sell"):
+            if self.on_error:
+                self.on_error(str(ccxt_sym), ValueError(
+                    f"order update for ccxt order {ccxt_id or '?'} names no side; "
+                    f"its {events[0][0]} event was not delivered"))
+            return
+        ts_ns = _ccxt_ts_ns(o)
+        for event_status, qty, price, reason in events:
+            try:
+                self._runner.on_order_event(
+                    progress.lrvx_id, int(sym), progress.side, event_status,
+                    order_type=progress.order_type, fill_qty=qty, fill_price=price,
+                    ts_ns=ts_ns, reject_reason=reason)
+            except BaseException as e:
+                if self.on_error:
+                    self.on_error(str(ccxt_sym), e)
 
     def _note_order_closed(self, o: Mapping[str, Any]) -> None:
         """Forget an order the exchange reports finished, and pass the news

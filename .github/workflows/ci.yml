@@ -146,6 +146,11 @@ jobs:
     - name: Verify every QuickJS global the JS layer calls is registered
       run: python3 scripts/check_quickjs_registration.py
 
+    # The lrvx object is an object literal in a C++ string and its typing a
+    # block in a .d.ts; sixteen members shipped with no typing at all.
+    - name: Verify every member of the QuickJS lrvx object is typed
+      run: python3 scripts/check_quickjs_lrvx_typings.py
+
     # JS_ToCString returns null for a Symbol or a throwing toString, and a
     # binding that skips the test hands that null to strlen. The test was
     # missing at most call sites until the owning holder replaced them.

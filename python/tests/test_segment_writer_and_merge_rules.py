@@ -103,3 +103,23 @@ def test_the_issue_type_constants_are_the_enum_values():
     assert lrvx.ISSUE_INVALID_MAGIC == 0
     assert lrvx.ISSUE_FILE_NOT_FOUND != lrvx.ISSUE_FILE_READ_ERROR
     assert lrvx.ISSUE_SEGMENT_RANGE_OVERLAP > lrvx.ISSUE_FILE_READ_ERROR
+
+
+def test_a_per_event_issue_says_which_event(tmp_path):
+    """The issue dict had no event_index, and the validator never filled the
+    field it would have come from: only the message said which event."""
+    writer = lrvx.DataWriter(str(tmp_path))
+    for i, second in enumerate((10, 11, 12, 5, 13)):
+        writer.write_trade(second * SEC, second * SEC, 100.0, 1.0, i + 1, 1, True)
+    writer.close()
+    (segment,) = _segments(tmp_path)
+
+    issues = lrvx.validate(str(segment))["issues"]
+    (late,) = [i for i in issues if i["type"] == lrvx.ISSUE_TIMESTAMP_OUT_OF_ORDER]
+    assert late["event_index"] == 3
+    assert late["message"] == "Timestamp out of order at event 3"
+    assert late["timestamp_ns"] == 5 * SEC
+    assert late["file_offset"] > 0
+
+    missing = lrvx.validate(str(tmp_path / "no_such.lrvx"))["issues"]
+    assert [i["event_index"] for i in missing] == [0], "an issue of the whole file names no event"

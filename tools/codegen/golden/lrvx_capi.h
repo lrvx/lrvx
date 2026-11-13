@@ -1357,8 +1357,10 @@ extern "C"
                                       LrvxExchangeCapabilities* caps_out);
   void lrvx_live_engine_set_executor(LrvxLiveEngineHandle engine, LrvxExecutorHandle executor);
   void lrvx_live_engine_order_closed(LrvxLiveEngineHandle engine, uint64_t order_id);
+  void lrvx_live_engine_on_order_event(LrvxLiveEngineHandle engine, const LrvxOrderEventData* event);
   void lrvx_runner_set_executor(LrvxRunnerHandle runner, LrvxExecutorHandle executor);
   void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id);
+  void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventData* event);
   void lrvx_backtest_runner_add_execution_listener(LrvxBacktestRunnerHandle runner,
                                                    LrvxExecutionListenerHandle listener);
   void lrvx_backtest_runner_set_executor(LrvxBacktestRunnerHandle runner,

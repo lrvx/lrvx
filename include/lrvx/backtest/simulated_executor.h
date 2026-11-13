@@ -82,6 +82,7 @@ class SimulatedExecutor : public IOrderExecutor
   // applyVenueLot) is read on the next order, at the cost of one atomic load
   // per check while nothing changes.
   void setSymbolRegistry(const SymbolRegistry* registry);
+  const SymbolRegistry* symbolRegistry() const noexcept { return _registry; }
   // For a registry that is a copy of the entries another registry held (the
   // one BacktestRunner builds from Strategy::symbolInfos()): the venue tick
   // log of the registry the copy was taken from. A tick or lot that log holds

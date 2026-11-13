@@ -9,9 +9,10 @@ strategy behaviour.
 
 Every binding's `.lrvxrun` directory is read back through the pybind11
 `TraceReader`, and the decoded records (signals, order events, fills) are
-compared field by field. Every field must be equal except the timestamps
-(`run_ts_ns`, `feed_ts_ns` and their camelCase forms), which may differ by
-up to 1024 ns because NAPI passes them through a JS `Number`. The segment
+compared field by field. Every field must be equal, timestamps to the
+nanosecond: the fixtures stamp their records with odd nanosecond counts,
+which no float64 holds, so a binding that routed a timestamp through a
+double would show here. The segment
 files themselves are not compared: each segment header carries
 `created_ns`, the wall clock at the moment the segment was opened
 (src/run/trace_recorder.cpp), so two runs never produce the same bytes,
@@ -156,15 +157,6 @@ def run_codon(out_dir: Path) -> Optional[Dict[str, List[Dict[str, Any]]]]:
     return _read_via_pybind(out_dir)
 
 
-# NAPI converts ns-level int64 timestamps through JS `Number` (float64),
-# which loses the bottom bits past Number.MAX_SAFE_INTEGER (~2^53). The
-# gate tolerates timestamp drift of up to 1024 ns and asserts strict
-# equality on every other field. A BigInt path through the NAPI write_*
-# surface would remove the drift and let this tolerance go to zero.
-_TIMESTAMP_TOLERANCE_NS = 1024
-_TIMESTAMP_FIELDS = {"run_ts_ns", "feed_ts_ns", "runTsNs", "feedTsNs"}
-
-
 def _diff_records(name_a: str, recs_a: Dict[str, List[Dict[str, Any]]],
                    name_b: str, recs_b: Dict[str, List[Dict[str, Any]]]) -> List[str]:
     issues: List[str] = []
@@ -177,9 +169,6 @@ def _diff_records(name_a: str, recs_a: Dict[str, List[Dict[str, Any]]],
             for k in sorted(set(a) | set(b)):
                 va, vb = a.get(k), b.get(k)
                 if va == vb:
-                    continue
-                if (k in _TIMESTAMP_FIELDS and isinstance(va, int) and isinstance(vb, int)
-                        and abs(va - vb) <= _TIMESTAMP_TOLERANCE_NS):
                     continue
                 issues.append(
                     f"{name_a} vs {name_b}: {kind}[{i}].{k}  "

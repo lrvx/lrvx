@@ -1497,7 +1497,9 @@ extern "C"
   typedef void* LrvxDataWriterHandle;
 
   // max_segment_mb 0 is the 256 MB default, here and in
-  // lrvx_binary_log_recorder_hook_create(_ex).
+  // lrvx_binary_log_recorder_hook_create(_ex). A value above 17592186044415,
+  // whose size in bytes does not fit in 64 bits, is refused by all three:
+  // NULL, with the reason in lrvx_last_error_message.
   LRVX_EXPORT(group = "data_writer")
   LrvxDataWriterHandle lrvx_data_writer_create(const char* output_dir, uint64_t max_segment_mb,
                                                uint8_t exchange_id);
@@ -2659,14 +2661,36 @@ extern "C"
   //   boundary. A gate that plainly returns false is a decision, not a
   //   failure, and is not reported as one.
   //
+  // The gates of each runner, in one place.
+  //
+  //   Runner and live engine. Every signal a strategy emits -- an order, a
+  //   Cancel, a CancelAll, a Modify, either liquidity signal, reduce-only or
+  //   not -- is put to the kill switch, the order validator and the risk
+  //   manager, in that order. The first that returns 0 drops it: on_signal,
+  //   the executor and the PnL / storage observers do not see it. A signal
+  //   that passes goes to on_signal, then to the executor, then to the
+  //   observers. on_signal is an observer too: with a NULL on_signal the
+  //   gates are asked and the executor is called exactly the same.
+  //
+  //   Backtest runner. Only a signal that creates an order is put to the
+  //   gates: Market, Limit, the Stop and TakeProfit pairs, TrailingStop, and
+  //   each of the two legs of an OCO (either leg refused drops the pair).
+  //   Cancel, CancelAll and Modify pass unasked: they add no exposure. A
+  //   reduce-only order passes unasked as well, so that a tightened limit
+  //   cannot hold a strategy in a position. The order is the same: kill
+  //   switch, order validator, risk manager. A kill switch that returned 0
+  //   stays triggered for the rest of the run.
+  //
   // What the emitter learns of a drop. The emit that produced the signal has
   // already returned an order id, so a drop by any of the three gates leaves
   // its reason in the last error of the emitting thread, the way a refused
   // Modify does: lrvx_last_error_message reads
   //   "emit: <type> signal for order <id> on symbol <n> was dropped by the
-  //    <gate>; it reached neither on_signal nor the executor [<token>]"
+  //    <gate>; <outcome> [<token>]"
   // with <gate> / <token> one of kill switch / kill_switch, order validator /
-  // order_validator, risk manager / risk_manager. Call lrvx_clear_last_error
+  // order_validator, risk manager / risk_manager, and <outcome> "it reached
+  // neither on_signal nor the executor" on a runner or live engine and "it
+  // reached no executor" on a backtest runner. Call lrvx_clear_last_error
   // before the lrvx_emit_* call and read lrvx_last_error_code after it; the
   // bindings' emit methods clear it themselves, so a strategy reads
   // last_error() / lastError() right after the emit, inside the callback
@@ -3312,6 +3336,12 @@ extern "C"
   LRVX_EXPORT(group = "execution")
   void lrvx_live_engine_order_closed(LrvxLiveEngineHandle engine, uint64_t order_id);
 
+  // The engine's counterpart of lrvx_runner_on_order_event. The callbacks
+  // run on the calling thread, not on a strategy's consumer thread.
+  LRVX_EXPORT(group = "execution")
+  void lrvx_live_engine_on_order_event(LrvxLiveEngineHandle engine,
+                                       const LrvxOrderEventData* event);
+
   LRVX_EXPORT(group = "lrvxliveengine_disruptor")
   void lrvx_live_engine_start(LrvxLiveEngineHandle engine);
   LRVX_EXPORT(group = "lrvxliveengine_disruptor")
@@ -3458,6 +3488,27 @@ extern "C"
   // lrvx_clear_last_error first and read lrvx_last_error_code after.
   LRVX_EXPORT(group = "execution")
   void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id);
+
+  // Reports one order event a venue sent (a broker's order update or fill)
+  // to the strategies of this runner, the way the backtest runner delivers
+  // its simulator's: the runner's position tracker sees it first, then the
+  // strategy's on_fill for PARTIALLY_FILLED and FILLED (and only on_fill),
+  // on_order_update for every other status, with the same LrvxSymbolContext
+  // and LrvxOrderEventData. So the position an on_fill reads already counts
+  // the fill, and a strategy written for a backtest hears of its live orders
+  // through the same callbacks.
+  //
+  // event->status is an lrvx::OrderEventStatus code and event->order_type an
+  // lrvx::OrderType code, as in the events a strategy receives; fill_qty_raw
+  // and fill_price_raw are this fill's own quantity and price, not the
+  // order's running totals. The strategy that issued the order (its id is
+  // order_id >> 32) receives the event; an id from no attached strategy's
+  // block goes to every strategy subscribed to the symbol. Runs the
+  // callbacks on the calling thread. A status, side or order type outside
+  // its range is refused: nothing is delivered and the reason is in
+  // lrvx_last_error_message.
+  LRVX_EXPORT(group = "execution")
+  void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventData* event);
 
   LRVX_EXPORT(group = "strategyrunner_synchronous")
   void lrvx_runner_start(LrvxRunnerHandle runner);
@@ -3676,11 +3727,11 @@ extern "C"
   void lrvx_backtest_runner_set_executor(LrvxBacktestRunnerHandle runner,
                                          LrvxExecutorHandle executor);
 
-  // Pre-trade gate parity with the live runner. All four hooks are
-  // optional (NULL = no-op). The gate fires on entry-type signals
-  // (Market / Limit / Stop* / TP* / TrailingStop); Cancel / CancelAll
-  // / Modify pass through. Reduce-only orders bypass the gate so
-  // tightening caps cannot strand a strategy in a position.
+  // The backtest runner's gates. All four hooks are optional (NULL =
+  // no-op). Which signals are asked, which pass unasked (Cancel, CancelAll,
+  // Modify, reduce-only orders) and what a drop leaves in the last error
+  // are described with the runner's and the live engine's under
+  // "The gates of each runner" at LrvxRiskManagerCallbacks.
   LRVX_EXPORT(group = "backtestrunner_replay")
   void lrvx_backtest_runner_set_risk_manager(LrvxBacktestRunnerHandle runner,
                                              LrvxRiskManagerHandle rm);
@@ -5454,7 +5505,8 @@ extern "C"
   // lrvx_walk_forward_run_csv, lrvx_run_reader_open,
   // lrvx_run_recorder_create, lrvx_tape_diff_create,
   // lrvx_merged_tape_reader_create, lrvx_funding_schedule_load_tape, a
-  // segment merge, split or export that ends with success = 0, a segment
+  // segment merge, split or export that ends with success = 0 (every error
+  // it collected, joined with "; "), a segment
   // recompress or extract that could not read or write, and a strategy a
   // runner or engine refuses to attach -- leave the reason here beside their
   // failure value. Never NULL -- an empty string means nothing has been

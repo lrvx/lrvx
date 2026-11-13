@@ -197,14 +197,17 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
 // Helpers
 // ──────────────────────────────────────────────────────────────
 
-// Accept Symbol object or plain number → uint32_t id.
+// Accept Symbol object or plain number → uint32_t id. Anything else (a
+// missing argument, a string, an object with no numeric id, a fraction, a
+// negative) is a TypeError; it used to be read as whatever the conversion
+// made of it, or to surface as a bare "A number was expected".
 inline uint32_t symId(const Napi::Value& v)
 {
   if (v.IsObject())
   {
-    return v.As<Napi::Object>().Get("id").As<Napi::Number>().Uint32Value();
+    return argUint32(v.As<Napi::Object>().Get("id"), "symbol: the id of a Symbol");
   }
-  return v.As<Napi::Number>().Uint32Value();
+  return argUint32(v, "symbol: a Symbol or a symbol id");
 }
 
 // The arguments of an emit.* call. A missing argument or one of the wrong
@@ -631,8 +634,8 @@ struct NodeStrategyHost : TsfnHost
                                                 {
         auto* h = static_cast<NodeStrategyHost*>(i.Data());
         uint32_t sym = symId(i[0]);
-        uint8_t bt = i[1].As<Napi::Number>().Uint32Value();
-        uint64_t param = static_cast<uint64_t>(i[2].As<Napi::Number>().Int64Value());
+        uint8_t bt = static_cast<uint8_t>(argUint32(i[1], "lastClosedBar: barType"));
+        uint64_t param = argUint64(i[2], "lastClosedBar: barTypeParam");
         auto bar = h->bridge->lastClosedBar(sym, static_cast<BarType>(bt), param);
         if (!bar){ return i.Env().Null();
 }
@@ -641,9 +644,9 @@ struct NodeStrategyHost : TsfnHost
                                                   {
         auto* h = static_cast<NodeStrategyHost*>(i.Data());
         uint32_t sym = symId(i[0]);
-        uint8_t bt = i[1].As<Napi::Number>().Uint32Value();
-        uint64_t param = static_cast<uint64_t>(i[2].As<Napi::Number>().Int64Value());
-        size_t n = static_cast<size_t>(i[3].As<Napi::Number>().Uint32Value());
+        uint8_t bt = static_cast<uint8_t>(argUint32(i[1], "lastNClosedBars: barType"));
+        uint64_t param = argUint64(i[2], "lastNClosedBars: barTypeParam");
+        size_t n = argUint32(i[3], "lastNClosedBars: n");
         auto bars = h->bridge->lastNClosedBars(sym, static_cast<BarType>(bt), param, n);
         Napi::Array out = Napi::Array::New(i.Env(), bars.size());
         for (size_t k = 0; k < bars.size(); ++k){ out.Set(static_cast<uint32_t>(k), buildBar(i.Env(), bars[k]));
@@ -652,7 +655,7 @@ struct NodeStrategyHost : TsfnHost
     em.Set("setBarRingCapacity", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                                      {
         auto* h = static_cast<NodeStrategyHost*>(i.Data());
-        size_t n = static_cast<size_t>(i[0].As<Napi::Number>().Uint32Value());
+        size_t n = argUint32(i[0], "setBarRingCapacity: capacity");
         h->bridge->setBarRingCapacity(n);
         return i.Env().Undefined(); }, "setBarRingCapacity", this));
 
@@ -1231,8 +1234,8 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
   {
     auto env = info.Env();
     _reg = Napi::ObjectWrap<SymbolRegistryNode>::Unwrap(info[0].As<Napi::Object>())->get();
-    double fee = info[1].As<Napi::Number>().DoubleValue();
-    double cap = info[2].As<Napi::Number>().DoubleValue();
+    double fee = argNumber(info[1], "BacktestRunner: feeRate");
+    double cap = argNumber(info[2], "BacktestRunner: initialCapital");
     if (info.Length() < 4 || info[3].IsUndefined())
     {
       _handle = lrvx_backtest_runner_create(static_cast<LrvxRegistryHandle>(_reg), fee, cap);
@@ -1603,9 +1606,11 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
         return info.Env().Undefined();
       }
       std::string symbol = info[7].As<Napi::String>().Utf8Value();
-      uint8_t barType = info.Length() > 8 ? static_cast<uint8_t>(info[8].As<Napi::Number>().Uint32Value()) : 0;
-      uint64_t barTypeParam = info.Length() > 9
-                                  ? static_cast<uint64_t>(info[9].As<Napi::Number>().Int64Value())
+      uint8_t barType = info.Length() > 8 && !info[8].IsUndefined()
+                            ? static_cast<uint8_t>(argUint32(info[8], "runBars: barType"))
+                            : 0;
+      uint64_t barTypeParam = info.Length() > 9 && !info[9].IsUndefined()
+                                  ? argUint64(info[9], "runBars: barTypeParam")
                                   : 0;
       uint32_t n = static_cast<uint32_t>(startNs.ElementLength());
       LrvxBacktestStats s{};
@@ -2024,8 +2029,12 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
   Napi::Value onTrade(const Napi::CallbackInfo& info)
   {
     uint32_t sym = symId(info[0]);
-    double price = info[1].As<Napi::Number>().DoubleValue();
-    double qty = info[2].As<Napi::Number>().DoubleValue();
+    double price = argNumber(info[1], "onTrade: price");
+    double qty = argNumber(info[2], "onTrade: qty");
+    if (!info[3].IsBoolean())
+    {
+      throw Napi::TypeError::New(info.Env(), "onTrade: isBuy must be a boolean");
+    }
     bool isBuy = info[3].As<Napi::Boolean>().Value();
     int64_t ts = info.Length() > 4 ? toInt64Ns(info[4]) : 0;
     if (_mode == Mode::Sync)
@@ -2096,8 +2105,8 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       }
       auto o = v.As<Napi::Object>();
       has = 1;
-      price = o.Get("price").As<Napi::Number>().DoubleValue();
-      qty = o.Get("qty").As<Napi::Number>().DoubleValue();
+      price = argNumber(o.Get("price"), "onBookTop: price");
+      qty = argNumber(o.Get("qty"), "onBookTop: qty");
       return true;
     };
     uint8_t hasBid = 0;
@@ -2571,20 +2580,20 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
           .ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    auto opts = info[0].As<Napi::Object>();
-    uint64_t order_id = opts.Get("orderId").As<Napi::Number>().Int64Value();
+    auto opts = argOptions(info, "traceOrderEvent");
+    const auto u8 = [&opts](const char* key, const char* what)
+    { return static_cast<uint8_t>(argUint32(opts.Get(key), what)); };
+    uint64_t order_id = argUint64(opts.Get("orderId"), "traceOrderEvent: orderId");
     uint64_t parent = opts.Has("parentSignalId")
-                          ? opts.Get("parentSignalId").As<Napi::Number>().Int64Value()
+                          ? argUint64(opts.Get("parentSignalId"), "traceOrderEvent: parentSignalId")
                           : 0;
-    uint32_t sym = opts.Get("symbolId").As<Napi::Number>().Uint32Value();
-    uint8_t kind = opts.Get("eventKind").As<Napi::Number>().Uint32Value();
-    uint8_t side = opts.Get("side").As<Napi::Number>().Uint32Value();
-    uint8_t order_type = opts.Has("orderType")
-                             ? opts.Get("orderType").As<Napi::Number>().Uint32Value()
-                             : 0;
-    double price = opts.Has("price") ? opts.Get("price").As<Napi::Number>().DoubleValue() : 0.0;
-    double qty = opts.Has("qty") ? opts.Get("qty").As<Napi::Number>().DoubleValue() : 0.0;
-    uint32_t flags = opts.Has("flags") ? opts.Get("flags").As<Napi::Number>().Uint32Value() : 0;
+    uint32_t sym = argUint32(opts.Get("symbolId"), "traceOrderEvent: symbolId");
+    uint8_t kind = u8("eventKind", "traceOrderEvent: eventKind");
+    uint8_t side = u8("side", "traceOrderEvent: side");
+    uint8_t order_type = opts.Has("orderType") ? u8("orderType", "traceOrderEvent: orderType") : 0;
+    double price = opts.Has("price") ? argNumber(opts.Get("price"), "traceOrderEvent: price") : 0.0;
+    double qty = opts.Has("qty") ? argNumber(opts.Get("qty"), "traceOrderEvent: qty") : 0.0;
+    uint32_t flags = opts.Has("flags") ? argUint32(opts.Get("flags"), "traceOrderEvent: flags") : 0;
     lrvx_runner_trace_order_event(_runner, order_id, parent, sym, kind, side, order_type,
                                   lrvx_price_from_double(price),
                                   lrvx_quantity_from_double(qty), flags);
@@ -2600,18 +2609,16 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
           .ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    auto opts = info[0].As<Napi::Object>();
-    uint64_t order_id = opts.Get("orderId").As<Napi::Number>().Int64Value();
-    uint64_t fill_id = opts.Has("fillId")
-                           ? opts.Get("fillId").As<Napi::Number>().Int64Value()
-                           : 0;
-    double price = opts.Get("price").As<Napi::Number>().DoubleValue();
-    double qty = opts.Get("qty").As<Napi::Number>().DoubleValue();
-    double fee = opts.Has("fee") ? opts.Get("fee").As<Napi::Number>().DoubleValue() : 0.0;
-    uint32_t sym = opts.Get("symbolId").As<Napi::Number>().Uint32Value();
-    uint8_t side = opts.Get("side").As<Napi::Number>().Uint32Value();
+    auto opts = argOptions(info, "traceFill");
+    uint64_t order_id = argUint64(opts.Get("orderId"), "traceFill: orderId");
+    uint64_t fill_id = opts.Has("fillId") ? argUint64(opts.Get("fillId"), "traceFill: fillId") : 0;
+    double price = argNumber(opts.Get("price"), "traceFill: price");
+    double qty = argNumber(opts.Get("qty"), "traceFill: qty");
+    double fee = opts.Has("fee") ? argNumber(opts.Get("fee"), "traceFill: fee") : 0.0;
+    uint32_t sym = argUint32(opts.Get("symbolId"), "traceFill: symbolId");
+    uint8_t side = static_cast<uint8_t>(argUint32(opts.Get("side"), "traceFill: side"));
     uint8_t liq = opts.Has("liquidity")
-                      ? opts.Get("liquidity").As<Napi::Number>().Uint32Value()
+                      ? static_cast<uint8_t>(argUint32(opts.Get("liquidity"), "traceFill: liquidity"))
                       : 0;
     lrvx_runner_trace_fill(_runner, order_id, fill_id, lrvx_price_from_double(price),
                            lrvx_quantity_from_double(qty), lrvx_quantity_from_double(fee),

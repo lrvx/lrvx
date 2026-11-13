@@ -167,6 +167,22 @@ void LrvxJsStrategy::loadStdlib()
       return _queueMap[model];
     };
 
+    // A side, an order type or an outage policy the classes below do not
+    // know throws. Anything but "buy" used to be a sell, an unknown bracket
+    // order type a limit, and an unknown outage policy "cancel_all".
+    const _sideCode = (where, side) => {
+      if (side === "buy") return 0;
+      if (side === "sell") return 1;
+      throw new TypeError(where + ": side must be 'buy' or 'sell'; got '" + side + "'");
+    };
+    const _nameCode = (where, what, map, name) => {
+      if (!Object.prototype.hasOwnProperty.call(map, name)) {
+        throw new TypeError(where + ": " + what + " must be one of " +
+          Object.keys(map).map((k) => "'" + k + "'").join(", ") + "; got '" + name + "'");
+      }
+      return map[name];
+    };
+
     class SimulatedExecutor {
       constructor() { this._h = __lrvx_simulated_executor_create(); }
       destroy() { __lrvx_simulated_executor_destroy(this._h); }
@@ -174,7 +190,8 @@ void LrvxJsStrategy::loadStdlib()
         // JS convention: type 0 = market (default), 1 = limit.
         // C API convention: LIMIT=0, MARKET=1.
         var cType = (type === 1) ? 0 : 1;
-        __lrvx_simulated_executor_submit(this._h, id, side === "buy" ? 0 : 1, price, qty, cType, __lrvxOr(symbol, 1));
+        __lrvx_simulated_executor_submit(this._h, id, _sideCode("submitOrder", side), price, qty,
+                                         cType, __lrvxOr(symbol, 1));
       }
       onBar(symbol, closePrice) { __lrvx_simulated_executor_on_bar(this._h, symbol, closePrice); }
       // Open-aware form: moves the market to the open (releasing any order
@@ -239,13 +256,11 @@ void LrvxJsStrategy::loadStdlib()
           this._h, va && va.handle ? va.handle : 0);
       }
       submitBracket(opts) {
-        const sideU = (s) => s === "buy" ? 0 : 1;
-        const typeU = (t) => {
-          if (t === "market") return 1;
-          if (t === "stop_market") return 2;
-          if (t === "stop_limit") return 3;
-          return 0;
-        };
+        const sideU = (s) => _sideCode("submitBracket", s);
+        // A leg with no type given is a limit order.
+        const typeMap = { limit: 0, market: 1, stop_market: 2, stop_limit: 3 };
+        const typeU = (t) => (t === undefined || t === null)
+          ? 0 : _nameCode("submitBracket", "an order type", typeMap, t);
         __lrvx_simulated_executor_submit_bracket(
           this._h, opts.bracketId, __lrvxOr(opts.symbol, 1),
           sideU(opts.entrySide), typeU(opts.entryType),
@@ -260,7 +275,7 @@ void LrvxJsStrategy::loadStdlib()
         return names[s] || "pending_entry";
       }
       submitIceberg(id, side, price, total, visible, symbol) {
-        __lrvx_simulated_executor_submit_iceberg(this._h, id, side === "buy" ? 0 : 1,
+        __lrvx_simulated_executor_submit_iceberg(this._h, id, _sideCode("submitIceberg", side),
           price, total, visible, __lrvxOr(symbol, 1));
       }
       setIcebergRefreshLatency(latencyNs) {
@@ -274,6 +289,9 @@ void LrvxJsStrategy::loadStdlib()
     }
 
     const _outageMap = { cancel_all: 0, hold: 1, expire_gtc_after: 2 };
+    // Left out, the policy is "cancel_all".
+    const _outageCode = (where, policy) => (policy === undefined || policy === null)
+      ? 0 : _nameCode(where, "onOpenOrders", _outageMap, policy);
 
     class VenueAvailability {
       constructor() { this._h = __lrvx_venue_availability_create(); }
@@ -281,12 +299,12 @@ void LrvxJsStrategy::loadStdlib()
       scheduleOutage(startNs, durationNs, onOpenOrders, gtcTtlNs) {
         __lrvx_venue_availability_schedule_outage(
           this._h, startNs, durationNs,
-          _outageMap[onOpenOrders || "cancel_all"] || 0, gtcTtlNs || 0);
+          _outageCode("scheduleOutage", onOpenOrders), gtcTtlNs || 0);
       }
       autoRandomOutages(perDay, meanDurationNs, onOpenOrders, seed) {
         __lrvx_venue_availability_auto_random_outages(
           this._h, perDay, meanDurationNs,
-          _outageMap[onOpenOrders || "cancel_all"] || 0, __lrvxOr(seed, 0xC0FFEE));
+          _outageCode("autoRandomOutages", onOpenOrders), __lrvxOr(seed, 0xC0FFEE));
       }
       isUp(nowNs) { return __lrvx_venue_availability_is_up(this._h, nowNs); }
       get handle() { return this._h; }
@@ -306,7 +324,8 @@ void LrvxJsStrategy::loadStdlib()
       destroy() { __lrvx_backtest_result_destroy(this._h); }
       recordFill(orderId, symbol, side, price, qty, timestampNs) {
         __lrvx_backtest_result_record_fill(this._h, orderId, symbol,
-                                           side === "buy" ? 0 : 1, price, qty, timestampNs);
+                                           _sideCode("recordFill", side), price, qty,
+                                           timestampNs);
       }
       ingestExecutor(executor) {
         __lrvx_backtest_result_ingest(this._h, executor.handle);
@@ -320,7 +339,7 @@ void LrvxJsStrategy::loadStdlib()
       constructor(costBasis) { this._h = __lrvx_pos_create(costBasis || 0); }
       destroy() { __lrvx_pos_destroy(this._h); }
       onFill(symbol, side, price, qty) {
-        __lrvx_pos_on_fill(this._h, symbol, side === "buy" ? 0 : 1, price, qty);
+        __lrvx_pos_on_fill(this._h, symbol, _sideCode("onFill", side), price, qty);
       }
       position(symbol) { return __lrvx_pos_position(this._h, symbol); }
       avgEntryPrice(symbol) { return __lrvx_pos_avg_entry(this._h, symbol); }
@@ -343,7 +362,7 @@ void LrvxJsStrategy::loadStdlib()
       constructor() { this._h = __lrvx_l3_create(); }
       destroy() { __lrvx_l3_destroy(this._h); }
       addOrder(orderId, price, qty, side) {
-        return __lrvx_l3_add_order(this._h, orderId, price, qty, side === "buy" ? 0 : 1);
+        return __lrvx_l3_add_order(this._h, orderId, price, qty, _sideCode("addOrder", side));
       }
       removeOrder(orderId) { return __lrvx_l3_remove_order(this._h, orderId); }
       modifyOrder(orderId, newQty) { return __lrvx_l3_modify_order(this._h, orderId, newQty); }
@@ -400,7 +419,8 @@ void LrvxJsStrategy::loadStdlib()
       constructor() { this._h = __lrvx_ot_create(); }
       destroy() { __lrvx_ot_destroy(this._h); }
       onSubmitted(orderId, symbol, side, price, qty) {
-        return __lrvx_ot_submit(this._h, orderId, symbol, side === "buy" ? 0 : 1, price, qty);
+        return __lrvx_ot_submit(this._h, orderId, symbol, _sideCode("onSubmitted", side), price,
+                                qty);
       }
       onFilled(orderId, fillQty) { return __lrvx_ot_filled(this._h, orderId, fillQty); }
       onCanceled(orderId) { return __lrvx_ot_canceled(this._h, orderId); }
@@ -434,7 +454,8 @@ void LrvxJsStrategy::loadStdlib()
       constructor() { this._h = __lrvx_pg_create(); }
       destroy() { __lrvx_pg_destroy(this._h); }
       openPosition(orderId, symbol, side, price, qty) {
-        return __lrvx_pg_open(this._h, orderId, symbol, side === "buy" ? 0 : 1, price, qty);
+        return __lrvx_pg_open(this._h, orderId, symbol, _sideCode("openPosition", side), price,
+                              qty);
       }
       closePosition(positionId, exitPrice) { __lrvx_pg_close(this._h, positionId, exitPrice); }
       netPosition(symbol) { return __lrvx_pg_net(this._h, symbol); }
@@ -707,6 +728,15 @@ void LrvxJsStrategy::loadStdlib()
       }
     }
 
+    // An execution algo's side and order type. Left out they are a buy at
+    // market; a name that is neither of the two throws.
+    var __lrvxAlgoSide = function(where, side) {
+      return (side === undefined || side === null) ? 0 : _sideCode(where, side);
+    };
+    var __lrvxAlgoType = function(where, type) {
+      return (type === undefined || type === null)
+        ? 0 : _nameCode(where, "type", { market: 0, limit: 1 }, type);
+    };
     var lrvx = {
       register: function(strategy) {
         __lrvx_registered_strategy = strategy;
@@ -869,8 +899,8 @@ void LrvxJsStrategy::loadStdlib()
         constructor(opts) {
           var o = opts || {};
           this._h = __lrvx_exec_twap_create(
-            o.targetQty, (o.side === 'sell') ? 1 : 0, o.symbol || 0,
-            (o.type === 'limit') ? 1 : 0, o.limitPrice || 0,
+            o.targetQty, __lrvxAlgoSide("TWAPExecutor", o.side), o.symbol || 0,
+            __lrvxAlgoType("TWAPExecutor", o.type), o.limitPrice || 0,
             o.durationNs, o.sliceCount, o.startTimeNs);
         }
         destroy() { if (this._h) { __lrvx_exec_destroy(this._h); this._h = null; } }
@@ -885,8 +915,8 @@ void LrvxJsStrategy::loadStdlib()
         constructor(opts) {
           var o = opts || {};
           this._h = __lrvx_exec_vwap_create(
-            o.targetQty, (o.side === 'sell') ? 1 : 0, o.symbol || 0,
-            (o.type === 'limit') ? 1 : 0, o.limitPrice || 0,
+            o.targetQty, __lrvxAlgoSide("VWAPExecutor", o.side), o.symbol || 0,
+            __lrvxAlgoType("VWAPExecutor", o.type), o.limitPrice || 0,
             o.volumeCurve || []);
         }
         destroy() { if (this._h) { __lrvx_exec_destroy(this._h); this._h = null; } }
@@ -901,8 +931,8 @@ void LrvxJsStrategy::loadStdlib()
         constructor(opts) {
           var o = opts || {};
           this._h = __lrvx_exec_iceberg_create(
-            o.targetQty, (o.side === 'sell') ? 1 : 0, o.symbol || 0,
-            (o.type === 'limit') ? 1 : 0, o.limitPrice || 0, o.visibleQty);
+            o.targetQty, __lrvxAlgoSide("IcebergExecutor", o.side), o.symbol || 0,
+            __lrvxAlgoType("IcebergExecutor", o.type), o.limitPrice || 0, o.visibleQty);
         }
         destroy() { if (this._h) { __lrvx_exec_destroy(this._h); this._h = null; } }
         step(nowNs) { return __lrvx_exec_step(this._h, nowNs); }
@@ -916,8 +946,8 @@ void LrvxJsStrategy::loadStdlib()
         constructor(opts) {
           var o = opts || {};
           this._h = __lrvx_exec_pov_create(
-            o.targetQty, (o.side === 'sell') ? 1 : 0, o.symbol || 0,
-            (o.type === 'limit') ? 1 : 0, o.limitPrice || 0,
+            o.targetQty, __lrvxAlgoSide("POVExecutor", o.side), o.symbol || 0,
+            __lrvxAlgoType("POVExecutor", o.type), o.limitPrice || 0,
             o.participationRate, o.minSliceQty || 0);
         }
         destroy() { if (this._h) { __lrvx_exec_destroy(this._h); this._h = null; } }

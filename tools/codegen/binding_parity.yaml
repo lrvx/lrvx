@@ -2151,6 +2151,7 @@ allowlist_functions:
     lrvx_last_error_code: *no_napi_wrapper
     lrvx_last_error_message: *no_napi_wrapper
     lrvx_last_trade_price_raw: *no_napi_wrapper
+    lrvx_live_engine_on_order_event: *no_napi_wrapper
     lrvx_market_data_recorder_create_p: *no_napi_wrapper
     lrvx_market_profile_num_levels: *no_napi_wrapper
     lrvx_mid_price_raw: *no_napi_wrapper
@@ -2173,6 +2174,7 @@ allowlist_functions:
     lrvx_replay_source_seek_to: *no_napi_wrapper
     lrvx_risk_manager_create_p: *no_napi_wrapper
     lrvx_run_recorder_write_signal: *wide_variant_called
+    lrvx_runner_on_order_event: *no_napi_wrapper
     lrvx_segment_export_p: *no_napi_wrapper
     lrvx_segment_merge_dir: *no_napi_wrapper
     lrvx_segment_merge_dir_p: *no_napi_wrapper
@@ -2237,6 +2239,7 @@ allowlist_functions:
     lrvx_best_ask_raw: "the Codon context reads the _opt variants, which tell no quote from a price of zero"
     lrvx_best_bid_raw: "the Codon context reads the _opt variants, which tell no quote from a price of zero"
     lrvx_funding_schedule_tick: *no_codon_import
+    lrvx_live_engine_on_order_event: *no_codon_import
     lrvx_mid_price_raw: "the Codon context reads the _opt variants, which tell no quote from a price of zero"
     lrvx_backtest_runner_add_execution_listener: *no_codon_import
     lrvx_backtest_runner_add_journey_tracer: *no_codon_import
@@ -2365,6 +2368,7 @@ allowlist_functions:
     lrvx_risk_manager_destroy: *no_codon_import
     lrvx_run_recorder_write_signal: *wide_variant_called
     lrvx_runner_attach_trace_recorder: *no_codon_import
+    lrvx_runner_on_order_event: *no_codon_import
     lrvx_runner_order_closed: *no_codon_import
     lrvx_runner_set_executor: *no_codon_import
     lrvx_runner_set_kill_switch: *no_codon_import
@@ -2506,6 +2510,7 @@ allowlist_functions:
     lrvx_live_engine_add_strategy: *no_quickjs_global
     lrvx_live_engine_create: *no_quickjs_global
     lrvx_live_engine_destroy: *no_quickjs_global
+    lrvx_live_engine_on_order_event: *no_quickjs_global
     lrvx_live_engine_publish_bar: *no_quickjs_global
     lrvx_live_engine_publish_book_snapshot: *no_quickjs_global
     lrvx_live_engine_publish_book_top: *no_quickjs_global
@@ -2582,6 +2587,7 @@ allowlist_functions:
     lrvx_runner_on_bar: *no_quickjs_global
     lrvx_runner_on_book_snapshot: *no_quickjs_global
     lrvx_runner_on_book_top: *no_quickjs_global
+    lrvx_runner_on_order_event: *no_quickjs_global
     lrvx_runner_on_trade: *no_quickjs_global
     lrvx_runner_order_closed: *no_quickjs_global
     lrvx_runner_set_executor: *no_quickjs_global

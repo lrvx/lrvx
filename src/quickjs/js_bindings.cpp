@@ -4262,10 +4262,10 @@ static JSValue js_run_reader_signals(JSContext* ctx, JSValueConst, int, JSValueC
     JS_SetPropertyStr(ctx, rec, "runTsNs", JS_NewBigInt64(ctx, run_ts));
     JS_SetPropertyStr(ctx, rec, "feedTsNs", JS_NewBigInt64(ctx, feed_ts));
     JS_SetPropertyStr(ctx, rec, "signalId", JS_NewUint32(ctx, sid));
-    // A Number, as orderId and parentSignalId are on an order event record.
-    JS_SetPropertyStr(
-        ctx, rec, "signalId64",
-        JS_NewInt64(ctx, static_cast<int64_t>(lrvx_run_reader_signal_id64(h, i))));
+    // A BigInt, as every 64-bit id of a trace record is: an order id from a
+    // strategy with a subscriber id of 2^21 or more does not fit a Number.
+    JS_SetPropertyStr(ctx, rec, "signalId64",
+                      JS_NewBigUint64(ctx, lrvx_run_reader_signal_id64(h, i)));
     JS_SetPropertyStr(ctx, rec, "flags", JS_NewUint32(ctx, flags));
     JS_SetPropertyStr(ctx, rec, "strengthRaw", JS_NewInt64(ctx, strength));
     JS_SetPropertyStr(ctx, rec, "name", JS_NewStringLen(ctx, name.data(), name.size()));
@@ -4299,8 +4299,8 @@ static JSValue js_run_reader_orders(JSContext* ctx, JSValueConst, int, JSValueCo
     JSValue rec = JS_NewObject(ctx);
     JS_SetPropertyStr(ctx, rec, "runTsNs", JS_NewBigInt64(ctx, run_ts));
     JS_SetPropertyStr(ctx, rec, "feedTsNs", JS_NewBigInt64(ctx, feed_ts));
-    JS_SetPropertyStr(ctx, rec, "orderId", JS_NewInt64(ctx, static_cast<int64_t>(oid)));
-    JS_SetPropertyStr(ctx, rec, "parentSignalId", JS_NewInt64(ctx, static_cast<int64_t>(pid)));
+    JS_SetPropertyStr(ctx, rec, "orderId", JS_NewBigUint64(ctx, oid));
+    JS_SetPropertyStr(ctx, rec, "parentSignalId", JS_NewBigUint64(ctx, pid));
     JS_SetPropertyStr(ctx, rec, "priceRaw", JS_NewInt64(ctx, price));
     JS_SetPropertyStr(ctx, rec, "qtyRaw", JS_NewInt64(ctx, qty));
     JS_SetPropertyStr(ctx, rec, "symbolId", JS_NewUint32(ctx, sid));
@@ -4329,8 +4329,8 @@ static JSValue js_run_reader_fills(JSContext* ctx, JSValueConst, int, JSValueCon
     JSValue rec = JS_NewObject(ctx);
     JS_SetPropertyStr(ctx, rec, "runTsNs", JS_NewBigInt64(ctx, run_ts));
     JS_SetPropertyStr(ctx, rec, "feedTsNs", JS_NewBigInt64(ctx, feed_ts));
-    JS_SetPropertyStr(ctx, rec, "orderId", JS_NewInt64(ctx, static_cast<int64_t>(oid)));
-    JS_SetPropertyStr(ctx, rec, "fillId", JS_NewInt64(ctx, static_cast<int64_t>(fid)));
+    JS_SetPropertyStr(ctx, rec, "orderId", JS_NewBigUint64(ctx, oid));
+    JS_SetPropertyStr(ctx, rec, "fillId", JS_NewBigUint64(ctx, fid));
     JS_SetPropertyStr(ctx, rec, "priceRaw", JS_NewInt64(ctx, price));
     JS_SetPropertyStr(ctx, rec, "qtyRaw", JS_NewInt64(ctx, qty));
     JS_SetPropertyStr(ctx, rec, "feeRaw", JS_NewInt64(ctx, fee));

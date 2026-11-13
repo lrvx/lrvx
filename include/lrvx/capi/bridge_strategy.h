@@ -35,6 +35,15 @@ class BridgeStrategy : public Strategy
     delete _cb.load(std::memory_order_acquire);
   }
 
+  // Reads positions from a manager it shares with whoever feeds it (a runner
+  // or a live engine, with the fills reported to it) and keeps it alive, so
+  // the strategy may outlive that owner.
+  void sharePositionManager(std::shared_ptr<IPositionManager> positions)
+  {
+    _sharedPositions = std::move(positions);
+    setPositionManager(_sharedPositions.get());
+  }
+
   // Atomically replace the callback set. In-flight dispatches see
   // either the old or the new callback set; the struct is never
   // torn. State carry-over happens through the on_stop / on_start
@@ -377,6 +386,7 @@ class BridgeStrategy : public Strategy
 
   std::atomic<LrvxStrategyCallbacks*> _cb;
   const SymbolRegistry* _registry;
+  std::shared_ptr<IPositionManager> _sharedPositions;
 };
 
 }  // namespace lrvx

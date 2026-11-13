@@ -85,8 +85,10 @@ public:
   // Persistence
   bool saveToFile(const std::filesystem::path& path) const;
   bool loadFromFile(const std::filesystem::path& path);
+  bool loadFromFile(const std::filesystem::path& path, std::string& why);
   std::vector<std::byte> serialize() const;
   bool deserialize(std::span<const std::byte> data);
+  bool deserialize(std::span<const std::byte> data, std::string& why);
 
   // Utilities
   void clear();
@@ -135,6 +137,13 @@ registry has handed out or loaded, starting at 1. `0` is never a symbol's id. It
 registration returns: `registerSymbol(ExchangeId, symbol)` for an exchange that is not registered,
 and `registerSymbol(info)` for an invalid scale or for an explicit `info.id` that a symbol with
 another name already holds (nothing is changed then).
+
+The largest id is `SymbolRegistry::kMaxSymbolId`, 1,048,575. The id-to-name and id-to-exchange
+tables are arrays indexed by id, which is what makes `getSymbolName` and `getExchangeForSymbol` an
+array read, so one explicit id sizes them for every id below it: `registerSymbol(info)` with
+`info.id = 4'000'000'000` asked for about 190 GB. Every `registerSymbol` overload returns `0` and
+changes nothing for an id above the limit, explicit or next in the sequence, and a load that holds
+one fails.
 
 The two name overloads used to number from 0 (the size of the id-to-name table) while
 `registerSymbol(info)` numbered from the entry count plus one. The first symbol registered by name
@@ -240,10 +249,15 @@ auto bybitEquiv = registry.getEquivalentOnExchange(btcBinance, bybitExchangeId);
 Both writers emit the symbols in ascending id order, so two registries holding the same entries
 write the same bytes however the entries were added; the order used to be the hash map's.
 
-`saveToFile` writes `<path>.tmp` and renames it over `path` only after every write, the flush and
-the close have succeeded. It returns false when the temporary cannot be created, when a write or
-the close fails (a full disk), and when the rename fails; the file that was at `path` is then
-untouched and the temporary is removed. It used to open `path` itself for writing, check nothing
+`saveToFile` writes a temporary file beside `path`, syncs it to the device (`fsync`, `_commit` on
+Windows) and renames it over `path` only after every write, the flush, the sync and the close have
+succeeded; on POSIX the directory is synced after the rename. The temporary is named
+`<path>.<pid>.<n>.tmp`, with `n` a counter of the process, and is opened so that an existing name
+is never reused: saves to one path from several threads or processes each write a whole file and
+the last rename wins. The name used to be `<path>.tmp` for every save, so two concurrent saves
+wrote through one file, and the data was not synced before the rename. It returns false when the
+temporary cannot be created, when a write, the sync or the close fails (a full disk), and when the
+rename fails; the file that was at `path` is then untouched and the temporary is removed. It used to open `path` itself for writing, check nothing
 after that and return true, so a save that ran out of space returned true and had already
 truncated the previous file.
 
@@ -258,7 +272,23 @@ lacks its `id`, `exchange` or `symbol` (such an entry used to end the load quiet
 before it kept and those after it dropped), and when two entries carry one id. A duplicate id used
 to load with the later entry in the table and both names resolving to it; trailing bytes used to
 be ignored. A file that cannot be opened or is empty returns false
-and leaves the registry as it was. The exchanges and the equivalence table are not part of either
+and leaves the registry as it was.
+
+Both loads also fail, registry empty, when two entries carry one exchange and symbol under
+different ids (the name resolved to one of them and the other entry could not be found by name)
+and when an entry's id is above `kMaxSymbolId`. `loadFromFile` reads the whole document: one JSON
+object with a `symbols` array and scalar members beside it. Anything but whitespace after the
+object's closing brace fails the load; everything after the `symbols` array used to be ignored.
+The `version` member is read: a value above `SymbolRegistry::kFileVersion` (1, the version
+`saveToFile` writes) fails the load, because a later format may hold fields this build would
+misread, and so does a value that is not a positive integer. A file with no `version` is read as
+version 1. The member used to be skipped.
+
+The overloads taking `std::string& why` set it to the reason for a `false`, for example
+`registry.json: the file is version 2, newer than the version 1 this build reads and writes`,
+`registry.json: two entries are named binance:BTCUSDT (ids 3 and 4)`,
+`registry.json: content after the end of the document at byte 181` or
+`1 byte(s) follow the last entry`, and to an empty string for a `true`. The exchanges and the equivalence table are not part of either
 format and are not touched by a load, failed or not.
 
 Both formats keep `tickSizeKnown`, so a symbol whose tick was declared is checked the same way

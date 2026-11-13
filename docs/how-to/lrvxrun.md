@@ -134,18 +134,18 @@ This page covers the write-then-read loop. Format details live in the [lrvxrun s
     var rec = new lrvx.TraceRecorder({
       path: 'run.lrvxrun',
       strategyId: 'ratio-cross',
-      runStartedNs: 1700000000000000000,
+      runStartedNs: 1700000000000000000n,
     });
     rec.addTapeRef({ path: 'BTCUSDT.lrvx' });
     rec.writeSignal({
-      runTsNs: 1700000000100000000,
+      runTsNs: 1700000000100000000n,
       signalId: 42,
       name: 'ratio-cross',
       symbolIds: [1, 2],
       payload: '{"src":"ETH","dst":"BTC"}',
     });
     rec.writeOrderEvent({
-      runTsNs: 1700000000200000000,
+      runTsNs: 1700000000200000000n,
       orderId: 7,
       parentSignalId: 42,
       symbolId: 1,
@@ -154,7 +154,7 @@ This page covers the write-then-read loop. Format details live in the [lrvxrun s
       qtyRaw: 100000000,
     });
     rec.writeFill({
-      runTsNs: 1700000000300000000,
+      runTsNs: 1700000000300000000n,
       orderId: 7,
       fillId: 12345,
       priceRaw: 5000000000000,
@@ -165,7 +165,12 @@ This page covers the write-then-read loop. Format details live in the [lrvxrun s
 
     var reader = new lrvx.TraceReader('run.lrvxrun');
     console.log(reader.readAllSignals().length);
+    console.log(reader.runStartedNs() === 1700000000000000000n);  // true
     ```
+
+    Timestamps are nanoseconds since the epoch and are past 2^53, where a Number no longer
+    holds every integer: write them as BigInt literals (`1700000000100000000n`). The reader
+    returns them, and every 64-bit id, as BigInt.
 
 ## Multi-symbol decisions
 
@@ -216,6 +221,17 @@ A signal has two id fields. `signal_id` is the low 32 bits, as it has always rea
 equal for an id below 2^32. A signal a runner captured carries the id of the order it asks for,
 `(subscriber id << 32) + n`: join it to that order's events on `signal_id64 == order_id`, and to
 the events the C++ capture listener writes on `parent_signal_id` as well.
+
+In Node and QuickJS the reader returns every 64-bit id as a BigInt: `signalId64` on a signal,
+`orderId` and `parentSignalId` on an order event, `orderId` and `fillId` on a fill. An order id is
+`(subscriber id << 32) + n`, so with a subscriber id of 2^21 or more it is past 2^53 and a Number
+no longer holds it; they used to be Numbers, with the low bits of such an id lost. Compare with
+`===` against a BigInt (`e.orderId === 7n`), or convert with `Number(e.orderId)` when the id is
+known to be small. The Node writers (`writeOrderEvent`, `writeFill`, and
+`Runner.traceOrderEvent` / `traceFill`) take `orderId`, `parentSignalId` and `fillId` as a
+non-negative integer Number or a BigInt and `priceRaw` / `qtyRaw` / `feeRaw` as an integer Number or
+a BigInt; anything else (NaN, a fraction, a negative id, a string) is a `TypeError` naming the
+field, where it used to be written as whatever the conversion made of it.
 
 `write_signal` takes the whole 64-bit id in every binding, so an order id can be passed as it
 is: Python `signal_id=`, Node and QuickJS `signalId` (a Number or a BigInt), Codon `signal_id=`,

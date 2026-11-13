@@ -1850,6 +1850,11 @@
         {
           "group": "execution",
           "kind": "function",
+          "name": "lrvx_live_engine_on_order_event"
+        },
+        {
+          "group": "execution",
+          "kind": "function",
           "name": "lrvx_live_engine_order_closed"
         },
         {
@@ -2986,6 +2991,11 @@
           "group": "strategyrunner_synchronous",
           "kind": "function",
           "name": "lrvx_runner_on_book_top"
+        },
+        {
+          "group": "execution",
+          "kind": "function",
+          "name": "lrvx_runner_on_order_event"
         },
         {
           "group": "strategyrunner_synchronous",
@@ -10346,6 +10356,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_live_engine_on_order_event"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_live_engine_order_closed"
         },
         {
@@ -11255,6 +11269,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_runner_on_book_top"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_runner_on_order_event"
         },
         {
           "kind": "c_import",
@@ -15281,6 +15299,11 @@
         },
         {
           "kind": "method",
+          "name": "setSignalDropHandler",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
           "name": "setSimulatedExecutor",
           "parent": "BacktestRunner"
         },
@@ -16442,6 +16465,11 @@
         {
           "kind": "method",
           "name": "replaceCallbacks",
+          "parent": "BridgeStrategy"
+        },
+        {
+          "kind": "method",
+          "name": "sharePositionManager",
           "parent": "BridgeStrategy"
         },
         {
@@ -25727,6 +25755,11 @@
         {
           "kind": "method",
           "name": "submitOrder",
+          "parent": "SimulatedExecutor"
+        },
+        {
+          "kind": "method",
+          "name": "symbolRegistry",
           "parent": "SimulatedExecutor"
         },
         {
@@ -39022,6 +39055,11 @@
         },
         {
           "kind": "method",
+          "name": "on_order_event",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "on_trade",
           "parent": "Runner"
         },
@@ -39033,6 +39071,11 @@
         {
           "kind": "method",
           "name": "replace_strategy",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
+          "name": "replay_tape",
           "parent": "Runner"
         },
         {
@@ -43765,8 +43808,10 @@
         "lrvx_executor_create_p",
         "lrvx_executor_destroy",
         "lrvx_executor_get_capabilities",
+        "lrvx_live_engine_on_order_event",
         "lrvx_live_engine_order_closed",
         "lrvx_live_engine_set_executor",
+        "lrvx_runner_on_order_event",
         "lrvx_runner_order_closed",
         "lrvx_runner_set_executor"
       ],

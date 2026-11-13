@@ -39,12 +39,12 @@ console.log('=== writeSignal keeps an id above 32 bits ===');
   const reader = new lrvx.TraceReader(dir);
   const sigs = reader.readAllSignals();
   reader.close();
-  check(sigs[0].signalId64 === 7 * 4294967296 + 5,
+  check(sigs[0].signalId64 === (7n << 32n) + 5n,
         `a wide Number id reads back whole (${sigs[0].signalId64})`);
   check(sigs[0].signalId === 5, 'and its low half is signalId');
-  check(sigs[1].signalId64 === 7 * 4294967296 + 6,
+  check(sigs[1].signalId64 === (7n << 32n) + 6n,
         `a wide BigInt id reads back whole (${sigs[1].signalId64})`);
-  check(sigs[2].signalId === 4294967295 && sigs[2].signalId64 === 4294967295,
+  check(sigs[2].signalId === 4294967295 && sigs[2].signalId64 === 4294967295n,
         'an id below 2^32 is unchanged');
 }
 

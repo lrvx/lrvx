@@ -247,12 +247,28 @@ def _feed_tape(runner, tape_path: Path, tape_symbol_id: int,
     """Drive a Runner from a recorded ``.lrvx`` tape. Returns the
     number of trades dispatched to the strategy.
 
-    With ``sim_bridge`` (see :func:`_make_sim_bridge`) each trade is shown to
-    the simulator before the strategy sees it, so the simulator has a price
-    to fill against, and the orders it has filled completely are reported to
-    the runner after it. Without one only the runner is fed, and a simulator
+    With ``sim_bridge`` (see :func:`_make_sim_bridge`) the replay is
+    ``Runner.replay_tape``: the loop ``BacktestRunner.run_tape`` uses, with
+    the bridge's simulator in the place of the backtest's own. Every event
+    the tape holds -- trades, book snapshots, book deltas, top-of-book
+    frames -- moves the simulator's clock and is shown to the simulator
+    before the strategy sees it, in time order, so a resting limit order
+    fills from the book as it would in a backtest. The bridge's lock is held
+    while the simulator takes an event, and the orders the simulator has
+    filled completely are reported to the runner after each one. Trades
+    alone used to be replayed, and a resting order never filled.
+
+    Without a bridge only the runner is fed, trades only, and a simulator
     behind the runner's executor never fills."""
     from . import tape as tape_mod
+
+    if sim_bridge is not None:
+        stats = runner.replay_tape(
+            str(tape_path), sim_bridge.simulator,
+            tape_symbol_id=tape_symbol_id, symbol=registered_symbol_id,
+            lock=sim_bridge.lock,
+            after_event=lambda: sim_bridge.report_fills(runner))
+        return int(stats["trades"])
 
     counter = [0]
 
@@ -265,11 +281,7 @@ def _feed_tape(runner, tape_path: Path, tape_symbol_id: int,
         if sym_id != tape_symbol_id:
             return
         # side: 0 = buy, 1 = sell. Runner.on_trade wants is_buy=bool.
-        if sim_bridge is not None:
-            sim_bridge.on_tape_trade(ts_ns, registered_symbol_id, price, qty, side == 0)
         runner.on_trade(registered_symbol_id, price, qty, side == 0, ts_ns)
-        if sim_bridge is not None:
-            sim_bridge.report_fills(runner)
         counter[0] += 1
 
     tape_mod.replay_tape(tape_path, on_trade=_on_trade)
@@ -287,8 +299,9 @@ def _make_sim_bridge(sim: Any) -> Any:
     ``SimulatedExecutor`` is an unrelated binding of the C++ matching engine
     and is not a subclass of it, so handing one straight to the runner raises
     TypeError. This adapter is the join: the runner sees an ``Executor``, and
-    the ControlServer keeps talking to the same underlying ``sim``, so orders
-    from the strategy and orders placed over MCP land in one book.
+    the ControlServer talks to ``bridge.control`` (see :class:`_SimControl`),
+    so orders from the strategy and orders placed over MCP land in one book,
+    behind one lock and in one account of what is still working.
 
     Built inside a function because ``lrvx`` is imported lazily here --
     binding the base class at module scope would drag the extension into
@@ -307,17 +320,43 @@ def _make_sim_bridge(sim: Any) -> Any:
             # this bridge sent that the simulator has not finished.
             self._working: Dict[int, list] = {}
             self._fills_seen = 0
+            # What the ControlServer is given as its executor.
+            self.control = _SimControl(self)
+
+        @property
+        def simulator(self) -> Any:
+            return self._sim
+
+        @property
+        def lock(self) -> Any:
+            """Held around every call into the simulator. The tape replay
+            takes it while the simulator is shown an event."""
+            return self._lock
 
         def _submit(self, order: Any) -> None:
+            order_type = order.order_type or "market"
+            offset = float(order.trailing_offset)
+            if order_type == "trailing_stop" and offset <= 0:
+                # A percent trailing stop: the order the runner hands an
+                # executor has no field for the rate.
+                raise ValueError(
+                    f"order {order.id}: a trailing stop reached the simulator with no "
+                    "trailing offset; trailing_stop_percent cannot be routed through an "
+                    "executor, use trailing_stop(offset=...)")
+            # The trigger of a stop or take-profit and the offset of a
+            # trailing stop: without them the simulator took the order as one
+            # triggered at its limit price, or at nothing.
             self._sim.submit_order(
                 order.id,
                 order.side or "buy",
                 float(order.price),
                 float(order.quantity),
-                type=order.order_type or "market",
+                type=order_type,
                 symbol=order.symbol,
                 tif=order.time_in_force or "gtc",
                 reduce_only=bool(order.reduce_only),
+                trigger=float(order.trigger_price),
+                trailing_offset=offset,
             )
             self._working[int(order.id)] = [int(order.symbol), float(order.quantity)]
 
@@ -345,13 +384,29 @@ def _make_sim_bridge(sim: Any) -> Any:
                 for order_id in [i for i, w in self._working.items() if w[0] == int(symbol)]:
                     del self._working[order_id]
 
-        def on_tape_trade(self, ts_ns: int, symbol: int, price: float, qty: float,
-                          is_buy: bool) -> None:
-            """Show the simulator one trade of the tape, so it has a price to
-            fill against."""
+        # ── orders that come from outside the runner (the ControlServer) ──
+
+        def control_submit(self, order_id: int, side: str, price: float, quantity: float,
+                           *, type: str = "market", symbol: int = 1) -> None:
             with self._lock:
-                self._sim.advance_clock(int(ts_ns))
-                self._sim.on_trade_qty(int(symbol), float(price), float(qty), bool(is_buy))
+                self._sim.submit_order(order_id, side, price, quantity,
+                                       type=type, symbol=symbol)
+                self._working[int(order_id)] = [int(symbol), float(quantity)]
+
+        def control_cancel(self, order_id: int) -> bool:
+            """True when the order was one this bridge still had working."""
+            with self._lock:
+                self._sim.cancel_order(order_id)
+                return self._working.pop(int(order_id), None) is not None
+
+        def control_cancel_all(self, symbol: int) -> List[int]:
+            """The ids that were working on ``symbol``."""
+            with self._lock:
+                self._sim.cancel_all(symbol)
+                gone = [i for i, w in self._working.items() if w[0] == int(symbol)]
+                for order_id in gone:
+                    del self._working[order_id]
+                return gone
 
         def report_fills(self, runner: Any) -> int:
             """Tell ``runner`` (``Runner.order_closed``) about every order the
@@ -377,6 +432,40 @@ def _make_sim_bridge(sim: Any) -> Any:
             return len(finished)
 
     return _SimBridge()
+
+
+class _SimControl:
+    """The executor the ControlServer acts through in ``lrvx engine sim``.
+
+    The server used to hold the simulator itself and call it from its own
+    thread with no lock, while the runner's thread and the tape replay were
+    inside it; and an order it cancelled stayed in the runner's record of
+    forwarded orders and in the bridge's fill accounting. Its three calls go
+    through the bridge instead: under the bridge's lock, into the bridge's
+    account of working orders, and, for a cancel, on to
+    ``Runner.order_closed`` so a strategy's later modify of that order is
+    refused instead of resubmitting it.
+    """
+
+    def __init__(self, bridge: Any) -> None:
+        self._bridge = bridge
+        self._runner: Any = None
+
+    def attach_runner(self, runner: Any) -> None:
+        self._runner = runner
+
+    def submit_order(self, order_id: int, side: str, price: float, quantity: float,
+                     *, type: str = "market", symbol: int = 1) -> None:
+        self._bridge.control_submit(order_id, side, price, quantity, type=type, symbol=symbol)
+
+    def cancel_order(self, order_id: int) -> None:
+        if self._bridge.control_cancel(order_id) and self._runner is not None:
+            self._runner.order_closed(int(order_id))
+
+    def cancel_all(self, symbol: int) -> None:
+        for order_id in self._bridge.control_cancel_all(symbol):
+            if self._runner is not None:
+                self._runner.order_closed(order_id)
 
 
 def _make_kill_switch_bridge(state: "_KillSwitch") -> Any:
@@ -431,6 +520,7 @@ def cmd_engine_sim(args: argparse.Namespace) -> int:
                             threaded=bool(args.threaded))
     sim = lrvx.SimulatedExecutor()
     sim_bridge = _make_sim_bridge(sim)
+    sim_bridge.control.attach_runner(runner)
     runner.set_executor(sim_bridge)
 
     ks = _KillSwitch()
@@ -446,7 +536,7 @@ def cmd_engine_sim(args: argparse.Namespace) -> int:
     token = args.token or secrets.token_urlsafe(16)
     server = cs_mod.ControlServer(
         tokens={token: "paper"},
-        executor=sim,
+        executor=sim_bridge.control,
         kill_switch=ks,
         runner=runner,
         strategies=lambda: [{

@@ -152,3 +152,98 @@ def test_a_trace_write_failure_fails_the_pack(tmp_path, monkeypatch):
     monkeypatch.setattr(lrvx.TraceRecorder, "write_order_event", refuse)
     with pytest.raises(RuntimeError, match="disk full"):
         bundle.pack_bundle(strategy=strat, tape=tape_dir, output=tmp_path / "b.tar")
+
+
+_TWO_ROUND_TRIPS = '''
+import lrvx
+
+
+class BuyThenSell(lrvx.Strategy):
+    """Buys on the first trade it sees and sells on the third."""
+
+    def __init__(self, symbols):
+        super().__init__(symbols)
+        self._seen = 0
+
+    def on_trade(self, ctx, trade):
+        self._seen += 1
+        if self._seen == 1:
+            self.market_buy(1.0)
+        elif self._seen == 3:
+            self.market_sell(1.0)
+'''
+
+
+def _two_fill_trace(work: Path):
+    strat = work / "strategy.py"
+    strat.write_text(_TWO_ROUND_TRIPS)
+    tape_dir = work / "tape"
+    tape_dir.mkdir()
+    registry = lrvx.SymbolRegistry()
+    sym = int(registry.add_symbol("bundle", "BTCUSDT", tick_size=0.01))
+    recorder = tape.make_recorder_hook(tape_dir)
+    runner = lrvx.Runner(registry, on_signal=lambda _: None)
+    runner.set_market_data_recorder(recorder)
+    runner.start()
+    for i in range(5):
+        runner.on_trade(sym, 100.0 + i, 1.0, True, (i + 1) * 1_000_000_000)
+    runner.stop()
+    recorder.close()
+    path = bundle.pack_bundle(strategy=strat, tape=tape_dir, output=work / "b.tar")
+    reader = lrvx.TraceReader(str(_expected_trace(path, work)))
+    return path, reader.read_all_signals(), reader.read_all_order_events(), reader.read_all_fills()
+
+
+def test_each_fill_has_its_own_id_and_its_own_times(tmp_path):
+    """fill_id was the order's id, and every fill of a run carried the one
+    run_ts_ns taken after the run, with no feed_ts_ns."""
+    _, signals, orders, fills = _two_fill_trace(tmp_path)
+    assert len(signals) == 2 and len(orders) == 2 and len(fills) == 2
+
+    assert [f["fill_id"] for f in fills] == [1, 2], "the run's fills, numbered"
+    assert [f["order_id"] for f in fills] == [o["order_id"] for o in orders]
+    assert all(f["fill_id"] != f["order_id"] for f in fills)
+
+    # feed_ts_ns: the tape event the record belongs to.
+    assert [s["feed_ts_ns"] for s in signals] == [1_000_000_000, 3_000_000_000]
+    assert [o["feed_ts_ns"] for o in orders] == [1_000_000_000, 3_000_000_000]
+    assert [f["feed_ts_ns"] for f in fills] == [1_000_000_000, 3_000_000_000], \
+        "a market order fills at the trade it was sent on, at the simulator's time"
+
+    # run_ts_ns: the wall clock when it happened, so the first fill comes
+    # before the second order was sent, not after the whole run.
+    assert signals[0]["run_ts_ns"] <= fills[0]["run_ts_ns"] <= signals[1]["run_ts_ns"]
+    assert signals[1]["run_ts_ns"] <= fills[1]["run_ts_ns"]
+
+
+def test_a_bundle_whose_trace_has_the_old_fill_ids_still_validates(tmp_path):
+    """Validation compares the three counts, so a bundle packed when a fill
+    carried its order's id and the run's one timestamp validates as before."""
+    path, signals, orders, fills = _two_fill_trace(tmp_path)
+
+    old_trace = tmp_path / "old_ids.lrvxrun"
+    rec = lrvx.TraceRecorder(str(old_trace), strategy_id="strategy")
+    for sig, order in zip(signals, orders):
+        rec.write_signal(run_ts_ns=sig["run_ts_ns"], signal_id=sig["signal_id64"],
+                         name=sig["name"], symbol_ids=sig["symbol_ids"])
+        rec.write_order_event(run_ts_ns=order["run_ts_ns"], order_id=order["order_id"],
+                              parent_signal_id=order["parent_signal_id"], symbol_id=1)
+    for fill in fills:
+        rec.write_fill(run_ts_ns=fills[-1]["run_ts_ns"], order_id=fill["order_id"],
+                       fill_id=fill["order_id"], price_raw=fill["price_raw"],
+                       qty_raw=fill["qty_raw"], symbol_id=1)
+    rec.close()
+
+    old = tmp_path / "old_ids.tar"
+    with tarfile.open(path, "r") as src, tarfile.open(old, "w") as dst:
+        for member in src.getmembers():
+            if member.name.startswith("expected.lrvxrun"):
+                continue
+            data = src.extractfile(member).read() if member.isfile() else None
+            dst.addfile(member, io.BytesIO(data) if data is not None else None)
+        dst.add(str(old_trace), arcname="expected.lrvxrun")
+
+    res = _validate(old)
+    assert res.matches, res.diff
+    assert res.expected["lrvxrun_compared"] == "signals, order events, fills"
+    assert res.expected["lrvxrun_fill_count"] == 2

@@ -71,6 +71,7 @@ Runs eight checks in sequence (each takes <5s):
 | `check_test_gating.py` | Every `tests/*.cpp` is registered in CMake | Register the target — see [test-gating.md](test-gating.md) |
 | `check_suite_discovery.py` | Every Python/Node test file is reachable by the suite runners, and nobody re-listed files by hand | Rename the file to `test_*`, add cases, or drop the hand-written step |
 | `check_quickjs_registration.py` | Every `__lrvx_*` global the JS layer calls has an `addGlobalFunc` registration | Register the global in `js_bindings.cpp` |
+| `check_quickjs_lrvx_typings.py` | Every member of the QuickJS `lrvx` object has a typing in `quickjs/types/lrvx.d.ts`, and every typed member exists | Add the typing to the `declare const lrvx` block, or remove the stale one |
 | `gen_api_index.py --check` | `docs/reference/python/_api_index.md` matches `.pyi` | Run `python3 scripts/gen_api_index.py` |
 | `check_doc_snippets.py` | Doc snippets follow `--8<--` include pattern | Refactor inline snippets into includes |
 | `sync_mcp_data.py --check` | `mcp/lrvx_mcp/data/` matches source | Run `python3 scripts/sync_mcp_data.py` |

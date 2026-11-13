@@ -83,6 +83,10 @@ The third row is a bundle packed while pack lost its signals: the runner's order
 
 Pack now writes the signal with its whole 64-bit id (`signal_id64` on the record is the order id, and the order event's and the fill's `order_id` equal it), and a signal or order event that cannot be written fails the pack or the replay with a `RuntimeError` naming the trace and the writer's error. Nothing about the trace is skipped quietly.
 
+Each record of the trace pack writes carries the fields the [`.lrvxrun` spec](../spec/lrvxrun.md) gives it. `feed_ts_ns` is the tape event the record belongs to: for a signal and its order event the trade the strategy was handling, for a fill the simulator's time of the fill. `run_ts_ns` is the wall clock at the moment the record was produced, so a fill sorts between the order that caused it and whatever the strategy did next. `fill_id` numbers the run's fills 1, 2, 3, ... (the simulator issues no fill ids of its own), so two fills of one order are two ids. Before this, every fill was written after the run had ended, with one `run_ts_ns` for all of them, `feed_ts_ns` 0, and the order's id in `fill_id`.
+
+A bundle packed before that validates as it did: the comparison is of the record counts in the table above, never of ids or timestamps.
+
 A trace that is present but cannot be read fails validation with a `lrvxrun_read_error` diff line naming the side and the reader's error; it is never skipped.
 
 If you need stricter comparison (per-fill timestamps, intermediate equity curve), open an issue. The current set is the minimum that catches engine-level regressions; extending it is cheap once a real divergence shows up.

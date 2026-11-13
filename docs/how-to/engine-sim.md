@@ -54,30 +54,49 @@ play.
 
 ## What the simulator sees and does
 
-Every tape trade that feeds the strategy is shown to the simulator first
-(its clock is advanced to the trade and the trade is passed to
-`SimulatedExecutor.on_trade_qty`), so it has a price to fill against. A tape
-replays trades only: a market order fills at the last trade, and a resting
-limit order, which the simulator fills from a book or a bar, stays open.
-The replay used to feed the strategy alone, so the simulator never saw a
-price and no order ever filled.
+The tape is replayed by `Runner.replay_tape`, which is the loop
+`BacktestRunner.run_tape` uses with the engine's simulator in the place of the
+backtest's own. Every event the tape holds for the chosen symbol (trades, book
+snapshots, book deltas, top-of-book frames) moves the simulator's clock and is
+shown to the simulator before the strategy sees it, in the tape's time order.
+A market order fills at the next event, and a resting limit order fills from
+the book as it does in a backtest of the same tape. The strategy receives the
+trades, the book snapshots and the tops (`on_trade`, `on_book_update`); a live
+runner has no entry for a book delta, so deltas move the simulator's book only.
+The simulator is reset when the replay starts.
+
+The replay used to feed trades only, so a resting limit order, which the
+simulator fills from a book, stayed open for the whole tape.
 
 The strategy's orders reach the simulator through the runner's executor hook:
 
 | Strategy call | Simulator |
 |---------------|-----------|
-| an order (`market_buy`, `limit_sell`, ...) | `submit_order` under the order's id |
+| an order (`market_buy`, `limit_sell`, ...) | `submit_order` under the order's id, with the trigger of a stop or take-profit order and the offset of a trailing stop. They used to be left out, so a stop reached the simulator without its trigger. `trailing_stop_percent` is refused (the order a runner hands an executor has no field for the rate); use `trailing_stop(offset=...)` |
 | `cancel_order(id)` | `cancel_order(id)` |
 | `cancel_all_orders()` | `cancel_all(symbol)` |
 | `modify_order(id, price, qty)` | `cancel_order(id)`, then `submit_order` of the order with its new price and quantity under the same id. A modify used to be dropped: the hook had no `replace`. |
 
-After each trade the orders the simulator has filled completely are reported
+After each event the orders the simulator has filled completely are reported
 to the runner (`Runner.order_closed`), which drops them from the record it
 keeps for `modify_order`. A later `modify_order` of a filled order is then
 refused by the runner with `[unknown_order]` in `lrvx.last_error()` and is
 not sent to the simulator as a new order. A partly filled order stays on
-record until the rest fills. Orders placed over the control server go to the
-simulator directly and are not part of that record.
+record until the rest fills.
+
+Orders placed or cancelled over the control server go through the same bridge
+as the strategy's: under the same lock (the replay holds it while the simulator
+takes an event, so a control call never lands mid-event), into the same account
+of working orders, so their fills are reported like any other. A control-server
+cancel of a strategy's order, or a cancel-all, is passed on to
+`Runner.order_closed`, so the strategy's later `modify_order` of it is refused
+with `[unknown_order]`. The control server used to call the simulator itself,
+from its own thread and with no lock, and what it cancelled stayed on the
+runner's record.
+
+With `--threaded` the strategy runs on the runner's consumer thread and the
+replay does not wait for it: an order is submitted when that thread reaches the
+event, which may be after the replay has moved on.
 
 ## Drive it from an agent
 

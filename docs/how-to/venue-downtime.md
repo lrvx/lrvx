@@ -107,6 +107,10 @@ A worked example (Python):
     lrvx_venue_availability_destroy(va);
     ```
 
+In QuickJS the policy is `"cancel_all"` (also what leaving it out means), `"hold"` or
+`"expire_gtc_after"`. Any other string throws a `TypeError` listing the three; it used to be read
+as `"cancel_all"`.
+
 ## What this catches
 
 Stress-testing a backtest with a downtime profile surfaces failure

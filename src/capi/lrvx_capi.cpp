@@ -8,6 +8,7 @@
  */
 
 #include "lrvx/capi/lrvx_capi.h"
+#include "drop_reason.h"
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/log/abstract_logger.h"
@@ -307,6 +308,76 @@ class LrvxBorrowedHandles
 };
 
 }  // namespace
+
+// The names a captured signal carries in a trace, and the ones the reason
+// for a drop uses.
+static const char* signalTypeName(lrvx::SignalType type) noexcept
+{
+  switch (type)
+  {
+    case SignalType::Market:
+      return "market";
+    case SignalType::Limit:
+      return "limit";
+    case SignalType::Cancel:
+      return "cancel";
+    case SignalType::CancelAll:
+      return "cancel_all";
+    case SignalType::Modify:
+      return "modify";
+    case SignalType::StopMarket:
+      return "stop_market";
+    case SignalType::StopLimit:
+      return "stop_limit";
+    case SignalType::TakeProfitMarket:
+      return "take_profit_market";
+    case SignalType::TakeProfitLimit:
+      return "take_profit_limit";
+    case SignalType::TrailingStop:
+      return "trailing_stop";
+    case SignalType::OCO:
+      return "oco";
+    case SignalType::ProvideLiquidity:
+      return "provide_liquidity";
+    case SignalType::WithdrawLiquidity:
+      return "withdraw_liquidity";
+  }
+  return "unknown";
+}
+
+void lrvxCapiNoteDroppedSignal(const lrvx::Signal& sig, std::string_view gate,
+                               std::string_view token, std::string_view detail,
+                               std::string_view outcome) noexcept
+{
+  try
+  {
+    std::string why = std::string(signalTypeName(sig.type)) + " signal for order " +
+                      std::to_string(sig.orderId) + " on symbol " + std::to_string(sig.symbol) +
+                      " was dropped by the ";
+    why += gate;
+    if (!detail.empty())
+    {
+      why += " (";
+      why += detail;
+      why += ")";
+    }
+    why += "; ";
+    why += outcome;
+    why += " [";
+    why += token;
+    why += "]";
+    lrvxCapiNoteException("emit", why.c_str());
+  }
+  catch (...)
+  {
+  }
+}
+
+void lrvxCapiNoteBacktestDrop(const lrvx::BacktestRunner::SignalDrop& drop) noexcept
+{
+  lrvxCapiNoteDroppedSignal(drop.signal, drop.gate, drop.token, drop.detail,
+                            "it reached no executor");
+}
 
 // Every _destroy opens with this. Destroying NULL has always been legal and
 // stays legal -- a binding's finaliser runs on a half-constructed object often
@@ -3988,7 +4059,7 @@ LrvxDataWriterHandle lrvx_data_writer_create(const char* output_dir, uint64_t ma
   LRVX_CAPI_REQUIRE(output_dir);
   replay::WriterConfig cfg;
   cfg.output_dir = output_dir;
-  cfg.max_segment_bytes = max_segment_mb * 1024 * 1024;
+  cfg.max_segment_bytes = replay::segmentBytesFromMb(max_segment_mb);
   cfg.exchange_id = exchange_id;
   return new replay::BinaryLogWriter(cfg);
   LRVX_CAPI_LEAVE;
@@ -5391,13 +5462,14 @@ static replay::CompressionType toCompression(uint8_t c)
 
 // The merge, split and export results carry the counts of what was done
 // before the failure, so they are returned as they are and the reason goes to
-// lrvx_last_error_message beside them.
+// lrvx_last_error_message beside them: every error the operation collected,
+// joined with "; ".
 template <typename Result>
 static void noteSegmentOpFailure(const char* fn, const Result& r)
 {
   if (!r.success)
   {
-    lrvxCapiNoteException(fn, r.errors.empty() ? "failed" : r.errors.front().c_str());
+    lrvxCapiNoteException(fn, r.errors.empty() ? "failed" : joinErrors(r.errors, "; ").c_str());
   }
 }
 
@@ -7310,14 +7382,10 @@ class RunnerSignalHandler : public ISignalHandler
       }
       view.strength_raw = 0;
       view.symbol_ids = {static_cast<uint32_t>(sig.symbol)};
-      view.name = signalName(sig.type);
+      view.name = signalTypeName(sig.type);
       recorder->writeSignal(view);
     }
 
-    if (!_cb)
-    {
-      return;
-    }
     LrvxSignal fs{};
     fs.order_id = sig.orderId;
     fs.symbol = sig.symbol;
@@ -7412,7 +7480,12 @@ class RunnerSignalHandler : public ISignalHandler
       }
     }
 
-    _cb(_ud, &fs);
+    // on_signal observes what passed the gates. Without one the signal is
+    // gated and forwarded just the same.
+    if (_cb != nullptr)
+    {
+      _cb(_ud, &fs);
+    }
 
     // Binding-supplied executor — alternative path for order routing.
     // Runs after the user on_signal so existing on_signal-based wiring
@@ -7528,42 +7601,6 @@ class RunnerSignalHandler : public ISignalHandler
   }
 
  private:
-  // The names a captured signal carries in a trace, and the ones the reason
-  // for a drop uses.
-  static const char* signalName(SignalType type) noexcept
-  {
-    switch (type)
-    {
-      case SignalType::Market:
-        return "market";
-      case SignalType::Limit:
-        return "limit";
-      case SignalType::Cancel:
-        return "cancel";
-      case SignalType::CancelAll:
-        return "cancel_all";
-      case SignalType::Modify:
-        return "modify";
-      case SignalType::StopMarket:
-        return "stop_market";
-      case SignalType::StopLimit:
-        return "stop_limit";
-      case SignalType::TakeProfitMarket:
-        return "take_profit_market";
-      case SignalType::TakeProfitLimit:
-        return "take_profit_limit";
-      case SignalType::TrailingStop:
-        return "trailing_stop";
-      case SignalType::OCO:
-        return "oco";
-      case SignalType::ProvideLiquidity:
-        return "provide_liquidity";
-      case SignalType::WithdrawLiquidity:
-        return "withdraw_liquidity";
-    }
-    return "unknown";
-  }
-
   // The tokens a drop's reason ends in, as a refused Modify's ends in
   // [unknown_order].
   static constexpr const char* kDroppedByKillSwitch = "kill_switch";
@@ -7572,17 +7609,8 @@ class RunnerSignalHandler : public ISignalHandler
 
   static void noteDropped(const Signal& sig, const char* gate, const char* token) noexcept
   {
-    try
-    {
-      const std::string why = std::string(signalName(sig.type)) + " signal for order " +
-                              std::to_string(sig.orderId) + " on symbol " +
-                              std::to_string(sig.symbol) + " was dropped by the " + gate +
-                              "; it reached neither on_signal nor the executor [" + token + "]";
-      lrvxCapiNoteException("emit", why.c_str());
-    }
-    catch (...)
-    {
-    }
+    lrvxCapiNoteDroppedSignal(sig, gate, token, {},
+                              "it reached neither on_signal nor the executor");
   }
 
   // Market orders and IOC / FOK orders are answered at once and never rest.
@@ -7683,11 +7711,91 @@ static void mirrorBookToRecorder(LrvxMarketDataRecorderImpl* r, const BookUpdate
                        bidPtr, n_bids, askPtr, n_asks, ts_ns);
 }
 
+// Order events a venue reported, on their way to the strategies of a runner
+// or a live engine. The position tracker sees each event first, as in the
+// backtest runner, so the context a strategy's on_fill reads already counts
+// the fill.
+class ReportedOrderEvents
+{
+ public:
+  void attach(BridgeStrategy* s) { s->sharePositionManager(_positions); }
+
+  void deliver(const std::vector<BridgeStrategy*>& strategies, const LrvxOrderEventData& d)
+  {
+    if (d.status > static_cast<uint8_t>(OrderEventStatus::REPLACED_GAS))
+    {
+      throw std::invalid_argument("order event status " + std::to_string(d.status) +
+                                  " is not an order event status");
+    }
+    if (d.side > 1)
+    {
+      throw std::invalid_argument("order event side " + std::to_string(d.side) +
+                                  " is neither 0 (buy) nor 1 (sell)");
+    }
+    if (d.order_type > static_cast<uint8_t>(OrderType::ICEBERG))
+    {
+      throw std::invalid_argument("order event order_type " + std::to_string(d.order_type) +
+                                  " is not an order type");
+    }
+    OrderEvent ev;
+    ev.status = static_cast<OrderEventStatus>(d.status);
+    ev.order.id = d.order_id;
+    ev.order.symbol = d.symbol_id;
+    ev.order.side = d.side == 0 ? Side::BUY : Side::SELL;
+    ev.order.type = static_cast<OrderType>(d.order_type);
+    ev.fillQty = Quantity::fromRaw(d.fill_qty_raw);
+    ev.fillPrice = Price::fromRaw(d.fill_price_raw);
+    ev.exchangeTsNs = UnixNanos{d.exchange_ts_ns};
+    if (d.reject_reason != nullptr)
+    {
+      ev.rejectReason = d.reject_reason;
+    }
+    ev.queueAhead = Quantity::fromRaw(d.queue_ahead_raw);
+    ev.queueTotal = Quantity::fromRaw(d.queue_total_raw);
+    ev.timestamps.submittedAtNs = UnixNanos{d.submitted_at_ns};
+    ev.timestamps.acceptedAtNs = UnixNanos{d.accepted_at_ns};
+    ev.timestamps.firstFillAtNs = UnixNanos{d.first_fill_at_ns};
+    ev.timestamps.lastFillAtNs = UnixNanos{d.last_fill_at_ns};
+    ev.timestamps.canceledAtNs = UnixNanos{d.canceled_at_ns};
+    ev.timestamps.rejectedAtNs = UnixNanos{d.rejected_at_ns};
+    ev.timestamps.triggeredAtNs = UnixNanos{d.triggered_at_ns};
+    ev.timestamps.expiredAtNs = UnixNanos{d.expired_at_ns};
+    ev.isMaker = d.is_maker != 0;
+    ev.marketPosition = static_cast<MarketPosition>(d.market_position);
+    ev.distanceToBestTicks = d.distance_to_best_ticks;
+
+    ev.dispatchTo(*_positions);
+
+    // An order id is (subscriber id << 32) + n: the strategy that issued the
+    // order is the one that hears of it. An id from no strategy's block (an
+    // OCO's second leg, an order placed by hand) goes to every strategy, and
+    // each ignores a symbol it is not subscribed to.
+    const auto owner = static_cast<SubscriberId>(d.order_id >> 32);
+    for (BridgeStrategy* s : strategies)
+    {
+      if (s->id() == owner)
+      {
+        s->onOrderEvent(ev);
+        return;
+      }
+    }
+    for (BridgeStrategy* s : strategies)
+    {
+      s->onOrderEvent(ev);
+    }
+  }
+
+ private:
+  std::shared_ptr<MultiModePositionTracker> _positions{
+      std::make_shared<MultiModePositionTracker>(0xFEFEFEFEu)};
+};
+
 struct LrvxRunnerImpl
 {
   SymbolRegistry* registry;
   RunnerSignalHandler handler;
   std::vector<BridgeStrategy*> strategies;
+  ReportedOrderEvents orderEvents;
   std::pmr::unsynchronized_pool_resource pool;
 
   // Optional market data recorder hook. Owned by caller; non-owning ptr.
@@ -7709,6 +7817,7 @@ struct LrvxRunnerImpl
   {
     requireAttachableId(strategies, s);
     s->setSignalHandler(&handler);
+    orderEvents.attach(s);
     strategies.push_back(s);
   }
 
@@ -7946,6 +8055,7 @@ struct LrvxLiveEngineImpl
   // The one record of what went to the executor, shared by every handler.
   std::shared_ptr<ForwardedOrders> forwarded{std::make_shared<ForwardedOrders>()};
   std::vector<BridgeStrategy*> strategies;
+  ReportedOrderEvents orderEvents;
 
   // Latest pre-trade hooks attached to this engine. Stored here (rather
   // than only on the handlers) so newly-added strategies inherit the
@@ -7979,6 +8089,7 @@ struct LrvxLiveEngineImpl
     h->setStorageSink(storageSink.load(std::memory_order_acquire));
     h->setExecutor(executor.load(std::memory_order_acquire));
     s->setSignalHandler(h.get());
+    orderEvents.attach(s);
     handlers.push_back(std::move(h));
     tradeBus->subscribe(s);
     bookBus->subscribe(s);
@@ -8508,6 +8619,7 @@ struct LrvxBacktestRunnerImpl
     fill.applyTo(cfg);
     runner = std::make_unique<BacktestRunner>(cfg);
     runner->setSymbolRegistry(reg);
+    runner->setSignalDropHandler(&lrvxCapiNoteBacktestDrop);
   }
 
   // VOLUME_IMPACT reads the visible level size; bar and trade-only replays
@@ -9026,7 +9138,7 @@ lrvx_binary_log_recorder_hook_create_ex(const char* output_dir,
   LRVX_CAPI_ENTER_NOHANDLE;
   lrvx::replay::BinaryLogRecorderHookConfig cfg{};
   cfg.output_dir = output_dir ? output_dir : "";
-  cfg.max_segment_bytes = max_segment_mb * 1024ull * 1024ull;
+  cfg.max_segment_bytes = replay::segmentBytesFromMb(max_segment_mb);
   cfg.exchange_id = exchange_id;
   cfg.compression = static_cast<lrvx::replay::CompressionType>(compression);
 
@@ -9371,6 +9483,15 @@ void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id)
   LRVX_CAPI_LEAVE_VOID;
 }
 
+void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventData* event)
+{
+  LRVX_CAPI_ENTER_VOID(runner);
+  LRVX_CAPI_REQUIRE_VOID(event);
+  auto* impl = toRunner(runner);
+  impl->orderEvents.deliver(impl->strategies, *event);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
 void lrvx_runner_set_market_data_recorder(LrvxRunnerHandle runner,
                                           LrvxMarketDataRecorderHandle recorder)
 {
@@ -9609,6 +9730,15 @@ void lrvx_live_engine_order_closed(LrvxLiveEngineHandle engine, uint64_t order_i
 {
   LRVX_CAPI_ENTER_VOID(engine);
   toLiveEngine(engine)->forwarded->erase(order_id);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_live_engine_on_order_event(LrvxLiveEngineHandle engine, const LrvxOrderEventData* event)
+{
+  LRVX_CAPI_ENTER_VOID(engine);
+  LRVX_CAPI_REQUIRE_VOID(event);
+  auto* impl = toLiveEngine(engine);
+  impl->orderEvents.deliver(impl->strategies, *event);
   LRVX_CAPI_LEAVE_VOID;
 }
 

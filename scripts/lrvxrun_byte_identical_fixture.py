@@ -26,11 +26,11 @@ def write_fixture(out_dir: str) -> None:
         out_dir,
         strategy_id="byte-identical-gate",
         strategy_hash="sha256:fixture",
-        run_started_ns=1_700_000_000_000_000_000,
+        run_started_ns=1_700_000_000_000_000_001,
     )
     rec.write_signal(
-        run_ts_ns=1_700_000_000_100_000_000,
-        feed_ts_ns=1_700_000_000_099_000_000,
+        run_ts_ns=1_700_000_000_100_000_001,
+        feed_ts_ns=1_700_000_000_099_000_001,
         signal_id=42,
         flags=lrvx._lrvx.SIGNAL_FLAG_ENTER,
         strength_raw=75_000_000,
@@ -39,8 +39,8 @@ def write_fixture(out_dir: str) -> None:
         payload=b"",
     )
     rec.write_signal(
-        run_ts_ns=1_700_000_000_200_000_000,
-        feed_ts_ns=1_700_000_000_199_000_000,
+        run_ts_ns=1_700_000_000_200_000_001,
+        feed_ts_ns=1_700_000_000_199_000_001,
         signal_id=43,
         flags=lrvx._lrvx.SIGNAL_FLAG_EXIT,
         strength_raw=0,
@@ -49,8 +49,8 @@ def write_fixture(out_dir: str) -> None:
         payload=b"",
     )
     rec.write_order_event(
-        run_ts_ns=1_700_000_000_150_000_000,
-        feed_ts_ns=1_700_000_000_149_000_000,
+        run_ts_ns=1_700_000_000_150_000_001,
+        feed_ts_ns=1_700_000_000_149_000_001,
         order_id=7,
         parent_signal_id=42,
         price_raw=50_000_00000000,
@@ -63,8 +63,8 @@ def write_fixture(out_dir: str) -> None:
         reason="",
     )
     rec.write_fill(
-        run_ts_ns=1_700_000_000_175_000_000,
-        feed_ts_ns=1_700_000_000_174_000_000,
+        run_ts_ns=1_700_000_000_175_000_001,
+        feed_ts_ns=1_700_000_000_174_000_001,
         order_id=7,
         fill_id=12345,
         price_raw=50_000_00000000,
@@ -74,7 +74,7 @@ def write_fixture(out_dir: str) -> None:
         side=0,
         liquidity=lrvx.FillLiquidity.MAKER,
     )
-    rec.set_run_ended_ns(1_700_000_000_400_000_000)
+    rec.set_run_ended_ns(1_700_000_000_400_000_001)
     rec.close()
 
 

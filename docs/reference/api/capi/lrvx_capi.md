@@ -646,7 +646,7 @@ All return `OrderId` (`uint64_t`), 0 on failure. `cancel` and `modify` return vo
 | `lrvx_emit_cancel_all(s, sym)` | Cancel all orders for symbol |
 | `lrvx_emit_modify(s, order_id, new_price_raw, new_qty_raw)` | Modify order |
 
-On a runner or a live engine a signal can be refused after the emit has assigned its order id. The
+On a runner, a live engine or a backtest runner a signal can be refused after the emit has assigned its order id. The
 reason is then in the last error of the thread that emitted: call `lrvx_clear_last_error()` before
 the emit and read `lrvx_last_error_code()` / `lrvx_last_error_message()` after it.
 
@@ -657,10 +657,32 @@ the emit and read `lrvx_last_error_code()` / `lrvx_last_error_message()` after i
 | `[risk_manager]` | the risk manager's `allow` returned 0 |
 | `[unknown_order]` | a modify named an order the executor record does not hold |
 
-A drop reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached
-neither on_signal nor the executor [<token>]`; the gates are asked in the order kill switch, order
-validator, risk manager. A drop used to leave nothing behind. The Python, Node, QuickJS and Codon
-emit methods clear the last error on entry themselves.
+A drop reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; <outcome> [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned.
+
+What is put to the gates depends on what runs the strategy:
+
+| | `lrvx_runner_*` and `lrvx_live_engine_*` | `lrvx_backtest_runner_*` |
+|---|---|---|
+| Signals asked | every signal: orders, cancel, cancel-all, modify, the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
+| Pass unasked | nothing | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
+| A drop skips | `on_signal`, the executor and the PnL / storage observers | the simulator or the attached executor |
+| `<outcome>` | `it reached neither on_signal nor the executor` | `it reached no executor` |
+| Kill switch | asked again for every signal | stays triggered for the rest of the run once it said no |
+
+`on_signal` is an observer: a runner created without one gates and forwards its signals the same way.
+
+The Python, Node, QuickJS and Codon emit methods clear the last error on entry themselves.
+
+`lrvx_runner_on_order_event(runner, event)` and `lrvx_live_engine_on_order_event(engine, event)`
+report one order event a venue sent (a broker's order update or fill) to the strategies, the way the
+backtest runner delivers its simulator's. The runner's position tracker sees the event first; then
+`on_fill` fires for `PARTIALLY_FILLED` and `FILLED` (and only `on_fill`) and `on_order_update` for
+every other status, with the same `LrvxSymbolContext` and `LrvxOrderEventData` a backtest passes, so
+the position an `on_fill` reads counts the fill. `event->status` is an `lrvx::OrderEventStatus` code
+and `event->order_type` an `lrvx::OrderType` code; `fill_qty_raw` / `fill_price_raw` are this fill's
+own. The strategy whose id is `order_id >> 32` receives the event; an id from no attached strategy's
+block goes to every strategy subscribed to the symbol. The callbacks run on the calling thread. A
+status, side or order type out of range delivers nothing and leaves the reason in the last error.
 
 The record a runner or a live engine keeps of the orders it forwarded to an executor treats the two
 legs of an OCO as one: a cancel of either leg, or `lrvx_runner_order_closed` /
