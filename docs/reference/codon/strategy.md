@@ -333,3 +333,27 @@ class EmaCrossover(Strategy):
         elif fast < slow and ctx.is_long():
             self.emit_close_position(sym)
 ```
+
+## Reporting a live order's updates and fills
+
+`Runner.on_order_event(order_id, symbol, side, status, order_type=0, fill_qty=0.0, fill_price=0.0,
+ts_ns=0, reject_reason="", is_maker=False)` reports one order event a venue sent to the strategy
+that issued the order, through the callbacks a backtest uses: `ORDER_STATUS_PARTIALLY_FILLED` and
+`ORDER_STATUS_FILLED` reach `on_fill` and only `on_fill`, every other status reaches
+`on_order_update`. `side` is `"buy"` or `"sell"`; `status` is one of the `ORDER_STATUS_*` constants
+the runner module exports and `order_type` an order type code (0 is a limit order), the codes
+`OrderEventData` carries. `fill_qty` and `fill_price` are this fill's own.
+
+```codon
+from lrvx.runner import Runner, ORDER_STATUS_FILLED
+
+order_id = strategy.emit_limit_buy(sym, 100.0, 2.0)
+runner.on_order_event(order_id, sym, "buy", ORDER_STATUS_FILLED, fill_qty=2.0, fill_price=100.0)
+```
+
+Each strategy has a position of its own, as in a backtest: the fill counts for the strategy that
+issued the order before `on_fill` runs, and another strategy on the same runner still reads its own.
+A synchronous runner runs the callbacks inside the call. A threaded runner queues the event and runs
+them on the strategy's order-event consumer thread, after the market data published before the
+report; `Runner.drain()` returns once everything published so far has been handed over. An unknown
+side, or a status or order type that is not a code, raises `ValueError`.

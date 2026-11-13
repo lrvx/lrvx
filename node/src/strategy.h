@@ -12,6 +12,7 @@
 #include "lrvx/backtest/runner_fill_settings.h"
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/capi/lrvx_capi.h"
+#include "lrvx/capi/order_status_names.hpp"
 #include "lrvx/capi/order_type_names.hpp"
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/execution/order_price_rule.h"
@@ -901,53 +902,7 @@ struct NodeStrategyHost : TsfnHost
 
   static const char* orderEventStatusName(uint8_t s)
   {
-    switch (s)
-    {
-      case 0:
-        return "NEW";
-      case 1:
-        return "ACCEPTED";
-      case 2:
-        return "PENDING_NEW";
-      case 3:
-        return "PARTIALLY_FILLED";
-      case 4:
-        return "FILLED";
-      case 5:
-        return "PENDING_CANCEL";
-      case 6:
-        return "CANCELED";
-      case 7:
-        return "EXPIRED";
-      case 8:
-        return "REJECTED";
-      case 9:
-        return "REPLACED";
-      case 10:
-        return "PENDING_TRIGGER";
-      case 11:
-        return "TRIGGERED";
-      case 12:
-        return "TRAILING_UPDATED";
-      case 13:
-        return "QUEUE_POSITION_UPDATED";
-      case 14:
-        return "MARKET_POSITION_CHANGED";
-      case 15:
-        return "REPLACE_SUBMITTED";
-      case 16:
-        return "REPLACE_ACCEPTED";
-      case 17:
-        return "REPLACE_REJECTED";
-      case 19:
-        return "PENDING_ONCHAIN";
-      case 20:
-        return "REVERTED";
-      case 21:
-        return "REPLACED_GAS";
-      default:
-        return "UNKNOWN";
-    }
+    return lrvx::capi::orderEventStatusName(s);
   }
 
   static const char* marketPositionName(uint8_t p)
@@ -1842,6 +1797,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
             InstanceMethod("setMarketDataRecorder", &RunnerNode::setMarketDataRecorder),
             InstanceMethod("setExecutor", &RunnerNode::setExecutor),
             InstanceMethod("orderClosed", &RunnerNode::orderClosed),
+            InstanceMethod("onOrderEvent", &RunnerNode::onOrderEvent),
             InstanceMethod("hookErrors", &RunnerNode::hookErrors),
             InstanceMethod("attachTraceRecorder", &RunnerNode::attachTraceRecorder),
             InstanceMethod("setTraceFeedTsNs", &RunnerNode::setTraceFeedTsNs),
@@ -2515,6 +2471,97 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     else
     {
       lrvx_live_engine_order_closed(_engine, orderId);
+    }
+    return env.Undefined();
+  }
+
+  // One order event a venue reported, in the words a strategy's onFill and
+  // onOrderUpdate read them back in.
+  Napi::Value onOrderEvent(const Napi::CallbackInfo& info)
+  {
+    auto env = info.Env();
+    auto opts = argOptions(info, "onOrderEvent");
+    const auto text = [&](const char* key, const char* fallback) -> std::string
+    {
+      if (!opts.Has(key) || opts.Get(key).IsUndefined())
+      {
+        if (fallback != nullptr)
+        {
+          return fallback;
+        }
+        throw Napi::TypeError::New(env, std::string("onOrderEvent: ") + key + " is required");
+      }
+      if (!opts.Get(key).IsString())
+      {
+        throw Napi::TypeError::New(env, std::string("onOrderEvent: ") + key + " must be a string");
+      }
+      return opts.Get(key).As<Napi::String>().Utf8Value();
+    };
+    if (!opts.Has("orderId") || !opts.Has("symbol"))
+    {
+      throw Napi::TypeError::New(env, "onOrderEvent: orderId and symbol are required");
+    }
+
+    LrvxOrderEventData ev{};
+    ev.order_id = argUint64(opts.Get("orderId"), "onOrderEvent: orderId");
+    ev.symbol_id = symId(opts.Get("symbol"));
+    const std::string side = text("side", nullptr);
+    if (side != "buy" && side != "sell")
+    {
+      throw Napi::TypeError::New(env, "onOrderEvent: side must be 'buy' or 'sell', got '" + side +
+                                          "'");
+    }
+    ev.side = side == "buy" ? 0 : 1;
+    const std::string orderType = text("orderType", "limit");
+    if (!lrvx::capi::orderTypeCodeFromName(orderType, &ev.order_type))
+    {
+      throw Napi::TypeError::New(env, "onOrderEvent: " +
+                                          lrvx::capi::unknownOrderTypeMessage(orderType));
+    }
+    const std::string status = text("status", nullptr);
+    if (!lrvx::capi::orderEventStatusCodeFromName(status, &ev.status))
+    {
+      throw Napi::TypeError::New(env, "onOrderEvent: " +
+                                          lrvx::capi::unknownOrderEventStatusMessage(status));
+    }
+    const auto number = [&](const char* key, const char* what)
+    { return opts.Has(key) ? argNumber(opts.Get(key), what) : 0.0; };
+    ev.fill_qty_raw = lrvx_quantity_from_double(number("fillQty", "onOrderEvent: fillQty"));
+    ev.fill_price_raw = lrvx_price_from_double(number("fillPrice", "onOrderEvent: fillPrice"));
+    ev.exchange_ts_ns = opts.Has("tsNs") ? toInt64Ns(opts.Get("tsNs")) : 0;
+    const std::string rejectReason = text("rejectReason", "");
+    ev.reject_reason = rejectReason.empty() ? nullptr : rejectReason.c_str();
+    if (opts.Has("isMaker"))
+    {
+      if (!opts.Get("isMaker").IsBoolean())
+      {
+        throw Napi::TypeError::New(env, "onOrderEvent: isMaker must be a boolean");
+      }
+      ev.is_maker = opts.Get("isMaker").As<Napi::Boolean>().Value() ? 1 : 0;
+    }
+    if (ev.status == 3 || ev.status == 4)
+    {
+      ev.last_fill_at_ns = ev.exchange_ts_ns;
+    }
+
+    lrvx_clear_last_error();
+    if (_mode == Mode::Sync)
+    {
+      lrvx_runner_on_order_event(_runner, &ev);
+    }
+    else
+    {
+      // A threaded runner's callbacks cross to this thread through channels
+      // that only exist between start() and stop().
+      if (!_running)
+      {
+        throw Napi::Error::New(env, "onOrderEvent: the threaded runner is not started");
+      }
+      lrvx_live_engine_on_order_event(_engine, &ev);
+    }
+    if (lrvx_last_error_code() != 0)
+    {
+      throw Napi::Error::New(env, "onOrderEvent: " + capiReason());
     }
     return env.Undefined();
   }

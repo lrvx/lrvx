@@ -4562,6 +4562,10 @@ TEST(JsIntegrationTest, CallbackArgumentsHaveTheDocumentedTypes)
   const std::string statuses = str("updateStatuses");
   EXPECT_NE(statuses.find("ACCEPTED"), std::string::npos) << statuses;
   EXPECT_EQ(statuses.find("FILLED"), std::string::npos) << statuses;
+  // The names are the engine's: a submitted order read "ACCEPTED" and an
+  // accepted one "PENDING_NEW".
+  EXPECT_NE(statuses.find("SUBMITTED"), std::string::npos) << statuses;
+  EXPECT_EQ(statuses.find("PENDING_NEW"), std::string::npos) << statuses;
 }
 
 // A script's modify() goes out as a Modify signal, which names only the order

@@ -1,0 +1,123 @@
+# Smoke test: Runner.on_order_event reports a venue's order updates and fills
+# to the strategy that issued the order.
+#
+# The C API had the entry and the Codon Runner did not, so a strategy on a
+# live Runner never heard of its orders and read a position of 0.
+#   * a fill reaches on_fill, every other status on_order_update
+#   * the fill counts in the position of the strategy that issued the order,
+#     and only in that one
+#   * an unknown side is refused before anything is delivered
+
+from C import lrvx_registry_create() -> cobj
+from C import lrvx_registry_destroy(cobj)
+from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+
+from lrvx.runner import Runner, Signal
+from lrvx.runner import ORDER_STATUS_ACCEPTED, ORDER_STATUS_PARTIALLY_FILLED
+from lrvx.runner import ORDER_STATUS_FILLED, ORDER_STATUS_REJECTED
+from lrvx.strategy import Strategy, SymbolContext
+from lrvx.types import OrderEventData, TradeData
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+def on_signal(sig: Signal):
+    pass
+
+
+# Every strategy here is an instance of this subclass; the program never runs
+# a plain base Strategy.
+class Listening(Strategy):
+    fills: int
+    updates: int
+    last_status: int
+    last_reason: str
+    position_in_fill: float
+
+    def __init__(self, symbols: List[int]):
+        super().__init__(symbols)
+        self.fills = 0
+        self.updates = 0
+        self.last_status = -1
+        self.last_reason = ""
+        self.position_in_fill = 0.0
+
+    def on_trade(self, ctx: SymbolContext, trade: TradeData):
+        pass
+
+    def on_fill(self, ctx: SymbolContext, ev: OrderEventData):
+        self.fills += 1
+        self.last_status = ev.status
+        self.position_in_fill = ctx.position()
+
+    def on_order_update(self, ctx: SymbolContext, ev: OrderEventData):
+        self.updates += 1
+        self.last_status = ev.status
+        self.last_reason = ev.reject_reason
+
+
+reg = lrvx_registry_create()
+sym = int(lrvx_registry_add_symbol(reg, "test".c_str(), "BTCUSDT".c_str(), 0.01))
+
+runner = Runner(reg, on_signal)
+first = Listening([sym])
+second = Listening([sym])
+runner.add_strategy(first)
+runner.add_strategy(second)
+runner.start()
+
+mine = second.emit_limit_buy(sym, 100.0, 2.0)
+runner.on_order_event(mine, sym, "buy", ORDER_STATUS_ACCEPTED)
+check(second.updates == 1 and second.last_status == ORDER_STATUS_ACCEPTED,
+      "an accepted order reaches on_order_update")
+check(second.fills == 0, "and not on_fill")
+
+runner.on_order_event(mine, sym, "buy", ORDER_STATUS_PARTIALLY_FILLED,
+                      fill_qty=0.5, fill_price=100.0, ts_ns=1000)
+check(second.fills == 1 and second.updates == 1, "a partial fill reaches on_fill only")
+check(abs(second.position_in_fill - 0.5) < 1e-9, "the context in on_fill counts the fill")
+
+runner.on_order_event(mine, sym, "buy", ORDER_STATUS_FILLED, fill_qty=1.5, fill_price=100.0)
+check(second.fills == 2, "the closing fill too")
+check(abs(second.position() - 2.0) < 1e-9, "the issuing strategy holds 2")
+check(first.fills == 0 and first.updates == 0, "the other strategy heard nothing")
+check(abs(first.position()) < 1e-9, "and its position is its own")
+
+other = first.emit_limit_buy(sym, 100.0, 1.0)
+runner.on_order_event(other, sym, "buy", ORDER_STATUS_REJECTED, reject_reason="no margin")
+check(first.updates == 1 and first.last_reason == "no margin",
+      "a rejection carries its reason: " + first.last_reason)
+
+refused = False
+reason = ""
+try:
+    runner.on_order_event(mine, sym, "long", ORDER_STATUS_FILLED, fill_qty=1.0)
+except ValueError as e:
+    refused = True
+    reason = str(e)
+check(refused and "'long'" in reason, "an unknown side is refused: " + reason)
+check(second.fills == 2, "and nothing was delivered")
+
+out_of_range = False
+try:
+    runner.on_order_event(mine, sym, "buy", 200)
+except ValueError as e:
+    out_of_range = True
+check(out_of_range, "a status that is not a status is refused")
+
+runner.drain()
+runner.stop()
+lrvx_registry_destroy(reg)
+
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")

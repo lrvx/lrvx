@@ -12,6 +12,7 @@
 
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/capi/lrvx_capi.h"
+#include "lrvx/capi/order_status_names.hpp"
 #include "lrvx/common.h"
 #include "lrvx/execution/events/order_event.h"
 #include "lrvx/strategy/signal.h"
@@ -335,5 +336,29 @@ TEST_P(LiveEngineOrderEvents, DrainReturnsAtOnceOnAnEngineThatIsNotRunning)
 }
 
 INSTANTIATE_TEST_SUITE_P(LiveEngine, LiveEngineOrderEvents, ::testing::Values(true));
+
+// Node and QuickJS kept a table of their own that named code 1 "ACCEPTED" and
+// code 2 "PENDING_NEW"; no table named REJECTED_RATE_LIMIT.
+TEST(OrderEventStatusNames, FollowTheEnum)
+{
+  using Status = lrvx::OrderEventStatus;
+  const auto name = [](Status s)
+  { return std::string(lrvx::capi::orderEventStatusName(static_cast<uint8_t>(s))); };
+  EXPECT_EQ(name(Status::NEW), "NEW");
+  EXPECT_EQ(name(Status::SUBMITTED), "SUBMITTED");
+  EXPECT_EQ(name(Status::ACCEPTED), "ACCEPTED");
+  EXPECT_EQ(name(Status::FILLED), "FILLED");
+  EXPECT_EQ(name(Status::REPLACE_REJECTED), "REPLACE_REJECTED");
+  EXPECT_EQ(name(Status::REJECTED_RATE_LIMIT), "REJECTED_RATE_LIMIT");
+  EXPECT_EQ(name(Status::REPLACED_GAS), "REPLACED_GAS");
+  EXPECT_EQ(lrvx::capi::kOrderEventStatusNameCount,
+            static_cast<size_t>(Status::REPLACED_GAS) + 1);
+
+  uint8_t code = 0;
+  EXPECT_TRUE(lrvx::capi::orderEventStatusCodeFromName("ACCEPTED", &code));
+  EXPECT_EQ(code, static_cast<uint8_t>(Status::ACCEPTED));
+  EXPECT_FALSE(lrvx::capi::orderEventStatusCodeFromName("PENDING_NEW", &code));
+  EXPECT_FALSE(lrvx::capi::orderEventStatusCodeFromName("UNKNOWN", &code));
+}
 
 }  // namespace

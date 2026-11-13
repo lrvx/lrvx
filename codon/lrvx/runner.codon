@@ -78,6 +78,11 @@ from C import lrvx_live_engine_publish_bar(cobj, u32, u8, u64,
                                             float, float, float, float,
                                             float, float, i64, i64, u8)
 from C import lrvx_live_engine_set_market_data_recorder(cobj, cobj)
+from C import lrvx_runner_on_order_event(cobj, cobj)
+from C import lrvx_live_engine_on_order_event(cobj, cobj)
+from C import lrvx_live_engine_drain(cobj)
+from C import lrvx_price_from_double(float) -> i64
+from C import lrvx_quantity_from_double(float) -> i64
 
 from C import lrvx_backtest_runner_create(cobj, float, float) -> cobj
 from C import lrvx_backtest_runner_create_with_fill_settings(
@@ -124,6 +129,21 @@ from lrvx.types import SCALE, Price, Quantity
 from lrvx.backtest import BacktestStats
 from lrvx.dispatch import bind_callbacks, _as_class, _report_callback_error
 from lrvx.dispatch import _gc_register_thread
+from lrvx.layout import _EV_ORDER_ID, _EV_SYMBOL_ID, _EV_SIDE, _EV_ORDER_TYPE
+from lrvx.layout import _EV_STATUS, _EV_FILL_QTY_RAW, _EV_FILL_PRICE_RAW, _EV_TS_NS
+from lrvx.layout import _EV_REJECT_REASON, _EV_LAST_FILL_AT_NS, _EV_IS_MAKER, _EV_SIZE
+
+# lrvx::OrderEventStatus codes, as OrderEventData.status carries them.
+ORDER_STATUS_NEW = 0
+ORDER_STATUS_SUBMITTED = 1
+ORDER_STATUS_ACCEPTED = 2
+ORDER_STATUS_PARTIALLY_FILLED = 3
+ORDER_STATUS_FILLED = 4
+ORDER_STATUS_PENDING_CANCEL = 5
+ORDER_STATUS_CANCELED = 6
+ORDER_STATUS_EXPIRED = 7
+ORDER_STATUS_REJECTED = 8
+ORDER_STATUS_REPLACED = 9
 
 
 # Value type, not a reference class. @dataclass in Codon makes a reference
@@ -383,6 +403,68 @@ class Runner[F]:
             lrvx_runner_on_book_top(
                 self._sync_handle, u32(symbol),
                 hb, bid_price, bid_qty, ha, ask_price, ask_qty, i64(ts_ns))
+
+    def on_order_event(self, order_id: int, symbol: int, side: str, status: int,
+                       order_type: int = 0, fill_qty: float = 0.0,
+                       fill_price: float = 0.0, ts_ns: int = 0,
+                       reject_reason: str = "", is_maker: bool = False):
+        """Report one order event a venue sent (an order update or a fill)
+        to the strategy that issued the order, through the callbacks a
+        backtest uses: PARTIALLY_FILLED and FILLED reach on_fill and only
+        on_fill, every other status reaches on_order_update.
+
+        ``side`` is "buy" or "sell"; ``status`` is an ORDER_STATUS_* code
+        and ``order_type`` an lrvx::OrderType code (0 is LIMIT), the codes
+        OrderEventData carries. ``fill_qty`` and ``fill_price`` are this
+        fill's own. Each strategy has a position of its own, as in a
+        backtest: the fill counts for the strategy that issued the order
+        before on_fill runs. An order id no attached strategy issued goes
+        to every strategy subscribed to the symbol and counts in no
+        position.
+
+        A synchronous runner runs the callbacks inside this call. A
+        threaded runner queues the event; the callbacks run on the
+        strategy's order-event consumer thread, after the market data
+        published before the report. Raises ValueError for an unknown side
+        or a status or order type out of range.
+        """
+        if side != "buy" and side != "sell":
+            raise ValueError(
+                "Runner.on_order_event: side must be 'buy' or 'sell', got '" + side + "'")
+        if status < 0 or status > 255 or order_type < 0 or order_type > 255:
+            raise ValueError(
+                "Runner.on_order_event: status " + str(status) + " or order_type " +
+                str(order_type) + " is not a code")
+        words = [i64(0) for _ in range(_EV_SIZE // 8)]
+        ev = cobj(words.arr.ptr)
+        Ptr[u64](ev + _EV_ORDER_ID)[0] = u64(order_id)
+        Ptr[u32](ev + _EV_SYMBOL_ID)[0] = u32(symbol)
+        Ptr[u8](ev + _EV_SIDE)[0] = u8(0 if side == "buy" else 1)
+        Ptr[u8](ev + _EV_ORDER_TYPE)[0] = u8(order_type)
+        Ptr[u8](ev + _EV_STATUS)[0] = u8(status)
+        Ptr[i64](ev + _EV_FILL_QTY_RAW)[0] = lrvx_quantity_from_double(fill_qty)
+        Ptr[i64](ev + _EV_FILL_PRICE_RAW)[0] = lrvx_price_from_double(fill_price)
+        Ptr[i64](ev + _EV_TS_NS)[0] = i64(ts_ns)
+        if len(reject_reason) > 0:
+            Ptr[cobj](ev + _EV_REJECT_REASON)[0] = reject_reason.c_str()
+        if status == ORDER_STATUS_PARTIALLY_FILLED or status == ORDER_STATUS_FILLED:
+            Ptr[i64](ev + _EV_LAST_FILL_AT_NS)[0] = i64(ts_ns)
+        Ptr[u8](ev + _EV_IS_MAKER)[0] = u8(1 if is_maker else 0)
+        lrvx_clear_last_error()
+        if self._threaded:
+            lrvx_live_engine_on_order_event(self._live_handle, ev)
+        else:
+            lrvx_runner_on_order_event(self._sync_handle, ev)
+        if int(lrvx_last_error_code()) != 0:
+            raise ValueError(
+                "Runner.on_order_event: " + str.from_ptr(lrvx_last_error_message()))
+
+    def drain(self):
+        """Return once every strategy of a threaded runner has been handed
+        everything published so far. A synchronous runner has nothing
+        queued. Never call it from a strategy callback."""
+        if self._threaded:
+            lrvx_live_engine_drain(self._live_handle)
 
     def on_bar(self, symbol: int,
                open: float, high: float, low: float, close: float,

@@ -7575,6 +7575,11 @@
         },
         {
           "kind": "method",
+          "name": "drain",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "on_bar",
           "parent": "Runner"
         },
@@ -7586,6 +7591,11 @@
         {
           "kind": "method",
           "name": "on_book_top",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
+          "name": "on_order_event",
           "parent": "Runner"
         },
         {
@@ -28367,6 +28377,10 @@
         },
         {
           "kind": "class",
+          "name": "ReportedOrderEvent"
+        },
+        {
+          "kind": "class",
           "name": "RiskManager"
         },
         {
@@ -33088,6 +33102,56 @@
         },
         {
           "kind": "method",
+          "name": "fillPrice",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "fillQty",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "isMaker",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "orderId",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "orderType",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "rejectReason",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "side",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "status",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "symbol",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "tsNs",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
           "name": "allow",
           "parent": "RiskManager"
         },
@@ -33174,6 +33238,11 @@
         {
           "kind": "method",
           "name": "onBookTop",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
+          "name": "onOrderEvent",
           "parent": "Runner"
         },
         {

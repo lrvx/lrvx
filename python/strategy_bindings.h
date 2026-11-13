@@ -26,6 +26,7 @@
 #include "lrvx/book/events/trade_event.h"
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/capi/lrvx_capi.h"
+#include "lrvx/capi/order_status_names.hpp"
 #include "lrvx/capi/order_type_names.hpp"
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/error/lrvx_error.h"
@@ -1040,53 +1041,7 @@ struct PyStrategyHost
 
   static const char* orderStatusName(uint8_t s)
   {
-    switch (s)
-    {
-      case 0:
-        return "NEW";
-      case 1:
-        return "SUBMITTED";
-      case 2:
-        return "ACCEPTED";
-      case 3:
-        return "PARTIALLY_FILLED";
-      case 4:
-        return "FILLED";
-      case 5:
-        return "PENDING_CANCEL";
-      case 6:
-        return "CANCELED";
-      case 7:
-        return "EXPIRED";
-      case 8:
-        return "REJECTED";
-      case 9:
-        return "REPLACED";
-      case 10:
-        return "PENDING_TRIGGER";
-      case 11:
-        return "TRIGGERED";
-      case 12:
-        return "TRAILING_UPDATED";
-      case 13:
-        return "QUEUE_POSITION_UPDATED";
-      case 14:
-        return "MARKET_POSITION_CHANGED";
-      case 15:
-        return "REPLACE_SUBMITTED";
-      case 16:
-        return "REPLACE_ACCEPTED";
-      case 17:
-        return "REPLACE_REJECTED";
-      case 19:
-        return "PENDING_ONCHAIN";
-      case 20:
-        return "REVERTED";
-      case 21:
-        return "REPLACED_GAS";
-      default:
-        return "UNKNOWN";
-    }
+    return lrvx::capi::orderEventStatusName(s);
   }
 
   static const char* marketPositionName(uint8_t p)
@@ -2158,27 +2113,10 @@ class PyRunner
       throw py::value_error("Runner.on_order_event: " +
                             lrvx::capi::unknownOrderTypeMessage(order_type));
     }
-    bool known = false;
-    std::string names;
-    for (uint8_t code = 0; code <= static_cast<uint8_t>(OrderEventStatus::REPLACED_GAS); ++code)
+    if (!lrvx::capi::orderEventStatusCodeFromName(status, &ev.status))
     {
-      const char* name = PyStrategyHost::orderStatusName(code);
-      if (status == name && status != "UNKNOWN")
-      {
-        ev.status = code;
-        known = true;
-        break;
-      }
-      if (std::string(name) != "UNKNOWN")
-      {
-        names += names.empty() ? "" : ", ";
-        names += name;
-      }
-    }
-    if (!known)
-    {
-      throw py::value_error("Runner.on_order_event: unknown status '" + status +
-                            "'; expected one of: " + names);
+      throw py::value_error("Runner.on_order_event: " +
+                            lrvx::capi::unknownOrderEventStatusMessage(status));
     }
     ev.fill_qty_raw = Quantity::fromDouble(fill_qty).raw();
     ev.fill_price_raw = Price::fromDouble(fill_price).raw();

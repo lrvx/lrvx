@@ -244,6 +244,47 @@ What is put to the gates depends on what runs the strategy:
 | `<outcome>` | `it reached neither on_signal nor the executor` | `it reached no executor` |
 | Kill switch | asked again for every signal it is asked about | stays triggered for the rest of the run once it said no |
 
+### Reporting a live order's updates and fills
+
+`runner.onOrderEvent(event)` reports one order event a venue sent to the strategy that issued the
+order, through the callbacks a backtest uses: `PARTIALLY_FILLED` and `FILLED` reach `onFill` and
+only `onFill`, every other status reaches `onOrderUpdate`.
+
+```js
+runner.onOrderEvent({
+  orderId,                 // number or bigint, as emit.limitBuy returned it
+  symbol,                  // the Symbol from addSymbol, or its numeric id
+  side: 'buy',             // 'buy' | 'sell'
+  status: 'PARTIALLY_FILLED',
+  orderType: 'limit',      // optional, 'limit' when omitted
+  fillQty: 0.5,            // this fill's own quantity and price,
+  fillPrice: 100.0,        // not the order's running totals
+  tsNs: 1700000000000000000n,
+  isMaker: true,
+});
+```
+
+Each strategy has a position of its own, as in a backtest: the fill counts in the position of the
+strategy that issued the order (its id is the high 32 bits of the order id) before `onFill` runs,
+so `ctx.position` inside `onFill` counts it, and another strategy on the same runner still reads its
+own. An order id no attached strategy issued goes to every strategy subscribed to the symbol and
+counts in no position.
+
+On a sync runner the callbacks run inside the call. On a threaded runner the event is queued behind
+the trades, books and bars published before it and the callbacks run later on the JS thread, like
+every other callback of that runner; `onOrderEvent` throws unless the runner is started. A missing
+or mistyped field, or an unknown side, status or order type, throws a `TypeError` that names the
+value.
+
+The status names are the `OrderEventStatus` names of the engine: `NEW`, `SUBMITTED`, `ACCEPTED`,
+`PARTIALLY_FILLED`, `FILLED`, `PENDING_CANCEL`, `CANCELED`, `EXPIRED`, `REJECTED`, `REPLACED`,
+`PENDING_TRIGGER`, `TRIGGERED`, `TRAILING_UPDATED`, `QUEUE_POSITION_UPDATED`,
+`MARKET_POSITION_CHANGED`, `REPLACE_SUBMITTED`, `REPLACE_ACCEPTED`, `REPLACE_REJECTED`,
+`REJECTED_RATE_LIMIT`, `PENDING_ONCHAIN`, `REVERTED`, `REPLACED_GAS`. Node and QuickJS used to read a
+`SUBMITTED` event as `"ACCEPTED"`, an `ACCEPTED` event as `"PENDING_NEW"` and
+`REJECTED_RATE_LIMIT` as `"UNKNOWN"`; Python read the last as `"UNKNOWN"` too. All three now read
+the one table.
+
 `onSignal` is an observer: a runner created without one gates and forwards its signals the same way.
 
 #### Argument checks

@@ -583,6 +583,7 @@ jobs:
                    codon_backtest_runner_stats_smoke \
                    codon_funding_schedule_smoke \
                    codon_runner_strategy_ids_smoke codon_last_error_smoke \
+                   codon_runner_order_event_smoke \
                    codon_order_quantity_lot_smoke \
                    codon_sma_crossover codon_pairs_strategy; do
           echo "── $bin"
