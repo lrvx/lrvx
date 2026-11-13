@@ -140,9 +140,11 @@ declare class Strategy {
     takeProfitLimit(opts: TakeProfitLimitOpts): number;
     trailingStop(opts: TrailingStopOpts): number;
     trailingStopPercent(opts: TrailingStopPercentOpts): number;
-    cancel(orderId: number): void;
+    /** `orderId` is a non-negative integer Number or a BigInt; anything else
+     *  is a TypeError and nothing is emitted. */
+    cancel(orderId: number | bigint): void;
     cancelAll(symbol?: string): void;
-    modify(orderId: number, opts: ModifyOpts): void;
+    modify(orderId: number | bigint, opts: ModifyOpts): void;
     closePosition(symbol?: string): number;
 
     position(symbol?: string): number;
@@ -580,8 +582,10 @@ interface TraceSignalRecord {
     /** The low 32 bits of the signal's id. */
     signalId: number;
     /** The whole id. For a signal a runner captured it is the order id the
-     *  signal asks for. A Number, as `orderId` on an order event is. */
-    signalId64: number;
+     *  signal asks for. A BigInt, as `orderId` on an order event record is:
+     *  an order id is (subscriber id << 32) + n, past what a Number holds
+     *  exactly once the subscriber id reaches 2^21. */
+    signalId64: bigint;
     flags: number;
     strengthRaw: number;
     name: string;
@@ -592,8 +596,8 @@ interface TraceSignalRecord {
 interface TraceOrderEventRecord {
     runTsNs: bigint;
     feedTsNs: bigint;
-    orderId: number;
-    parentSignalId: number;
+    orderId: bigint;
+    parentSignalId: bigint;
     priceRaw: number;
     qtyRaw: number;
     symbolId: number;
@@ -607,8 +611,8 @@ interface TraceOrderEventRecord {
 interface TraceFillRecord {
     runTsNs: bigint;
     feedTsNs: bigint;
-    orderId: number;
-    fillId: number;
+    orderId: bigint;
+    fillId: bigint;
     priceRaw: number;
     qtyRaw: number;
     feeRaw: number;
@@ -640,9 +644,250 @@ interface TraceReader {
     destroy(): void;
 }
 
+// ---- latency models ----
+
+/** A latency model: per-call delays in nanoseconds. */
+interface LatencyModel {
+    feedDelay(): number;
+    orderDelay(): number;
+    fillDelay(): number;
+    /** One draw of all three delays. */
+    sample(): { feedNs: number; orderNs: number; fillNs: number };
+    /** Restart the model's random sequence; `seed` 0 or omitted keeps its own. */
+    reset(seed?: number): void;
+    destroy(): void;
+}
+
+interface ConstantLatencyOpts { feedNs?: number; orderNs?: number; fillNs?: number; }
+interface GaussianLatencyOpts {
+    feedMeanNs?: number; feedStddevNs?: number;
+    orderMeanNs?: number; orderStddevNs?: number;
+    fillMeanNs?: number; fillStddevNs?: number;
+    seed?: number;
+}
+interface ExponentialLatencyOpts {
+    feedMeanNs?: number; orderMeanNs?: number; fillMeanNs?: number; seed?: number;
+}
+interface EmpiricalLatencyOpts {
+    feedSamples?: number[]; orderSamples?: number[]; fillSamples?: number[]; seed?: number;
+}
+
+// ---- tape diff ----
+
+interface TapeDiffTrade {
+    exchangeTsNs: bigint;
+    symbolId: number;
+    priceRaw: number;
+    qtyRaw: number;
+    /** 0 buy, 1 sell. */
+    side: number;
+}
+
+interface TapeDiffResult {
+    leftPath: string;
+    rightPath: string;
+    leftCount: number;
+    rightCount: number;
+    /** Index of the first trade that differs; `null` when the tapes agree. */
+    firstDivergenceIndex: number | null;
+    equal: boolean;
+    mismatches: { index: number; left: TapeDiffTrade; right: TapeDiffTrade }[];
+}
+
+// ---- delta book ----
+
+interface DeltaBookLevel { priceRaw: number; qtyRaw: number; }
+
+/** Encodes L2 snapshots as an anchor snapshot followed by deltas. */
+interface DeltaBookEncoder {
+    /** `isDelta` is false for an anchor: `bids` / `asks` are then the whole book. */
+    encode(symbolId: number, bids?: DeltaBookLevel[], asks?: DeltaBookLevel[]):
+        { isDelta: boolean; bids: DeltaBookLevel[]; asks: DeltaBookLevel[] };
+    destroy(): void;
+}
+
+/** Rebuilds snapshots from what a DeltaBookEncoder produced. */
+interface DeltaBookReplayer {
+    /** `type`: 0 for an anchor snapshot, 1 for a delta. Returns the book after it. */
+    apply(type: number, symbolId: number, bids?: DeltaBookLevel[], asks?: DeltaBookLevel[]):
+        { bids: DeltaBookLevel[]; asks: DeltaBookLevel[] };
+    destroy(): void;
+}
+
+// ---- bar dispatch recorder ----
+
+/** Records the order in which bars of several timeframes close. */
+interface BarDispatchRecorder {
+    /** Register a time-bar timeframe; returns its slot index. */
+    addTimeIntervalSeconds(seconds: number): number;
+    onTrade(symbol: number, price: number, qty: number, tsNs: number | bigint): void;
+    /** Drain the bus so every bar at the final tied close fires. */
+    finalize(): void;
+    count(): number;
+    /** The bar type code at `index`. */
+    typeAt(index: number): number;
+    /** The bar type parameter at `index` (nanoseconds for time bars). */
+    paramAt(index: number): number;
+    destroy(): void;
+}
+
+// ---- execution algos ----
+
+interface ExecChildOrder {
+    orderId: number;
+    timestampNs: bigint;
+    qty: number;
+    /** 0 for a market child. */
+    price: number;
+    type: "market" | "limit";
+}
+
+interface ExecAlgoOpts {
+    targetQty: number;
+    /** Left out: "buy". Any other string is a TypeError. */
+    side?: "buy" | "sell";
+    symbol?: number;
+    /** Left out: "market". Any other string is a TypeError. */
+    type?: "market" | "limit";
+    limitPrice?: number;
+}
+interface TWAPOpts extends ExecAlgoOpts {
+    durationNs: number | bigint;
+    sliceCount: number;
+    startTimeNs: number | bigint;
+}
+interface VWAPOpts extends ExecAlgoOpts {
+    /** `[timestampNs, volume]` points of the expected volume curve. */
+    volumeCurve?: [number | bigint, number][];
+}
+interface IcebergOpts extends ExecAlgoOpts { visibleQty: number; }
+interface POVOpts extends ExecAlgoOpts { participationRate: number; minSliceQty?: number; }
+
+/** A parent order worked as child orders. Call `step(nowNs)` and send what it returns. */
+interface ExecAlgo {
+    step(nowNs: number | bigint): ExecChildOrder[];
+    reportFill(qty: number): void;
+    submittedQty(): number;
+    filledQty(): number;
+    remainingQty(): number;
+    isDone(): boolean;
+    destroy(): void;
+}
+interface POVExecAlgo extends ExecAlgo {
+    /** Report market volume observed since the last call. */
+    observeVolume(qty: number): void;
+}
+
+// ---- portfolio risk ----
+
+interface PortfolioRiskRules {
+    maxDrawdownPct?: number;
+    maxDailyLoss?: number;
+    maxGrossExposure?: number;
+    maxConcentrationPct?: number;
+}
+interface PortfolioRiskBreach { rule: string; value: number; limit: number; detail: string; }
+interface PortfolioRiskAccountFields {
+    realizedPnl?: number;
+    unrealizedPnl?: number;
+    fees?: number;
+    grossExposure?: number;
+    netExposure?: number;
+    tradeCount?: number;
+}
+interface PortfolioRiskAggregator {
+    /** Set the named account's fields; the ones left out keep their value. */
+    update(name: string, fields?: PortfolioRiskAccountFields): void;
+    remove(name: string): void;
+    resetKillSwitch(): void;
+    /** The rule the order would breach, or `null`. */
+    checkOrder(strategy: string, notional: number, side: string): PortfolioRiskBreach | null;
+    snapshot(): {
+        totalDailyPnl: number;
+        totalGrossExposure: number;
+        currentEquity: number;
+        drawdownPct: number;
+        killSwitchActive: boolean;
+        breaches: PortfolioRiskBreach[];
+        accountCount: number;
+    };
+    destroy(): void;
+}
+
+// ---- indicator graphs ----
+
+/** A node's values for one symbol, computed from the graph it is handed. */
+type IndicatorGraphCompute = (graph: IndicatorGraph, symbol: number) => ArrayLike<number>;
+
+interface IndicatorGraph {
+    /** `high` / `low` default to `close`, `volume` to zeros. */
+    setBars(symbol: number, close: ArrayLike<number>, high?: ArrayLike<number> | null,
+            low?: ArrayLike<number> | null, volume?: ArrayLike<number> | null): void;
+    /** `deps` are names of nodes added before this one. */
+    addNode(name: string, deps: string[] | null | undefined, fn: IndicatorGraphCompute): void;
+    /** Compute, or return the cached, series of node `name`. */
+    require(symbol: number, name: string): ArrayLike<number>;
+    /** The cached series of node `name`, or `null` before it has been computed. */
+    get(symbol: number, name: string): ArrayLike<number> | null;
+    close(symbol: number): ArrayLike<number>;
+    high(symbol: number): ArrayLike<number>;
+    low(symbol: number): ArrayLike<number>;
+    volume(symbol: number): ArrayLike<number>;
+    invalidate(symbol: number): void;
+    invalidateAll(): void;
+    destroy(): void;
+}
+
+/** A node's value for the bar just pushed. */
+type StreamingIndicatorGraphCompute =
+    (graph: StreamingIndicatorGraph, symbol: number) => number;
+
+interface StreamingIndicatorGraph {
+    addNode(name: string, deps: string[] | null | undefined,
+            fn: StreamingIndicatorGraphCompute): void;
+    /** Push one bar. `high` / `low` default to `close`, `volume` to 0. */
+    step(symbol: number, close: number, high?: number, low?: number, volume?: number): void;
+    current(symbol: number, name: string): number;
+    barCount(symbol: number): number;
+    reset(symbol: number): void;
+    resetAll(): void;
+    close(symbol: number): ArrayLike<number>;
+    high(symbol: number): ArrayLike<number>;
+    low(symbol: number): ArrayLike<number>;
+    volume(symbol: number): ArrayLike<number>;
+    destroy(): void;
+}
+
 declare const lrvx: {
     TraceRecorder: new (opts: TraceRecorderOpts) => TraceRecorder;
     TraceReader: new (path: string) => TraceReader;
+    /** Forward-looking labels, for research only: each reads `horizon` bars
+     *  into the future, so feeding one to a live decision is look-ahead. */
+    targets: {
+        future_return(close: ArrayLike<number>, horizon: number): number[];
+        future_ctc_volatility(close: ArrayLike<number>, horizon: number): number[];
+        future_linear_slope(close: ArrayLike<number>, horizon: number): number[];
+    };
+    ConstantLatency: new (opts?: ConstantLatencyOpts) => LatencyModel;
+    GaussianLatency: new (opts?: GaussianLatencyOpts) => LatencyModel;
+    ExponentialLatency: new (opts?: ExponentialLatencyOpts) => LatencyModel;
+    EmpiricalLatency: new (opts?: EmpiricalLatencyOpts) => LatencyModel;
+    /** Compare the trades of two `.lrvx` tapes. Throws a TypeError when a
+     *  tape cannot be opened. `maxMismatches` bounds the list returned;
+     *  timestamps within `fieldToleranceNs` of each other count as equal. */
+    tapeDiff(left: string, right: string,
+             opts?: { maxMismatches?: number; fieldToleranceNs?: number | bigint }): TapeDiffResult;
+    DeltaBookEncoder: new (opts?: { anchorEvery?: number }) => DeltaBookEncoder;
+    DeltaBookReplayer: new () => DeltaBookReplayer;
+    BarDispatchRecorder: new () => BarDispatchRecorder;
+    TWAPExecutor: new (opts: TWAPOpts) => ExecAlgo;
+    VWAPExecutor: new (opts: VWAPOpts) => ExecAlgo;
+    IcebergExecutor: new (opts: IcebergOpts) => ExecAlgo;
+    POVExecutor: new (opts: POVOpts) => POVExecAlgo;
+    PortfolioRiskAggregator:
+        new (opts?: { rules?: PortfolioRiskRules; initialEquity?: number }) => PortfolioRiskAggregator;
+    IndicatorGraph: new () => IndicatorGraph;
+    StreamingIndicatorGraph: new () => StreamingIndicatorGraph;
     register(strategy: Strategy): void;
     correlation(x: number[], y: number[]): number;
     profitFactor(pnl: number[]): number;

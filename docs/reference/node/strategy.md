@@ -294,8 +294,17 @@ receiving every snapshot and delta. A hook without `onBookTop` skips tops.
 |--------|-------------|
 | `attachTraceRecorder(recorder)` | Auto-capture every signal into a `.lrvxrun` recorder. Sync mode only; throws otherwise |
 | `setTraceFeedTsNs(feedTsNs)` | Stamp every recorded signal with this `feed_ts_ns` until the next call |
-| `traceOrderEvent(opts)` | Mirror an order event into the attached recorder. No-op with no recorder attached |
-| `traceFill(opts)` | Mirror a fill into the attached recorder |
+| `traceOrderEvent(opts)` | Mirror an order event into the attached recorder. No-op with no recorder attached. `orderId` and `parentSignalId` are a non-negative integer Number or a BigInt |
+| `traceFill(opts)` | Mirror a fill into the attached recorder. `orderId` and `fillId` as above |
+
+Arguments are checked before anything is done with them. A symbol that is not a `Symbol` or a
+whole symbol id, a price or quantity that is not a number, an `isBuy` that is not a boolean, an id
+that is NaN, fractional, negative or a string: each is a `TypeError` naming the argument
+(`onTrade: price must be a number`, `traceFill: fillId must be a non-negative integer Number (at
+most 2^53) or a BigInt below 2^64`). The same holds for `emit.lastClosedBar`,
+`emit.lastNClosedBars` and `emit.setBarRingCapacity` inside a strategy. These reads used to be
+unchecked: the call threw a bare `A number was expected`, or went ahead with whatever the
+conversion produced.
 
 ### Signal callback
 

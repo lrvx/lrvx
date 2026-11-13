@@ -101,6 +101,7 @@ git diff --exit-code -- docs/ >/dev/null || {
 "$PY" scripts/check_suite_discovery.py
 "$PY" scripts/check_binding_smoke.py
 "$PY" scripts/check_quickjs_registration.py
+"$PY" scripts/check_quickjs_lrvx_typings.py
 "$PY" -m pytest scripts/tests -q
 "$PY" scripts/scan_sanitizer_reports.py --self-test
 "$PY" scripts/check_sanitizer_scan.py

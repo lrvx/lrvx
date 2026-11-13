@@ -75,13 +75,13 @@ check('signal payload', sigs[0].payload === '{"src":"ETH","dst":"BTC"}');
 
 var orders = reader.readAllOrderEvents();
 check('order count', orders.length === 1);
-check('order id', orders[0].orderId === 7);
-check('order parent', orders[0].parentSignalId === 42);
+check('order id', orders[0].orderId === 7n);
+check('order parent', orders[0].parentSignalId === 42n);
 check('order kind', orders[0].eventKind === 1);
 
 var fills = reader.readAllFills();
 check('fill count', fills.length === 1);
-check('fill id', fills[0].fillId === 12345);
+check('fill id', fills[0].fillId === 12345n);
 check('fill liquidity', fills[0].liquidity === 1);
 
 reader.destroy();
@@ -96,11 +96,29 @@ wide.writeSignal({ runTsNs: 3n, signalId: 4294967295, name: 'small' });
 wide.close();
 var wideReader = new lrvx.TraceReader(widePath);
 var wideSigs = wideReader.readAllSignals();
-check('a wide Number id reads back whole', wideSigs[0].signalId64 === 7 * 4294967296 + 5);
+check('a wide Number id reads back whole', wideSigs[0].signalId64 === (7n << 32n) + 5n);
 check('and its low half is signalId', wideSigs[0].signalId === 5);
-check('a wide BigInt id reads back whole', wideSigs[1].signalId64 === 7 * 4294967296 + 6);
+check('a wide BigInt id reads back whole', wideSigs[1].signalId64 === (7n << 32n) + 6n);
 check('an id below 2^32 is unchanged',
-      wideSigs[2].signalId === 4294967295 && wideSigs[2].signalId64 === 4294967295);
+      wideSigs[2].signalId === 4294967295 && wideSigs[2].signalId64 === 4294967295n);
 wideReader.destroy();
+
+// The ids of an order event and a fill read back as BigInt, whole: an order
+// id is (subscriber id << 32) + n, and with a subscriber id of 2^21 or more
+// it is past what a Number holds exactly.
+var bigPath = path + '_big';
+var BIG = ((2n ** 21n + 3n) << 32n) + 7n;
+var big = new lrvx.TraceRecorder({ path: bigPath, strategyId: 'qjs-big' });
+big.writeOrderEvent({ runTsNs: 1n, orderId: BIG, parentSignalId: BIG - 1n, symbolId: 1 });
+big.writeFill({ runTsNs: 2n, orderId: BIG, fillId: BIG + 5n, symbolId: 1 });
+big.close();
+var bigReader = new lrvx.TraceReader(bigPath);
+var bigOrders = bigReader.readAllOrderEvents();
+var bigFills = bigReader.readAllFills();
+check('an order id above 2^53 reads back whole', bigOrders[0].orderId === BIG);
+check('and so does its parent signal id', bigOrders[0].parentSignalId === BIG - 1n);
+check('a fill keeps its order id and fill id whole',
+      bigFills[0].orderId === BIG && bigFills[0].fillId === BIG + 5n);
+bigReader.destroy();
 
 console.log('quickjs run-trace smoke ok');

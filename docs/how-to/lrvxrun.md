@@ -217,6 +217,17 @@ equal for an id below 2^32. A signal a runner captured carries the id of the ord
 `(subscriber id << 32) + n`: join it to that order's events on `signal_id64 == order_id`, and to
 the events the C++ capture listener writes on `parent_signal_id` as well.
 
+In Node and QuickJS the reader returns every 64-bit id as a BigInt: `signalId64` on a signal,
+`orderId` and `parentSignalId` on an order event, `orderId` and `fillId` on a fill. An order id is
+`(subscriber id << 32) + n`, so with a subscriber id of 2^21 or more it is past 2^53 and a Number
+no longer holds it; they used to be Numbers, with the low bits of such an id lost. Compare with
+`===` against a BigInt (`e.orderId === 7n`), or convert with `Number(e.orderId)` when the id is
+known to be small. The Node writers (`writeOrderEvent`, `writeFill`, and
+`Runner.traceOrderEvent` / `traceFill`) take `orderId`, `parentSignalId` and `fillId` as a
+non-negative integer Number or a BigInt and `priceRaw` / `qtyRaw` / `feeRaw` as an integer Number or
+a BigInt; anything else (NaN, a fraction, a negative id, a string) is a `TypeError` naming the
+field, where it used to be written as whatever the conversion made of it.
+
 `write_signal` takes the whole 64-bit id in every binding, so an order id can be passed as it
 is: Python `signal_id=`, Node and QuickJS `signalId` (a Number or a BigInt), Codon `signal_id=`,
 and `lrvx_run_recorder_write_signal64` in C (`lrvx_run_recorder_write_signal` keeps its 32-bit

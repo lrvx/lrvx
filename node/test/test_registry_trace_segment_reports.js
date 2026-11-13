@@ -83,10 +83,10 @@ console.log('=== a captured signal keeps its whole order id ===');
   reader.close();
   check(sigs.length === 2, `two signals (${sigs.length})`);
   check(ids[0] >= 4294967296, `the order id carries the subscriber id (${ids[0]})`);
-  check(sigs[0].signalId64 === ids[0], `signalId64 is the order id (${sigs[0].signalId64})`);
+  check(sigs[0].signalId64 === BigInt(ids[0]), `signalId64 is the order id (${sigs[0].signalId64})`);
   check(sigs[0].signalId === ids[0] % 4294967296,
         `signalId is still its low 32 bits (${sigs[0].signalId})`);
-  check(sigs[1].signalId === 42 && sigs[1].signalId64 === 42,
+  check(sigs[1].signalId === 42 && sigs[1].signalId64 === 42n,
         'a small id reads the same through both');
 }
 

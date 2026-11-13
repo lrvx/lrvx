@@ -7,6 +7,21 @@ function _resolveSide(side) {
     return v;
 }
 
+// An order id is the Number an order method returned and order events carry,
+// or a BigInt. NaN, a fraction, a negative or a string used to be converted
+// to some integer and a cancel or modify sent for whatever order that named.
+function _orderId(usage, orderId) {
+    if (typeof orderId === "bigint") {
+        if (orderId >= 0n && orderId <= 0xFFFFFFFFFFFFFFFFn) return orderId;
+    } else if (typeof orderId === "number") {
+        if (orderId >= 0 && orderId <= 9007199254740992 && Math.floor(orderId) === orderId) {
+            return orderId;
+        }
+    }
+    throw new TypeError(usage +
+        " expected: orderId is a non-negative integer Number or a BigInt");
+}
+
 function _resolveTif(tif) {
     if (tif === undefined || tif === null) return 0;
     var v = TIF_MAP[tif];
@@ -91,10 +106,13 @@ class Strategy {
 
     // --- Order management ---
 
-    cancel(orderId) { __lrvx_emit_cancel(this._handle, orderId); }
+    cancel(orderId) {
+        __lrvx_emit_cancel(this._handle, _orderId("cancel(orderId)", orderId));
+    }
     cancelAll(symbol) { __lrvx_emit_cancel_all(this._handle, this._resolve(symbol)); }
     modify(orderId, opts) {
-        __lrvx_emit_modify(this._handle, orderId, opts.price, opts.qty);
+        __lrvx_emit_modify(this._handle, _orderId("modify(orderId, opts)", orderId),
+            opts.price, opts.qty);
     }
     closePosition(symbol) {
         return __lrvx_emit_close_position(this._handle, this._resolve(symbol));

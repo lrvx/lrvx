@@ -85,14 +85,14 @@ function roundTrip() {
 
   const orders = reader.readAllOrderEvents();
   check('order count', orders.length === 1);
-  check('order id', orders[0].orderId === 7);
-  check('order parent', orders[0].parentSignalId === 42);
+  check('order id', orders[0].orderId === 7n);
+  check('order parent', orders[0].parentSignalId === 42n);
   check('order kind', orders[0].eventKind === 1);
   check('order flags', orders[0].flags === 1);
 
   const fills = reader.readAllFills();
   check('fill count', fills.length === 1);
-  check('fill id', fills[0].fillId === 12345);
+  check('fill id', fills[0].fillId === 12345n);
   check('fill liquidity', fills[0].liquidity === 1);
 
   fs.rmSync(out, { recursive: true, force: true });

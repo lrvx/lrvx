@@ -754,8 +754,10 @@ export class Runner {
    *  `eventKind`: 1=Submit, 2=Cancel, 3=Modify, 4=Ack, 5=Reject,
    *               6=Expire. */
   traceOrderEvent(opts: {
-    orderId: number;
-    parentSignalId?: number;
+    /** A 64-bit id: a non-negative integer Number (exact up to 2^53) or a
+     *  BigInt. Anything else is a TypeError. */
+    orderId: number | bigint;
+    parentSignalId?: number | bigint;
     symbolId: number;
     eventKind: number;
     side: 0 | 1;
@@ -768,8 +770,8 @@ export class Runner {
   /** Mirror a fill into the attached recorder. `liquidity`:
    *  0=Unknown, 1=Maker, 2=Taker. */
   traceFill(opts: {
-    orderId: number;
-    fillId?: number;
+    orderId: number | bigint;
+    fillId?: number | bigint;
     price: number;
     qty: number;
     fee?: number;
@@ -3437,10 +3439,13 @@ export interface TraceSignalInput {
 export interface TraceOrderEventInput {
   runTsNs: number | bigint;
   feedTsNs?: number | bigint;
-  orderId?: number;
-  parentSignalId?: number;
-  priceRaw?: number;
-  qtyRaw?: number;
+  /** A 64-bit id: a non-negative integer Number (exact up to 2^53) or a
+   *  BigInt. NaN, a fraction, a negative or a string is a TypeError. */
+  orderId?: number | bigint;
+  parentSignalId?: number | bigint;
+  /** A raw fixed-point value: an integer Number or a BigInt. */
+  priceRaw?: number | bigint;
+  qtyRaw?: number | bigint;
   symbolId?: number;
   eventKind?: number;
   side?: number;
@@ -3452,11 +3457,11 @@ export interface TraceOrderEventInput {
 export interface TraceFillInput {
   runTsNs: number | bigint;
   feedTsNs?: number | bigint;
-  orderId?: number;
-  fillId?: number;
-  priceRaw?: number;
-  qtyRaw?: number;
-  feeRaw?: number;
+  orderId?: number | bigint;
+  fillId?: number | bigint;
+  priceRaw?: number | bigint;
+  qtyRaw?: number | bigint;
+  feeRaw?: number | bigint;
   symbolId?: number;
   side?: number;
   liquidity?: number;
@@ -3469,8 +3474,10 @@ export interface TraceSignalRecord {
   signalId: number;
   /** The whole id. For a signal a runner captured it is the order id the
    *  signal asks for, and equals `orderId` / `parentSignalId` on that order's
-   *  event records. A Number, as those are. */
-  signalId64: number;
+   *  event records. A BigInt, as those are: an order id is
+   *  (subscriber id << 32) + n, past what a Number holds exactly once the
+   *  subscriber id reaches 2^21. */
+  signalId64: bigint;
   flags: number;
   strengthRaw: number;
   name: string;
@@ -3481,8 +3488,8 @@ export interface TraceSignalRecord {
 export interface TraceOrderEventRecord {
   runTsNs: bigint;
   feedTsNs: bigint;
-  orderId: number;
-  parentSignalId: number;
+  orderId: bigint;
+  parentSignalId: bigint;
   priceRaw: number;
   qtyRaw: number;
   symbolId: number;
@@ -3496,8 +3503,8 @@ export interface TraceOrderEventRecord {
 export interface TraceFillRecord {
   runTsNs: bigint;
   feedTsNs: bigint;
-  orderId: number;
-  fillId: number;
+  orderId: bigint;
+  fillId: bigint;
   priceRaw: number;
   qtyRaw: number;
   feeRaw: number;

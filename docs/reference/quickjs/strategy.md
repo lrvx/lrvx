@@ -180,6 +180,11 @@ this.modify(orderId, { price: 50100, qty: 0.2 })
 this.closePosition()
 ```
 
+`orderId` is the Number an order method returned (and `event.orderId` carries), or a BigInt.
+`cancel` and `modify` throw a `TypeError` for anything else (NaN, a fraction, a negative, a string,
+`undefined`, a BigInt outside 64 bits) and emit nothing; such a value used to be converted to some
+integer and the cancel or modify sent for the order that named.
+
 Every order method above, from `marketBuy` to `closePosition`, clears the last error on entry.
 `lrvx.lastError()`, read right after one inside the callback that called it, is `''` unless that
 call left a reason; a reason an earlier call left (a `recompressSegment` that failed, say) is not
