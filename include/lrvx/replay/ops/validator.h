@@ -68,6 +68,9 @@ struct ValidationIssue
   IssueSeverity severity;
   std::string message;
   uint64_t file_offset{0};
+  // For an issue found at one event (a CRC mismatch, a timestamp out of
+  // order or too far ahead): that event's index in the segment, counted from
+  // 0, and its timestamp where it was read. 0 for every other issue.
   uint64_t event_index{0};
   int64_t timestamp_ns{0};
 };
@@ -191,7 +194,8 @@ class SegmentValidator
   bool validateIndex(std::FILE* file, SegmentValidationResult& result);
 
   void addIssue(SegmentValidationResult& result, IssueType type, IssueSeverity severity,
-                const std::string& message, uint64_t offset = 0);
+                const std::string& message, uint64_t offset = 0, uint64_t eventIndex = 0,
+                int64_t timestampNs = 0);
 
   ValidatorConfig _config;
 };

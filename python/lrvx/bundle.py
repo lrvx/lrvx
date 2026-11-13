@@ -182,6 +182,9 @@ def _run_strategy_against_tape(
     )
 
     next_id = [1]
+    # The timestamp of the tape event being replayed: the feed_ts_ns of every
+    # record the trace takes while that event is handled.
+    feed_ts = [0]
 
     # Optional .lrvxrun capture. When `lrvxrun_out` is set we mirror
     # every signal / order / fill into a TraceRecorder so the bundle
@@ -241,11 +244,11 @@ def _run_strategy_against_tape(
             try:
                 ts = time.time_ns()
                 rec.write_signal(
-                    run_ts_ns=ts, signal_id=oid, name=order_type,
+                    run_ts_ns=ts, feed_ts_ns=feed_ts[0], signal_id=oid, name=order_type,
                     symbol_ids=[int(sym)],
                 )
                 rec.write_order_event(
-                    run_ts_ns=ts, order_id=oid, parent_signal_id=oid,
+                    run_ts_ns=ts, feed_ts_ns=feed_ts[0], order_id=oid, parent_signal_id=oid,
                     symbol_id=int(sym),
                     event_kind=OrderEventKind.SUBMIT,
                     side=0 if side == "buy" else 1,
@@ -280,13 +283,44 @@ def _run_strategy_against_tape(
             f"Re-pack the bundle from a single-symbol tape.")
     tape_sym = tape_ids[0] if tape_ids else int(sym)
     delivered = [0]
+    fills_traced = [0]
+
+    def trace_new_fills() -> None:
+        """Write the fills the simulator has made since the last call.
+
+        A fill is traced when it happens, so its run_ts_ns is the wall clock
+        of that moment and orders with the run's other records; feed_ts_ns
+        is the simulator's own time of the fill, which is the tape event it
+        filled on; and fill_id numbers the run's fills 1, 2, 3, ... Every
+        fill used to be written after the run with one shared run_ts_ns, no
+        feed_ts_ns, and its order's id as its fill id, so the two fills of
+        one order had the same id."""
+        if rec is None or int(sim.fill_count) == fills_traced[0]:
+            return
+        fills = sim.fills_list()
+        for f in fills[fills_traced[0]:]:
+            fills_traced[0] += 1
+            rec.write_fill(
+                run_ts_ns=time.time_ns(),
+                feed_ts_ns=int(f.get("timestamp_ns", 0) or 0) or feed_ts[0],
+                order_id=int(f.get("order_id", 0) or 0),
+                fill_id=fills_traced[0],
+                price_raw=int(float(f["price"]) * 1e8),
+                qty_raw=int(float(f["quantity"]) * 1e8),
+                symbol_id=int(f["symbol"]),
+                side=0 if str(f["side"]).lower() == "buy" else 1,
+                liquidity=FillLiquidity.TAKER,
+            )
 
     def on_trade(ts_ns, sym_id, price, qty, side):
         if int(sym_id) != tape_sym:
             return
+        feed_ts[0] = int(ts_ns)
         sim.advance_clock(int(ts_ns))
         sim.on_trade_qty(int(sym), float(price), float(qty), side == 0)
+        trace_new_fills()
         runner.on_trade(int(sym), float(price), float(qty), side == 0, int(ts_ns))
+        trace_new_fills()
         delivered[0] += 1
 
     replay_tape(tape_path, on_trade=on_trade)
@@ -302,18 +336,7 @@ def _run_strategy_against_tape(
                 f"bundle trace {lrvxrun_out}: a signal or order event could "
                 f"not be written: {type(trace_errors[0]).__name__}: "
                 f"{trace_errors[0]}") from trace_errors[0]
-        ts = time.time_ns()
-        for f in fills:
-            rec.write_fill(
-                run_ts_ns=ts,
-                order_id=int(f.get("order_id", 0) or 0),
-                fill_id=int(f.get("order_id", 0) or 0),
-                price_raw=int(float(f["price"]) * 1e8),
-                qty_raw=int(float(f["quantity"]) * 1e8),
-                symbol_id=int(f["symbol"]),
-                side=0 if str(f["side"]).lower() == "buy" else 1,
-                liquidity=FillLiquidity.TAKER,
-            )
+        trace_new_fills()
         rec.set_run_ended_ns(time.time_ns())
         rec.close()
     # Order IDs are intentionally omitted: the runner assigns them

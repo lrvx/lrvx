@@ -14832,7 +14832,10 @@ if not result['valid']:
 | `issues` | `list[dict]` | Issue details |
 
 Each issue is a dict with `type`, `message`, `severity` (0 info, 1 warning, 2 error, 3 critical),
-`file_offset` and `timestamp_ns`. `type` is an int that says which check failed; compare it with
+`file_offset`, `event_index` and `timestamp_ns`. `event_index` is the index, counted from 0, of the
+event an issue was found at, for the issues found at one event (a CRC mismatch, a timestamp out of
+order, a timestamp jump), with that event's timestamp in `timestamp_ns`; both are 0 for an issue of
+the whole file. The key used to be absent, and the index was only in the message. `type` is an int that says which check failed; compare it with
 the module constants:
 
 | Constant | Meaning |

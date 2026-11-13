@@ -134,18 +134,18 @@ This page covers the write-then-read loop. Format details live in the [lrvxrun s
     var rec = new lrvx.TraceRecorder({
       path: 'run.lrvxrun',
       strategyId: 'ratio-cross',
-      runStartedNs: 1700000000000000000,
+      runStartedNs: 1700000000000000000n,
     });
     rec.addTapeRef({ path: 'BTCUSDT.lrvx' });
     rec.writeSignal({
-      runTsNs: 1700000000100000000,
+      runTsNs: 1700000000100000000n,
       signalId: 42,
       name: 'ratio-cross',
       symbolIds: [1, 2],
       payload: '{"src":"ETH","dst":"BTC"}',
     });
     rec.writeOrderEvent({
-      runTsNs: 1700000000200000000,
+      runTsNs: 1700000000200000000n,
       orderId: 7,
       parentSignalId: 42,
       symbolId: 1,
@@ -154,7 +154,7 @@ This page covers the write-then-read loop. Format details live in the [lrvxrun s
       qtyRaw: 100000000,
     });
     rec.writeFill({
-      runTsNs: 1700000000300000000,
+      runTsNs: 1700000000300000000n,
       orderId: 7,
       fillId: 12345,
       priceRaw: 5000000000000,
@@ -165,7 +165,12 @@ This page covers the write-then-read loop. Format details live in the [lrvxrun s
 
     var reader = new lrvx.TraceReader('run.lrvxrun');
     console.log(reader.readAllSignals().length);
+    console.log(reader.runStartedNs() === 1700000000000000000n);  // true
     ```
+
+    Timestamps are nanoseconds since the epoch and are past 2^53, where a Number no longer
+    holds every integer: write them as BigInt literals (`1700000000100000000n`). The reader
+    returns them, and every 64-bit id, as BigInt.
 
 ## Multi-symbol decisions
 
