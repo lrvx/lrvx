@@ -1261,7 +1261,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     auto modelV = opts.Get("slippageModel");
     if (!modelV.IsUndefined())
     {
-      const std::string m = modelV.ToString().Utf8Value();
+      const std::string m = argString(modelV, "BacktestRunner: slippageModel");
       const auto parsed = lrvx::slippageModelFromName(m);
       if (!parsed)
       {
