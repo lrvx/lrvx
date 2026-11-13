@@ -1536,6 +1536,10 @@ extern "C"
   // on record is ignored. A market, IOC or FOK order is never kept and needs
   // no call, and a Cancel the strategy emits drops the entry by itself.
   //
+  // The two legs of an OCO leave the record together: the venue cancels the
+  // other leg when one fills or is cancelled, so a Cancel of either leg, or
+  // this call with either leg's id, drops both.
+  //
   // A Modify that names an id not on record (never forwarded, not an order
   // that rests, cancelled, or reported closed here) is not sent to the
   // executor: lrvx_emit_modify returns with the reason in
@@ -2491,6 +2495,16 @@ extern "C"
   // Risk
   // ============================================================
 
+  // The kill switch, the order validator and the risk manager are asked in
+  // that order about every signal, and returning 0 drops it. The emit that
+  // produced the signal has already returned an order id, so a drop leaves
+  // its reason in the last error of the emitting thread, the way a refused
+  // Modify does: lrvx_last_error_message reads
+  //   "emit: <type> signal for order <id> on symbol <n> was dropped by the
+  //    <gate>; it reached neither on_signal nor the executor [<token>]"
+  // with <gate> / <token> one of kill switch / kill_switch, order validator /
+  // order_validator, risk manager / risk_manager. Call lrvx_clear_last_error
+  // before the lrvx_emit_* call and read lrvx_last_error_code after it.
   LrvxRiskManagerHandle lrvx_risk_manager_create(LrvxRiskManagerCallbacks callbacks);
   LrvxRiskManagerHandle lrvx_risk_manager_create_p(const LrvxRiskManagerCallbacks* callbacks);
   void lrvx_risk_manager_destroy(LrvxRiskManagerHandle rm);

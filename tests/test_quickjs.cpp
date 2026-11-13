@@ -1746,6 +1746,87 @@ TEST(JsIntegrationTest, OrderPriceAndQuantityRejectNonFiniteInput)
   JS_FreeValue(ctx, results);
 }
 
+// Every emit clears the last error first, so lrvx.lastError() read right
+// after one is '' unless that emit left a reason. It used to read back
+// whatever an earlier call had left.
+TEST(JsIntegrationTest, AnEmitClearsAStaleLastError)
+{
+  TempJsFile script(R"(
+    var before = [];
+    var after = [];
+    function stale() {
+      lrvx.recompressSegment("/no/such/lrvx-emit-stale-a.lrvx", "/no/such/b.lrvx", 1);
+      before.push(lrvx.lastError());
+    }
+    class TestStrat extends Strategy {
+      constructor() { super({ exchange: "T", symbols: ["S1"] }); }
+      onTrade(ctx, trade) {
+        stale();
+        var id = this.limitBuy({ symbol: trade.symbol, price: 100.5, qty: 2.0 });
+        after.push(lrvx.lastError());
+        stale();
+        this.marketBuy({ symbol: trade.symbol, qty: 1.0 });
+        after.push(lrvx.lastError());
+        stale();
+        this.modify(id, { price: 101.0, qty: 1.0 });
+        after.push(lrvx.lastError());
+        stale();
+        this.cancel(id);
+        after.push(lrvx.lastError());
+        stale();
+        this.cancelAll(trade.symbol);
+        after.push(lrvx.lastError());
+      }
+    }
+    lrvx.register(new TestStrat());
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+
+  auto bridge = std::make_unique<BridgeStrategy>(
+      1, std::vector<SymbolId>(symIds.begin(), symIds.end()), registry, callbacks);
+  jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+
+  LrvxSymbolContext fctx{};
+  fctx.symbol_id = symIds[0];
+  LrvxTradeData ftrade{};
+  ftrade.symbol = symIds[0];
+  ftrade.price_raw = lrvx_price_from_double(100.0);
+  ftrade.quantity_raw = lrvx_quantity_from_double(1.0);
+  callbacks.on_trade(callbacks.user_data, &fctx, &ftrade);
+
+  auto* ctx = jsStrat.engine().context();
+  const auto strings = [&](const char* name)
+  {
+    std::vector<std::string> out;
+    JSValue arr = jsStrat.engine().getGlobalProperty(name);
+    for (uint32_t i = 0; i < 5; ++i)
+    {
+      JSValue elem = JS_GetPropertyUint32(ctx, arr, i);
+      const char* s = JS_ToCString(ctx, elem);
+      out.emplace_back(s ? s : "<missing>");
+      JS_FreeCString(ctx, s);
+      JS_FreeValue(ctx, elem);
+    }
+    JS_FreeValue(ctx, arr);
+    return out;
+  };
+  for (const std::string& stale : strings("before"))
+  {
+    EXPECT_NE(stale.find("lrvx-emit-stale-a"), std::string::npos) << stale;
+  }
+  const char* emits[] = {"limitBuy", "marketBuy", "modify", "cancel", "cancelAll"};
+  const auto after = strings("after");
+  for (size_t i = 0; i < after.size(); ++i)
+  {
+    EXPECT_EQ(after[i], "") << emits[i] << " left the stale reason behind";
+  }
+  lrvx_clear_last_error();
+}
+
 // ============================================================
 // A non-string (or throwing-toString) graph node name used to
 // reach strlen(nullptr) and segfault. It must throw a catchable TypeError

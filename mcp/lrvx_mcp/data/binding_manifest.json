@@ -8055,6 +8055,11 @@
         },
         {
           "kind": "method",
+          "name": "_emitting",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "_load_symbol_names",
           "parent": "Strategy"
         },

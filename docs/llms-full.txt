@@ -12578,9 +12578,32 @@ runner.stop()
 | `set_executor(executor)` | Replace the executor |
 | `order_closed(order_id)` | Tell the runner an order it sent to the executor is finished |
 
-With an executor attached the runner keeps every order that can rest, by id, so that a strategy's `modify_order` reaches `Executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `order_closed(order_id)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. A `cancel_order` from the strategy drops the entry by itself, and market, IOC and FOK orders are never kept. `CcxtBroker` calls it for every terminal status its orders stream reports.
+With an executor attached the runner keeps every order that can rest, by id, so that a strategy's `modify_order` reaches `Executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `order_closed(order_id)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. A `cancel_order` from the strategy drops the entry by itself, and market, IOC and FOK orders are never kept. The two legs of an OCO leave the record together: a cancel of either leg, or `order_closed` with either leg's id, drops both, because the venue cancels the other leg when one fills or is cancelled.
 
-A `modify_order` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor. `modify_order` clears `lrvx.last_error()` on entry, and after a refused one it reads `modify: order <id> is not on record with this executor ... [unknown_order]`, on the thread the strategy ran on.
+`CcxtBroker` calls `order_closed` for every terminal status (`closed`, `canceled`, `expired`, `rejected`) its orders stream reports, and for an order the exchange already reports finished in the answer to its placement. It drops the order from its own maps at the same moment, so they hold open orders only; they used to hold every order ever placed. A `cancel_order` or `modify_order` the strategy still sends for such an order is not sent to the exchange and is reported through `on_error` as `ValueError("CANCEL: no ccxt order id tracked ...")` / `"MODIFY: ..."`.
+
+A `modify_order` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor, and after it `lrvx.last_error()` reads `modify: order <id> is not on record with this executor ... [unknown_order]`.
+
+#### Reading why a signal went nowhere
+
+Every emit method (`market_buy`, `limit_sell`, `stop_market`, `cancel_order`, `modify_order`, `close_position`, the `emit_*` forms, ...) clears `lrvx.last_error()` on entry. Read it right after the emit, inside the callback that emitted (it is per thread): `''` means nothing refused the signal, otherwise it says what did.
+
+| `lrvx.last_error()` ends in | What happened |
+|-----------------------------|---------------|
+| `[kill_switch]` | `KillSwitch.check` returned `False` |
+| `[order_validator]` | `OrderValidator.validate` returned `False` |
+| `[risk_manager]` | `RiskManager.allow` returned `False` |
+| `[unknown_order]` | a `modify_order` named an order the runner's executor record does not hold |
+
+A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached neither on_signal nor the executor [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned; a drop used to leave nothing behind.
+
+```python
+def on_trade(self, ctx, trade):
+    order_id = self.limit_buy(trade.price - 1.0, 0.1)
+    why = lrvx.last_error()
+    if why:
+        print("order", order_id, "went nowhere:", why)
+```
 
 A `MarketDataRecorderHook` subclass overrides any of `on_trade(trade)`,
 `on_book_update(symbol, is_snapshot, bids, asks, ts_ns)`,
@@ -15667,9 +15690,30 @@ Each takes a plain JS object, or `null` to detach.
 | `setExecutor(executor)` | Replace the executor. Sync only — `capabilities()` is read inline |
 | `orderClosed(orderId)` | Tell the runner an order it sent to the executor is finished. `orderId` is a `number` or a `bigint` |
 
-With an executor attached the runner keeps every order that can rest, by id, so that `emit.modify` reaches `executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `orderClosed(orderId)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. `emit.cancel` drops the entry by itself, and market, IOC and FOK orders are never kept.
+With an executor attached the runner keeps every order that can rest, by id, so that `emit.modify` reaches `executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `orderClosed(orderId)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. `emit.cancel` drops the entry by itself, and market, IOC and FOK orders are never kept. The two legs of an OCO leave the record together: a cancel of either leg, or `orderClosed` with either leg's id, drops both, because the venue cancels the other leg when one fills or is cancelled.
 
-An `emit.modify` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor. `emit.modify` clears `lrvx.lastError()` on entry, and after a refused one it reads `modify: order <id> is not on record with this executor ... [unknown_order]`.
+An `emit.modify` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor, and after it `lrvx.lastError()` reads `modify: order <id> is not on record with this executor ... [unknown_order]`.
+
+#### Reading why a signal went nowhere
+
+Every `emit.*` function clears `lrvx.lastError()` on entry. Read it right after the emit, inside the callback that emitted: `''` means nothing refused the signal, otherwise it says what did.
+
+| `lrvx.lastError()` ends in | What happened |
+|----------------------------|---------------|
+| `[kill_switch]` | `killSwitch.check` returned `false` |
+| `[order_validator]` | `orderValidator.validate` returned `false` |
+| `[risk_manager]` | `riskManager.allow` returned `false` |
+| `[unknown_order]` | an `emit.modify` named an order the runner's executor record does not hold |
+
+A dropped signal reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached neither on_signal nor the executor [<token>]`. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned; a drop used to leave nothing behind.
+
+#### Argument checks
+
+Every `emit.*` function checks its arguments before it emits and throws a `TypeError` that names the call, such as `emit.cancel(orderId) expected: orderId is a non-negative integer Number or a BigInt`:
+
+- a price, quantity or liquidity must be a `number`;
+- an order id (`emit.cancel`, `emit.modify`) must be a non-negative integer `number` or a `bigint`. `emit.cancel` used to read it unchecked: `NaN`, a negative or a fractional number was converted and a cancel for whatever id came out was emitted, and a `bigint` threw a bare `A number was expected`;
+- the optional symbol must be a `Symbol` or a symbol id; left out or `undefined`, it is the strategy's first symbol.
 
 #### What a hook is handed
 
@@ -16812,6 +16856,11 @@ quantities are not checked. See
 `lrvx_registry_get_symbol_lot(reg, u32(sym), value, declared)` (both importable from `lrvx.runner`)
 read back what an entry holds: they return `u8(1)` for a registered id and fill a `Ptr[float]` with
 the value and a `Ptr[u8]` with whether orders are checked against it.
+
+Every emit method, and the string-symbol forms that call them, clears the last error on entry.
+`last_error()` from `lrvx.abi`, read right after an emit inside the callback that emitted, is `""`
+unless that emit left a reason; a reason an earlier call left (a `validate_segment` that failed, say)
+is not read as the emit's.
 
 #### `emit_market_buy(symbol, qty) -> int`
 
@@ -18528,6 +18577,11 @@ this.modify(orderId, { price: 50100, qty: 0.2 })
 this.closePosition()
 ```
 
+Every order method above, from `marketBuy` to `closePosition`, clears the last error on entry.
+`lrvx.lastError()`, read right after one inside the callback that called it, is `''` unless that
+call left a reason; a reason an earlier call left (a `recompressSegment` that failed, say) is not
+read as the order's.
+
 ---
 
 ## Context queries
@@ -19630,6 +19684,28 @@ All return `OrderId` (`uint64_t`), 0 on failure. `cancel` and `modify` return vo
 | `lrvx_emit_cancel(s, order_id)` | Cancel order |
 | `lrvx_emit_cancel_all(s, sym)` | Cancel all orders for symbol |
 | `lrvx_emit_modify(s, order_id, new_price_raw, new_qty_raw)` | Modify order |
+
+On a runner or a live engine a signal can be refused after the emit has assigned its order id. The
+reason is then in the last error of the thread that emitted: call `lrvx_clear_last_error()` before
+the emit and read `lrvx_last_error_code()` / `lrvx_last_error_message()` after it.
+
+| The message ends in | What happened |
+|---------------------|---------------|
+| `[kill_switch]` | the kill switch's `check` returned 0 |
+| `[order_validator]` | the order validator's `validate` returned 0 |
+| `[risk_manager]` | the risk manager's `allow` returned 0 |
+| `[unknown_order]` | a modify named an order the executor record does not hold |
+
+A drop reads `emit: <type> signal for order <id> on symbol <n> was dropped by the <gate>; it reached
+neither on_signal nor the executor [<token>]`; the gates are asked in the order kill switch, order
+validator, risk manager. A drop used to leave nothing behind. The Python, Node, QuickJS and Codon
+emit methods clear the last error on entry themselves.
+
+The record a runner or a live engine keeps of the orders it forwarded to an executor treats the two
+legs of an OCO as one: a cancel of either leg, or `lrvx_runner_order_closed` /
+`lrvx_live_engine_order_closed` with either leg's id, drops both, because the venue cancels the other
+leg when one fills or is cancelled. Each leg used to stay until it was cancelled or closed by its own
+id.
 
 ---
 

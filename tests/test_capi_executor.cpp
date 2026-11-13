@@ -17,6 +17,7 @@
 
 #include <gtest/gtest.h>
 #include <atomic>
+#include <string>
 #include <vector>
 
 namespace
@@ -475,15 +476,17 @@ TEST(CapiExecutor, RunnerModifyNamesOneOcoLeg)
   EXPECT_EQ(ctx.state.last_replace_order.symbol, ctx.symbol);
   EXPECT_EQ(ctx.state.last_replace_order.price_raw, 10600000000LL);
 
-  // Cancelling one leg forgets that leg only.
+  // Cancelling one leg forgets both: the venue cancels the other leg of an
+  // OCO with it, so neither is left to modify.
   lrvx_emit_cancel(ctx.strategy, secondId);
   lrvx_emit_modify(ctx.strategy, secondId, 9300000000LL, 50000000LL);
   EXPECT_EQ(ctx.state.replace.load(), 2) << "the cancelled leg is not modified";
   lrvx_clear_last_error();
   lrvx_emit_modify(ctx.strategy, id, 10700000000LL, 100000000LL);
-  ASSERT_EQ(ctx.state.replace.load(), 3);
-  EXPECT_EQ(ctx.state.last_replace_order.id, id);
-  EXPECT_EQ(ctx.state.last_replace_order.symbol, ctx.symbol);
+  EXPECT_EQ(ctx.state.replace.load(), 2) << "nor is its sibling";
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("unknown_order"), std::string::npos)
+      << lrvx_last_error_message();
+  lrvx_clear_last_error();
 }
 
 // Order ids carry the strategy's subscriber id in their upper half, so two

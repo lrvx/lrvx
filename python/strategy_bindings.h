@@ -200,7 +200,7 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitMarketBuy(symbol, Quantity::fromDouble(qty));
+    return emitting()->publicEmitMarketBuy(symbol, Quantity::fromDouble(qty));
   }
 
   uint64_t emit_market_sell(uint32_t symbol, double qty)
@@ -209,7 +209,7 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitMarketSell(symbol, Quantity::fromDouble(qty));
+    return emitting()->publicEmitMarketSell(symbol, Quantity::fromDouble(qty));
   }
 
   uint64_t emit_limit_buy(uint32_t symbol, double price, double qty)
@@ -218,8 +218,8 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitLimitBuy(symbol, Price::fromDouble(price),
-                                       Quantity::fromDouble(qty));
+    return emitting()->publicEmitLimitBuy(symbol, Price::fromDouble(price),
+                                          Quantity::fromDouble(qty));
   }
 
   uint64_t emit_limit_sell(uint32_t symbol, double price, double qty)
@@ -228,8 +228,8 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitLimitSell(symbol, Price::fromDouble(price),
-                                        Quantity::fromDouble(qty));
+    return emitting()->publicEmitLimitSell(symbol, Price::fromDouble(price),
+                                           Quantity::fromDouble(qty));
   }
 
   uint64_t emit_provide_liquidity(uint32_t pool, double price_lower, double price_upper,
@@ -239,9 +239,9 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitProvideLiquidity(pool, Price::fromDouble(price_lower),
-                                               Price::fromDouble(price_upper),
-                                               Quantity::fromDouble(liquidity));
+    return emitting()->publicEmitProvideLiquidity(pool, Price::fromDouble(price_lower),
+                                                  Price::fromDouble(price_upper),
+                                                  Quantity::fromDouble(liquidity));
   }
 
   uint64_t emit_withdraw_liquidity(uint32_t pool, double liquidity)
@@ -250,14 +250,14 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitWithdrawLiquidity(pool, Quantity::fromDouble(liquidity));
+    return emitting()->publicEmitWithdrawLiquidity(pool, Quantity::fromDouble(liquidity));
   }
 
   void emit_cancel(uint64_t order_id)
   {
     if (_bridge)
     {
-      _bridge->publicEmitCancel(order_id);
+      emitting()->publicEmitCancel(order_id);
     }
   }
 
@@ -265,7 +265,7 @@ class PyStrategyBase
   {
     if (_bridge)
     {
-      _bridge->publicEmitCancelAll(symbol);
+      emitting()->publicEmitCancelAll(symbol);
     }
   }
 
@@ -273,8 +273,8 @@ class PyStrategyBase
   {
     if (_bridge)
     {
-      _bridge->publicEmitModify(order_id, Price::fromDouble(new_price),
-                                Quantity::fromDouble(new_qty));
+      emitting()->publicEmitModify(order_id, Price::fromDouble(new_price),
+                                   Quantity::fromDouble(new_qty));
     }
   }
 
@@ -284,8 +284,8 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitStopMarket(symbol, parseSide(side), Price::fromDouble(trigger),
-                                         Quantity::fromDouble(qty));
+    return emitting()->publicEmitStopMarket(symbol, parseSide(side), Price::fromDouble(trigger),
+                                            Quantity::fromDouble(qty));
   }
 
   uint64_t emit_stop_limit(uint32_t symbol, const std::string& side, double trigger,
@@ -295,9 +295,9 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitStopLimit(symbol, parseSide(side), Price::fromDouble(trigger),
-                                        Price::fromDouble(limit_price),
-                                        Quantity::fromDouble(qty));
+    return emitting()->publicEmitStopLimit(symbol, parseSide(side), Price::fromDouble(trigger),
+                                           Price::fromDouble(limit_price),
+                                           Quantity::fromDouble(qty));
   }
 
   uint64_t emit_take_profit_market(uint32_t symbol, const std::string& side, double trigger,
@@ -307,9 +307,9 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitTakeProfitMarket(symbol, parseSide(side),
-                                               Price::fromDouble(trigger),
-                                               Quantity::fromDouble(qty));
+    return emitting()->publicEmitTakeProfitMarket(symbol, parseSide(side),
+                                                  Price::fromDouble(trigger),
+                                                  Quantity::fromDouble(qty));
   }
 
   uint64_t emit_take_profit_limit(uint32_t symbol, const std::string& side, double trigger,
@@ -319,10 +319,10 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitTakeProfitLimit(symbol, parseSide(side),
-                                              Price::fromDouble(trigger),
-                                              Price::fromDouble(limit_price),
-                                              Quantity::fromDouble(qty));
+    return emitting()->publicEmitTakeProfitLimit(symbol, parseSide(side),
+                                                 Price::fromDouble(trigger),
+                                                 Price::fromDouble(limit_price),
+                                                 Quantity::fromDouble(qty));
   }
 
   uint64_t emit_trailing_stop(uint32_t symbol, const std::string& side, double offset, double qty)
@@ -331,8 +331,8 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitTrailingStop(symbol, parseSide(side), Price::fromDouble(offset),
-                                           Quantity::fromDouble(qty));
+    return emitting()->publicEmitTrailingStop(symbol, parseSide(side), Price::fromDouble(offset),
+                                              Quantity::fromDouble(qty));
   }
 
   uint64_t emit_trailing_stop_percent(uint32_t symbol, const std::string& side,
@@ -342,8 +342,8 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitTrailingStopPercent(symbol, parseSide(side), callback_bps,
-                                                  Quantity::fromDouble(qty));
+    return emitting()->publicEmitTrailingStopPercent(symbol, parseSide(side), callback_bps,
+                                                     Quantity::fromDouble(qty));
   }
 
   uint64_t emit_limit_buy_tif(uint32_t symbol, double price, double qty, const std::string& tif)
@@ -365,8 +365,8 @@ class PyStrategyBase
     {
       t = TimeInForce::POST_ONLY;
     }
-    return _bridge->publicEmitLimitBuyTif(symbol, Price::fromDouble(price),
-                                          Quantity::fromDouble(qty), t);
+    return emitting()->publicEmitLimitBuyTif(symbol, Price::fromDouble(price),
+                                             Quantity::fromDouble(qty), t);
   }
 
   uint64_t emit_limit_sell_tif(uint32_t symbol, double price, double qty, const std::string& tif)
@@ -388,8 +388,8 @@ class PyStrategyBase
     {
       t = TimeInForce::POST_ONLY;
     }
-    return _bridge->publicEmitLimitSellTif(symbol, Price::fromDouble(price),
-                                           Quantity::fromDouble(qty), t);
+    return emitting()->publicEmitLimitSellTif(symbol, Price::fromDouble(price),
+                                              Quantity::fromDouble(qty), t);
   }
 
   uint64_t emit_close_position(uint32_t symbol)
@@ -398,7 +398,7 @@ class PyStrategyBase
     {
       return 0;
     }
-    return _bridge->publicEmitClosePosition(symbol);
+    return emitting()->publicEmitClosePosition(symbol);
   }
 
   int32_t get_order_status(uint64_t order_id) const
@@ -539,11 +539,11 @@ class PyStrategyBase
     emit_cancel_all(_resolve(symbol));
   }
 
-  // Cleared first, so lrvx.last_error() after the call is '' unless a live
-  // runner refused the modify (an id its executor record does not hold).
+  // lrvx.last_error() after the call is '' unless a live runner refused the
+  // modify (an id its executor record does not hold) or a gate dropped it:
+  // every emit clears the last error first (see emitting()).
   void modify_order(uint64_t order_id, double new_price, double new_qty)
   {
-    lrvx_clear_last_error();
     emit_modify(order_id, new_price, new_qty);
   }
 
@@ -666,6 +666,16 @@ class PyStrategyBase
   std::unordered_map<std::string, uint32_t> _symbolMap;
   std::unordered_map<uint32_t, std::string> _reverseMap;
   BridgeStrategy* _bridge = nullptr;
+
+  // What every emit calls through. The last error is cleared first, so
+  // lrvx.last_error() read right after an emit is '' unless that emit left a
+  // reason: a live runner refused a modify, or a pre-trade gate dropped the
+  // signal.
+  BridgeStrategy* emitting() const
+  {
+    lrvx_clear_last_error();
+    return _bridge;
+  }
 
   void _buildSymbolMap()
   {

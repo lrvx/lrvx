@@ -2657,7 +2657,20 @@ extern "C"
   //   non-boolean return both DENY the order, and both are reported. Neither
   //   ever lets the order through, and neither escapes through the C
   //   boundary. A gate that plainly returns false is a decision, not a
-  //   failure, and is not reported.
+  //   failure, and is not reported as one.
+  //
+  // What the emitter learns of a drop. The emit that produced the signal has
+  // already returned an order id, so a drop by any of the three gates leaves
+  // its reason in the last error of the emitting thread, the way a refused
+  // Modify does: lrvx_last_error_message reads
+  //   "emit: <type> signal for order <id> on symbol <n> was dropped by the
+  //    <gate>; it reached neither on_signal nor the executor [<token>]"
+  // with <gate> / <token> one of kill switch / kill_switch, order validator /
+  // order_validator, risk manager / risk_manager. Call lrvx_clear_last_error
+  // before the lrvx_emit_* call and read lrvx_last_error_code after it; the
+  // bindings' emit methods clear it themselves, so a strategy reads
+  // last_error() / lastError() right after the emit, inside the callback
+  // that emitted.
   //
   // A binding therefore catches its own host-language exception inside the
   // bridge — an exception crossing a C function pointer is undefined
@@ -3433,6 +3446,10 @@ extern "C"
   // learns the order is finished and the entry is dropped; an id that is not
   // on record is ignored. A market, IOC or FOK order is never kept and needs
   // no call, and a Cancel the strategy emits drops the entry by itself.
+  //
+  // The two legs of an OCO leave the record together: the venue cancels the
+  // other leg when one fills or is cancelled, so a Cancel of either leg, or
+  // this call with either leg's id, drops both.
   //
   // A Modify that names an id not on record (never forwarded, not an order
   // that rests, cancelled, or reported closed here) is not sent to the

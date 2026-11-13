@@ -243,9 +243,15 @@ def _resolve_tape_symbol(tape_path: Path, requested: Optional[int]) -> int:
 
 
 def _feed_tape(runner, tape_path: Path, tape_symbol_id: int,
-               registered_symbol_id: int) -> int:
+               registered_symbol_id: int, sim_bridge: Any = None) -> int:
     """Drive a Runner from a recorded ``.lrvx`` tape. Returns the
-    number of trades dispatched to the strategy."""
+    number of trades dispatched to the strategy.
+
+    With ``sim_bridge`` (see :func:`_make_sim_bridge`) each trade is shown to
+    the simulator before the strategy sees it, so the simulator has a price
+    to fill against, and the orders it has filled completely are reported to
+    the runner after it. Without one only the runner is fed, and a simulator
+    behind the runner's executor never fills."""
     from . import tape as tape_mod
 
     counter = [0]
@@ -259,7 +265,11 @@ def _feed_tape(runner, tape_path: Path, tape_symbol_id: int,
         if sym_id != tape_symbol_id:
             return
         # side: 0 = buy, 1 = sell. Runner.on_trade wants is_buy=bool.
+        if sim_bridge is not None:
+            sim_bridge.on_tape_trade(ts_ns, registered_symbol_id, price, qty, side == 0)
         runner.on_trade(registered_symbol_id, price, qty, side == 0, ts_ns)
+        if sim_bridge is not None:
+            sim_bridge.report_fills(runner)
         counter[0] += 1
 
     tape_mod.replay_tape(tape_path, on_trade=_on_trade)
@@ -290,8 +300,15 @@ def _make_sim_bridge(sim: Any) -> Any:
         def __init__(self) -> None:
             super().__init__()
             self._sim = sim
+            # The bridge is called on the runner's thread and the tape replay
+            # on the caller's; with a threaded runner those are two threads.
+            self._lock = threading.Lock()
+            # order id -> [symbol, quantity still to fill], for the orders
+            # this bridge sent that the simulator has not finished.
+            self._working: Dict[int, list] = {}
+            self._fills_seen = 0
 
-        def submit(self, order: Any) -> None:
+        def _submit(self, order: Any) -> None:
             self._sim.submit_order(
                 order.id,
                 order.side or "buy",
@@ -302,12 +319,62 @@ def _make_sim_bridge(sim: Any) -> Any:
                 tif=order.time_in_force or "gtc",
                 reduce_only=bool(order.reduce_only),
             )
+            self._working[int(order.id)] = [int(order.symbol), float(order.quantity)]
+
+        def submit(self, order: Any) -> None:
+            with self._lock:
+                self._submit(order)
+
+        def replace(self, old_order_id: int, new_order: Any) -> None:
+            # The simulator's Python surface has no replace. The runner sends
+            # the order as it is after the modify, under the id it keeps:
+            # cancel that id, then submit the order again.
+            with self._lock:
+                self._sim.cancel_order(old_order_id)
+                self._working.pop(int(old_order_id), None)
+                self._submit(new_order)
 
         def cancel(self, order_id: int) -> None:
-            self._sim.cancel_order(order_id)
+            with self._lock:
+                self._sim.cancel_order(order_id)
+                self._working.pop(int(order_id), None)
 
         def cancel_all(self, symbol: int) -> None:
-            self._sim.cancel_all(symbol)
+            with self._lock:
+                self._sim.cancel_all(symbol)
+                for order_id in [i for i, w in self._working.items() if w[0] == int(symbol)]:
+                    del self._working[order_id]
+
+        def on_tape_trade(self, ts_ns: int, symbol: int, price: float, qty: float,
+                          is_buy: bool) -> None:
+            """Show the simulator one trade of the tape, so it has a price to
+            fill against."""
+            with self._lock:
+                self._sim.advance_clock(int(ts_ns))
+                self._sim.on_trade_qty(int(symbol), float(price), float(qty), bool(is_buy))
+
+        def report_fills(self, runner: Any) -> int:
+            """Tell ``runner`` (``Runner.order_closed``) about every order the
+            simulator has filled completely since the last call. Returns how
+            many orders that was."""
+            finished = []
+            with self._lock:
+                if int(self._sim.fill_count) == self._fills_seen:
+                    return 0
+                fills = self._sim.fills_list()
+                for fill in fills[self._fills_seen:]:
+                    order_id = int(fill["order_id"])
+                    working = self._working.get(order_id)
+                    if working is None:
+                        continue
+                    working[1] -= float(fill["quantity"])
+                    if working[1] <= 1e-12:
+                        del self._working[order_id]
+                        finished.append(order_id)
+                self._fills_seen = len(fills)
+            for order_id in finished:
+                runner.order_closed(order_id)
+            return len(finished)
 
     return _SimBridge()
 
@@ -363,7 +430,8 @@ def cmd_engine_sim(args: argparse.Namespace) -> int:
     runner = lrvx.Runner(registry, on_signal=lambda s: None,
                             threaded=bool(args.threaded))
     sim = lrvx.SimulatedExecutor()
-    runner.set_executor(_make_sim_bridge(sim))
+    sim_bridge = _make_sim_bridge(sim)
+    runner.set_executor(sim_bridge)
 
     ks = _KillSwitch()
     runner.set_kill_switch(_make_kill_switch_bridge(ks))
@@ -417,7 +485,7 @@ def cmd_engine_sim(args: argparse.Namespace) -> int:
     signal.signal(signal.SIGTERM, _on_signal)
 
     try:
-        n = _feed_tape(runner, tape_path, tape_symbol_id, sym_id)
+        n = _feed_tape(runner, tape_path, tape_symbol_id, sym_id, sim_bridge)
         print(f"tape replay complete: {n} trade(s) dispatched.")
         print("engine still running — Ctrl-C to stop.")
         # Hold until SIGINT so the user can introspect via MCP after

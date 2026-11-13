@@ -322,13 +322,19 @@ static bool toFiniteQtyOrThrow(JSContext* ctx, JSValueConst val, double& out, co
     return JS_ThrowTypeError((ctx), "Strategy handle is null (not connected to engine)"); \
   }
 
+// The handle of an emit, with the last error cleared: lrvx.lastError() read
+// right after an emit is '' unless that emit left a reason.
+#define GET_EMIT_HANDLE_OR_THROW(ctx, argv) \
+  GET_HANDLE_OR_THROW(ctx, argv)            \
+  lrvx_clear_last_error()
+
 // ============================================================
 // Signal emission bindings
 // ============================================================
 
 static JSValue js_emit_market_buy(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   TO_QTY_OR_THROW(qty, ctx, argv[2], "quantity");
   uint64_t oid = lrvx_emit_market_buy(h, sym, lrvx_quantity_from_double(qty));
@@ -337,7 +343,7 @@ static JSValue js_emit_market_buy(JSContext* ctx, JSValueConst, int, JSValueCons
 
 static JSValue js_emit_market_sell(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   TO_QTY_OR_THROW(qty, ctx, argv[2], "quantity");
   uint64_t oid = lrvx_emit_market_sell(h, sym, lrvx_quantity_from_double(qty));
@@ -346,7 +352,7 @@ static JSValue js_emit_market_sell(JSContext* ctx, JSValueConst, int, JSValueCon
 
 static JSValue js_emit_limit_buy_tif(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   TO_PRICE_OR_THROW(price, ctx, argv[2], "price");
   TO_QTY_OR_THROW(qty, ctx, argv[3], "quantity");
@@ -359,7 +365,7 @@ static JSValue js_emit_limit_buy_tif(JSContext* ctx, JSValueConst, int, JSValueC
 
 static JSValue js_emit_limit_sell_tif(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   TO_PRICE_OR_THROW(price, ctx, argv[2], "price");
   TO_QTY_OR_THROW(qty, ctx, argv[3], "quantity");
@@ -372,7 +378,7 @@ static JSValue js_emit_limit_sell_tif(JSContext* ctx, JSValueConst, int, JSValue
 
 static JSValue js_emit_cancel(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   int64_t oid = toInt64(ctx, argv[1]);
   lrvx_emit_cancel(h, static_cast<uint64_t>(oid));
   return JS_UNDEFINED;
@@ -380,7 +386,7 @@ static JSValue js_emit_cancel(JSContext* ctx, JSValueConst, int, JSValueConst* a
 
 static JSValue js_emit_cancel_all(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   lrvx_emit_cancel_all(h, sym);
   return JS_UNDEFINED;
@@ -388,7 +394,7 @@ static JSValue js_emit_cancel_all(JSContext* ctx, JSValueConst, int, JSValueCons
 
 static JSValue js_emit_modify(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   int64_t oid = toInt64(ctx, argv[1]);
   TO_PRICE_OR_THROW(price, ctx, argv[2], "price");
   TO_QTY_OR_THROW(qty, ctx, argv[3], "quantity");
@@ -399,7 +405,7 @@ static JSValue js_emit_modify(JSContext* ctx, JSValueConst, int, JSValueConst* a
 
 static JSValue js_emit_stop_market(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   uint32_t side = toUint32(ctx, argv[2]);
   TO_PRICE_OR_THROW(trigger, ctx, argv[3], "trigger price");
@@ -412,7 +418,7 @@ static JSValue js_emit_stop_market(JSContext* ctx, JSValueConst, int, JSValueCon
 
 static JSValue js_emit_stop_limit(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   uint32_t side = toUint32(ctx, argv[2]);
   TO_PRICE_OR_THROW(trigger, ctx, argv[3], "trigger price");
@@ -427,7 +433,7 @@ static JSValue js_emit_stop_limit(JSContext* ctx, JSValueConst, int, JSValueCons
 
 static JSValue js_emit_take_profit_market(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   uint32_t side = toUint32(ctx, argv[2]);
   TO_PRICE_OR_THROW(trigger, ctx, argv[3], "trigger price");
@@ -440,7 +446,7 @@ static JSValue js_emit_take_profit_market(JSContext* ctx, JSValueConst, int, JSV
 
 static JSValue js_emit_take_profit_limit(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   uint32_t side = toUint32(ctx, argv[2]);
   TO_PRICE_OR_THROW(trigger, ctx, argv[3], "trigger price");
@@ -455,7 +461,7 @@ static JSValue js_emit_take_profit_limit(JSContext* ctx, JSValueConst, int, JSVa
 
 static JSValue js_emit_trailing_stop(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   uint32_t side = toUint32(ctx, argv[2]);
   TO_PRICE_OR_THROW(offset, ctx, argv[3], "offset");
@@ -468,7 +474,7 @@ static JSValue js_emit_trailing_stop(JSContext* ctx, JSValueConst, int, JSValueC
 
 static JSValue js_emit_trailing_stop_pct(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   uint32_t side = toUint32(ctx, argv[2]);
   int32_t bps = static_cast<int32_t>(toInt64(ctx, argv[3]));
@@ -480,7 +486,7 @@ static JSValue js_emit_trailing_stop_pct(JSContext* ctx, JSValueConst, int, JSVa
 
 static JSValue js_emit_close_position(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
-  GET_HANDLE_OR_THROW(ctx, argv);
+  GET_EMIT_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
   uint64_t oid = lrvx_emit_close_position(h, sym);
   return JS_NewFloat64(ctx, static_cast<double>(oid));

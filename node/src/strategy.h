@@ -207,6 +207,68 @@ inline uint32_t symId(const Napi::Value& v)
   return v.As<Napi::Number>().Uint32Value();
 }
 
+// The arguments of an emit.* call. A missing argument or one of the wrong
+// type is a TypeError that names the call, thrown before anything is
+// emitted; reading it unchecked either threw a bare "A number was expected"
+// or, for an order id that is NaN, negative or fractional, emitted with
+// whatever the conversion produced.
+[[noreturn]] inline void throwEmitUsage(const Napi::CallbackInfo& i, const char* usage,
+                                        const char* what)
+{
+  throw Napi::TypeError::New(i.Env(), std::string(usage) + " expected: " + what);
+}
+
+inline double emitNumber(const Napi::CallbackInfo& i, size_t at, const char* usage,
+                         const char* name)
+{
+  if (i.Length() <= at || !i[at].IsNumber())
+  {
+    throwEmitUsage(i, usage, (std::string(name) + " is a number").c_str());
+  }
+  return i[at].As<Napi::Number>().DoubleValue();
+}
+
+// An order id is the Number the emit that placed the order returned and
+// order events carry; a BigInt is taken too, as Runner.orderClosed takes one.
+inline uint64_t emitOrderId(const Napi::CallbackInfo& i, size_t at, const char* usage)
+{
+  if (i.Length() > at && i[at].IsBigInt())
+  {
+    bool lossless = false;
+    const uint64_t id = i[at].As<Napi::BigInt>().Uint64Value(&lossless);
+    if (lossless)
+    {
+      return id;
+    }
+  }
+  else if (i.Length() > at && i[at].IsNumber())
+  {
+    const double v = i[at].As<Napi::Number>().DoubleValue();
+    if (v >= 0.0 && v <= 9007199254740992.0 && v == std::floor(v))
+    {
+      return static_cast<uint64_t>(v);
+    }
+  }
+  throwEmitUsage(i, usage, "orderId is a non-negative integer Number or a BigInt");
+}
+
+// The optional symbol argument: a Symbol, a symbol id, or left out (the
+// strategy's first symbol).
+inline uint32_t emitSymbol(const Napi::CallbackInfo& i, size_t at, const std::vector<uint32_t>& syms,
+                           const char* usage)
+{
+  if (i.Length() <= at || i[at].IsUndefined())
+  {
+    return syms.empty() ? 0u : syms[0];
+  }
+  const Napi::Value v = i[at];
+  if (v.IsNumber() || (v.IsObject() && v.As<Napi::Object>().Get("id").IsNumber()))
+  {
+    return symId(v);
+  }
+  throwEmitUsage(i, usage, "symbol is a Symbol or a symbol id");
+}
+
 inline Napi::Object signalToJs(Napi::Env env, const LrvxSignal* s)
 {
   auto obj = Napi::Object::New(env);
@@ -248,6 +310,16 @@ struct NodeStrategyHost : TsfnHost
   Napi::ObjectReference emitter;
   std::vector<uint32_t> syms;
   std::unique_ptr<BridgeStrategy> bridge;
+
+  // What every emit.* calls through. The last error is cleared first, so
+  // lastError() read right after an emit is '' unless that emit left a
+  // reason: a live runner refused a modify, or a pre-trade gate dropped the
+  // signal.
+  BridgeStrategy* emitting() const
+  {
+    lrvx_clear_last_error();
+    return bridge.get();
+  }
 
   // Set by enableThreaded() when host is used with LiveEngine.
   // onTrade / onBook / onStart / onStop queue via the channel instead of
@@ -457,88 +529,84 @@ struct NodeStrategyHost : TsfnHost
 
     em.Set("marketBuy", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                             {
+        static const char* const usage = "emit.marketBuy(qty, symbol?)";
         auto* h   = static_cast<NodeStrategyHost*>(i.Data());
-        double qty = i[0].As<Napi::Number>().DoubleValue();
-        uint32_t sym = i.Length() > 1 ? symId(i[1])
-                                       : (h->syms.empty() ? 0u : h->syms[0]);
-        return orderIdToJs(i.Env(), h->bridge->publicEmitMarketBuy(sym, Quantity::fromDouble(qty))); }, "marketBuy", this));
+        double qty = emitNumber(i, 0, usage, "qty");
+        uint32_t sym = emitSymbol(i, 1, h->syms, usage);
+        return orderIdToJs(i.Env(), h->emitting()->publicEmitMarketBuy(sym, Quantity::fromDouble(qty))); }, "marketBuy", this));
 
     em.Set("marketSell", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                              {
+        static const char* const usage = "emit.marketSell(qty, symbol?)";
         auto* h   = static_cast<NodeStrategyHost*>(i.Data());
-        double qty = i[0].As<Napi::Number>().DoubleValue();
-        uint32_t sym = i.Length() > 1 ? symId(i[1])
-                                       : (h->syms.empty() ? 0u : h->syms[0]);
-        return orderIdToJs(i.Env(), h->bridge->publicEmitMarketSell(sym, Quantity::fromDouble(qty))); }, "marketSell", this));
+        double qty = emitNumber(i, 0, usage, "qty");
+        uint32_t sym = emitSymbol(i, 1, h->syms, usage);
+        return orderIdToJs(i.Env(), h->emitting()->publicEmitMarketSell(sym, Quantity::fromDouble(qty))); }, "marketSell", this));
 
     em.Set("limitBuy", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                            {
+        static const char* const usage = "emit.limitBuy(price, qty, symbol?)";
         auto* h    = static_cast<NodeStrategyHost*>(i.Data());
-        double price = i[0].As<Napi::Number>().DoubleValue();
-        double qty   = i[1].As<Napi::Number>().DoubleValue();
-        uint32_t sym = i.Length() > 2 ? symId(i[2])
-                                       : (h->syms.empty() ? 0u : h->syms[0]);
-        return orderIdToJs(i.Env(), h->bridge->publicEmitLimitBuy(sym, Price::fromDouble(price), Quantity::fromDouble(qty))); }, "limitBuy", this));
+        double price = emitNumber(i, 0, usage, "price");
+        double qty   = emitNumber(i, 1, usage, "qty");
+        uint32_t sym = emitSymbol(i, 2, h->syms, usage);
+        return orderIdToJs(i.Env(), h->emitting()->publicEmitLimitBuy(sym, Price::fromDouble(price), Quantity::fromDouble(qty))); }, "limitBuy", this));
 
     em.Set("limitSell", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                             {
+        static const char* const usage = "emit.limitSell(price, qty, symbol?)";
         auto* h    = static_cast<NodeStrategyHost*>(i.Data());
-        double price = i[0].As<Napi::Number>().DoubleValue();
-        double qty   = i[1].As<Napi::Number>().DoubleValue();
-        uint32_t sym = i.Length() > 2 ? symId(i[2])
-                                       : (h->syms.empty() ? 0u : h->syms[0]);
-        return orderIdToJs(i.Env(), h->bridge->publicEmitLimitSell(sym, Price::fromDouble(price), Quantity::fromDouble(qty))); }, "limitSell", this));
+        double price = emitNumber(i, 0, usage, "price");
+        double qty   = emitNumber(i, 1, usage, "qty");
+        uint32_t sym = emitSymbol(i, 2, h->syms, usage);
+        return orderIdToJs(i.Env(), h->emitting()->publicEmitLimitSell(sym, Price::fromDouble(price), Quantity::fromDouble(qty))); }, "limitSell", this));
 
     em.Set("provideLiquidity", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                                    {
+        static const char* const usage =
+            "emit.provideLiquidity(priceLower, priceUpper, liquidity, symbol?)";
         auto* h    = static_cast<NodeStrategyHost*>(i.Data());
-        double lo  = i[0].As<Napi::Number>().DoubleValue();
-        double hi  = i[1].As<Napi::Number>().DoubleValue();
-        double liq = i[2].As<Napi::Number>().DoubleValue();
-        uint32_t sym = i.Length() > 3 ? symId(i[3])
-                                       : (h->syms.empty() ? 0u : h->syms[0]);
-        return orderIdToJs(i.Env(), h->bridge->publicEmitProvideLiquidity(sym, Price::fromDouble(lo), Price::fromDouble(hi),
+        double lo  = emitNumber(i, 0, usage, "priceLower");
+        double hi  = emitNumber(i, 1, usage, "priceUpper");
+        double liq = emitNumber(i, 2, usage, "liquidity");
+        uint32_t sym = emitSymbol(i, 3, h->syms, usage);
+        return orderIdToJs(i.Env(), h->emitting()->publicEmitProvideLiquidity(sym, Price::fromDouble(lo), Price::fromDouble(hi),
                                               Quantity::fromDouble(liq))); }, "provideLiquidity", this));
 
     em.Set("withdrawLiquidity", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                                     {
+        static const char* const usage = "emit.withdrawLiquidity(liquidity, symbol?)";
         auto* h    = static_cast<NodeStrategyHost*>(i.Data());
-        double liq = i[0].As<Napi::Number>().DoubleValue();
-        uint32_t sym = i.Length() > 1 ? symId(i[1])
-                                       : (h->syms.empty() ? 0u : h->syms[0]);
-        return orderIdToJs(i.Env(), h->bridge->publicEmitWithdrawLiquidity(sym, Quantity::fromDouble(liq))); }, "withdrawLiquidity", this));
+        double liq = emitNumber(i, 0, usage, "liquidity");
+        uint32_t sym = emitSymbol(i, 1, h->syms, usage);
+        return orderIdToJs(i.Env(), h->emitting()->publicEmitWithdrawLiquidity(sym, Quantity::fromDouble(liq))); }, "withdrawLiquidity", this));
 
     em.Set("cancel", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                          {
         auto* h = static_cast<NodeStrategyHost*>(i.Data());
-        uint64_t orderId = static_cast<uint64_t>(i[0].As<Napi::Number>().Int64Value());
-        h->bridge->publicEmitCancel(orderId);
+        const uint64_t orderId = emitOrderId(i, 0, "emit.cancel(orderId)");
+        h->emitting()->publicEmitCancel(orderId);
         return i.Env().Undefined(); }, "cancel", this));
 
     em.Set("modify", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                          {
+        static const char* const usage = "emit.modify(orderId, newPrice, newQty)";
         auto* h = static_cast<NodeStrategyHost*>(i.Data());
-        if (i.Length() < 3 || !i[0].IsNumber() || !i[1].IsNumber() || !i[2].IsNumber())
-        {
-          Napi::TypeError::New(i.Env(), "emit.modify(orderId, newPrice, newQty) expected")
-              .ThrowAsJavaScriptException();
-          return i.Env().Undefined();
-        }
-        uint64_t orderId = static_cast<uint64_t>(i[0].As<Napi::Number>().Int64Value());
-        // Cleared first, so lastError() after the call is '' unless a live
-        // runner refused the modify (an id its executor record does not hold).
-        lrvx_clear_last_error();
-        lrvx_emit_modify(h->bridge.get(), orderId,
-                         lrvx_price_from_double(i[1].As<Napi::Number>().DoubleValue()),
-                         lrvx_quantity_from_double(i[2].As<Napi::Number>().DoubleValue()));
+        const uint64_t orderId = emitOrderId(i, 0, usage);
+        const double newPrice = emitNumber(i, 1, usage, "newPrice");
+        const double newQty = emitNumber(i, 2, usage, "newQty");
+        // lastError() after the call is '' unless a live runner refused the
+        // modify (an id its executor record does not hold) or a gate dropped
+        // it: emitting() clears the last error first.
+        lrvx_emit_modify(h->emitting(), orderId, lrvx_price_from_double(newPrice),
+                         lrvx_quantity_from_double(newQty));
         return i.Env().Undefined(); }, "modify", this));
 
     em.Set("closePosition", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
                                                 {
         auto* h  = static_cast<NodeStrategyHost*>(i.Data());
-        uint32_t sym = i.Length() > 0 ? symId(i[0])
-                                       : (h->syms.empty() ? 0u : h->syms[0]);
-        return orderIdToJs(i.Env(), h->bridge->publicEmitClosePosition(sym)); }, "closePosition", this));
+        uint32_t sym = emitSymbol(i, 0, h->syms, "emit.closePosition(symbol?)");
+        return orderIdToJs(i.Env(), h->emitting()->publicEmitClosePosition(sym)); }, "closePosition", this));
 
     // Multi-TF alignment helpers: read the per-(symbol, timeframe)
     // ring of the most recent closed bars without bookkeeping in
