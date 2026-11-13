@@ -12237,7 +12237,11 @@ extern "C" uint64_t lrvx_run_reader_signal_payload(LrvxRunReaderHandle handle, u
     return p.size();
   }
   uint64_t n = std::min(static_cast<uint64_t>(p.size()), max_bytes);
-  std::memcpy(out, p.data(), n);
+  // An empty payload's data() may be null, and memcpy's source must not be.
+  if (n > 0)
+  {
+    std::memcpy(out, p.data(), n);
+  }
   return n;
   LRVX_CAPI_LEAVE;
 }
