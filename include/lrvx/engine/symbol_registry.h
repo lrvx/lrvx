@@ -20,6 +20,7 @@
 #include <shared_mutex>
 #include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -267,12 +268,17 @@ class SymbolRegistry : public ISubsystem
   // it is above kMaxSymbolId, and when the info's scales are not valid.
   //
   // kMaxSymbolId is the largest id a symbol may have, explicit or assigned.
-  // The name and exchange tables are indexed by id, which is what keeps
-  // getSymbolName and getExchangeForSymbol an array read; an id of four
-  // thousand million sized them for every id below it, some gigabytes. Every
-  // registerSymbol overload returns 0 for an id above the limit, and a load
-  // that holds one fails.
+  // Every registerSymbol overload returns 0 for an id above the limit, and a
+  // load that holds one fails.
+  //
+  // The name, exchange and equivalence tables are indexed by id. Below
+  // kDenseSymbolIds, where the ids of a registry normally are, each is an
+  // array and getSymbolName / getExchangeForSymbol / getEquivalentSymbols an
+  // array read; from there up each is a hash map, so one explicit id near
+  // the limit is one entry in each table. The tables used to be arrays all
+  // the way and that id sized them for every id below it, about 48 MB.
   static constexpr SymbolId kMaxSymbolId = 1'048'575;
+  static constexpr SymbolId kDenseSymbolIds = 16'384;
   SymbolId registerSymbol(const std::string& exchange, const std::string& symbol);
   SymbolId registerSymbol(const SymbolInfo& info);
   std::optional<SymbolId> getSymbolId(const std::string& exchange,
@@ -333,9 +339,10 @@ class SymbolRegistry : public ISubsystem
   // loadFromFile and deserialize return false and leave the registry empty
   // for input that is not a whole registry: malformed or truncated data, an
   // entry with an invalid scale or an id above kMaxSymbolId, two entries
-  // with one id, two entries with one exchange and symbol, and anything
-  // after the end (bytes after the last entry; for a file, anything but
-  // whitespace after the closing brace of the document). A file's "version"
+  // with one id, two entries with one exchange and symbol, a file entry with
+  // a member that is itself an object or an array (an entry is flat), and
+  // anything after the end (bytes after the last entry; for a file, anything
+  // but whitespace after the closing brace of the document). A file's "version"
   // is read: one above kFileVersion, the version saveToFile writes, fails
   // the load, since a later format may hold fields this build would misread;
   // a file with no "version" is read as version 1. The overloads taking
@@ -355,6 +362,16 @@ class SymbolRegistry : public ISubsystem
   std::vector<SymbolInfo> getAllSymbols() const;
   size_t size() const;
 
+#ifdef LRVX_UNIT_TEST
+  // Test-only: how many slots the three by-id arrays hold between them, so a
+  // test can tell an array sized by the largest id from one that is not.
+  size_t denseTableEntries() const
+  {
+    std::shared_lock lock(_mutex);
+    return _reverse.denseSize() + _symbolToExchange.denseSize() + _equivalents.denseSize();
+  }
+#endif
+
  private:
   // The getters below used to read the exchange table and the symbol-to-
   // exchange vector with no lock at all, while a writer resized that vector
@@ -370,16 +387,97 @@ class SymbolRegistry : public ISubsystem
   ExchangeId getExchangeForSymbolLocked(SymbolId symbol) const;
   std::span<const SymbolId> getEquivalentSymbolsLocked(SymbolId symbol) const;
 
-  // The id the next new symbol takes, whichever overload registers it.
-  // _reverse is indexed by id and covers every id in use, so its size is one
-  // above the highest.
+  // The id the next new symbol takes, whichever overload registers it: one
+  // above the highest id in use.
   SymbolId nextSymbolIdLocked() const;
   void setSymbolNameLocked(SymbolId id, std::string exchange, std::string symbol);
+  // getSymbolName for an id the name array does not cover.
+  std::pair<std::string, std::string> symbolNameAboveDenseLocked(SymbolId id) const;
 
+ public:
+  // A table indexed by symbol id: an array for the ids below kDenseSymbolIds
+  // and a hash map from there up. A lookup of a small id is the bounds check
+  // and the index it always was; a large id costs one entry, not an array
+  // sized up to it.
+  template <typename T>
+  class IdTable
+  {
+   public:
+    // nullptr for an id this table has no slot for. An id below the dense
+    // size that nobody wrote reads as a default T, as the arrays did.
+    const T* find(SymbolId id) const noexcept
+    {
+      if (id < _dense.size())
+      {
+        return &_dense[id];
+      }
+      if (id < kDenseSymbolIds || _sparse.empty())
+      {
+        return nullptr;
+      }
+      const auto it = _sparse.find(id);
+      return it == _sparse.end() ? nullptr : &it->second;
+    }
+    // The value at `id`, or `fallback` where find() answers nullptr. The
+    // small-id path is the one compare and one index the arrays had; the
+    // hash map is kept out of it.
+    T valueOr(SymbolId id, const T& fallback) const noexcept
+    {
+      if (id < _dense.size()) [[likely]]
+      {
+        return _dense[id];
+      }
+      return sparseValueOr(id, fallback);
+    }
+    // The slot of `id`, made if absent; slots made on the way are `fill`.
+    T& slot(SymbolId id, const T& fill = T{})
+    {
+      if (id < kDenseSymbolIds)
+      {
+        if (_dense.size() <= id)
+        {
+          _dense.resize(static_cast<size_t>(id) + 1, fill);
+        }
+        return _dense[id];
+      }
+      return _sparse.try_emplace(id, fill).first->second;
+    }
+    void clear()
+    {
+      _dense.clear();
+      _sparse.clear();
+    }
+    size_t denseSize() const noexcept { return _dense.size(); }
+    // The array's slot, for an id below denseSize().
+    const T& denseAt(SymbolId id) const noexcept { return _dense[id]; }
+
+   private:
+    T sparseValueOr(SymbolId id, const T& fallback) const noexcept
+    {
+      if (id < kDenseSymbolIds || _sparse.empty())
+      {
+        return fallback;
+      }
+      const auto it = _sparse.find(id);
+      return it == _sparse.end() ? fallback : it->second;
+    }
+
+    std::vector<T> _dense;
+    std::unordered_map<SymbolId, T> _sparse;
+  };
+
+  // The key a name is found under. An exchange and a symbol joined with ':'
+  // gave ("a:b", "c") and ("a", "b:c") one key; the exchange's length in
+  // front says where it ends.
+  static std::string nameKey(std::string_view exchange, std::string_view symbol);
+
+ private:
   mutable std::shared_mutex _mutex;
   std::unordered_map<SymbolId, SymbolInfo> _symbols;
   std::unordered_map<std::string, SymbolId> _map;
-  std::vector<std::pair<std::string, std::string>> _reverse;
+  IdTable<std::pair<std::string, std::string>> _reverse;
+  // One above the highest id in use; 1 for an empty registry.
+  SymbolId _nextSymbolId{1};
 
   // Exchange storage
   std::array<ExchangeInfo, kMaxExchanges> _exchanges{};
@@ -387,12 +485,10 @@ class SymbolRegistry : public ISubsystem
   size_t _numExchanges{0};
 
   // Symbol-to-exchange mapping (O(1) lookup)
-  std::vector<ExchangeId> _symbolToExchange;
+  IdTable<ExchangeId> _symbolToExchange;
 
-  // Equivalence: flat storage for O(1) lookup
-  // [sym * kMaxEquivalentsPerSymbol ... (sym+1) * kMaxEquivalentsPerSymbol)
-  std::vector<SymbolId> _equivalents;
-  std::vector<uint8_t> _equivalentCounts;
+  // Equivalence: the ids each symbol is mapped to (O(1) lookup)
+  IdTable<EquivalentSymbols> _equivalents;
 
   std::shared_ptr<VenueTickLog> _venueTicks{std::make_shared<VenueTickLog>()};
 };

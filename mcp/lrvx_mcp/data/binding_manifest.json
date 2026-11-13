@@ -26540,6 +26540,11 @@
         },
         {
           "kind": "method",
+          "name": "denseTableEntries",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
           "name": "deserialize",
           "parent": "SymbolRegistry"
         },
@@ -26620,6 +26625,11 @@
         },
         {
           "kind": "method",
+          "name": "nameKey",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
           "name": "nextSymbolIdLocked",
           "parent": "SymbolRegistry"
         },
@@ -26651,6 +26661,11 @@
         {
           "kind": "method",
           "name": "size",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
+          "name": "symbolNameAboveDenseLocked",
           "parent": "SymbolRegistry"
         },
         {

@@ -110,16 +110,26 @@ ExchangeId SymbolRegistry::getExchangeId(std::string_view name) const
 
 SymbolId SymbolRegistry::nextSymbolIdLocked() const
 {
-  return static_cast<SymbolId>(std::max<size_t>(_reverse.size(), 1));
+  return _nextSymbolId;
 }
 
 void SymbolRegistry::setSymbolNameLocked(SymbolId id, std::string exchange, std::string symbol)
 {
-  if (_reverse.size() <= id)
+  _reverse.slot(id) = {std::move(exchange), std::move(symbol)};
+  if (id >= _nextSymbolId)
   {
-    _reverse.resize(static_cast<size_t>(id) + 1);
+    _nextSymbolId = id + 1;
   }
-  _reverse[id] = {std::move(exchange), std::move(symbol)};
+}
+
+std::string SymbolRegistry::nameKey(std::string_view exchange, std::string_view symbol)
+{
+  std::string key = std::to_string(exchange.size());
+  key.reserve(key.size() + 1 + exchange.size() + symbol.size());
+  key += ':';
+  key += exchange;
+  key += symbol;
+  return key;
 }
 
 SymbolId SymbolRegistry::registerSymbol(ExchangeId exchange, std::string_view symbol)
@@ -133,7 +143,7 @@ SymbolId SymbolRegistry::registerSymbol(ExchangeId exchange, std::string_view sy
   }
 
   std::string exchangeName(_exchanges[exchange].nameView());
-  std::string key = exchangeName + ":" + std::string(symbol);
+  std::string key = nameKey(exchangeName, symbol);
 
   auto it = _map.find(key);
   if (it != _map.end())
@@ -149,12 +159,7 @@ SymbolId SymbolRegistry::registerSymbol(ExchangeId exchange, std::string_view sy
   _map[key] = id;
   setSymbolNameLocked(id, exchangeName, std::string(symbol));
 
-  // Ensure _symbolToExchange has capacity
-  if (_symbolToExchange.size() <= id)
-  {
-    _symbolToExchange.resize(id + 1, InvalidExchangeId);
-  }
-  _symbolToExchange[id] = exchange;
+  _symbolToExchange.slot(id, InvalidExchangeId) = exchange;
 
   // A name-based registration used to fill only the name maps, so
   // getSymbolInfo() returned nullopt for the id it had just handed out and
@@ -173,11 +178,7 @@ SymbolId SymbolRegistry::registerSymbol(ExchangeId exchange, std::string_view sy
 
 ExchangeId SymbolRegistry::getExchangeForSymbolLocked(SymbolId symbol) const
 {
-  if (symbol >= _symbolToExchange.size())
-  {
-    return InvalidExchangeId;
-  }
-  return _symbolToExchange[symbol];
+  return _symbolToExchange.valueOr(symbol, InvalidExchangeId);
 }
 
 ExchangeId SymbolRegistry::getExchangeForSymbol(SymbolId symbol) const
@@ -206,71 +207,41 @@ void SymbolRegistry::mapEquivalentSymbols(std::span<const SymbolId> equivalentSy
     return;
   }
 
-  // Ensure capacity
-  SymbolId maxSym = 0;
-  for (SymbolId s : equivalentSymbols)
-  {
-    maxSym = std::max(maxSym, s);
-  }
-
-  size_t requiredSize = (maxSym + 1) * kMaxEquivalentsPerSymbol;
-  if (_equivalents.size() < requiredSize)
-  {
-    _equivalents.resize(requiredSize, 0);
-  }
-  if (_equivalentCounts.size() <= maxSym)
-  {
-    _equivalentCounts.resize(maxSym + 1, 0);
-  }
-
   // Map all symbols to each other
+  EquivalentSymbols all;
+  for (SymbolId eq : equivalentSymbols)
+  {
+    if (all.count >= kMaxEquivalentsPerSymbol)
+    {
+      break;
+    }
+    all.ids[all.count++] = eq;
+  }
   for (SymbolId sym : equivalentSymbols)
   {
-    size_t baseIdx = sym * kMaxEquivalentsPerSymbol;
-    uint8_t count = 0;
-
-    for (SymbolId eq : equivalentSymbols)
-    {
-      if (count >= kMaxEquivalentsPerSymbol)
-      {
-        break;
-      }
-      _equivalents[baseIdx + count++] = eq;
-    }
-    _equivalentCounts[sym] = count;
+    _equivalents.slot(sym) = all;
   }
 }
 
 std::span<const SymbolId> SymbolRegistry::getEquivalentSymbolsLocked(SymbolId symbol) const
 {
-  if (symbol >= _equivalentCounts.size())
+  const EquivalentSymbols* entry = _equivalents.find(symbol);
+  if (entry == nullptr || entry->count == 0)
   {
     return {};
   }
-
-  uint8_t count = _equivalentCounts[symbol];
-  if (count == 0)
-  {
-    return {};
-  }
-
-  size_t baseIdx = symbol * kMaxEquivalentsPerSymbol;
-  return {&_equivalents[baseIdx], count};
+  return {entry->ids.data(), entry->count};
 }
 
 SymbolRegistry::EquivalentSymbols SymbolRegistry::getEquivalentSymbols(SymbolId symbol) const
 {
   std::shared_lock lock(_mutex);
 
-  // Same reasoning as getExchange: a span points into a vector that the next
-  // mapEquivalentSymbols reallocates and clear() empties, and the caller walks
+  // Same reasoning as getExchange: a span points into storage that the next
+  // mapEquivalentSymbols may move and clear() empties, and the caller walks
   // it after the lock is gone. The list is at most kMaxEquivalentsPerSymbol
-  // entries, so it is copied out instead.
-  EquivalentSymbols out;
-  const std::span<const SymbolId> view = getEquivalentSymbolsLocked(symbol);
-  out.count = static_cast<uint8_t>(view.size());
-  std::copy(view.begin(), view.end(), out.ids.begin());
-  return out;
+  // entries, so the table's entry is copied out instead.
+  return _equivalents.valueOr(symbol, EquivalentSymbols{});
 }
 
 SymbolId SymbolRegistry::getEquivalentOnExchange(SymbolId symbol, ExchangeId exchange) const
@@ -294,7 +265,7 @@ SymbolId SymbolRegistry::getEquivalentOnExchange(SymbolId symbol, ExchangeId exc
 SymbolId SymbolRegistry::registerSymbol(const std::string& exchange, const std::string& symbol)
 {
   std::scoped_lock lock(_mutex);
-  std::string key = exchange + ":" + symbol;
+  std::string key = nameKey(exchange, symbol);
   auto it = _map.find(key);
   if (it != _map.end())
   {
@@ -325,11 +296,7 @@ SymbolId SymbolRegistry::registerSymbol(const std::string& exchange, const std::
   info.exchangeId = exId;
   _symbols[id] = std::move(info);
 
-  if (_symbolToExchange.size() <= id)
-  {
-    _symbolToExchange.resize(id + 1, InvalidExchangeId);
-  }
-  _symbolToExchange[id] = exId;
+  _symbolToExchange.slot(id, InvalidExchangeId) = exId;
 
   return id;
 }
@@ -344,7 +311,7 @@ SymbolId SymbolRegistry::registerSymbol(const SymbolInfo& info)
   }
 
   std::lock_guard lock(_mutex);
-  std::string key = info.exchange + ":" + info.symbol;
+  std::string key = nameKey(info.exchange, info.symbol);
 
   auto it = _map.find(key);
   if (it != _map.end())
@@ -387,11 +354,7 @@ SymbolId SymbolRegistry::registerSymbol(const SymbolInfo& info)
   // venueTypeForSymbol work for SymbolInfo-registered symbols, the same as the
   // ExchangeId overload. Without this the mapping is only set by the
   // ExchangeId-based registerSymbol, and venue-type lookup silently defaults.
-  if (_symbolToExchange.size() <= newId)
-  {
-    _symbolToExchange.resize(newId + 1, InvalidExchangeId);
-  }
-  _symbolToExchange[newId] = exId;
+  _symbolToExchange.slot(newId, InvalidExchangeId) = exId;
 
   return newId;
 }
@@ -402,7 +365,7 @@ std::optional<SymbolId> SymbolRegistry::getSymbolId(const std::string& exchange,
   LRVX_PROFILE_SCOPE("SymbolRegistry::getSymbolId");
 
   std::scoped_lock lock(_mutex);
-  std::string key = exchange + ":" + symbol;
+  std::string key = nameKey(exchange, symbol);
   auto it = _map.find(key);
   if (it != _map.end())
   {
@@ -411,10 +374,36 @@ std::optional<SymbolId> SymbolRegistry::getSymbolId(const std::string& exchange,
   return std::nullopt;
 }
 
+namespace
+{
+[[noreturn]] void throwNoSuchSymbol(SymbolId id)
+{
+  throw std::out_of_range("SymbolRegistry::getSymbolName: no symbol has the id " +
+                          std::to_string(id));
+}
+}  // namespace
+
 std::pair<std::string, std::string> SymbolRegistry::getSymbolName(SymbolId id) const
 {
   std::scoped_lock lock(_mutex);
-  return _reverse.at(id);
+  // The array read it always was for the ids a registry normally holds.
+  if (id < _reverse.denseSize()) [[likely]]
+  {
+    return _reverse.denseAt(id);
+  }
+  return symbolNameAboveDenseLocked(id);
+}
+
+std::pair<std::string, std::string> SymbolRegistry::symbolNameAboveDenseLocked(SymbolId id) const
+{
+  // An id at or above the next one to hand out names nothing; one below it
+  // that was skipped has an empty name, as the array this used to index had.
+  if (id >= _nextSymbolId)
+  {
+    throwNoSuchSymbol(id);
+  }
+  const auto* name = _reverse.find(id);
+  return name != nullptr ? *name : std::pair<std::string, std::string>{};
 }
 
 std::optional<SymbolInfo> SymbolRegistry::getSymbolInfo(SymbolId id) const
@@ -506,6 +495,7 @@ void SymbolRegistry::clear()
   _symbols.clear();
   _map.clear();
   _reverse.clear();
+  _nextSymbolId = 1;
 
   // Clear exchange data
   _exchanges = {};
@@ -517,7 +507,6 @@ void SymbolRegistry::clear()
 
   // Clear equivalence data
   _equivalents.clear();
-  _equivalentCounts.clear();
 }
 
 std::vector<SymbolInfo> SymbolRegistry::getAllSymbols() const
@@ -684,7 +673,8 @@ class RegistryJsonReader
         }
         if (!entries(out))
         {
-          return bad("\"symbols\" is not an array of objects: malformed");
+          return bad(_reason.empty() ? "\"symbols\" is not an array of objects: malformed"
+                                     : _reason.c_str());
         }
         haveSymbols = true;
         continue;
@@ -733,7 +723,7 @@ class RegistryJsonReader
       }
       ws();
       Entry e;
-      if (!object(e))
+      if (!object(e, out.size()))
       {
         return false;
       }
@@ -758,7 +748,10 @@ class RegistryJsonReader
     return !v.empty();
   }
 
-  bool object(Entry& e)
+  // One entry: a flat object. A member whose value is itself an object or an
+  // array is refused with the reason in _reason. It used to be taken as raw
+  // text, or to end the entry where the nested value closed.
+  bool object(Entry& e, size_t index)
   {
     if (!eat('{'))
     {
@@ -788,6 +781,13 @@ class RegistryJsonReader
       }
       ws();
       std::string v;
+      if (peek() == '{' || peek() == '[')
+      {
+        _reason = "entry " + std::to_string(index) + ": member \"" + k + "\" is " +
+                  (peek() == '{' ? "an object" : "an array") +
+                  "; a registry entry is flat, every member a string, a number or a literal";
+        return false;
+      }
       if (peek() == '"')
       {
         if (!string(v))
@@ -944,6 +944,8 @@ class RegistryJsonReader
 
   std::string_view _t;
   size_t _p{0};
+  // Why an entry was refused, when there is more to say than "malformed".
+  std::string _reason;
 };
 
 // What registration builds next to the symbol table, rebuilt for symbols a
@@ -953,11 +955,13 @@ class RegistryJsonReader
 // indexed by id.
 void rebuildLoadedIndexes(std::unordered_map<SymbolId, SymbolInfo>& symbols,
                           const std::unordered_map<std::string, ExchangeId>& exchangeNameToId,
-                          std::vector<std::pair<std::string, std::string>>& reverse,
-                          std::vector<ExchangeId>& symbolToExchange)
+                          SymbolRegistry::IdTable<std::pair<std::string, std::string>>& reverse,
+                          SymbolRegistry::IdTable<ExchangeId>& symbolToExchange,
+                          SymbolId& nextSymbolId)
 {
   reverse.clear();
   symbolToExchange.clear();
+  nextSymbolId = 1;
   for (auto& [id, info] : symbols)
   {
     ExchangeId exId = InvalidExchangeId;
@@ -966,16 +970,9 @@ void rebuildLoadedIndexes(std::unordered_map<SymbolId, SymbolInfo>& symbols,
       exId = it->second;
     }
     info.exchangeId = exId;
-    if (reverse.size() <= id)
-    {
-      reverse.resize(id + 1);
-    }
-    reverse[id] = {info.exchange, info.symbol};
-    if (symbolToExchange.size() <= id)
-    {
-      symbolToExchange.resize(id + 1, InvalidExchangeId);
-    }
-    symbolToExchange[id] = exId;
+    reverse.slot(id) = {info.exchange, info.symbol};
+    symbolToExchange.slot(id, InvalidExchangeId) = exId;
+    nextSymbolId = std::max<SymbolId>(nextSymbolId, id + 1);
   }
 }
 
@@ -1224,6 +1221,7 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path, std::string
     _symbols.clear();
     _map.clear();
     _reverse.clear();
+    _nextSymbolId = 1;
     _symbolToExchange.clear();
     return false;
   };
@@ -1369,7 +1367,8 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path, std::string
       // the other entry could not be found by it.
       const SymbolId sid = info.id;
       const std::string name = info.exchange + ":" + info.symbol;
-      if (const auto [it, fresh] = names.emplace(name, sid); !fresh)
+      if (const auto [it, fresh] = names.emplace(nameKey(info.exchange, info.symbol), sid);
+          !fresh)
       {
         return fail("two entries are named " + name + " (ids " + std::to_string(it->second) +
                     " and " + std::to_string(sid) + ")");
@@ -1389,7 +1388,8 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path, std::string
   _venueTicks->reset();
   _symbols = std::move(loaded);
   _map = std::move(names);
-  rebuildLoadedIndexes(_symbols, _exchangeNameToId, _reverse, _symbolToExchange);
+  rebuildLoadedIndexes(_symbols, _exchangeNameToId, _reverse, _symbolToExchange,
+                       _nextSymbolId);
   return true;
 }
 
@@ -1588,6 +1588,7 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data, std::string& w
     _symbols.clear();
     _map.clear();
     _reverse.clear();
+    _nextSymbolId = 1;
     _symbolToExchange.clear();
     return false;
   };
@@ -1773,7 +1774,7 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data, std::string& w
     }
     // So do a name and an id that an earlier entry carries.
     const std::string name = info.exchange + ":" + info.symbol;
-    if (const auto [it, fresh] = names.emplace(name, sid); !fresh)
+    if (const auto [it, fresh] = names.emplace(nameKey(info.exchange, info.symbol), sid); !fresh)
     {
       return fail("two entries are named " + name + " (ids " + std::to_string(it->second) +
                   " and " + std::to_string(sid) + ")");
@@ -1795,7 +1796,8 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data, std::string& w
   _venueTicks->reset();
   _symbols = std::move(loaded);
   _map = std::move(names);
-  rebuildLoadedIndexes(_symbols, _exchangeNameToId, _reverse, _symbolToExchange);
+  rebuildLoadedIndexes(_symbols, _exchangeNameToId, _reverse, _symbolToExchange,
+                       _nextSymbolId);
 
   return true;
 }

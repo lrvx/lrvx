@@ -138,12 +138,23 @@ registration returns: `registerSymbol(ExchangeId, symbol)` for an exchange that 
 and `registerSymbol(info)` for an invalid scale or for an explicit `info.id` that a symbol with
 another name already holds (nothing is changed then).
 
-The largest id is `SymbolRegistry::kMaxSymbolId`, 1,048,575. The id-to-name and id-to-exchange
-tables are arrays indexed by id, which is what makes `getSymbolName` and `getExchangeForSymbol` an
-array read, so one explicit id sizes them for every id below it: `registerSymbol(info)` with
-`info.id = 4'000'000'000` asked for about 190 GB. Every `registerSymbol` overload returns `0` and
-changes nothing for an id above the limit, explicit or next in the sequence, and a load that holds
-one fails.
+The largest id is `SymbolRegistry::kMaxSymbolId`, 1,048,575. Every `registerSymbol` overload
+returns `0` and changes nothing for an id above the limit, explicit or next in the sequence, and a
+load that holds one fails.
+
+The id-to-name, id-to-exchange and equivalence tables are indexed by id. Below
+`SymbolRegistry::kDenseSymbolIds` (16,384), where the ids of a registry normally are, each is an
+array, and `getSymbolName`, `getExchangeForSymbol` and `getEquivalentSymbols` are an array read.
+From there up each is a hash map, still O(1), so one explicit id near the limit is one entry in
+each table. The tables used to be arrays all the way: one explicit id sized them for every id
+below it, about 48 MB at the limit, and `mapEquivalentSymbols` sized its own by the largest id it
+was given, with no limit at all. `benchmarks/symbol_registry_benchmark.cpp` measures the lookups on
+both sides of the bound; registering one symbol under id 1,000,000 went from about 770 microseconds
+to under 4.
+
+A name is the exchange and the symbol as a pair. The table that resolves one used to key it by the
+two joined with `:`, so `("a:b", "c")` and `("a", "b:c")` were one name: registering the second
+returned the id of the first, and a file holding both failed to load as a duplicate.
 
 The two name overloads used to number from 0 (the size of the id-to-name table) while
 `registerSymbol(info)` numbered from the entry count plus one. The first symbol registered by name
@@ -277,7 +288,11 @@ and leaves the registry as it was.
 Both loads also fail, registry empty, when two entries carry one exchange and symbol under
 different ids (the name resolved to one of them and the other entry could not be found by name)
 and when an entry's id is above `kMaxSymbolId`. `loadFromFile` reads the whole document: one JSON
-object with a `symbols` array and scalar members beside it. Anything but whitespace after the
+object with a `symbols` array and scalar members beside it. Each entry of the array is a flat
+object: a member whose value is itself an object or an array fails the load, and the reason names
+the entry and the member (`entry 1: member "meta" is an object; a registry entry is flat, ...`). An
+array there used to be read as text and ignored, and an object failed with no reason beyond
+"malformed". A flat member this version does not know is skipped, as before. Anything but whitespace after the
 object's closing brace fails the load; everything after the `symbols` array used to be ignored.
 The `version` member is read: a value above `SymbolRegistry::kFileVersion` (1, the version
 `saveToFile` writes) fails the load, because a later format may hold fields this build would
