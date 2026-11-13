@@ -507,7 +507,12 @@ export interface ExecutionListener {
 
 /** Install a Node callable as the global lrvx log sink. Pass null to
  *  detach. Receives `(level: number, msg: string)`; level: 0=info,
- *  1=warn, 2=error. */
+ *  1=warn, 2=error. Each environment (the main thread and every worker
+ *  thread) installs, replaces and detaches only its own callback. The
+ *  engine logs from whatever thread it runs on, so every installed
+ *  callback receives every line, called on its own thread; with none
+ *  installed lrvx logs to its default sink. An installed callback keeps
+ *  its thread's event loop alive until it is detached. */
 export function setLogCallback(
   callback: ((level: number, msg: string) => void) | null
 ): void;

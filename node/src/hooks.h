@@ -46,9 +46,11 @@
 #include "lrvx/capi/order_type_names.hpp"
 #include "tsfn_util.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -896,84 +898,138 @@ struct ExecutionListenerHost
 
 // ── Logger callback ─────────────────────────────────────────────────────
 
-// The one owner whose channel is not tied to a runner: the C ABI logger is
-// process-scoped, so install/uninstall are its open/close, and a JS log
-// callback deliberately keeps the event loop alive while it is installed.
-// The instance is a function-local static, so `self` in the queued callback
-// below can never dangle and needs no liveness flag.
-struct LoggerCallback
-{
-  Napi::FunctionReference fn;
-  std::unique_ptr<TsfnChannel> chan;
-  bool active{false};
+}  // namespace lrvx_node
 
-  void install(Napi::Env env, Napi::Function f)
+namespace node_lrvx
+{
+
+// The callback one environment installed with setLogCallback. The C ABI
+// logger is process-wide and takes one callback; the engine logs from
+// whatever thread it is on and cannot say which environment a line belongs
+// to. So one bridge is installed while any environment has a callback, and
+// it hands every line to each of them through that environment's own
+// thread-safe function: every installed callback receives every line, on its
+// own thread. An environment installs, replaces and removes only its own.
+//
+// The callback used to be one process-wide static: a worker's
+// setLogCallback replaced the main thread's function with one from another
+// isolate, and its setLogCallback(null) detached the main thread's too.
+struct LogSink
+{
+  Napi::ThreadSafeFunction tsfn;
+};
+
+struct LogPayload
+{
+  int32_t level;
+  std::string msg;
+};
+
+class LogFanout
+{
+ public:
+  // JS thread.
+  static void install(Napi::Env env, Napi::Function fn)
   {
-    if (active)
+    uninstall(env);
+    auto* sink = new LogSink;
+    // The finalizer runs once the function is released and its queue has
+    // drained, or when the environment is torn down with it still open;
+    // either way no producer can reach it after it is taken off the list.
+    sink->tsfn = Napi::ThreadSafeFunction::New(
+        env, fn, "lrvx_logger_cb", kTsfnMaxQueueSize, 1, sink,
+        [](Napi::Env, LogSink* s)
+        {
+          remove(s);
+          delete s;
+        });
+    envData(env).logSink = sink;
+    std::lock_guard<std::mutex> lock(mutex());
+    sinks().push_back(sink);
+    if (sinks().size() == 1)
     {
-      uninstall();
+      lrvx_set_log_callback(&LogFanout::bridge, nullptr);
     }
-    fn = Napi::Persistent(f);
-    auto noop = Napi::Function::New(env, [](const Napi::CallbackInfo&) {});
-    chan = std::make_unique<TsfnChannel>(env, noop, "lrvx_logger_cb");
-    lrvx_set_log_callback(&LoggerCallback::bridge, this);
-    active = true;
   }
-  void uninstall()
+
+  // JS thread. Lines already queued are still delivered.
+  static void uninstall(Napi::Env env)
   {
-    if (!active)
+    EnvData& data = envData(env);
+    LogSink* sink = data.logSink;
+    if (sink == nullptr)
     {
       return;
     }
-    lrvx_set_log_callback(nullptr, nullptr);
-    chan->close();
-    chan.reset();
-    fn.Reset();
-    active = false;
+    data.logSink = nullptr;
+    remove(sink);
+    sink->tsfn.Release();
   }
-  static void bridge(void* ud, int32_t level, const char* msg)
+
+ private:
+  static std::mutex& mutex()
   {
-    auto* self = static_cast<LoggerCallback*>(ud);
-    if (self->fn.IsEmpty())
+    static std::mutex m;
+    return m;
+  }
+  static std::vector<LogSink*>& sinks()
+  {
+    static std::vector<LogSink*> v;
+    return v;
+  }
+
+  static void remove(LogSink* sink)
+  {
+    std::lock_guard<std::mutex> lock(mutex());
+    auto& v = sinks();
+    const auto it = std::find(v.begin(), v.end(), sink);
+    if (it == v.end())
     {
       return;
     }
-    struct LogPayload
+    v.erase(it);
+    if (v.empty())
     {
-      int32_t level;
-      std::string msg;
-    };
-    auto* p = new LogPayload{level, msg ? std::string(msg) : std::string{}};
-    if (!self->chan)
-    {
-      delete p;
-      return;
+      lrvx_set_log_callback(nullptr, nullptr);
     }
-    self->chan->call(p,
-                     [self](Napi::Env env, Napi::Function, LogPayload* lp)
-                     {
-                       std::unique_ptr<LogPayload> guard(lp);
-                       self->fn.Call({
-                           Napi::Number::New(env, lp->level),
-                           Napi::String::New(env, lp->msg),
-                       });
-                     });
+  }
+
+  // Any thread.
+  static void bridge(void*, int32_t level, const char* msg)
+  {
+    std::lock_guard<std::mutex> lock(mutex());
+    for (LogSink* sink : sinks())
+    {
+      auto* p = new LogPayload{level, msg ? std::string(msg) : std::string{}};
+      const napi_status st = sink->tsfn.NonBlockingCall(
+          p,
+          [](Napi::Env env, Napi::Function fn, LogPayload* lp)
+          {
+            std::unique_ptr<LogPayload> guard(lp);
+            if (env != nullptr && fn != nullptr)
+            {
+              fn.Call({Napi::Number::New(env, lp->level), Napi::String::New(env, lp->msg)});
+            }
+          });
+      if (st != napi_ok)
+      {
+        delete p;
+      }
+    }
   }
 };
 
-// Global, single instance. Logger is process-scoped in the C ABI.
-inline LoggerCallback& globalLogger()
+}  // namespace node_lrvx
+
+namespace lrvx_node
 {
-  static LoggerCallback inst;
-  return inst;
-}
 
 inline Napi::Value setLogCallback(const Napi::CallbackInfo& info)
 {
   auto env = info.Env();
   if (info.Length() == 0 || info[0].IsNull() || info[0].IsUndefined())
   {
-    globalLogger().uninstall();
+    node_lrvx::LogFanout::uninstall(env);
     return env.Undefined();
   }
   if (!info[0].IsFunction())
@@ -981,7 +1037,7 @@ inline Napi::Value setLogCallback(const Napi::CallbackInfo& info)
     Napi::TypeError::New(env, "expected function or null").ThrowAsJavaScriptException();
     return env.Undefined();
   }
-  globalLogger().install(env, info[0].As<Napi::Function>());
+  node_lrvx::LogFanout::install(env, info[0].As<Napi::Function>());
   return env.Undefined();
 }
 

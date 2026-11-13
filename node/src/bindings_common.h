@@ -263,15 +263,30 @@ inline uint32_t argNamedCode(const Napi::Value& v, const char* what,
                                           " or a code");
 }
 
-// The constructors one instance of this module registered. Node loads the
-// addon once per environment -- the main thread and each worker thread -- and
-// a constructor belongs to the environment that made it. Process-wide
-// statics held the constructor of whichever environment registered last, so
-// argInstance in any other compared against a foreign constructor.
-struct EnvConstructors
+struct LogSink;
+
+// What one instance of this module keeps for itself. Node loads the addon
+// once per environment -- the main thread and each worker thread -- and a
+// constructor or a callback belongs to the environment that made it.
+// Process-wide statics held the one of whichever environment registered
+// last, so every other environment used a reference from another isolate.
+struct EnvData
 {
   std::unordered_map<const void*, Napi::FunctionReference> byClass;
+  // The callback setLogCallback installed here, if any (hooks.h).
+  LogSink* logSink{nullptr};
 };
+
+inline EnvData& envData(Napi::Env env)
+{
+  auto* data = env.GetInstanceData<EnvData>();
+  if (data == nullptr)
+  {
+    data = new EnvData;
+    env.SetInstanceData(data);
+  }
+  return *data;
+}
 
 template <typename T>
 inline constexpr char kClassKey = 0;
@@ -281,13 +296,7 @@ inline constexpr char kClassKey = 0;
 template <typename T>
 inline Napi::FunctionReference& ctorOf(Napi::Env env)
 {
-  auto* data = env.GetInstanceData<EnvConstructors>();
-  if (data == nullptr)
-  {
-    data = new EnvConstructors;
-    env.SetInstanceData(data);
-  }
-  return data->byClass[&kClassKey<T>];
+  return envData(env).byClass[&kClassKey<T>];
 }
 
 // The constructor a wrap class keeps so that argInstance can tell its
