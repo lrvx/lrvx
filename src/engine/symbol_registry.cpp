@@ -20,7 +20,9 @@
 #include <span>
 #include <stdexcept>
 #include <string_view>
+#include <system_error>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace lrvx
@@ -96,6 +98,20 @@ ExchangeId SymbolRegistry::getExchangeId(std::string_view name) const
 // Symbol registration (ExchangeId-based API)
 // =============================================================================
 
+SymbolId SymbolRegistry::nextSymbolIdLocked() const
+{
+  return static_cast<SymbolId>(std::max<size_t>(_reverse.size(), 1));
+}
+
+void SymbolRegistry::setSymbolNameLocked(SymbolId id, std::string exchange, std::string symbol)
+{
+  if (_reverse.size() <= id)
+  {
+    _reverse.resize(static_cast<size_t>(id) + 1);
+  }
+  _reverse[id] = {std::move(exchange), std::move(symbol)};
+}
+
 SymbolId SymbolRegistry::registerSymbol(ExchangeId exchange, std::string_view symbol)
 {
   std::scoped_lock lock(_mutex);
@@ -115,9 +131,9 @@ SymbolId SymbolRegistry::registerSymbol(ExchangeId exchange, std::string_view sy
     return it->second;
   }
 
-  SymbolId id = static_cast<SymbolId>(_reverse.size());
+  const SymbolId id = nextSymbolIdLocked();
   _map[key] = id;
-  _reverse.emplace_back(exchangeName, std::string(symbol));
+  setSymbolNameLocked(id, exchangeName, std::string(symbol));
 
   // Ensure _symbolToExchange has capacity
   if (_symbolToExchange.size() <= id)
@@ -271,9 +287,9 @@ SymbolId SymbolRegistry::registerSymbol(const std::string& exchange, const std::
     return it->second;
   }
 
-  SymbolId id = static_cast<SymbolId>(_reverse.size());
+  const SymbolId id = nextSymbolIdLocked();
   _map[key] = id;
-  _reverse.emplace_back(exchange, symbol);
+  setSymbolNameLocked(id, exchange, symbol);
 
   // Same gap as the ExchangeId overload: without a SymbolInfo entry the id
   // this function returns cannot be fed to getSymbolInfo() or a Strategy.
@@ -318,20 +334,14 @@ SymbolId SymbolRegistry::registerSymbol(const SymbolInfo& info)
     return it->second;
   }
 
-  // Use provided ID or find next available ID
-  SymbolId newId;
-  if (info.id != 0)
+  // The id the caller names, or the next one. An id another symbol holds is
+  // refused: taking it would replace that symbol's entry while its name still
+  // resolved to the id.
+  if (info.id != 0 && _symbols.find(info.id) != _symbols.end())
   {
-    newId = info.id;
+    return 0;
   }
-  else
-  {
-    newId = static_cast<SymbolId>(_symbols.size() + 1);
-    while (_symbols.find(newId) != _symbols.end())
-    {
-      ++newId;
-    }
-  }
+  const SymbolId newId = info.id != 0 ? info.id : nextSymbolIdLocked();
 
   _map[key] = newId;
 
@@ -347,11 +357,7 @@ SymbolId SymbolRegistry::registerSymbol(const SymbolInfo& info)
   copy.exchangeId = exId;
   _symbols[newId] = std::move(copy);
 
-  if (_reverse.size() <= newId)
-  {
-    _reverse.resize(newId + 1);
-  }
-  _reverse[newId] = {info.exchange, info.symbol};
+  setSymbolNameLocked(newId, info.exchange, info.symbol);
 
   // Record the symbol -> exchange mapping so getExchangeForSymbol and
   // venueTypeForSymbol work for SymbolInfo-registered symbols, the same as the
@@ -895,7 +901,12 @@ bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
   // size ftell reports and the count fread returns disagree and the load
   // rejects a file it wrote itself. Nothing on POSIX distinguishes the two
   // modes, so this costs nothing there.
-  std::FILE* f = std::fopen(path.string().c_str(), "wb");
+  //
+  // Written beside the target and renamed over it at the end, so a save that
+  // fails part-way leaves the file that was there.
+  std::filesystem::path tmp = path;
+  tmp += ".tmp";
+  std::FILE* f = std::fopen(tmp.string().c_str(), "wb");
   if (!f)
   {
     return false;
@@ -972,8 +983,24 @@ bool SymbolRegistry::saveToFile(const std::filesystem::path& path) const
   }
 
   std::fprintf(f, "  ]\n}\n");
-  std::fclose(f);
-  return true;
+
+  // A write that failed (a full disk) sets the stream's error flag, and the
+  // bytes still buffered are written by the flush and the close: all three
+  // have to succeed before the file may replace the previous one.
+  const bool flushed = std::fflush(f) == 0;
+  const bool written = std::ferror(f) == 0;
+  const bool closed = std::fclose(f) == 0;
+  std::error_code ec;
+  if (flushed && written && closed)
+  {
+    std::filesystem::rename(tmp, path, ec);
+    if (!ec)
+    {
+      return true;
+    }
+  }
+  std::filesystem::remove(tmp, ec);
+  return false;
 }
 
 bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
@@ -1120,8 +1147,13 @@ bool SymbolRegistry::loadFromFile(const std::filesystem::path& path)
       {
         throw std::invalid_argument("symbol registry file: invalid scale");
       }
+      // Two entries with one id make the file malformed: the second would
+      // replace the first while both names resolved to the id.
       const SymbolId sid = info.id;
-      loaded[sid] = std::move(info);
+      if (!loaded.emplace(sid, std::move(info)).second)
+      {
+        return fail();
+      }
     }
   }
   catch (const std::exception&)
@@ -1497,8 +1529,19 @@ bool SymbolRegistry::deserialize(std::span<const std::byte> data)
     {
       return fail();
     }
+    // So does an id that an earlier entry carries.
     const SymbolId sid = info.id;
-    loaded[sid] = std::move(info);
+    if (!loaded.emplace(sid, std::move(info)).second)
+    {
+      return fail();
+    }
+  }
+
+  // The blob is its header and its entries. Bytes after the last entry mean
+  // the count is wrong or the data is something else.
+  if (pos != data.size())
+  {
+    return fail();
   }
 
   std::lock_guard lock(_mutex);

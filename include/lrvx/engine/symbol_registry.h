@@ -256,6 +256,15 @@ class SymbolRegistry : public ISubsystem
   }
 
   // Symbol registration (legacy string-based API)
+  //
+  // Every overload draws a new id from one sequence: one above the highest
+  // id this registry has handed out or loaded, starting at 1. 0 is never a
+  // symbol's id; it is what a registration that was refused returns. A name
+  // that is already registered returns the id it has.
+  //
+  // registerSymbol(info) uses info.id when it is not 0. It returns 0 and
+  // changes nothing when that id belongs to a symbol with another name, and
+  // when the info's scales are not valid.
   SymbolId registerSymbol(const std::string& exchange, const std::string& symbol);
   SymbolId registerSymbol(const SymbolInfo& info);
   std::optional<SymbolId> getSymbolId(const std::string& exchange,
@@ -303,6 +312,17 @@ class SymbolRegistry : public ISubsystem
   SymbolId getEquivalentOnExchange(SymbolId symbol, ExchangeId exchange) const;
 
   // Persistence
+  //
+  // saveToFile writes a temporary file beside `path` and renames it over
+  // `path` once every byte is written and the file is closed. It returns
+  // false when the temporary cannot be created, a write or the close fails
+  // (a full disk), or the rename fails; the file that was at `path` is then
+  // untouched and the temporary is removed.
+  //
+  // loadFromFile and deserialize return false and leave the registry empty
+  // for input that is not a whole registry: malformed or truncated data, an
+  // entry with an invalid scale, two entries with one id, and, for
+  // deserialize, bytes after the last entry.
   bool saveToFile(const std::filesystem::path& path) const;
   bool loadFromFile(const std::filesystem::path& path);
 
@@ -329,6 +349,12 @@ class SymbolRegistry : public ISubsystem
   const ExchangeInfo* getExchangeLocked(ExchangeId id) const;
   ExchangeId getExchangeForSymbolLocked(SymbolId symbol) const;
   std::span<const SymbolId> getEquivalentSymbolsLocked(SymbolId symbol) const;
+
+  // The id the next new symbol takes, whichever overload registers it.
+  // _reverse is indexed by id and covers every id in use, so its size is one
+  // above the highest.
+  SymbolId nextSymbolIdLocked() const;
+  void setSymbolNameLocked(SymbolId id, std::string exchange, std::string symbol);
 
   mutable std::shared_mutex _mutex;
   std::unordered_map<SymbolId, SymbolInfo> _symbols;

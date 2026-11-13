@@ -14,6 +14,7 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include <atomic>
+#include <csignal>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -23,7 +24,12 @@
 #include <string>
 #include <thread>
 #include <unordered_set>
+#include <utility>
 #include <vector>
+
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
 
 using namespace lrvx;
 
@@ -1416,4 +1422,297 @@ TEST(SymbolRegistryTest, SaveAndSerializeWriteInIdOrder)
     ASSERT_NE(found, std::string::npos) << "id " << i << " is not after id " << (i - 1);
     at = found + key.size();
   }
+}
+
+// A blob is the header and exactly `count` entries. Bytes after the last
+// entry are not a registry: the load is refused and the registry left empty.
+TEST(SymbolRegistryTest, DeserializeRefusesTrailingBytes)
+{
+  SymbolRegistry src;
+  auto bytes = fillThreeSymbols(src)->serialize();
+  {
+    SymbolRegistry whole;
+    ASSERT_TRUE(whole.deserialize(bytes));
+    ASSERT_EQ(whole.size(), 3u);
+  }
+  for (const size_t extra : {size_t{1}, size_t{8}, bytes.size()})
+  {
+    SCOPED_TRACE(std::to_string(extra) + " trailing byte(s)");
+    auto longer = bytes;
+    longer.insert(longer.end(), extra, std::byte{0});
+    SymbolRegistry dst;
+    dst.registerSymbol("held", "BEFORE");
+    EXPECT_FALSE(dst.deserialize(longer));
+    EXPECT_EQ(dst.size(), 0u);
+    EXPECT_FALSE(dst.getSymbolId("held", "BEFORE").has_value());
+  }
+}
+
+// Two entries with one id: the second replaced the first in the table while
+// both names stayed in the name map, and the load returned true.
+TEST(SymbolRegistryTest, DeserializeRefusesADuplicateId)
+{
+  SymbolRegistry src;
+  SymbolInfo a;
+  a.id = 1;
+  a.exchange = "ex";
+  a.symbol = "AAA";
+  SymbolInfo b;
+  b.id = 2;
+  b.exchange = "ex";
+  b.symbol = "BBB";
+  src.registerSymbol(a);
+  src.registerSymbol(b);
+  auto bytes = src.serialize();
+
+  // header, then per entry: id, two length-prefixed names, type, tick, flags,
+  // v3 spec, v4 scales
+  const size_t entry = 4 + 2 + 2 + 2 + 3 + 1 + 8 + 1 + 8 + 1 + 1 + 16;
+  ASSERT_EQ(bytes.size(), 12 + 2 * entry);
+  uint32_t second = 0;
+  std::memcpy(&second, bytes.data() + 12 + entry, 4);
+  ASSERT_EQ(second, 2u);
+  bytes[12 + entry] = std::byte{1};
+
+  SymbolRegistry dst;
+  dst.registerSymbol("held", "BEFORE");
+  EXPECT_FALSE(dst.deserialize(bytes));
+  EXPECT_EQ(dst.size(), 0u);
+  EXPECT_FALSE(dst.getSymbolId("ex", "AAA").has_value());
+  EXPECT_FALSE(dst.getSymbolId("ex", "BBB").has_value());
+}
+
+TEST(SymbolRegistryTest, LoadRefusesADuplicateId)
+{
+  const auto path = std::filesystem::temp_directory_path() / "test_registry_duplicate_id.json";
+  {
+    std::FILE* f = std::fopen(path.string().c_str(), "wb");
+    ASSERT_NE(f, nullptr);
+    std::fputs(
+        "{\n  \"version\": 1,\n  \"symbols\": [\n"
+        "    {\"id\": 1, \"exchange\": \"ex\", \"symbol\": \"AAA\", \"type\": 0},\n"
+        "    {\"id\": 1, \"exchange\": \"ex\", \"symbol\": \"BBB\", \"type\": 0}\n"
+        "  ]\n}\n",
+        f);
+    std::fclose(f);
+  }
+  SymbolRegistry dst;
+  dst.registerSymbol("held", "BEFORE");
+  EXPECT_FALSE(dst.loadFromFile(path));
+  EXPECT_EQ(dst.size(), 0u);
+  std::filesystem::remove(path);
+}
+
+// 0 is what a registration that failed returns. The name overloads handed it
+// to the first symbol of a registry.
+TEST(SymbolRegistryTest, NoOverloadHandsOutTheInvalidId)
+{
+  {
+    SymbolRegistry reg;
+    EXPECT_NE(reg.registerSymbol("ex", "BYNAME"), 0u);
+  }
+  {
+    SymbolRegistry reg;
+    const ExchangeId ex = reg.registerExchange("ex");
+    const SymbolId id = reg.registerSymbol(ex, "BYEXCHANGE");
+    EXPECT_NE(id, 0u);
+    EXPECT_EQ(reg.registerSymbol(ExchangeId{200}, "NOEXCHANGE"), 0u)
+        << "an exchange that is not registered is still refused with 0";
+  }
+  {
+    SymbolRegistry reg;
+    SymbolInfo info;
+    info.exchange = "ex";
+    info.symbol = "BYINFO";
+    EXPECT_NE(reg.registerSymbol(info), 0u);
+  }
+}
+
+// One allocator: whichever overload registers a symbol, its id is one above
+// the highest id the registry has handed out, starting at 1.
+TEST(SymbolRegistryTest, EveryOverloadDrawsFromOneIdSequence)
+{
+  SymbolRegistry reg;
+  const ExchangeId ex = reg.registerExchange("ex");
+  const auto byInfo = [&reg](const std::string& name, SymbolId id = 0)
+  {
+    SymbolInfo info;
+    info.id = id;
+    info.exchange = "ex";
+    info.symbol = name;
+    return reg.registerSymbol(info);
+  };
+
+  std::vector<std::pair<SymbolId, std::string>> made;
+  made.emplace_back(reg.registerSymbol("ex", "N1"), "N1");
+  made.emplace_back(byInfo("I1"), "I1");
+  made.emplace_back(reg.registerSymbol(ex, "E1"), "E1");
+  made.emplace_back(byInfo("I2"), "I2");
+  made.emplace_back(reg.registerSymbol("ex", "N2"), "N2");
+  made.emplace_back(byInfo("X9", 9), "X9");
+  made.emplace_back(byInfo("I3"), "I3");
+  made.emplace_back(reg.registerSymbol("ex", "N3"), "N3");
+  made.emplace_back(reg.registerSymbol(ex, "E2"), "E2");
+
+  const std::vector<SymbolId> expected{1, 2, 3, 4, 5, 9, 10, 11, 12};
+  ASSERT_EQ(made.size(), expected.size());
+  for (size_t i = 0; i < made.size(); ++i)
+  {
+    SCOPED_TRACE(made[i].second);
+    EXPECT_EQ(made[i].first, expected[i]);
+    EXPECT_EQ(reg.getSymbolName(made[i].first).second, made[i].second);
+    const auto info = reg.getSymbolInfo(made[i].first);
+    ASSERT_TRUE(info.has_value());
+    EXPECT_EQ(info->symbol, made[i].second);
+    EXPECT_EQ(info->id, made[i].first);
+  }
+  EXPECT_EQ(reg.size(), made.size());
+}
+
+// A symbol registered by name keeps its id when its info is copied into
+// another registry, as BacktestRunner does with a strategy's symbols. Its id
+// was 0, which the copy read as "assign one".
+TEST(SymbolRegistryTest, ANameRegisteredSymbolKeepsItsIdWhenCopied)
+{
+  SymbolRegistry src;
+  const SymbolId id = src.registerSymbol("ex", "FIRST");
+  const auto info = src.getSymbolInfo(id);
+  ASSERT_TRUE(info.has_value());
+
+  SymbolRegistry copy;
+  EXPECT_EQ(copy.registerSymbol(*info), id);
+}
+
+// An explicit id that another symbol holds is refused: the registration used
+// to replace that symbol's entry while its name still resolved to the id.
+TEST(SymbolRegistryTest, AnExplicitIdHeldByAnotherSymbolIsRefused)
+{
+  SymbolRegistry reg;
+  const SymbolId first = reg.registerSymbol("ex", "FIRST");
+  SymbolInfo intruder;
+  intruder.id = first;
+  intruder.exchange = "ex";
+  intruder.symbol = "INTRUDER";
+
+  EXPECT_EQ(reg.registerSymbol(intruder), 0u);
+  EXPECT_EQ(reg.size(), 1u);
+  EXPECT_FALSE(reg.getSymbolId("ex", "INTRUDER").has_value());
+  EXPECT_EQ(reg.getSymbolName(first).second, "FIRST");
+  EXPECT_EQ(reg.getSymbolInfo(first)->symbol, "FIRST");
+
+  // The symbol that holds the id may be registered again under it.
+  SymbolInfo again;
+  again.id = first;
+  again.exchange = "ex";
+  again.symbol = "FIRST";
+  EXPECT_EQ(reg.registerSymbol(again), first);
+}
+
+#ifndef _WIN32
+namespace
+{
+
+// Caps the size of any file this process writes while it lives, so a write
+// past the cap fails the way a full disk fails it.
+class FileSizeCap
+{
+ public:
+  explicit FileSizeCap(rlim_t bytes)
+  {
+    _oldHandler = std::signal(SIGXFSZ, SIG_IGN);
+    getrlimit(RLIMIT_FSIZE, &_old);
+    rlimit capped = _old;
+    capped.rlim_cur = bytes;
+    _set = setrlimit(RLIMIT_FSIZE, &capped) == 0;
+  }
+  ~FileSizeCap()
+  {
+    setrlimit(RLIMIT_FSIZE, &_old);
+    std::signal(SIGXFSZ, _oldHandler);
+  }
+  bool set() const { return _set; }
+
+ private:
+  rlimit _old{};
+  void (*_oldHandler)(int){SIG_DFL};
+  bool _set{false};
+};
+
+}  // namespace
+
+// A save that cannot finish says so and leaves the file that was there. It
+// used to open the target for writing first, so a failed save had already
+// destroyed the previous file, and it returned true whatever the writes did.
+TEST(SymbolRegistryTest, AFailedSaveReturnsFalseAndKeepsThePreviousFile)
+{
+  const auto dir = std::filesystem::temp_directory_path() / "test_registry_failed_save";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  const auto path = dir / "registry.json";
+
+  SymbolRegistry small;
+  fillThreeSymbols(small);
+  ASSERT_TRUE(small.saveToFile(path));
+  const std::string before = readWholeFile(path);
+  ASSERT_FALSE(before.empty());
+
+  SymbolRegistry large;
+  for (int i = 0; i < 2000; ++i)
+  {
+    large.registerSymbol("exchange", "SYMBOL" + std::to_string(i));
+  }
+
+  bool saved = true;
+  {
+    FileSizeCap cap(4096);
+    ASSERT_TRUE(cap.set());
+    saved = large.saveToFile(path);
+  }
+  EXPECT_FALSE(saved);
+  EXPECT_EQ(readWholeFile(path), before) << "the previous file is intact";
+
+  size_t files = 0;
+  for (const auto& entry : std::filesystem::directory_iterator(dir))
+  {
+    (void)entry;
+    ++files;
+  }
+  EXPECT_EQ(files, 1u) << "no temporary file is left behind";
+
+  SymbolRegistry loaded;
+  EXPECT_TRUE(loaded.loadFromFile(path));
+  EXPECT_EQ(loaded.size(), 3u);
+  std::filesystem::remove_all(dir);
+}
+#endif
+
+TEST(SymbolRegistryTest, ASaveReplacesThePreviousFileAndLeavesNoTemporary)
+{
+  const auto dir = std::filesystem::temp_directory_path() / "test_registry_replacing_save";
+  std::filesystem::remove_all(dir);
+  std::filesystem::create_directories(dir);
+  const auto path = dir / "registry.json";
+
+  SymbolRegistry first;
+  fillThreeSymbols(first);
+  ASSERT_TRUE(first.saveToFile(path));
+  SymbolRegistry second;
+  second.registerSymbol("ex", "ONLY");
+  ASSERT_TRUE(second.saveToFile(path));
+
+  SymbolRegistry loaded;
+  ASSERT_TRUE(loaded.loadFromFile(path));
+  EXPECT_EQ(loaded.size(), 1u);
+  EXPECT_TRUE(loaded.getSymbolId("ex", "ONLY").has_value());
+
+  size_t files = 0;
+  for (const auto& entry : std::filesystem::directory_iterator(dir))
+  {
+    (void)entry;
+    ++files;
+  }
+  EXPECT_EQ(files, 1u);
+
+  EXPECT_FALSE(second.saveToFile(dir / "no_such_directory" / "registry.json"));
+  std::filesystem::remove_all(dir);
 }

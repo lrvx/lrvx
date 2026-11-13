@@ -26516,6 +26516,11 @@
         },
         {
           "kind": "method",
+          "name": "nextSymbolIdLocked",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
           "name": "registerExchange",
           "parent": "SymbolRegistry"
         },
@@ -26532,6 +26537,11 @@
         {
           "kind": "method",
           "name": "serialize",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
+          "name": "setSymbolNameLocked",
           "parent": "SymbolRegistry"
         },
         {
