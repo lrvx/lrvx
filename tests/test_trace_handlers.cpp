@@ -114,6 +114,46 @@ TEST(TraceHandlers, ExecutionListenerCapturesEvents)
   std::filesystem::remove_all(tmp);
 }
 
+// Every fill was written with fill_id = order id, so the partial fills of one
+// order were indistinguishable, and at the order's limit price, not the
+// price it filled at.
+TEST(TraceHandlers, EachCapturedFillHasItsOwnIdAndItsOwnPrice)
+{
+  auto tmp = std::filesystem::temp_directory_path() / "lrvx_trace_handler_fill_ids";
+  auto rec = makeRec(tmp);
+  lrvx::run::TraceExecutionListener h(2, nullptr, &rec);
+
+  lrvx::Order first;
+  first.id = (uint64_t{3} << 32) + 7;
+  first.symbol = 1;
+  first.side = lrvx::Side::BUY;
+  first.type = lrvx::OrderType::LIMIT;
+  first.price = lrvx::Price::fromDouble(50000.0);
+  first.quantity = lrvx::Quantity::fromDouble(1.0);
+  lrvx::Order second = first;
+  second.id = (uint64_t{3} << 32) + 8;
+
+  h.onOrderPartiallyFilled(first, lrvx::Quantity::fromDouble(0.4),
+                           lrvx::Price::fromDouble(49990.0));
+  h.onOrderFilled(second, lrvx::Quantity::fromDouble(1.0), lrvx::Price::fromDouble(49995.0));
+  h.onOrderFilled(first, lrvx::Quantity::fromDouble(0.6), lrvx::Price::fromDouble(49980.0));
+  rec.close();
+
+  lrvx::run::TraceReader reader(tmp.string());
+  const auto fills = reader.readAllFills();
+  ASSERT_EQ(fills.size(), 3u);
+  EXPECT_EQ(fills[0].fill_id, 1u);
+  EXPECT_EQ(fills[1].fill_id, 2u);
+  EXPECT_EQ(fills[2].fill_id, 3u);
+  EXPECT_EQ(fills[0].order_id, first.id);
+  EXPECT_EQ(fills[1].order_id, second.id);
+  EXPECT_EQ(fills[2].order_id, first.id);
+  EXPECT_EQ(fills[0].price_raw, lrvx::Price::fromDouble(49990.0).raw());
+  EXPECT_EQ(fills[2].price_raw, lrvx::Price::fromDouble(49980.0).raw());
+  EXPECT_EQ(fills[0].qty_raw, lrvx::Quantity::fromDouble(0.4).raw());
+  std::filesystem::remove_all(tmp);
+}
+
 TEST(TraceHandlers, NullRecorderDisablesCaptureWithoutBreakingForward)
 {
   CountingSignalSink inner;

@@ -207,7 +207,7 @@ class PyL3Book
 
   const char* addOrder(uint64_t orderId, double price, double quantity, const std::string& side)
   {
-    auto s = (side == "buy") ? Side::BUY : Side::SELL;
+    const Side s = parseSide(side);
     auto status = _book.addOrder(orderId, Price::fromDouble(price), Quantity::fromDouble(quantity), s);
     return orderStatusStr(status);
   }
@@ -279,7 +279,7 @@ class PyL3Book
       o.price = Price::fromDouble(d["price"].cast<double>());
       o.quantity = Quantity::fromDouble(d["quantity"].cast<double>());
       std::string side = d["side"].cast<std::string>();
-      o.side = (side == "buy") ? Side::BUY : Side::SELL;
+      o.side = parseSide(side);
       snap.orders_.push_back(o);
     }
     _book.buildFromSnapshot(snap);

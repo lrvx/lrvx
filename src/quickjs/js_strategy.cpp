@@ -2,6 +2,7 @@
 #include "js_bindings.h"
 #include "js_cstring.h"
 
+#include "lrvx/capi/order_status_names.hpp"
 #include "lrvx/capi/order_type_names.hpp"
 
 #include <iostream>
@@ -1362,53 +1363,7 @@ namespace
 {
 const char* jsOrderEventStatusName(uint8_t s)
 {
-  switch (s)
-  {
-    case 0:
-      return "NEW";
-    case 1:
-      return "ACCEPTED";
-    case 2:
-      return "PENDING_NEW";
-    case 3:
-      return "PARTIALLY_FILLED";
-    case 4:
-      return "FILLED";
-    case 5:
-      return "PENDING_CANCEL";
-    case 6:
-      return "CANCELED";
-    case 7:
-      return "EXPIRED";
-    case 8:
-      return "REJECTED";
-    case 9:
-      return "REPLACED";
-    case 10:
-      return "PENDING_TRIGGER";
-    case 11:
-      return "TRIGGERED";
-    case 12:
-      return "TRAILING_UPDATED";
-    case 13:
-      return "QUEUE_POSITION_UPDATED";
-    case 14:
-      return "MARKET_POSITION_CHANGED";
-    case 15:
-      return "REPLACE_SUBMITTED";
-    case 16:
-      return "REPLACE_ACCEPTED";
-    case 17:
-      return "REPLACE_REJECTED";
-    case 19:
-      return "PENDING_ONCHAIN";
-    case 20:
-      return "REVERTED";
-    case 21:
-      return "REPLACED_GAS";
-    default:
-      return "UNKNOWN";
-  }
+  return lrvx::capi::orderEventStatusName(s);
 }
 const char* jsMarketPositionName(uint8_t p)
 {

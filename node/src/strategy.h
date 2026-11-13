@@ -12,6 +12,7 @@
 #include "lrvx/backtest/runner_fill_settings.h"
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/capi/lrvx_capi.h"
+#include "lrvx/capi/order_status_names.hpp"
 #include "lrvx/capi/order_type_names.hpp"
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/execution/order_price_rule.h"
@@ -39,16 +40,37 @@ using namespace lrvx;
 class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
 {
  public:
+  static Napi::FunctionReference& Ctor()
+  {
+    static Napi::FunctionReference ref;
+    return ref;
+  }
+
   static Napi::Function Init(Napi::Env env)
   {
-    return DefineClass(env, "SymbolRegistry",
-                       {
-                           InstanceMethod("addSymbol", &SymbolRegistryNode::addSymbol),
-                           InstanceMethod("symbolCount", &SymbolRegistryNode::symbolCount),
-                           InstanceMethod("tickSize", &SymbolRegistryNode::tickSize),
-                           InstanceMethod("tickSizeDeclared", &SymbolRegistryNode::tickSizeDeclared),
-                           InstanceMethod("lotSize", &SymbolRegistryNode::lotSize),
-                       });
+    Napi::Function fn = DefineClass(env, "SymbolRegistry",
+                                    {
+                                        InstanceMethod("addSymbol", &SymbolRegistryNode::addSymbol),
+                                        InstanceMethod("symbolCount", &SymbolRegistryNode::symbolCount),
+                                        InstanceMethod("tickSize", &SymbolRegistryNode::tickSize),
+                                        InstanceMethod("tickSizeDeclared", &SymbolRegistryNode::tickSizeDeclared),
+                                        InstanceMethod("lotSize", &SymbolRegistryNode::lotSize),
+                                    });
+    Ctor() = Napi::Persistent(fn);
+    Ctor().SuppressDestruct();
+    return fn;
+  }
+
+  // The registry behind `v`. Unwrap() alone takes any wrapped object: a plain
+  // one threw a bare "Invalid argument" and another class's instance was read
+  // as a registry.
+  static SymbolRegistry* of(const Napi::Value& v, const char* what)
+  {
+    if (!v.IsObject() || Ctor().IsEmpty() || !v.As<Napi::Object>().InstanceOf(Ctor().Value()))
+    {
+      throw Napi::TypeError::New(v.Env(), std::string(what) + " must be a SymbolRegistry");
+    }
+    return Unwrap(v.As<Napi::Object>())->get();
   }
 
   SymbolRegistryNode(const Napi::CallbackInfo& info)
@@ -65,12 +87,12 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
   Napi::Value addSymbol(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
-    std::string ex = info[0].As<Napi::String>().Utf8Value();
-    std::string sym = info[1].As<Napi::String>().Utf8Value();
+    std::string ex = argString(info[0], "addSymbol: exchange");
+    std::string sym = argString(info[1], "addSymbol: symbol");
     // A tick passed here is the venue's, and a backtest refuses orders priced
     // off it. Left out, the book uses 0.01 and order prices are not checked.
-    const bool hasTick = info.Length() > 2 && info[2].IsNumber();
-    double tickSize = hasTick ? info[2].As<Napi::Number>().DoubleValue() : 0.01;
+    const bool hasTick = info.Length() > 2 && !info[2].IsUndefined();
+    double tickSize = hasTick ? argNumber(info[2], "addSymbol: tickSize") : 0.01;
     lrvx::SymbolInfo si;
     si.exchange = ex;
     si.symbol = sym;
@@ -79,10 +101,10 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
     // A lot passed here is the venue's quantity step, and a backtest refuses
     // an order whose quantity is not a whole number of it. Left out,
     // quantities are not checked.
-    const bool hasLot = info.Length() > 3 && info[3].IsNumber();
+    const bool hasLot = info.Length() > 3 && !info[3].IsUndefined();
     if (hasLot)
     {
-      const double lotSize = info[3].As<Napi::Number>().DoubleValue();
+      const double lotSize = argNumber(info[3], "addSymbol: lotSize");
       si.lotSize = lrvx::Quantity::fromDouble(lotSize);
       if (si.lotSize.raw() <= 0)
       {
@@ -135,11 +157,11 @@ class SymbolRegistryNode : public Napi::ObjectWrap<SymbolRegistryNode>
     uint32_t id = 0;
     if (info.Length() > 0 && info[0].IsObject())
     {
-      id = info[0].As<Napi::Object>().Get("id").ToNumber().Uint32Value();
+      id = argObject(info[0], "symbolCount: argument 1").Get("id").ToNumber().Uint32Value();
     }
     else if (info.Length() > 0 && info[0].IsNumber())
     {
-      id = info[0].As<Napi::Number>().Uint32Value();
+      id = argUint32(info[0], "symbolCount: argument 1");
     }
     else
     {
@@ -901,53 +923,7 @@ struct NodeStrategyHost : TsfnHost
 
   static const char* orderEventStatusName(uint8_t s)
   {
-    switch (s)
-    {
-      case 0:
-        return "NEW";
-      case 1:
-        return "ACCEPTED";
-      case 2:
-        return "PENDING_NEW";
-      case 3:
-        return "PARTIALLY_FILLED";
-      case 4:
-        return "FILLED";
-      case 5:
-        return "PENDING_CANCEL";
-      case 6:
-        return "CANCELED";
-      case 7:
-        return "EXPIRED";
-      case 8:
-        return "REJECTED";
-      case 9:
-        return "REPLACED";
-      case 10:
-        return "PENDING_TRIGGER";
-      case 11:
-        return "TRIGGERED";
-      case 12:
-        return "TRAILING_UPDATED";
-      case 13:
-        return "QUEUE_POSITION_UPDATED";
-      case 14:
-        return "MARKET_POSITION_CHANGED";
-      case 15:
-        return "REPLACE_SUBMITTED";
-      case 16:
-        return "REPLACE_ACCEPTED";
-      case 17:
-        return "REPLACE_REJECTED";
-      case 19:
-        return "PENDING_ONCHAIN";
-      case 20:
-        return "REVERTED";
-      case 21:
-        return "REPLACED_GAS";
-      default:
-        return "UNKNOWN";
-    }
+    return lrvx::capi::orderEventStatusName(s);
   }
 
   static const char* marketPositionName(uint8_t p)
@@ -1233,7 +1209,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
       : Napi::ObjectWrap<BacktestRunnerNode>(info)
   {
     auto env = info.Env();
-    _reg = Napi::ObjectWrap<SymbolRegistryNode>::Unwrap(info[0].As<Napi::Object>())->get();
+    _reg = SymbolRegistryNode::of(info[0], "BacktestRunner: registry");
     double fee = argNumber(info[1], "BacktestRunner: feeRate");
     double cap = argNumber(info[2], "BacktestRunner: initialCapital");
     if (info.Length() < 4 || info[3].IsUndefined())
@@ -1245,7 +1221,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     {
       throw Napi::TypeError::New(env, "BacktestRunner: options must be an object");
     }
-    auto opts = info[3].As<Napi::Object>();
+    auto opts = argObject(info[3], "BacktestRunner: options");
     static const char* const kKeys[] = {
         "slippageModel", "slippageTicks", "slippageTickSize", "slippageBps",
         "slippageImpactCoeff", "submitAckLatencyNs", "submitAckJitterNs",
@@ -1413,8 +1389,8 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
           .ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    const std::string path = info[0].As<Napi::String>().Utf8Value();
-    const double seconds = info[1].As<Napi::Number>().DoubleValue();
+    const std::string path = argString(info[0], "runTapeBarsOnTicks: argument 1");
+    const double seconds = argNumber(info[1], "runTapeBarsOnTicks: argument 2");
     // Converted the way aggregateTimeBars converts its interval.
     const auto ns = std::isfinite(seconds)
                         ? std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -1434,7 +1410,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     std::string symbol;
     if (info.Length() > 2 && info[2].IsString())
     {
-      symbol = info[2].As<Napi::String>().Utf8Value();
+      symbol = argString(info[2], "runTapeBarsOnTicks: argument 3");
     }
     LrvxBacktestStats s{};
     if (!runFn(_handle, path.c_str(), ns, symbol.empty() ? nullptr : symbol.c_str(), &s))
@@ -1449,7 +1425,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
   Napi::Value setStrategy(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
-    auto obj = info[0].As<Napi::Object>();
+    auto obj = argObject(info[0], "setStrategy: argument 1");
     std::vector<uint32_t> syms;
     auto symsV = obj.Get("symbols");
     if (symsV.IsArray())
@@ -1473,7 +1449,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
     return tryLrvx(info.Env(),
                    [&]() -> Napi::Value
                    {
-                     std::string path = info[0].As<Napi::String>().Utf8Value();
+                     std::string path = argString(info[0], "runTape: argument 1");
                      LrvxBacktestStats s{};
                      int ok = lrvx_backtest_runner_run_tape(_handle, path.c_str(), &s);
                      if (!ok)
@@ -1503,13 +1479,13 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
                            .ThrowAsJavaScriptException();
                        return env.Undefined();
                      }
-                     auto arr = info[0].As<Napi::Array>();
+                     auto arr = argArray(info[0], "runTapes: argument 1");
                      uint32_t n = arr.Length();
                      std::vector<std::string> owned;
                      owned.reserve(n);
                      for (uint32_t i = 0; i < n; ++i)
                      {
-                       owned.emplace_back(arr.Get(i).As<Napi::String>().Utf8Value());
+                       owned.emplace_back(argString(arr.Get(i), "runTapes: a path"));
                      }
                      std::vector<const char*> cstrs;
                      cstrs.reserve(n);
@@ -1535,8 +1511,8 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
   {
     return tryLrvx(info.Env(), [&]() -> Napi::Value
                    {
-      std::string path = info[0].As<Napi::String>().Utf8Value();
-      std::string symbol = info[1].As<Napi::String>().Utf8Value();
+      std::string path = argString(info[0], "runCsv: argument 1");
+      std::string symbol = argString(info[1], "runCsv: argument 2");
       LrvxBacktestStats s{};
       int ok = lrvx_backtest_runner_run_csv(_handle, path.c_str(), symbol.c_str(), &s);
       if (!ok)
@@ -1553,14 +1529,14 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
   {
     return tryLrvx(info.Env(), [&]() -> Napi::Value
                    {
-      auto tsArr = info[0].As<Napi::BigInt64Array>();
-      auto closeArr = info[1].As<Napi::Float64Array>();
+      auto tsArr = argBigInt64Array(info[0], "runOhlcv: argument 1");
+      auto closeArr = argFloat64Array(info[1], "runOhlcv: argument 2");
       if (!requireSameLength(info.Env(), "runOhlcv",
                              {tsArr.ElementLength(), closeArr.ElementLength()}))
       {
         return info.Env().Undefined();
       }
-      std::string symbol = info[2].As<Napi::String>().Utf8Value();
+      std::string symbol = argString(info[2], "runOhlcv: argument 3");
       uint32_t n = static_cast<uint32_t>(tsArr.ElementLength());
       LrvxBacktestStats s{};
       int ok = lrvx_backtest_runner_run_ohlcv(_handle,
@@ -1583,13 +1559,13 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
   {
     return tryLrvx(info.Env(), [&]() -> Napi::Value
                    {
-      auto startNs = info[0].As<Napi::BigInt64Array>();
-      auto endNs = info[1].As<Napi::BigInt64Array>();
-      auto openA = info[2].As<Napi::Float64Array>();
-      auto highA = info[3].As<Napi::Float64Array>();
-      auto lowA = info[4].As<Napi::Float64Array>();
-      auto closeA = info[5].As<Napi::Float64Array>();
-      auto volA = info[6].As<Napi::Float64Array>();
+      auto startNs = argBigInt64Array(info[0], "runBars: argument 1");
+      auto endNs = argBigInt64Array(info[1], "runBars: argument 2");
+      auto openA = argFloat64Array(info[2], "runBars: argument 3");
+      auto highA = argFloat64Array(info[3], "runBars: argument 4");
+      auto lowA = argFloat64Array(info[4], "runBars: argument 5");
+      auto closeA = argFloat64Array(info[5], "runBars: argument 6");
+      auto volA = argFloat64Array(info[6], "runBars: argument 7");
       // The C entry point takes one element count for all eight columns and
       // indexes every one of them over [0, n). n came from startNs alone, so
       // a `high` one element short was an out-of-bounds read of the other
@@ -1605,7 +1581,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
       {
         return info.Env().Undefined();
       }
-      std::string symbol = info[7].As<Napi::String>().Utf8Value();
+      std::string symbol = argString(info[7], "runBars: argument 8");
       uint8_t barType = info.Length() > 8 && !info[8].IsUndefined()
                             ? static_cast<uint8_t>(argUint32(info[8], "runBars: barType"))
                             : 0;
@@ -1760,7 +1736,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
       _executor_host.reset();
       return env.Undefined();
     }
-    auto host = std::make_unique<lrvx_node::ExecutorHost>(env, info[0].As<Napi::Object>());
+    auto host = std::make_unique<lrvx_node::ExecutorHost>(env, argObject(info[0], "setExecutor: argument 1"));
     lrvx_clear_last_error();
     lrvx_backtest_runner_set_executor(_handle, host->handle);
     if (lrvx_last_error_code() != 0)
@@ -1782,7 +1758,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
       return env.Undefined();
     }
     auto host =
-        std::make_unique<lrvx_node::ExecutionListenerHost>(env, info[0].As<Napi::Object>());
+        std::make_unique<lrvx_node::ExecutionListenerHost>(env, argObject(info[0], "addExecutionListener: argument 1"));
     lrvx_backtest_runner_add_execution_listener(_handle, host->handle);
     _listener_hosts.push_back(std::move(host));
     return env.Undefined();
@@ -1801,7 +1777,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
           .ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    auto obj = info[0].As<Napi::Object>();
+    auto obj = argObject(info[0], "addJourneyTracer: argument 1");
     auto* tracer = Napi::ObjectWrap<OrderJourneyTracerWrap>::Unwrap(obj);
     lrvx_backtest_runner_add_journey_tracer(_handle, tracer->handle());
     _tracers.push_back(Napi::Persistent(obj));
@@ -1842,6 +1818,8 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
             InstanceMethod("setMarketDataRecorder", &RunnerNode::setMarketDataRecorder),
             InstanceMethod("setExecutor", &RunnerNode::setExecutor),
             InstanceMethod("orderClosed", &RunnerNode::orderClosed),
+            InstanceMethod("onOrderEvent", &RunnerNode::onOrderEvent),
+            InstanceMethod("seedPosition", &RunnerNode::seedPosition),
             InstanceMethod("hookErrors", &RunnerNode::hookErrors),
             InstanceMethod("attachTraceRecorder", &RunnerNode::attachTraceRecorder),
             InstanceMethod("setTraceFeedTsNs", &RunnerNode::setTraceFeedTsNs),
@@ -1854,9 +1832,9 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       : Napi::ObjectWrap<RunnerNode>(info), TsfnHost(info.Env())
   {
     auto env = info.Env();
-    auto* reg = Napi::ObjectWrap<SymbolRegistryNode>::Unwrap(info[0].As<Napi::Object>())->get();
-    auto onSig = info[1].As<Napi::Function>();
-    bool threaded = info.Length() > 2 && info[2].As<Napi::Boolean>().Value();
+    auto* reg = SymbolRegistryNode::of(info[0], "Runner: registry");
+    auto onSig = argFunction(info[1], "Runner: argument 2");
+    bool threaded = info.Length() > 2 && argBool(info[2], "Runner: argument 3");
 
     if (threaded)
     {
@@ -1930,7 +1908,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
   Napi::Value addStrategy(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
-    auto obj = info[0].As<Napi::Object>();
+    auto obj = argObject(info[0], "addStrategy: argument 1");
     uint32_t id = static_cast<uint32_t>(_hosts.size()) + 1;
     auto host = std::make_unique<NodeStrategyHost>(env, obj, _reg, id, extractSyms(obj));
     if (_mode == Mode::Threaded)
@@ -1973,7 +1951,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
           .ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    uint32_t idx = info[0].As<Napi::Number>().Uint32Value();
+    uint32_t idx = argUint32(info[0], "replaceStrategy: argument 1");
     if (idx >= _hosts.size())
     {
       auto err = Napi::Error::New(env, "replaceStrategy: index out of range");
@@ -1982,7 +1960,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       err.ThrowAsJavaScriptException();
       return env.Undefined();
     }
-    _hosts[idx]->replaceStrategy(info[1].As<Napi::Object>());
+    _hosts[idx]->replaceStrategy(argObject(info[1], "replaceStrategy: argument 2"));
     return env.Undefined();
   }
 
@@ -2035,8 +2013,8 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     {
       throw Napi::TypeError::New(info.Env(), "onTrade: isBuy must be a boolean");
     }
-    bool isBuy = info[3].As<Napi::Boolean>().Value();
-    int64_t ts = info.Length() > 4 ? toInt64Ns(info[4]) : 0;
+    bool isBuy = argBool(info[3], "onTrade: argument 4");
+    int64_t ts = info.Length() > 4 ? toInt64Ns(info[4], "onTrade: argument 5") : 0;
     if (_mode == Mode::Sync)
     {
       lrvx_runner_on_trade(_runner, sym, price, qty, isBuy ? 1 : 0, ts);
@@ -2054,11 +2032,11 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     // index.d.ts declares these as Float64Array; reading them as a plain
     // Napi::Array made every call written to the declared contract throw
     // "An array was expected".
-    auto bidP = info[1].As<Napi::Float64Array>();
-    auto bidQ = info[2].As<Napi::Float64Array>();
-    auto askP = info[3].As<Napi::Float64Array>();
-    auto askQ = info[4].As<Napi::Float64Array>();
-    int64_t ts = info.Length() > 5 ? toInt64Ns(info[5]) : 0;
+    auto bidP = argFloat64Array(info[1], "onBookSnapshot: argument 2");
+    auto bidQ = argFloat64Array(info[2], "onBookSnapshot: argument 3");
+    auto askP = argFloat64Array(info[3], "onBookSnapshot: argument 4");
+    auto askQ = argFloat64Array(info[4], "onBookSnapshot: argument 5");
+    int64_t ts = info.Length() > 5 ? toInt64Ns(info[5], "onBookSnapshot: argument 6") : 0;
     // The C ABI takes one length per side (bp/bq share bpLen, ap/aq share
     // apLen), so mismatched price/qty arrays on one side used to make the
     // qty side get read at the price side's length.
@@ -2116,7 +2094,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     {
       return info.Env().Undefined();
     }
-    int64_t ts = info.Length() > 3 ? toInt64Ns(info[3]) : 0;
+    int64_t ts = info.Length() > 3 ? toInt64Ns(info[3], "onBookTop: argument 4") : 0;
     if (_mode == Mode::Sync)
     {
       lrvx_runner_on_book_top(_runner, sym, hasBid, bidPrice, bidQty, hasAsk, askPrice,
@@ -2133,7 +2111,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
   Napi::Value onBar(const Napi::CallbackInfo& info)
   {
     uint32_t sym = symId(info[0]);
-    auto opts = info[1].As<Napi::Object>();
+    auto opts = argObject(info[1], "onBar: argument 2");
     auto getNum = [&](const char* k, double dflt) -> double
     {
       auto v = opts.Get(k);
@@ -2148,7 +2126,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       auto v = opts.Get(k);
       if (v.IsBigInt() || v.IsNumber())
       {
-        return toInt64Ns(v);
+        return toInt64Ns(v, "onBar: timestamp");
       }
       return dflt;
     };
@@ -2260,7 +2238,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     {
       return env.Undefined();
     }
-    _pnl_host = std::make_unique<lrvx_node::PnLTrackerHost>(env, info[0].As<Napi::Object>());
+    _pnl_host = std::make_unique<lrvx_node::PnLTrackerHost>(env, argObject(info[0], "setPnlTracker: argument 1"));
     if (_mode == Mode::Sync)
     {
       lrvx_runner_set_pnl_tracker(_runner, _pnl_host->handle);
@@ -2292,7 +2270,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     {
       return env.Undefined();
     }
-    _storage_host = std::make_unique<lrvx_node::StorageSinkHost>(env, info[0].As<Napi::Object>());
+    _storage_host = std::make_unique<lrvx_node::StorageSinkHost>(env, argObject(info[0], "setStorageSink: argument 1"));
     if (_mode == Mode::Sync)
     {
       lrvx_runner_set_storage_sink(_runner, _storage_host->handle);
@@ -2324,7 +2302,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     {
       return env.Undefined();
     }
-    _risk_host = std::make_unique<lrvx_node::RiskManagerHost>(env, info[0].As<Napi::Object>(), &_hook_errors);
+    _risk_host = std::make_unique<lrvx_node::RiskManagerHost>(env, argObject(info[0], "setRiskManager: argument 1"), &_hook_errors);
     if (_mode == Mode::Sync)
     {
       lrvx_runner_set_risk_manager(_runner, _risk_host->handle);
@@ -2356,7 +2334,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     {
       return env.Undefined();
     }
-    _kill_host = std::make_unique<lrvx_node::KillSwitchHost>(env, info[0].As<Napi::Object>(), &_hook_errors);
+    _kill_host = std::make_unique<lrvx_node::KillSwitchHost>(env, argObject(info[0], "setKillSwitch: argument 1"), &_hook_errors);
     if (_mode == Mode::Sync)
     {
       lrvx_runner_set_kill_switch(_runner, _kill_host->handle);
@@ -2389,7 +2367,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       return env.Undefined();
     }
     _validator_host =
-        std::make_unique<lrvx_node::OrderValidatorHost>(env, info[0].As<Napi::Object>(), &_hook_errors);
+        std::make_unique<lrvx_node::OrderValidatorHost>(env, argObject(info[0], "setOrderValidator: argument 1"), &_hook_errors);
     if (_mode == Mode::Sync)
     {
       lrvx_runner_set_order_validator(_runner, _validator_host->handle);
@@ -2424,7 +2402,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       return env.Undefined();
     }
 
-    auto obj = info[0].As<Napi::Object>();
+    auto obj = argObject(info[0], "setMarketDataRecorder: argument 1");
 
     // Detect the built-in BinaryLogRecorderHook wrapper via the cached
     // constructor stored at module init.
@@ -2485,7 +2463,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       return env.Undefined();
     }
     _executor_host =
-        std::make_unique<lrvx_node::ExecutorHost>(env, info[0].As<Napi::Object>(), &_hook_errors);
+        std::make_unique<lrvx_node::ExecutorHost>(env, argObject(info[0], "setExecutor: argument 1"), &_hook_errors);
     if (_mode == Mode::Sync)
     {
       lrvx_runner_set_executor(_runner, _executor_host->handle);
@@ -2502,12 +2480,11 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
   Napi::Value orderClosed(const Napi::CallbackInfo& info)
   {
     auto env = info.Env();
-    if (info.Length() < 1 || !(info[0].IsNumber() || info[0].IsBigInt()))
+    if (info.Length() < 1)
     {
-      Napi::TypeError::New(env, "orderClosed(orderId) expected").ThrowAsJavaScriptException();
-      return env.Undefined();
+      throw Napi::TypeError::New(env, "orderClosed(orderId) expected");
     }
-    const uint64_t orderId = static_cast<uint64_t>(toInt64Ns(info[0]));
+    const uint64_t orderId = argUint64(info[0], "orderClosed: orderId");
     if (_mode == Mode::Sync)
     {
       lrvx_runner_order_closed(_runner, orderId);
@@ -2515,6 +2492,135 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     else
     {
       lrvx_live_engine_order_closed(_engine, orderId);
+    }
+    return env.Undefined();
+  }
+
+  // What the strategy at `index` holds before any fill is reported.
+  Napi::Value seedPosition(const Napi::CallbackInfo& info)
+  {
+    auto env = info.Env();
+    if (info.Length() < 3)
+    {
+      throw Napi::TypeError::New(
+          env, "seedPosition(strategyIndex, symbol, position, avgEntryPrice?) expected");
+    }
+    const uint32_t idx = argUint32(info[0], "seedPosition: strategyIndex");
+    if (idx >= _hosts.size())
+    {
+      throw Napi::RangeError::New(env, "seedPosition: strategyIndex " + std::to_string(idx) +
+                                           " is not a strategy of this runner (it has " +
+                                           std::to_string(_hosts.size()) + ")");
+    }
+    const uint32_t sym = symId(info[1]);
+    const double position = argNumber(info[2], "seedPosition: position");
+    const double avg = info.Length() > 3 && !info[3].IsUndefined()
+                           ? argNumber(info[3], "seedPosition: avgEntryPrice")
+                           : 0.0;
+    const auto strategy = static_cast<LrvxStrategyHandle>(_hosts[idx]->bridge.get());
+    lrvx_clear_last_error();
+    const uint8_t ok =
+        _mode == Mode::Sync
+            ? lrvx_runner_seed_position(_runner, strategy, sym,
+                                        lrvx_quantity_from_double(position),
+                                        lrvx_price_from_double(avg))
+            : lrvx_live_engine_seed_position(_engine, strategy, sym,
+                                             lrvx_quantity_from_double(position),
+                                             lrvx_price_from_double(avg));
+    if (ok == 0)
+    {
+      throw Napi::Error::New(env, "seedPosition: " + capiReason());
+    }
+    return env.Undefined();
+  }
+
+  // One order event a venue reported, in the words a strategy's onFill and
+  // onOrderUpdate read them back in.
+  Napi::Value onOrderEvent(const Napi::CallbackInfo& info)
+  {
+    auto env = info.Env();
+    auto opts = argOptions(info, "onOrderEvent");
+    const auto text = [&](const char* key, const char* fallback) -> std::string
+    {
+      if (!opts.Has(key) || opts.Get(key).IsUndefined())
+      {
+        if (fallback != nullptr)
+        {
+          return fallback;
+        }
+        throw Napi::TypeError::New(env, std::string("onOrderEvent: ") + key + " is required");
+      }
+      if (!opts.Get(key).IsString())
+      {
+        throw Napi::TypeError::New(env, std::string("onOrderEvent: ") + key + " must be a string");
+      }
+      return opts.Get(key).As<Napi::String>().Utf8Value();
+    };
+    if (!opts.Has("orderId") || !opts.Has("symbol"))
+    {
+      throw Napi::TypeError::New(env, "onOrderEvent: orderId and symbol are required");
+    }
+
+    LrvxOrderEventData ev{};
+    ev.order_id = argUint64(opts.Get("orderId"), "onOrderEvent: orderId");
+    ev.symbol_id = symId(opts.Get("symbol"));
+    const std::string side = text("side", nullptr);
+    if (side != "buy" && side != "sell")
+    {
+      throw Napi::TypeError::New(env, "onOrderEvent: side must be 'buy' or 'sell', got '" + side +
+                                          "'");
+    }
+    ev.side = side == "buy" ? 0 : 1;
+    const std::string orderType = text("orderType", "limit");
+    if (!lrvx::capi::orderTypeCodeFromName(orderType, &ev.order_type))
+    {
+      throw Napi::TypeError::New(env, "onOrderEvent: " +
+                                          lrvx::capi::unknownOrderTypeMessage(orderType));
+    }
+    const std::string status = text("status", nullptr);
+    if (!lrvx::capi::orderEventStatusCodeFromName(status, &ev.status))
+    {
+      throw Napi::TypeError::New(env, "onOrderEvent: " +
+                                          lrvx::capi::unknownOrderEventStatusMessage(status));
+    }
+    const auto number = [&](const char* key, const char* what)
+    { return opts.Has(key) ? argNumber(opts.Get(key), what) : 0.0; };
+    ev.fill_qty_raw = lrvx_quantity_from_double(number("fillQty", "onOrderEvent: fillQty"));
+    ev.fill_price_raw = lrvx_price_from_double(number("fillPrice", "onOrderEvent: fillPrice"));
+    ev.exchange_ts_ns = opts.Has("tsNs") ? toInt64Ns(opts.Get("tsNs"), "onOrderEvent: tsNs") : 0;
+    const std::string rejectReason = text("rejectReason", "");
+    ev.reject_reason = rejectReason.empty() ? nullptr : rejectReason.c_str();
+    if (opts.Has("isMaker"))
+    {
+      if (!opts.Get("isMaker").IsBoolean())
+      {
+        throw Napi::TypeError::New(env, "onOrderEvent: isMaker must be a boolean");
+      }
+      ev.is_maker = argBool(opts.Get("isMaker"), "onOrderEvent: isMaker") ? 1 : 0;
+    }
+    if (ev.status == 3 || ev.status == 4)
+    {
+      ev.last_fill_at_ns = ev.exchange_ts_ns;
+    }
+
+    lrvx_clear_last_error();
+    if (_mode == Mode::Sync)
+    {
+      lrvx_runner_on_order_event(_runner, &ev);
+    }
+    else
+    {
+      // A threaded runner's callbacks cross to this thread through channels
+      // that only exist between start() and stop().
+      if (!_running)
+      {
+        throw Napi::Error::New(env, "onOrderEvent: the threaded runner is not started");
+      }
+      lrvx_live_engine_on_order_event(_engine, &ev);
+    }
+    if (lrvx_last_error_code() != 0)
+    {
+      throw Napi::Error::New(env, "onOrderEvent: " + capiReason());
     }
     return env.Undefined();
   }
@@ -2553,7 +2659,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
       lrvx_runner_attach_trace_recorder(_runner, nullptr);
       return env.Undefined();
     }
-    auto* tr = Napi::ObjectWrap<TraceRecorderWrap>::Unwrap(info[0].As<Napi::Object>());
+    auto* tr = Napi::ObjectWrap<TraceRecorderWrap>::Unwrap(argObject(info[0], "attachTraceRecorder: argument 1"));
     lrvx_runner_attach_trace_recorder(_runner, tr->handle());
     return env.Undefined();
   }
@@ -2566,7 +2672,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
           .ThrowAsJavaScriptException();
       return info.Env().Undefined();
     }
-    int64_t ts = toInt64Ns(info[0]);
+    int64_t ts = toInt64Ns(info[0], "setTraceFeedTsNs: argument 1");
     lrvx_runner_set_trace_feed_ts_ns(_runner, ts);
     return info.Env().Undefined();
   }

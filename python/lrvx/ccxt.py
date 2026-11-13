@@ -64,9 +64,16 @@ What the broker does
   returned, and ``ctx.position`` inside ``on_fill`` counts the fill. See
   "Order updates" below.
 - Before streams start, the broker calls ``fetch_balance()`` and
-  ``fetch_positions()`` and dispatches
-  ``strategy.on_initial_position(ccxt_sym, qty, avg_price)`` for any
-  open position. Strategies without that method see only the log line.
+  ``fetch_positions()``. For each open position on a registered symbol
+  it seeds the runner (``Runner.seed_position``), so the strategy reads
+  the position from ``ctx.position`` and ``self.position()`` and later
+  fills add to it, and it dispatches
+  ``strategy.on_initial_position(ccxt_sym, qty, avg_price)`` as before.
+  The seed is signed (a short is negative; ``qty`` in the callback is
+  what the exchange reports). A runner keeps a position per strategy, so
+  the seed goes to the one attached strategy that trades the symbol;
+  with several, none is seeded and ``on_error`` says so: call
+  ``broker.runner.seed_position`` for the one that holds it.
 - Stream errors are reported via ``on_error`` and retried with
   exponential backoff (configurable via ``retry_initial_delay``,
   ``retry_max_delay``, ``retry_multiplier``). Delay resets to
@@ -319,17 +326,25 @@ class _OrderProgress:
 def _takes_legacy_order_update(strategy: Any) -> bool:
     """True for a strategy whose ``on_order_update`` has the four-argument
     form ``(ccxt_sym, status, filled, avg_price)`` this broker used to call,
-    not ``lrvx.Strategy``'s ``(ctx, event)``."""
-    fn = getattr(type(strategy), "on_order_update", None)
-    if fn is None or not inspect.isfunction(fn):
+    not ``lrvx.Strategy``'s ``(ctx, event)``.
+
+    Judged on the bound callable, by the positional arguments it requires:
+    exactly four. A parameter with a default is optional, so
+    ``on_order_update(self, ctx, event, a=1, b=2)`` requires two and is the
+    new form; ``*args`` and keyword-only parameters do not count either.
+    """
+    fn = getattr(strategy, "on_order_update", None)
+    if fn is None or not callable(fn):
         return False
     try:
         params = list(inspect.signature(fn).parameters.values())
     except (TypeError, ValueError):
+        # A built-in with no signature: lrvx.Strategy's own method.
         return False
-    positional = [p for p in params
-                  if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
-    return len(positional) == 5
+    required = [p for p in params
+                if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+                and p.default is p.empty]
+    return len(required) == 4
 
 
 # Per-exchange override for ccxt's order-book depth. ccxt.pro's default
@@ -436,6 +451,12 @@ class CcxtBroker:
         logger.warning("ccxt broker error [%s]: %r", context, exc)
 
     # ── Lifecycle ─────────────────────────────────────────────────────
+
+    @property
+    def runner(self) -> Any:
+        """The ``lrvx.Runner`` the strategies are attached to; ``None``
+        until ``run()`` has started it."""
+        return self._runner
 
     async def __aenter__(self) -> "CcxtBroker":
         await self._ensure_exchange()
@@ -1134,6 +1155,15 @@ class CcxtBroker:
             if sym and sym in self._ccxt_orders_by_sym:
                 self._ccxt_orders_by_sym[sym].discard(ccxt_id)
                 self._ccxt_orders_by_sym[sym].add(str(new_id))
+        # The answer says where the order stands now, like the answer to a
+        # placement: a fill it carries is reported, and an order it reports
+        # finished is closed.
+        if isinstance(res, dict):
+            answer = dict(res)
+            answer.setdefault("id", self._lrvx_to_ccxt_order.get(lrvx_id, ccxt_id))
+            self._report_order(answer)
+            if str(answer.get("status", "")) in _TERMINAL_ORDER_STATUSES:
+                self._note_order_closed(answer)
 
     # ── Position reconciliation ───────────────────────────────────────
 
@@ -1173,6 +1203,7 @@ class CcxtBroker:
             avg = float(pos.get("entryPrice") or pos.get("average") or 0.0)
             if qty == 0:
                 continue
+            self._seed_position(ccxt_sym, pos, qty, avg)
             for strat in self._strategies:
                 fn = getattr(strat, "on_initial_position", None)
                 if callable(fn):
@@ -1181,6 +1212,37 @@ class CcxtBroker:
                     except BaseException as e:
                         if self.on_error:
                             self.on_error(ccxt_sym, e)
+
+    def _seed_position(self, ccxt_sym: str, pos: Mapping[str, Any], qty: float,
+                       avg: float) -> None:
+        """Tell the runner what the account already holds, so the strategy
+        reads it from ``ctx.position`` and ``self.position()``.
+
+        A runner keeps a position per strategy and an account's position
+        names none, so it is seeded only when exactly one attached strategy
+        trades the symbol. With several, none is seeded and ``on_error``
+        says so: call ``runner.seed_position`` for the one it belongs to.
+        """
+        if self._runner is None:
+            return
+        # ccxt reports the size in ``contracts`` and the direction in
+        # ``side``; some exchanges sign the size instead.
+        signed = -abs(qty) if str(pos.get("side") or "").lower() == "short" else qty
+        sym = int(self._ccxt_to_sym[ccxt_sym])
+        owners = [s for s in self._strategies
+                  if sym in [int(x) for x in getattr(s, "symbols", [])]]
+        try:
+            if len(owners) > 1:
+                raise ValueError(
+                    f"the account's position of {signed!r} in {ccxt_sym} could belong to any "
+                    f"of {len(owners)} strategies attached to it; none was given it. Call "
+                    "broker.runner.seed_position(strategy, symbol, position, "
+                    "avg_entry_price) for the one that holds it")
+            if owners:
+                self._runner.seed_position(owners[0], sym, signed, avg)
+        except BaseException as e:
+            if self.on_error:
+                self.on_error(ccxt_sym, e)
 
     # ── Order updates ─────────────────────────────────────────────────
 

@@ -8,9 +8,11 @@ captures the run; validating replays it and compares the result with
 the expected output field by field (trade count, every fill's symbol,
 side, price and quantity, total filled quantity), along with the
 strategy and tape hashes, the engine version and, when the bundle
-ships an expected `.lrvxrun`, the trace's signal, order and fill
-counts (the fill count alone for a bundle packed before its trace
-recorded signals; see `_trace_holds_signals`).
+ships an expected `.lrvxrun`, the trace: every signal, order-event and
+fill record field by field for a bundle whose manifest says its records
+are comparable (all but `run_ts_ns`, the wall clock), the record counts
+for one packed before that, and the fill count alone for one packed
+before its trace recorded signals (see `_trace_holds_signals`).
 
 Bundle layout:
 
@@ -67,7 +69,17 @@ _EXPECTED_LRVXRUN_DIR = "expected.lrvxrun"
 _LEGACY_EXPECTED_RUN_DIR = "expected.floxrun"
 _LEGACY_VERSION_KEY = "flox_version"
 _SIGNALS_RECORDED_KEY = "lrvxrun_signals_recorded"
+_RECORDS_COMPARABLE_KEY = "lrvxrun_records_comparable"
+_COMPARED_RECORDS = "signal, order event and fill records"
 _COMPARED_ALL = "signals, order events, fills"
+# The trace record fields two replays of one bundle need not agree on.
+# run_ts_ns is the wall clock when the record was produced.
+_NOT_REPRODUCIBLE_FIELDS = frozenset({"run_ts_ns"})
+_RECORD_KINDS = (
+    ("lrvxrun_signals", "read_all_signals"),
+    ("lrvxrun_order_events", "read_all_order_events"),
+    ("lrvxrun_fills", "read_all_fills"),
+)
 _COMPARED_FILLS = "fills"
 _STRATEGY_DIR = "strategy"
 _CONFIG_DIR = "config"
@@ -339,10 +351,9 @@ def _run_strategy_against_tape(
         trace_new_fills()
         rec.set_run_ended_ns(time.time_ns())
         rec.close()
-    # Order IDs are intentionally omitted: the runner assigns them
-    # from a process-wide counter, so they are not stable across runs
-    # in the same process. The pair (symbol, side, price, quantity)
-    # is the user-meaningful fill identity for reproducibility.
+    # The JSON summary identifies a fill by (symbol, side, price,
+    # quantity), as it always has; order and fill ids are compared in the
+    # trace of a bundle whose manifest has lrvxrun_records_comparable.
     return {
         "trade_count": int(n),
         "fill_count": len(fills),
@@ -424,6 +435,10 @@ def pack_bundle(
         # bundle without the key was packed when they could be missing
         # (see _trace_holds_signals).
         _SIGNALS_RECORDED_KEY: True,
+        # Every field of its records but the wall clock is the same at each
+        # replay, so validate compares them one by one. A bundle without the
+        # key is compared on its record counts.
+        _RECORDS_COMPARABLE_KEY: True,
         "slippage_model": slippage_model,
         "slippage_params": slippage_params,
     }
@@ -551,6 +566,19 @@ def _trace_counts(trace: Path) -> Dict[str, int]:
     }
 
 
+def _trace_records(trace: Path) -> Dict[str, List[Dict[str, Any]]]:
+    """Every signal, order-event and fill record of a `.lrvxrun`
+    directory, without the fields that differ between replays."""
+    from lrvx._lrvx import TraceReader
+
+    reader = TraceReader(str(trace))
+    return {
+        key: [{k: v for k, v in rec.items() if k not in _NOT_REPRODUCIBLE_FIELDS}
+              for rec in getattr(reader, read)()]
+        for key, read in _RECORD_KINDS
+    }
+
+
 def _trace_holds_signals(manifest: Dict[str, Any],
                          expected_counts: Dict[str, int]) -> bool:
     """Whether a bundle's expected trace can be compared on its signals
@@ -582,13 +610,37 @@ def _manifest_tick(manifest: Dict[str, Any]) -> Optional[float]:
     return float(manifest.get("tick_size", 0.01))
 
 
+def _diff_records(key: str, actual: List[Dict[str, Any]],
+                  expected: List[Dict[str, Any]]) -> List[str]:
+    """One line per record that differs, naming its index and fields."""
+    diffs: List[str] = []
+    for i in range(max(len(actual), len(expected))):
+        if i >= len(actual) or i >= len(expected):
+            side = "actual" if i >= len(actual) else "expected"
+            other = expected[i] if i < len(expected) else actual[i]
+            diffs.append(f"{key}[{i}]: missing from {side}; the other has {other!r}")
+            continue
+        a, e = actual[i], expected[i]
+        fields = [f for f in sorted(set(a) | set(e)) if a.get(f, "<missing>") != e.get(f, "<missing>")]
+        if fields:
+            diffs.append(f"{key}[{i}]: " + ", ".join(
+                f"{f} actual={a.get(f, '<missing>')!r} expected={e.get(f, '<missing>')!r}"
+                for f in fields))
+    return diffs
+
+
 def _diff_dicts(actual: Dict[str, Any], expected: Dict[str, Any]) -> List[str]:
     diffs: List[str] = []
     keys = sorted(set(actual.keys()) | set(expected.keys()))
+    record_keys = {key for key, _ in _RECORD_KINDS}
     for k in keys:
         a = actual.get(k, "<missing>")
         e = expected.get(k, "<missing>")
-        if a != e:
+        if a == e:
+            continue
+        if k in record_keys and isinstance(a, list) and isinstance(e, list):
+            diffs.extend(_diff_records(k, a, e))
+        else:
             diffs.append(f"{k}: actual={a!r} expected={e!r}")
     return diffs
 
@@ -695,11 +747,15 @@ def replay_bundle(bundle_path: Path) -> BundleResult:
                 # carries the error under lrvxrun_read_error, the other
                 # side None, so the diff names it. Each message names its
                 # side, so two unreadable traces still disagree.
+                by_record = bool(manifest.get(_RECORDS_COMPARABLE_KEY))
                 counts: Dict[str, Dict[str, int]] = {}
+                records: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
                 for side, out, trace in (("actual", actual, actual_lrvxrun),
                                          ("expected", expected, expected_lrvxrun)):
                     try:
                         counts[side] = _trace_counts(trace)
+                        if by_record:
+                            records[side] = _trace_records(trace)
                         out["lrvxrun_read_error"] = None
                     except Exception as e:
                         out["lrvxrun_read_error"] = (
@@ -717,8 +773,13 @@ def replay_bundle(bundle_path: Path) -> BundleResult:
                         out.update(counts[side])
                     else:
                         out["lrvxrun_fill_count"] = counts[side]["lrvxrun_fill_count"]
+                    if side in records:
+                        out.update(records[side])
                 if "expected" in counts:
-                    compared = _COMPARED_ALL if whole else _COMPARED_FILLS
+                    if "expected" in records:
+                        compared = _COMPARED_RECORDS
+                    else:
+                        compared = _COMPARED_ALL if whole else _COMPARED_FILLS
                     actual["lrvxrun_compared"] = compared
                     expected["lrvxrun_compared"] = compared
         # else: this bundle predates the .lrvxrun ride-along. Leave

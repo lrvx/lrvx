@@ -4,6 +4,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "bindings_common.h"
 
 #include "lrvx/common.h"
 #include "lrvx/execution/order_tracker.h"
@@ -30,7 +31,7 @@ class PyPositionTracker
   {
     lrvx::Order order;
     order.symbol = symbol;
-    order.side = (side == "buy") ? lrvx::Side::BUY : lrvx::Side::SELL;
+    order.side = parseSide(side);
     order.price = lrvx::Price::fromDouble(price);
     order.quantity = lrvx::Quantity::fromDouble(quantity);
     order.id = ++_nextOrderId;
@@ -62,15 +63,10 @@ class PyPositionTracker
 
   static lrvx::CostBasisMethod parseCostBasis(const std::string& s)
   {
-    if (s == "lifo")
-    {
-      return lrvx::CostBasisMethod::LIFO;
-    }
-    if (s == "average")
-    {
-      return lrvx::CostBasisMethod::AVERAGE;
-    }
-    return lrvx::CostBasisMethod::FIFO;
+    return parseChoice<lrvx::CostBasisMethod>("cost basis", s,
+                                              {{"fifo", lrvx::CostBasisMethod::FIFO},
+                                               {"lifo", lrvx::CostBasisMethod::LIFO},
+                                               {"average", lrvx::CostBasisMethod::AVERAGE}});
   }
 };
 
@@ -83,7 +79,7 @@ class PyPositionGroupTracker
                         double price, double qty)
   {
     return _tracker.openPosition(orderId, symbol,
-                                 (side == "buy") ? lrvx::Side::BUY : lrvx::Side::SELL,
+                                 parseSide(side),
                                  lrvx::Price::fromDouble(price),
                                  lrvx::Quantity::fromDouble(qty));
   }

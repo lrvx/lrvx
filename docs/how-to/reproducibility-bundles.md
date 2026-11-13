@@ -1,6 +1,6 @@
 # Reproducibility bundles with `lrvx bundle`
 
-A bundle is a single tarball that encodes everything needed to reproduce a backtest result on another machine: strategy code, the captured tape it ran against, the engine version, and the expected output. `lrvx bundle pack` captures a run; `lrvx bundle validate` replays it and compares the result with the expected output field by field (trade count, every fill's symbol, side, price and quantity, total filled quantity), along with the strategy and tape hashes and the engine version.
+A bundle is a single tarball that encodes everything needed to reproduce a backtest result on another machine: strategy code, the captured tape it ran against, the engine version, and the expected output. `lrvx bundle pack` captures a run; `lrvx bundle validate` replays it and compares the result with the expected output field by field (trade count, every fill's symbol, side, price and quantity, total filled quantity), along with the strategy and tape hashes, the engine version and the run's trace, record by record for a bundle packed now.
 
 **`lrvx bundle replay` and `lrvx bundle validate` run the strategy code shipped inside the bundle.** A bundle is designed to be shared, which is exactly why this matters: replaying one is the same as running any other code someone handed you. Only replay or validate a bundle from a source you trust. Nothing in the format authenticates who produced it.
 
@@ -66,7 +66,7 @@ Replay plus a strict comparison against the recorded `expected_output.json`. Exi
 
 ## What's compared
 
-The validator checks `trade_count`, `fill_count`, the per-fill `(symbol, side, price, quantity)` tuples in order, and `total_filled_quantity`. Order IDs are intentionally excluded because the runner assigns them from a process-wide counter that is not stable between processes.
+The validator checks `trade_count`, `fill_count`, the per-fill `(symbol, side, price, quantity)` tuples in order, and `total_filled_quantity`. The JSON summary carries no order ids; for a bundle packed now they are compared in the trace (below).
 
 It also recomputes `strategy_sha256` and `tape_sha256` from what was actually extracted and re-hashes the running engine's version, then compares all three against the values the manifest recorded at pack time. This catches a bundle whose `strategy.py` or tape changed after packing, even if `expected_output.json` was re-recorded to match the new content. It is not a substitute for signing: the manifest lives unsigned in the same archive it describes, so a party who edits the strategy can recompute these hashes too. What it does catch is accidental drift and an engine-version mismatch, which is the common case this format exists for.
 
@@ -74,7 +74,8 @@ When the bundle ships an `expected.lrvxrun/` trace, the validator also compares 
 
 | Bundle | Expected trace holds | Compared | `lrvxrun_compared` |
 |--------|----------------------|----------|--------------------|
-| Manifest has `lrvxrun_signals_recorded: true` (every bundle packed now) | one signal and one submit order event per order the strategy sent, one fill per fill | `lrvxrun_signal_count`, `lrvxrun_order_count`, `lrvxrun_fill_count` | `signals, order events, fills` |
+| Manifest has `lrvxrun_records_comparable: true` (every bundle packed now) | one signal and one submit order event per order the strategy sent, one fill per fill | the three counts below, and every record in order, field by field, except `run_ts_ns`: `lrvxrun_signals`, `lrvxrun_order_events`, `lrvxrun_fills` | `signal, order event and fill records` |
+| Manifest has `lrvxrun_signals_recorded: true` but not `lrvxrun_records_comparable` | the same three record kinds | `lrvxrun_signal_count`, `lrvxrun_order_count`, `lrvxrun_fill_count` | `signals, order events, fills` |
 | No `lrvxrun_signals_recorded`, and the trace has at least one signal or order event | the same three record kinds | the same three counts | `signals, order events, fills` |
 | No `lrvxrun_signals_recorded`, and the trace has no signal and no order event | fills only | `lrvxrun_fill_count` | `fills` |
 | No `expected.lrvxrun/` at all | nothing | the JSON fields alone | key absent |
@@ -85,7 +86,13 @@ Pack now writes the signal with its whole 64-bit id (`signal_id64` on the record
 
 Each record of the trace pack writes carries the fields the [`.lrvxrun` spec](../spec/lrvxrun.md) gives it. `feed_ts_ns` is the tape event the record belongs to: for a signal and its order event the trade the strategy was handling, for a fill the simulator's time of the fill. `run_ts_ns` is the wall clock at the moment the record was produced, so a fill sorts between the order that caused it and whatever the strategy did next. `fill_id` numbers the run's fills 1, 2, 3, ... (the simulator issues no fill ids of its own), so two fills of one order are two ids. Before this, every fill was written after the run had ended, with one `run_ts_ns` for all of them, `feed_ts_ns` 0, and the order's id in `fill_id`.
 
-A bundle packed before that validates as it did: the comparison is of the record counts in the table above, never of ids or timestamps.
+### Record by record
+
+A bundle packed now records `lrvxrun_records_comparable: true` in its manifest, and validate reads every signal, order-event and fill record from both traces and compares them in order, field by field. A record that differs is one diff line naming the record and the fields, for example `lrvxrun_fills[1]: price_raw actual=10100000000 expected=10100000001`; a record that one side has and the other does not is named as missing. Before this the comparison was of the counts alone, so a fill at another price, an order on the other side or a signal under another name passed as long as the number of records agreed.
+
+One field is left out: `run_ts_ns`, on every record kind. It is the wall clock at the moment the record was produced, so no two runs agree on it, in one process or in two. Everything else is the same at each replay of one bundle, including in another process: `feed_ts_ns` comes from the tape and the simulator's clock; the order ids (`signal_id`, `signal_id64`, `order_id`, `parent_signal_id`) are `(subscriber id << 32) + n` from the one strategy pack attaches, numbered by that strategy alone; `fill_id` numbers the run's fills; prices, quantities, fees, sides, kinds, flags, names, symbol ids and payloads follow from the tape and the strategy. The trace's manifest (`run_started_ns`, `run_ended_ns`) is not compared, since it is wall clock too.
+
+A bundle packed before that marker validates as it did: the comparison is of the record counts in the table above, never of ids or timestamps.
 
 A trace that is present but cannot be read fails validation with a `lrvxrun_read_error` diff line naming the side and the reader's error; it is never skipped.
 

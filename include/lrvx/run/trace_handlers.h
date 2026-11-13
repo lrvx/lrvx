@@ -187,7 +187,8 @@ class TraceExecutionListener : public IOrderExecutionListener
   }
   void onOrderPartiallyFilled(const Order& o, Quantity q) override
   {
-    writeFill(o, q);
+    // No fill price in this form either.
+    writeFill(o, q, o.price);
     if (_inner)
     {
       _inner->onOrderPartiallyFilled(o, q);
@@ -195,7 +196,8 @@ class TraceExecutionListener : public IOrderExecutionListener
   }
   void onOrderFilled(const Order& o) override
   {
-    writeFill(o, o.quantity);
+    // This form names no fill price: the order's own is all there is.
+    writeFill(o, o.quantity, o.price);
     if (_inner)
     {
       _inner->onOrderFilled(o);
@@ -203,7 +205,7 @@ class TraceExecutionListener : public IOrderExecutionListener
   }
   void onOrderPartiallyFilled(const Order& o, Quantity q, Price fillPrice) override
   {
-    writeFill(o, q);
+    writeFill(o, q, fillPrice);
     if (_inner)
     {
       _inner->onOrderPartiallyFilled(o, q, fillPrice);
@@ -211,7 +213,7 @@ class TraceExecutionListener : public IOrderExecutionListener
   }
   void onOrderFilled(const Order& o, Quantity q, Price fillPrice) override
   {
-    writeFill(o, q);
+    writeFill(o, q, fillPrice);
     if (_inner)
     {
       _inner->onOrderFilled(o, q, fillPrice);
@@ -259,6 +261,8 @@ class TraceExecutionListener : public IOrderExecutionListener
   IOrderExecutionListener* _inner;
   TraceRecorder* _recorder;
   std::atomic<int64_t> _feed_ts_ns{0};
+  // Fills written so far: a fill's id is its number in the run, 1, 2, 3, ...
+  std::atomic<uint64_t> _fills{0};
 
   static int64_t nowNs() noexcept
   {
@@ -296,7 +300,7 @@ class TraceExecutionListener : public IOrderExecutionListener
     _recorder->writeOrderEvent(e);
   }
 
-  void writeFill(const Order& o, Quantity q)
+  void writeFill(const Order& o, Quantity q, Price fillPrice)
   {
     if (!_recorder)
     {
@@ -306,8 +310,10 @@ class TraceExecutionListener : public IOrderExecutionListener
     f.run_ts_ns = nowNs();
     f.feed_ts_ns = _feed_ts_ns.load(std::memory_order_relaxed);
     f.order_id = static_cast<uint64_t>(o.id);
-    f.fill_id = static_cast<uint64_t>(o.id);
-    f.price_raw = o.price.raw();
+    // Its own id, not the order's: two partial fills of one order used to
+    // carry the same fill_id, the order id.
+    f.fill_id = _fills.fetch_add(1, std::memory_order_relaxed) + 1;
+    f.price_raw = fillPrice.raw();
     f.qty_raw = q.raw();
     f.fee_raw = 0;
     f.symbol_id = o.symbol;

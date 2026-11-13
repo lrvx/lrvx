@@ -47,22 +47,22 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
  private:
   void SetConstant(const Napi::CallbackInfo& info)
   {
-    lrvx_funding_schedule_set_constant(_h, info[0].As<Napi::Number>().Int64Value(),
-                                       info[1].As<Napi::Number>().DoubleValue());
+    lrvx_funding_schedule_set_constant(_h, argInteger(info[0], "setConstant: argument 1"),
+                                       argNumber(info[1], "setConstant: argument 2"));
   }
   void SetTape(const Napi::CallbackInfo& info)
   {
-    auto tsArr = info[0].As<Napi::Array>();
-    auto rateArr = info[1].As<Napi::Array>();
+    auto tsArr = argArray(info[0], "setTape: argument 1");
+    auto rateArr = argArray(info[1], "setTape: argument 2");
     std::vector<int64_t> ts(tsArr.Length());
     std::vector<double> rates(rateArr.Length());
     for (uint32_t i = 0; i < tsArr.Length(); ++i)
     {
-      ts[i] = toInt64Ns(tsArr.Get(i));
+      ts[i] = toInt64Ns(tsArr.Get(i), "setTape: timestamp");
     }
     for (uint32_t i = 0; i < rateArr.Length(); ++i)
     {
-      rates[i] = rateArr.Get(i).As<Napi::Number>().DoubleValue();
+      rates[i] = argNumber(rateArr.Get(i), "FundingSchedule: a rate");
     }
     lrvx_funding_schedule_set_tape(_h, ts.data(), rates.data(),
                                    static_cast<uint32_t>(ts.size()));
@@ -70,31 +70,31 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
   void SetTapeBySymbol(const Napi::CallbackInfo& info)
   {
     // (timestampsNs[], symbols[], rates[])
-    auto tsArr = info[0].As<Napi::Array>();
-    auto symArr = info[1].As<Napi::Array>();
-    auto rateArr = info[2].As<Napi::Array>();
+    auto tsArr = argArray(info[0], "setTapeBySymbol: argument 1");
+    auto symArr = argArray(info[1], "setTapeBySymbol: argument 2");
+    auto rateArr = argArray(info[2], "setTapeBySymbol: argument 3");
     const uint32_t n = tsArr.Length();
     std::vector<int64_t> ts(n);
     std::vector<uint32_t> sy(n);
     std::vector<double> rates(n);
     for (uint32_t i = 0; i < n; ++i)
     {
-      ts[i] = toInt64Ns(tsArr.Get(i));
-      sy[i] = symArr.Get(i).As<Napi::Number>().Uint32Value();
-      rates[i] = rateArr.Get(i).As<Napi::Number>().DoubleValue();
+      ts[i] = toInt64Ns(tsArr.Get(i), "setTapeBySymbol: timestamp");
+      sy[i] = argUint32(symArr.Get(i), "FundingSchedule: a symbol id");
+      rates[i] = argNumber(rateArr.Get(i), "FundingSchedule: a rate");
     }
     lrvx_funding_schedule_set_tape_by_symbol(_h, ts.data(), sy.data(), rates.data(), n);
   }
   Napi::Value LoadTape(const Napi::CallbackInfo& info)
   {
-    std::string path = info[0].As<Napi::String>().Utf8Value();
+    std::string path = argString(info[0], "loadTape: argument 1");
     lrvx_clear_last_error();
     const uint8_t ok = lrvx_funding_schedule_load_tape(_h, path.c_str());
     return Napi::Boolean::New(info.Env(), ok != 0);
   }
   void LoadProfile(const Napi::CallbackInfo& info)
   {
-    std::string name = info[0].As<Napi::String>().Utf8Value();
+    std::string name = argString(info[0], "loadProfile: argument 1");
     // A typo used to be a silent no-op, leaving default funding schedule
     // values in place -- a zero-fee or unthrottled backtest that
     // looks perfectly healthy.
@@ -107,25 +107,25 @@ class FundingScheduleWrap : public Napi::ObjectWrap<FundingScheduleWrap>
   }
   void SetConstantRate(const Napi::CallbackInfo& info)
   {
-    lrvx_funding_schedule_set_constant_rate(_h, info[0].As<Napi::Number>().DoubleValue());
+    lrvx_funding_schedule_set_constant_rate(_h, argNumber(info[0], "setConstantRate: argument 1"));
   }
   void Reset(const Napi::CallbackInfo&) { lrvx_funding_schedule_reset(_h); }
 
   Napi::Value Tick(const Napi::CallbackInfo& info)
   {
-    int64_t nowNs = toInt64Ns(info[0]);
-    auto symbols = info[1].As<Napi::Array>();
-    auto positions = info[2].As<Napi::Array>();
-    auto marks = info[3].As<Napi::Array>();
+    int64_t nowNs = toInt64Ns(info[0], "tick: argument 1");
+    auto symbols = argArray(info[1], "tick: argument 2");
+    auto positions = argArray(info[2], "tick: argument 3");
+    auto marks = argArray(info[3], "tick: argument 4");
     uint32_t n = symbols.Length();
     std::vector<uint32_t> sy(n);
     std::vector<double> ps(n);
     std::vector<double> mk(n);
     for (uint32_t i = 0; i < n; ++i)
     {
-      sy[i] = symbols.Get(i).As<Napi::Number>().Uint32Value();
-      ps[i] = positions.Get(i).As<Napi::Number>().DoubleValue();
-      mk[i] = marks.Get(i).As<Napi::Number>().DoubleValue();
+      sy[i] = argUint32(symbols.Get(i), "tick: a symbol id");
+      ps[i] = argNumber(positions.Get(i), "tick: a position");
+      mk[i] = argNumber(marks.Get(i), "tick: a mark price");
     }
     // One call settles and hands over; a second is made only when more
     // events were due than the first had room for, and that first one settled

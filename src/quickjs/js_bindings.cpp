@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -269,6 +270,167 @@ static int64_t toInt64(JSContext* ctx, JSValueConst val)
   return i;
 }
 
+// A 64-bit value read at the native boundary, with a check. JS_ToInt64Ext
+// takes anything: NaN and a string are 0, a fraction is truncated, a negative
+// becomes an id near 2^64, a Number above 2^53 has already lost its low bits
+// and a BigInt past 64 bits wraps. An order id, a signal id, a fill id or a
+// raw price read that way named some other order, or was written to a trace
+// as a value nobody passed. These throw a TypeError naming the argument and
+// return false; the JS wrappers' own checks sit on top of the same rule.
+//
+// A BigInt is read through its decimal text: the engine's own conversion
+// wraps without saying so.
+static bool bigIntDigits(JSContext* ctx, JSValueConst val, std::string& out)
+{
+  lrvx::JsCString text(ctx, val);
+  if (!text.ok())
+  {
+    return false;
+  }
+  out = text.get();
+  return true;
+}
+
+// A non-negative integer Number, which is exact up to 2^53, or a BigInt
+// below 2^64.
+static bool toIdOrThrow(JSContext* ctx, JSValueConst val, uint64_t& out, const char* what)
+{
+  if (JS_IsBigInt(ctx, val))
+  {
+    std::string digits;
+    if (!bigIntDigits(ctx, val, digits))
+    {
+      return false;
+    }
+    const auto [end, ec] = std::from_chars(digits.data(), digits.data() + digits.size(), out);
+    if (ec == std::errc{} && end == digits.data() + digits.size())
+    {
+      return true;
+    }
+  }
+  else if (JS_IsNumber(val))
+  {
+    double d = 0;
+    if (JS_ToFloat64(ctx, &d, val) < 0)
+    {
+      return false;
+    }
+    if (d >= 0.0 && d <= 9007199254740992.0 && d == std::floor(d))
+    {
+      out = static_cast<uint64_t>(d);
+      return true;
+    }
+  }
+  JS_ThrowTypeError(ctx,
+                    "%s must be a non-negative integer Number (at most 2^53) or a BigInt "
+                    "below 2^64",
+                    what);
+  return false;
+}
+
+// An integer Number within +-2^53, or a BigInt that fits 64 signed bits.
+static bool toInt64OrThrow(JSContext* ctx, JSValueConst val, int64_t& out, const char* what)
+{
+  if (JS_IsBigInt(ctx, val))
+  {
+    std::string digits;
+    if (!bigIntDigits(ctx, val, digits))
+    {
+      return false;
+    }
+    const auto [end, ec] = std::from_chars(digits.data(), digits.data() + digits.size(), out);
+    if (ec == std::errc{} && end == digits.data() + digits.size())
+    {
+      return true;
+    }
+  }
+  else if (JS_IsNumber(val))
+  {
+    double d = 0;
+    if (JS_ToFloat64(ctx, &d, val) < 0)
+    {
+      return false;
+    }
+    if (d >= -9007199254740992.0 && d <= 9007199254740992.0 && d == std::floor(d))
+    {
+      out = static_cast<int64_t>(d);
+      return true;
+    }
+  }
+  JS_ThrowTypeError(ctx, "%s must be an integer Number (within 2^53) or a BigInt that fits 64 bits",
+                    what);
+  return false;
+}
+
+// An integer Number from 0 to 2^32 - 1.
+static bool toUint32OrThrow(JSContext* ctx, JSValueConst val, uint32_t& out, const char* what)
+{
+  if (JS_IsNumber(val))
+  {
+    double d = 0;
+    if (JS_ToFloat64(ctx, &d, val) < 0)
+    {
+      return false;
+    }
+    if (d >= 0.0 && d <= 4294967295.0 && d == std::floor(d))
+    {
+      out = static_cast<uint32_t>(d);
+      return true;
+    }
+  }
+  JS_ThrowTypeError(ctx, "%s must be an integer from 0 to 4294967295", what);
+  return false;
+}
+
+// The members of an options object, read with those checks. The first one
+// that fails throws and every later read is skipped: test ok() before the
+// values are used.
+class CheckedOptions
+{
+ public:
+  CheckedOptions(JSContext* ctx, JSValueConst opts, const char* method)
+      : _ctx(ctx), _opts(opts), _method(method)
+  {
+  }
+  bool ok() const noexcept { return _ok; }
+
+  uint64_t id(const char* key) { return read<uint64_t>(key, 0, &toIdOrThrow); }
+  int64_t i64(const char* key) { return read<int64_t>(key, 0, &toInt64OrThrow); }
+  uint32_t u32(const char* key, uint32_t absent = 0)
+  {
+    return read<uint32_t>(key, absent, &toUint32OrThrow);
+  }
+
+ private:
+  template <typename T>
+  T read(const char* key, T absent, bool (*convert)(JSContext*, JSValueConst, T&, const char*))
+  {
+    T out = absent;
+    if (!_ok)
+    {
+      return out;
+    }
+    JSValue v = JS_GetPropertyStr(_ctx, _opts, key);
+    if (JS_IsException(v))
+    {
+      _ok = false;
+      return out;
+    }
+    if (!JS_IsUndefined(v) && !JS_IsNull(v))
+    {
+      const std::string what = std::string(_method) + ": " + key;
+      _ok = convert(_ctx, v, out, what.c_str());
+    }
+    JS_FreeValue(_ctx, v);
+    return out;
+  }
+
+  JSContext* _ctx;
+  JSValueConst _opts;
+  const char* _method;
+  bool _ok{true};
+};
+
 // Order price and quantity used to go through plain toDouble(),
 // which turns NaN into 0, +-Infinity into +-INT64_MAX once the C ABI's
 // fixed-point conversion saturates it, and a throwing valueOf() into a
@@ -379,8 +541,12 @@ static JSValue js_emit_limit_sell_tif(JSContext* ctx, JSValueConst, int, JSValue
 static JSValue js_emit_cancel(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
   GET_EMIT_HANDLE_OR_THROW(ctx, argv);
-  int64_t oid = toInt64(ctx, argv[1]);
-  lrvx_emit_cancel(h, static_cast<uint64_t>(oid));
+  uint64_t oid = 0;
+  if (!toIdOrThrow(ctx, argv[1], oid, "cancel: orderId"))
+  {
+    return JS_EXCEPTION;
+  }
+  lrvx_emit_cancel(h, oid);
   return JS_UNDEFINED;
 }
 
@@ -395,11 +561,14 @@ static JSValue js_emit_cancel_all(JSContext* ctx, JSValueConst, int, JSValueCons
 static JSValue js_emit_modify(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
   GET_EMIT_HANDLE_OR_THROW(ctx, argv);
-  int64_t oid = toInt64(ctx, argv[1]);
+  uint64_t oid = 0;
+  if (!toIdOrThrow(ctx, argv[1], oid, "modify: orderId"))
+  {
+    return JS_EXCEPTION;
+  }
   TO_PRICE_OR_THROW(price, ctx, argv[2], "price");
   TO_QTY_OR_THROW(qty, ctx, argv[3], "quantity");
-  lrvx_emit_modify(h, static_cast<uint64_t>(oid), lrvx_price_from_double(price),
-                   lrvx_quantity_from_double(qty));
+  lrvx_emit_modify(h, oid, lrvx_price_from_double(price), lrvx_quantity_from_double(qty));
   return JS_UNDEFINED;
 }
 
@@ -555,8 +724,12 @@ static JSValue js_mid_price(JSContext* ctx, JSValueConst, int, JSValueConst* arg
 static JSValue js_get_order_status(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
   GET_HANDLE_OR_THROW(ctx, argv);
-  int64_t oid = toInt64(ctx, argv[1]);
-  int32_t status = lrvx_get_order_status(h, static_cast<uint64_t>(oid));
+  uint64_t oid = 0;
+  if (!toIdOrThrow(ctx, argv[1], oid, "orderStatus: orderId"))
+  {
+    return JS_EXCEPTION;
+  }
+  int32_t status = lrvx_get_order_status(h, oid);
   return JS_NewInt32(ctx, status);
 }
 
@@ -4014,35 +4187,18 @@ static JSValue js_run_recorder_write_signal(JSContext* ctx, JSValueConst, int ar
     return JS_ThrowTypeError(ctx, "writeSignal(handle, opts)");
   }
   auto h = static_cast<LrvxRunRecorderHandle>(getHandle(ctx, argv[0]));
+  CheckedOptions opt(ctx, argv[1], "writeSignal");
   auto opts = argv[1];
-  auto getI64 = [&](const char* k, int64_t d = 0) -> int64_t
-  {
-    JSValue v = JS_GetPropertyStr(ctx, opts, k);
-    int64_t out = d;
-    if (!JS_IsUndefined(v) && !JS_IsNull(v))
-    {
-      JS_ToInt64Ext(ctx, &out, v);
-    }
-    JS_FreeValue(ctx, v);
-    return out;
-  };
-  auto getU32 = [&](const char* k, uint32_t d = 0) -> uint32_t
-  {
-    JSValue v = JS_GetPropertyStr(ctx, opts, k);
-    uint32_t out = d;
-    if (!JS_IsUndefined(v) && !JS_IsNull(v))
-    {
-      JS_ToUint32(ctx, &out, v);
-    }
-    JS_FreeValue(ctx, v);
-    return out;
-  };
-  int64_t run_ts = getI64("runTsNs");
-  int64_t feed_ts = getI64("feedTsNs");
+  const int64_t run_ts = opt.i64("runTsNs");
+  const int64_t feed_ts = opt.i64("feedTsNs");
   // A Number or a BigInt; the whole 64-bit id is written.
-  uint64_t signal_id = static_cast<uint64_t>(getI64("signalId"));
-  uint32_t flags = getU32("flags");
-  int64_t strength = getI64("strengthRaw");
+  const uint64_t signal_id = opt.id("signalId");
+  const uint32_t flags = opt.u32("flags");
+  const int64_t strength = opt.i64("strengthRaw");
+  if (!opt.ok())
+  {
+    return JS_EXCEPTION;
+  }
   std::string name;
   {
     JSValue v = JS_GetPropertyStr(ctx, opts, "name");
@@ -4092,29 +4248,23 @@ static JSValue js_run_recorder_write_order_event(JSContext* ctx, JSValueConst, i
     return JS_ThrowTypeError(ctx, "writeOrderEvent(handle, opts)");
   }
   auto h = static_cast<LrvxRunRecorderHandle>(getHandle(ctx, argv[0]));
+  CheckedOptions opt(ctx, argv[1], "writeOrderEvent");
   auto opts = argv[1];
-  auto getI64 = [&](const char* k, int64_t d = 0) -> int64_t
+  const int64_t run_ts = opt.i64("runTsNs");
+  const int64_t feed_ts = opt.i64("feedTsNs");
+  const uint64_t order_id = opt.id("orderId");
+  const uint64_t parent_signal_id = opt.id("parentSignalId");
+  const int64_t price_raw = opt.i64("priceRaw");
+  const int64_t qty_raw = opt.i64("qtyRaw");
+  const uint32_t symbol_id = opt.u32("symbolId");
+  const uint32_t event_kind = opt.u32("eventKind", 1);
+  const uint32_t side = opt.u32("side");
+  const uint32_t order_type = opt.u32("orderType");
+  const uint32_t flags = opt.u32("flags");
+  if (!opt.ok())
   {
-    JSValue v = JS_GetPropertyStr(ctx, opts, k);
-    int64_t out = d;
-    if (!JS_IsUndefined(v) && !JS_IsNull(v))
-    {
-      JS_ToInt64Ext(ctx, &out, v);
-    }
-    JS_FreeValue(ctx, v);
-    return out;
-  };
-  auto getU32 = [&](const char* k, uint32_t d = 0) -> uint32_t
-  {
-    JSValue v = JS_GetPropertyStr(ctx, opts, k);
-    uint32_t out = d;
-    if (!JS_IsUndefined(v) && !JS_IsNull(v))
-    {
-      JS_ToUint32(ctx, &out, v);
-    }
-    JS_FreeValue(ctx, v);
-    return out;
-  };
+    return JS_EXCEPTION;
+  }
   std::string reason;
   {
     JSValue v = JS_GetPropertyStr(ctx, opts, "reason");
@@ -4128,15 +4278,10 @@ static JSValue js_run_recorder_write_order_event(JSContext* ctx, JSValueConst, i
     }
     JS_FreeValue(ctx, v);
   }
-  lrvx_run_recorder_write_order_event(h, getI64("runTsNs"), getI64("feedTsNs"),
-                                      static_cast<uint64_t>(getI64("orderId")),
-                                      static_cast<uint64_t>(getI64("parentSignalId")),
-                                      getI64("priceRaw"), getI64("qtyRaw"),
-                                      getU32("symbolId"),
-                                      static_cast<uint8_t>(getU32("eventKind", 1)),
-                                      static_cast<uint8_t>(getU32("side")),
-                                      static_cast<uint8_t>(getU32("orderType")),
-                                      getU32("flags"),
+  lrvx_run_recorder_write_order_event(h, run_ts, feed_ts, order_id, parent_signal_id, price_raw,
+                                      qty_raw, symbol_id, static_cast<uint8_t>(event_kind),
+                                      static_cast<uint8_t>(side),
+                                      static_cast<uint8_t>(order_type), flags,
                                       reason.empty() ? nullptr : reason.data(), reason.size());
   return JS_UNDEFINED;
 }
@@ -4148,36 +4293,24 @@ static JSValue js_run_recorder_write_fill(JSContext* ctx, JSValueConst, int argc
     return JS_ThrowTypeError(ctx, "writeFill(handle, opts)");
   }
   auto h = static_cast<LrvxRunRecorderHandle>(getHandle(ctx, argv[0]));
-  auto opts = argv[1];
-  auto getI64 = [&](const char* k, int64_t d = 0) -> int64_t
+  CheckedOptions opt(ctx, argv[1], "writeFill");
+  const int64_t run_ts = opt.i64("runTsNs");
+  const int64_t feed_ts = opt.i64("feedTsNs");
+  const uint64_t order_id = opt.id("orderId");
+  const uint64_t fill_id = opt.id("fillId");
+  const int64_t price_raw = opt.i64("priceRaw");
+  const int64_t qty_raw = opt.i64("qtyRaw");
+  const int64_t fee_raw = opt.i64("feeRaw");
+  const uint32_t symbol_id = opt.u32("symbolId");
+  const uint32_t side = opt.u32("side");
+  const uint32_t liquidity = opt.u32("liquidity");
+  if (!opt.ok())
   {
-    JSValue v = JS_GetPropertyStr(ctx, opts, k);
-    int64_t out = d;
-    if (!JS_IsUndefined(v) && !JS_IsNull(v))
-    {
-      JS_ToInt64Ext(ctx, &out, v);
-    }
-    JS_FreeValue(ctx, v);
-    return out;
-  };
-  auto getU32 = [&](const char* k, uint32_t d = 0) -> uint32_t
-  {
-    JSValue v = JS_GetPropertyStr(ctx, opts, k);
-    uint32_t out = d;
-    if (!JS_IsUndefined(v) && !JS_IsNull(v))
-    {
-      JS_ToUint32(ctx, &out, v);
-    }
-    JS_FreeValue(ctx, v);
-    return out;
-  };
-  lrvx_run_recorder_write_fill(h, getI64("runTsNs"), getI64("feedTsNs"),
-                               static_cast<uint64_t>(getI64("orderId")),
-                               static_cast<uint64_t>(getI64("fillId")),
-                               getI64("priceRaw"), getI64("qtyRaw"), getI64("feeRaw"),
-                               getU32("symbolId"),
-                               static_cast<uint8_t>(getU32("side")),
-                               static_cast<uint8_t>(getU32("liquidity")));
+    return JS_EXCEPTION;
+  }
+  lrvx_run_recorder_write_fill(h, run_ts, feed_ts, order_id, fill_id, price_raw, qty_raw, fee_raw,
+                               symbol_id, static_cast<uint8_t>(side),
+                               static_cast<uint8_t>(liquidity));
   return JS_UNDEFINED;
 }
 

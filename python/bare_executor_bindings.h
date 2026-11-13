@@ -29,6 +29,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "bindings_common.h"
 #include "lrvx/backtest/rate_limit_policy.h"
 #include "lrvx/backtest/simulated_executor.h"
 #include "lrvx/backtest/venue_availability.h"
@@ -49,7 +50,7 @@ inline void bindBareExecutor(py::module_& m)
   using namespace lrvx;
 
   auto parseSide = [](const std::string& s) -> Side
-  { return s == "buy" ? Side::BUY : Side::SELL; };
+  { return ::parseSide(s); };
 
   // The canonical table, not a copy of it: see
   // python/order_type_bindings.h. An unrecognised name raises instead of
@@ -58,25 +59,7 @@ inline void bindBareExecutor(py::module_& m)
   { return lrvx::parseOrderTypeStrict(s); };
 
   auto parseTif = [](const std::string& s) -> TimeInForce
-  {
-    if (s == "ioc")
-    {
-      return TimeInForce::IOC;
-    }
-    if (s == "fok")
-    {
-      return TimeInForce::FOK;
-    }
-    if (s == "gtd")
-    {
-      return TimeInForce::GTD;
-    }
-    if (s == "post_only")
-    {
-      return TimeInForce::POST_ONLY;
-    }
-    return TimeInForce::GTC;
-  };
+  { return parseTimeInForceWithExpiry(s); };
 
   py::class_<lrvx::SimulatedExecutor>(
       m, "VenueExecutor",

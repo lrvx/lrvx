@@ -157,7 +157,7 @@ Followed by `reason_len` bytes of UTF-8 reason text and padding to 8-byte alignm
 | 0  | 8 | `run_ts_ns` | Wall-clock when the fill was processed. |
 | 8  | 8 | `feed_ts_ns` | Triggering trade tape event; `0` if not applicable. |
 | 16 | 8 | `order_id` | Order this fill belongs to. |
-| 24 | 8 | `fill_id` | Exchange fill id; `0` if unknown. |
+| 24 | 8 | `fill_id` | Exchange fill id; `0` if unknown. The capture listener (`TraceExecutionListener`) and a bundle's trace number the run's fills 1, 2, 3, ... here; the listener used to write the order id, so the partial fills of one order shared it. |
 | 32 | 8 | `price_raw` | Fixed-point price. |
 | 40 | 8 | `qty_raw` | Fixed-point quantity filled. |
 | 48 | 8 | `fee_raw` | Fixed-point fee in fee currency, scale `1e8`. |

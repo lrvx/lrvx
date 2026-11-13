@@ -11,6 +11,7 @@
 #include <stdexcept>
 
 #include "backtest_bindings.h"
+#include "bindings_common.h"
 #include "callback_guard.h"
 #include "drop_reason.h"
 #include "hook_bindings.h"
@@ -26,6 +27,7 @@
 #include "lrvx/book/events/trade_event.h"
 #include "lrvx/capi/bridge_strategy.h"
 #include "lrvx/capi/lrvx_capi.h"
+#include "lrvx/capi/order_status_names.hpp"
 #include "lrvx/capi/order_type_names.hpp"
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/error/lrvx_error.h"
@@ -170,49 +172,6 @@ struct PyOrderEventData
   int32_t distance_to_best_ticks{0};
 };
 
-// Anything but "buy" used to be a sell, and anything but "ioc", "fok" or
-// "post_only" a GTC order: a typo placed an order nobody asked for.
-inline Side parseSide(const std::string& s)
-{
-  if (s == "buy")
-  {
-    return Side::BUY;
-  }
-  if (s == "sell")
-  {
-    return Side::SELL;
-  }
-  throw py::value_error("unknown side '" + s + "'; expected 'buy' or 'sell'");
-}
-
-inline TimeInForce parseTimeInForce(const std::string& tif)
-{
-  if (tif == "gtc")
-  {
-    return TimeInForce::GTC;
-  }
-  if (tif == "ioc")
-  {
-    return TimeInForce::IOC;
-  }
-  if (tif == "fok")
-  {
-    return TimeInForce::FOK;
-  }
-  if (tif == "post_only")
-  {
-    return TimeInForce::POST_ONLY;
-  }
-  if (tif == "gtd")
-  {
-    throw py::value_error(
-        "tif 'gtd' needs an expiry time, which this method does not take; "
-        "expected 'gtc', 'ioc', 'fok' or 'post_only'");
-  }
-  throw py::value_error("unknown tif '" + tif +
-                        "'; expected 'gtc', 'ioc', 'fok' or 'post_only'");
-}
-
 class PyStrategyBase
 {
  public:
@@ -319,22 +278,28 @@ class PyStrategyBase
 
   uint64_t emit_stop_market(uint32_t symbol, const std::string& side, double trigger, double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitStopMarket(symbol, parseSide(side), Price::fromDouble(trigger),
+    return emitting()->publicEmitStopMarket(symbol, parsedSide, Price::fromDouble(trigger),
                                             Quantity::fromDouble(qty));
   }
 
   uint64_t emit_stop_limit(uint32_t symbol, const std::string& side, double trigger,
                            double limit_price, double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitStopLimit(symbol, parseSide(side), Price::fromDouble(trigger),
+    return emitting()->publicEmitStopLimit(symbol, parsedSide, Price::fromDouble(trigger),
                                            Price::fromDouble(limit_price),
                                            Quantity::fromDouble(qty));
   }
@@ -342,11 +307,14 @@ class PyStrategyBase
   uint64_t emit_take_profit_market(uint32_t symbol, const std::string& side, double trigger,
                                    double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitTakeProfitMarket(symbol, parseSide(side),
+    return emitting()->publicEmitTakeProfitMarket(symbol, parsedSide,
                                                   Price::fromDouble(trigger),
                                                   Quantity::fromDouble(qty));
   }
@@ -354,11 +322,14 @@ class PyStrategyBase
   uint64_t emit_take_profit_limit(uint32_t symbol, const std::string& side, double trigger,
                                   double limit_price, double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitTakeProfitLimit(symbol, parseSide(side),
+    return emitting()->publicEmitTakeProfitLimit(symbol, parsedSide,
                                                  Price::fromDouble(trigger),
                                                  Price::fromDouble(limit_price),
                                                  Quantity::fromDouble(qty));
@@ -366,43 +337,49 @@ class PyStrategyBase
 
   uint64_t emit_trailing_stop(uint32_t symbol, const std::string& side, double offset, double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitTrailingStop(symbol, parseSide(side), Price::fromDouble(offset),
+    return emitting()->publicEmitTrailingStop(symbol, parsedSide, Price::fromDouble(offset),
                                               Quantity::fromDouble(qty));
   }
 
   uint64_t emit_trailing_stop_percent(uint32_t symbol, const std::string& side,
                                       int32_t callback_bps, double qty)
   {
+    // Checked before the guard: an unattached strategy still refuses a side
+    // it does not know.
+    const Side parsedSide = parseSide(side);
     if (!_bridge)
     {
       return 0;
     }
-    return emitting()->publicEmitTrailingStopPercent(symbol, parseSide(side), callback_bps,
+    return emitting()->publicEmitTrailingStopPercent(symbol, parsedSide, callback_bps,
                                                      Quantity::fromDouble(qty));
   }
 
   uint64_t emit_limit_buy_tif(uint32_t symbol, double price, double qty, const std::string& tif)
   {
+    const TimeInForce t = parseTimeInForce(tif);
     if (!_bridge)
     {
       return 0;
     }
-    const TimeInForce t = parseTimeInForce(tif);
     return emitting()->publicEmitLimitBuyTif(symbol, Price::fromDouble(price),
                                              Quantity::fromDouble(qty), t);
   }
 
   uint64_t emit_limit_sell_tif(uint32_t symbol, double price, double qty, const std::string& tif)
   {
+    const TimeInForce t = parseTimeInForce(tif);
     if (!_bridge)
     {
       return 0;
     }
-    const TimeInForce t = parseTimeInForce(tif);
     return emitting()->publicEmitLimitSellTif(symbol, Price::fromDouble(price),
                                               Quantity::fromDouble(qty), t);
   }
@@ -1040,53 +1017,7 @@ struct PyStrategyHost
 
   static const char* orderStatusName(uint8_t s)
   {
-    switch (s)
-    {
-      case 0:
-        return "NEW";
-      case 1:
-        return "SUBMITTED";
-      case 2:
-        return "ACCEPTED";
-      case 3:
-        return "PARTIALLY_FILLED";
-      case 4:
-        return "FILLED";
-      case 5:
-        return "PENDING_CANCEL";
-      case 6:
-        return "CANCELED";
-      case 7:
-        return "EXPIRED";
-      case 8:
-        return "REJECTED";
-      case 9:
-        return "REPLACED";
-      case 10:
-        return "PENDING_TRIGGER";
-      case 11:
-        return "TRIGGERED";
-      case 12:
-        return "TRAILING_UPDATED";
-      case 13:
-        return "QUEUE_POSITION_UPDATED";
-      case 14:
-        return "MARKET_POSITION_CHANGED";
-      case 15:
-        return "REPLACE_SUBMITTED";
-      case 16:
-        return "REPLACE_ACCEPTED";
-      case 17:
-        return "REPLACE_REJECTED";
-      case 19:
-        return "PENDING_ONCHAIN";
-      case 20:
-        return "REVERTED";
-      case 21:
-        return "REPLACED_GAS";
-      default:
-        return "UNKNOWN";
-    }
+    return lrvx::capi::orderEventStatusName(s);
   }
 
   static const char* marketPositionName(uint8_t p)
@@ -1251,6 +1182,7 @@ class PyStrategyRunner
   void stop() { lrvx_runner_stop(_runner); }
 
   LrvxRunnerHandle handle() const noexcept { return _runner; }
+  const std::vector<std::unique_ptr<PyStrategyHost>>& hosts() const noexcept { return _hosts; }
 
   void set_pnl_tracker(std::shared_ptr<lrvx::PyPnLTracker> tracker)
   {
@@ -1740,10 +1672,34 @@ class PyLiveEngine
     }
   }
 
+  LrvxLiveEngineHandle handle() const noexcept { return _engine; }
+  const std::vector<std::unique_ptr<PyStrategyHost>>& hosts() const noexcept { return _hosts; }
+
   void order_closed(uint64_t order_id) { lrvx_live_engine_order_closed(_engine, order_id); }
+  // Released like the publish_* methods: the event is queued behind a ring a
+  // consumer drains, and on an engine that is not running the callbacks run
+  // here and take the GIL themselves.
   void on_order_event(const LrvxOrderEventData& ev)
   {
-    lrvx_live_engine_on_order_event(_engine, &ev);
+    std::string why;
+    {
+      py::gil_scoped_release release;
+      lrvx_clear_last_error();
+      lrvx_live_engine_on_order_event(_engine, &ev);
+      if (lrvx_last_error_code() != 0)
+      {
+        why = lrvx_last_error_message();
+      }
+    }
+    if (!why.empty())
+    {
+      throw std::runtime_error("Runner.on_order_event: " + why);
+    }
+  }
+  void drain()
+  {
+    py::gil_scoped_release release;
+    lrvx_live_engine_drain(_engine);
   }
 
   void set_executor(std::shared_ptr<lrvx::PyExecutor> exec)
@@ -1891,6 +1847,51 @@ class PyRunner
     }
   }
 
+  // The position `strat` holds before any fill is reported to this runner.
+  void seed_position(PyStrategyBase* strat, uint32_t symbol, double position,
+                     double avg_entry_price)
+  {
+    const auto bridgeOf = [strat](const auto& hosts) -> BridgeStrategy*
+    {
+      for (const auto& host : hosts)
+      {
+        if (host->strategy.load(std::memory_order_acquire) == strat)
+        {
+          return host->bridge.get();
+        }
+      }
+      return nullptr;
+    };
+    BridgeStrategy* bridge = _live ? bridgeOf(_live->hosts()) : bridgeOf(_sync->hosts());
+    if (bridge == nullptr)
+    {
+      throw py::value_error("Runner.seed_position: the strategy is not attached to this runner");
+    }
+    const int64_t positionRaw = Quantity::fromDouble(position).raw();
+    const int64_t avgRaw = Price::fromDouble(avg_entry_price).raw();
+    lrvx_clear_last_error();
+    const uint8_t ok =
+        _live ? lrvx_live_engine_seed_position(_live->handle(),
+                                               static_cast<LrvxStrategyHandle>(bridge), symbol,
+                                               positionRaw, avgRaw)
+              : lrvx_runner_seed_position(_sync->handle(),
+                                          static_cast<LrvxStrategyHandle>(bridge), symbol,
+                                          positionRaw, avgRaw);
+    if (ok == 0)
+    {
+      throw py::value_error(std::string("Runner.seed_position: ") + lrvx_last_error_message());
+    }
+  }
+
+  // A synchronous runner has delivered everything by the time a call returns.
+  void drain()
+  {
+    if (_live)
+    {
+      _live->drain();
+    }
+  }
+
   // Replays a `.lrvx` tape into this runner with `sim` standing in for the
   // venue. The loop is BacktestRunner's own tape loop (run / processEvent),
   // pointed at `sim` in place of its built-in executor: each trade, book
@@ -1900,7 +1901,7 @@ class PyRunner
   // it would in a backtest of the same tape, not from trades alone.
   py::dict replay_tape(const std::string& path, PySimulatedExecutor& sim,
                        std::optional<uint32_t> tape_symbol, std::optional<uint32_t> symbol,
-                       py::object lock, py::object after_event)
+                       py::object lock, py::object after_event, py::object on_start)
   {
     namespace fs = std::filesystem;
     if (!fs::is_directory(fs::path(path)))
@@ -1957,11 +1958,24 @@ class PyRunner
       std::optional<uint32_t> to;
       Held& held;
       py::object& afterEvent;
+      py::object& onStart;
+      PyRunner& runner;
+      bool started{false};
 
       Remapped(replay::IMultiSegmentReader& r, std::optional<uint32_t> id, Held& h,
-               py::object& after)
-          : inner(r), to(id), held(h), afterEvent(after)
+               py::object& after, py::object& start, PyRunner& owner)
+          : inner(r), to(id), held(h), afterEvent(after), onStart(start), runner(owner)
       {
+      }
+
+      // The driver asks for the events once it has reset the simulator.
+      void begin()
+      {
+        if (!started && !onStart.is_none())
+        {
+          started = true;
+          onStart();
+        }
       }
 
       bool one(const replay::ReplayEvent& event, const EventCallback& callback)
@@ -1990,19 +2004,28 @@ class PyRunner
           throw;
         }
         held.release();
+        // The barrier of a threaded runner: its strategies have been handed
+        // this event, and have sent whatever orders it made them send,
+        // before the hook runs; and they have heard whatever the hook
+        // reported before the simulator is shown the next event. Without it
+        // an order met the tape wherever the strategy thread happened to be.
+        runner.drain();
         if (!afterEvent.is_none())
         {
           afterEvent();
+          runner.drain();
         }
         return more;
       }
       uint64_t forEach(EventCallback callback) override
       {
+        begin();
         return inner.forEach([&](const replay::ReplayEvent& e)
                              { return one(e, callback); });
       }
       uint64_t forEachFrom(int64_t start, EventCallback callback) override
       {
+        begin();
         return inner.forEachFrom(start, [&](const replay::ReplayEvent& e)
                                  { return one(e, callback); });
       }
@@ -2011,7 +2034,7 @@ class PyRunner
         return inner.segments();
       }
       uint64_t totalEvents() const override { return inner.totalEvents(); }
-    } reader{*inner, symbol, held, after_event};
+    } reader{*inner, symbol, held, after_event, on_start, *this};
 
     // The runner's side of the loop: what a backtest hands its strategy goes
     // to this runner instead. The simulator has seen the event by now, so
@@ -2128,27 +2151,10 @@ class PyRunner
       throw py::value_error("Runner.on_order_event: " +
                             lrvx::capi::unknownOrderTypeMessage(order_type));
     }
-    bool known = false;
-    std::string names;
-    for (uint8_t code = 0; code <= static_cast<uint8_t>(OrderEventStatus::REPLACED_GAS); ++code)
+    if (!lrvx::capi::orderEventStatusCodeFromName(status, &ev.status))
     {
-      const char* name = PyStrategyHost::orderStatusName(code);
-      if (status == name && status != "UNKNOWN")
-      {
-        ev.status = code;
-        known = true;
-        break;
-      }
-      if (std::string(name) != "UNKNOWN")
-      {
-        names += names.empty() ? "" : ", ";
-        names += name;
-      }
-    }
-    if (!known)
-    {
-      throw py::value_error("Runner.on_order_event: unknown status '" + status +
-                            "'; expected one of: " + names);
+      throw py::value_error("Runner.on_order_event: " +
+                            lrvx::capi::unknownOrderEventStatusMessage(status));
     }
     ev.fill_qty_raw = Quantity::fromDouble(fill_qty).raw();
     ev.fill_price_raw = Price::fromDouble(fill_price).raw();
@@ -2160,15 +2166,13 @@ class PyRunner
     {
       ev.last_fill_at_ns = ts_ns;
     }
-    lrvx_clear_last_error();
     if (_live)
     {
       _live->on_order_event(ev);
+      return;
     }
-    else
-    {
-      _sync->on_order_event(ev);
-    }
+    lrvx_clear_last_error();
+    _sync->on_order_event(ev);
     if (lrvx_last_error_code() != 0)
     {
       throw std::runtime_error(std::string("Runner.on_order_event: ") + lrvx_last_error_message());
@@ -3700,6 +3704,10 @@ inline void bindStrategy(py::module_& m)
       .def_readwrite("filled_quantity", &lrvx::PyOrder::filled_quantity)
       .def_readwrite("trigger_price", &lrvx::PyOrder::trigger_price)
       .def_readwrite("trailing_offset", &lrvx::PyOrder::trailing_offset)
+      .def_readwrite("trailing_bps", &lrvx::PyOrder::trailing_bps,
+                     "Callback rate of a percent trailing stop (trailing_stop_percent), in "
+                     "basis points; 0 for a trailing stop with a fixed trailing_offset and for "
+                     "every other order.")
       .def_readwrite("created_at_ns", &lrvx::PyOrder::created_at_ns)
       .def_readwrite("exchange_ts_ns", &lrvx::PyOrder::exchange_ts_ns);
 
@@ -3814,13 +3822,13 @@ inline void bindStrategy(py::module_& m)
            "that is not on record is ignored; market, IOC and FOK orders are never kept. A "
            "modify that names an id not on record is not sent to the executor, and "
            "lrvx.last_error() then says why, ending in [unknown_order].")
-      .def("replay_tape", [](PyRunner& r, const std::string& path, PySimulatedExecutor& simulator, py::object tape_symbol_id, py::object symbol, py::object lock, py::object after_event)
+      .def("replay_tape", [](PyRunner& r, const std::string& path, PySimulatedExecutor& simulator, py::object tape_symbol_id, py::object symbol, py::object lock, py::object after_event, py::object on_start)
            { return r.replay_tape(
                  path, simulator,
                  tape_symbol_id.is_none() ? std::nullopt
                                           : std::optional<uint32_t>(tape_symbol_id.cast<uint32_t>()),
                  symbol.is_none() ? std::nullopt : std::optional<uint32_t>(symId(symbol)),
-                 std::move(lock), std::move(after_event)); }, py::arg("path"), py::arg("simulator"), py::kw_only(), py::arg("tape_symbol_id") = py::none(), py::arg("symbol") = py::none(), py::arg("lock") = py::none(), py::arg("after_event") = py::none(),
+                 std::move(lock), std::move(after_event), std::move(on_start)); }, py::arg("path"), py::arg("simulator"), py::kw_only(), py::arg("tape_symbol_id") = py::none(), py::arg("symbol") = py::none(), py::arg("lock") = py::none(), py::arg("after_event") = py::none(), py::arg("on_start") = py::none(),
            "Replay a `.lrvx` tape into this runner's strategies with `simulator` (a "
            "SimulatedExecutor) standing in for the venue, through the loop BacktestRunner.run_tape "
            "uses: every trade, book snapshot, book delta and top-of-book frame, in the tape's time "
@@ -3830,7 +3838,12 @@ inline void bindStrategy(py::module_& m)
            "tape_symbol_id and symbol, only that tape symbol is replayed and its events are "
            "delivered under the registered `symbol`. `lock` (anything with acquire / release) is "
            "held while the simulator is shown an event and released before the strategies see "
-           "it; `after_event()` is called after each event. The strategies receive trades, book "
+           "it; `after_event()` is called after each event. `on_start()` is called once, after "
+           "the simulator has been reset and before it is shown the first event: what is "
+           "submitted to the simulator from then on is not wiped by the reset. On a threaded "
+           "runner the replay waits, after each event, until the strategies have been handed it "
+           "and again after `after_event()`, so an order meets the tape at the same event as on "
+           "a synchronous runner. The strategies receive trades, book "
            "snapshots and tops; a live runner has no delta entry, so deltas reach the simulator "
            "only. Returns a dict: events, trades, books, book_deltas_not_delivered, "
            "skipped_option_quotes, skipped_pool_states.")
@@ -3840,13 +3853,33 @@ inline void bindStrategy(py::module_& m)
            "Report one order event a venue sent (a broker's order update or fill) to the "
            "strategy that issued the order, through the callbacks a backtest uses: "
            "PARTIALLY_FILLED and FILLED reach Strategy.on_fill(ctx, event) and only on_fill, "
-           "every other status reaches Strategy.on_order_update(ctx, event). The runner's "
-           "position tracker sees the event first, so ctx.position inside on_fill counts the "
-           "fill. side is 'buy' or 'sell'; status and order_type are the names OrderEventData "
-           "carries ('ACCEPTED', 'CANCELED', 'limit', ...); fill_qty and fill_price are this "
-           "fill's own, not the order's running totals. An order id from no attached "
-           "strategy's block goes to every strategy subscribed to the symbol. The callbacks run "
+           "every other status reaches Strategy.on_order_update(ctx, event). Each strategy has "
+           "a position of its own, as in a backtest: the fill counts in the position of the "
+           "strategy that issued the order, before on_fill runs, so ctx.position inside on_fill "
+           "counts it. side is 'buy' or 'sell'; status and order_type are the names "
+           "OrderEventData carries ('ACCEPTED', 'CANCELED', 'limit', ...); fill_qty and "
+           "fill_price are this fill's own, not the order's running totals. An order id no "
+           "attached strategy issued goes to every strategy subscribed to the symbol and counts "
+           "in no position. On a synchronous runner the callbacks run on the calling thread. On "
+           "a threaded runner the event is queued and the callbacks run on the strategy's "
+           "order-event consumer thread, after every trade, book and bar published before the "
+           "report has been handed to that strategy; before start() and after stop() they run "
            "on the calling thread. ValueError for an unknown side, status or order type.")
+      .def("seed_position", [](PyRunner& r, PyStrategyBase* strategy, py::object sym, double position, double avg_entry_price)
+           { r.seed_position(strategy, symId(sym), position, avg_entry_price); }, py::arg("strategy"), py::arg("symbol"), py::arg("position"), py::arg("avg_entry_price") = 0.0,
+           "Set what `strategy` holds in `symbol` before any fill is reported: the position an "
+           "account already has when a host starts or restarts, which no on_order_event will "
+           "tell of. `position` is signed (negative for a short) and `avg_entry_price` its "
+           "average entry (0.0 when unknown). The strategy then reads it from self.position() "
+           "and ctx.position, and the fills reported afterwards add to it. Positions are per "
+           "strategy, so name the one the position belongs to. ValueError for a strategy that "
+           "is not attached to this runner and for one that already holds a position in the "
+           "symbol: a position is seeded once. 0 is accepted and changes nothing.")
+      .def("drain", &PyRunner::drain,
+           "Return once every strategy has been handed everything published so far (trades, "
+           "books, bars, order events) and whatever those callbacks published in turn. A "
+           "threaded runner's barrier; a synchronous runner has nothing queued and returns at "
+           "once, as does a runner that is not started. Never call it from a strategy callback.")
       .def("attach_trace_recorder", [](PyRunner& r, py::object recorder)
            {
              // Accepts a lrvx.TraceRecorder or None. The TraceRecorder

@@ -41,7 +41,7 @@ inline std::vector<int64_t> readInt64Array(const Napi::Value& v)
   out.reserve(arr.Length());
   for (uint32_t i = 0; i < arr.Length(); ++i)
   {
-    out.push_back(arr.Get(i).As<Napi::Number>().Int64Value());
+    out.push_back(argInteger(arr.Get(i), "a latency sample"));
   }
   return out;
 }
@@ -50,7 +50,7 @@ inline int64_t getInt64(const Napi::Object& o, const char* key, int64_t fallback
 {
   if (o.Has(key))
   {
-    return o.Get(key).As<Napi::Number>().Int64Value();
+    return argInteger(o.Get(key), key);
   }
   return fallback;
 }
@@ -59,7 +59,7 @@ inline double getDouble(const Napi::Object& o, const char* key, double fallback)
 {
   if (o.Has(key))
   {
-    return o.Get(key).As<Napi::Number>().DoubleValue();
+    return argNumber(o.Get(key), key);
   }
   return fallback;
 }
@@ -93,7 +93,7 @@ inline double getDouble(const Napi::Object& o, const char* key, double fallback)
     uint64_t seed = 0;                                                           \
     if (info.Length() > 0 && info[0].IsNumber())                                 \
     {                                                                            \
-      seed = static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());     \
+      seed = static_cast<uint64_t>(argInteger(info[0], "reset: argument 1"));    \
     }                                                                            \
     lrvx_latency_reset(_h, seed);                                                \
   }                                                                              \
@@ -128,7 +128,7 @@ class ConstantLatencyWrap : public Napi::ObjectWrap<ConstantLatencyWrap>
     int64_t feed = 0, order = 0, fill = 0;
     if (info.Length() > 0 && info[0].IsObject())
     {
-      auto opts = info[0].As<Napi::Object>();
+      auto opts = argObject(info[0], "ConstantLatency: argument 1");
       feed = detail::getInt64(opts, "feedNs", 0);
       order = detail::getInt64(opts, "orderNs", 0);
       fill = detail::getInt64(opts, "fillNs", 0);
@@ -166,7 +166,7 @@ class GaussianLatencyWrap : public Napi::ObjectWrap<GaussianLatencyWrap>
     uint64_t seed = 0;
     if (info.Length() > 0 && info[0].IsObject())
     {
-      auto opts = info[0].As<Napi::Object>();
+      auto opts = argObject(info[0], "GaussianLatency: argument 1");
       fm = detail::getDouble(opts, "feedMeanNs", 0.0);
       fs = detail::getDouble(opts, "feedStddevNs", 0.0);
       om = detail::getDouble(opts, "orderMeanNs", 0.0);
@@ -208,7 +208,7 @@ class ExponentialLatencyWrap : public Napi::ObjectWrap<ExponentialLatencyWrap>
     uint64_t seed = 0;
     if (info.Length() > 0 && info[0].IsObject())
     {
-      auto opts = info[0].As<Napi::Object>();
+      auto opts = argObject(info[0], "ExponentialLatency: argument 1");
       fm = detail::getDouble(opts, "feedMeanNs", 0.0);
       om = detail::getDouble(opts, "orderMeanNs", 0.0);
       lm = detail::getDouble(opts, "fillMeanNs", 0.0);
@@ -247,7 +247,7 @@ class EmpiricalLatencyWrap : public Napi::ObjectWrap<EmpiricalLatencyWrap>
     uint64_t seed = 0;
     if (info.Length() > 0 && info[0].IsObject())
     {
-      auto opts = info[0].As<Napi::Object>();
+      auto opts = argObject(info[0], "EmpiricalLatency: argument 1");
       if (opts.Has("feedSamples"))
       {
         feed = detail::readInt64Array(opts.Get("feedSamples"));

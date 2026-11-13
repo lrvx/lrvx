@@ -159,11 +159,27 @@ export interface TradeData {
   exchangeTsNs?: bigint;
 }
 
+/** What `Runner.onOrderEvent` takes. */
+export interface ReportedOrderEvent {
+  orderId: number | bigint;
+  symbol: Symbol | number;
+  side: "buy" | "sell";
+  status: Exclude<OrderEventStatus, "UNKNOWN">;
+  /** Lower-case order type name; `"limit"` when omitted. */
+  orderType?: string;
+  fillQty?: number;
+  fillPrice?: number;
+  /** Exchange timestamp of the event, in nanoseconds. */
+  tsNs?: number | bigint;
+  rejectReason?: string;
+  isMaker?: boolean;
+}
+
 /** Order-event lifecycle status, mirrored from `LrvxOrderEventStatus`. */
 export type OrderEventStatus =
   | "NEW"
+  | "SUBMITTED"
   | "ACCEPTED"
-  | "PENDING_NEW"
   | "PARTIALLY_FILLED"
   | "FILLED"
   | "PENDING_CANCEL"
@@ -179,6 +195,7 @@ export type OrderEventStatus =
   | "REPLACE_SUBMITTED"
   | "REPLACE_ACCEPTED"
   | "REPLACE_REJECTED"
+  | "REJECTED_RATE_LIMIT"
   | "PENDING_ONCHAIN"
   | "REVERTED"
   | "REPLACED_GAS"
@@ -377,6 +394,9 @@ export interface Order {
   filledQuantity: number;
   triggerPrice: number;
   trailingOffset: number;
+  /** Callback rate of a percent trailing stop, in basis points; 0 for a
+   *  trailing stop with a fixed `trailingOffset` and for every other order. */
+  trailingBps: number;
   /** Absolute nanosecond clock readings: a `Number` is a double and steps
    *  256 ns at present-day magnitudes. */
   createdAtNs: bigint;
@@ -724,6 +744,40 @@ export class Runner {
    *  An `emit.modify` that names an id not on record is not sent to the
    *  executor; `lastError()` then says why and ends in `[unknown_order]`. */
   orderClosed(orderId: number | bigint): void;
+
+  /** Report one order event a venue sent (a broker's order update or fill)
+   *  to the strategy that issued the order, through the callbacks a
+   *  backtest uses: `PARTIALLY_FILLED` and `FILLED` reach `onFill` and only
+   *  `onFill`, every other status reaches `onOrderUpdate`.
+   *
+   *  Each strategy has a position of its own, as in a backtest: the fill
+   *  counts in the position of the strategy that issued the order before
+   *  `onFill` runs. An order id no attached strategy issued goes to every
+   *  strategy subscribed to the symbol and counts in no position.
+   *
+   *  `fillQty` and `fillPrice` are this fill's own, not the order's running
+   *  totals. On a sync runner the callbacks run inside the call. On a
+   *  threaded runner the event is queued behind the market data published
+   *  before it and the callbacks run later on the JS thread, like every
+   *  other callback of that runner; it throws unless the runner is started.
+   *
+   *  Throws `TypeError` for a missing or mistyped field and an unknown
+   *  side, status or order type. */
+  onOrderEvent(event: ReportedOrderEvent): void;
+
+  /** Set what the strategy at `strategyIndex` (the order of `addStrategy`,
+   *  from 0) holds in `symbol` before any fill is reported: the position
+   *  an account already has when a host starts or restarts. `position` is
+   *  signed, negative for a short; `avgEntryPrice` is 0 when omitted. The
+   *  strategy reads it from `ctx.position`, and fills reported afterwards
+   *  add to it. Throws for an index this runner does not hold and for a
+   *  strategy that already holds a position in the symbol. */
+  seedPosition(
+    strategyIndex: number,
+    symbol: Symbol | number,
+    position: number,
+    avgEntryPrice?: number,
+  ): void;
 
   /** Every hook failure this Runner has seen, oldest first.
    *

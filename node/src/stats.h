@@ -14,29 +14,29 @@ inline std::vector<double> toVec(Napi::Float64Array& a) { return {a.Data(), a.Da
 
 inline Napi::Value stat_correlation(const Napi::CallbackInfo& info)
 {
-  auto x = info[0].As<Napi::Float64Array>();
-  auto y = info[1].As<Napi::Float64Array>();
+  auto x = argFloat64Array(info[0], "stat_correlation: argument 1");
+  auto y = argFloat64Array(info[1], "stat_correlation: argument 2");
   size_t n = std::min(x.ElementLength(), y.ElementLength());
   return Napi::Number::New(info.Env(), lrvx_stat_correlation(x.Data(), y.Data(), n));
 }
 
 inline Napi::Value stat_profit_factor(const Napi::CallbackInfo& info)
 {
-  auto a = info[0].As<Napi::Float64Array>();
+  auto a = argFloat64Array(info[0], "stat_profit_factor: argument 1");
   return Napi::Number::New(info.Env(), lrvx_stat_profit_factor(a.Data(), a.ElementLength()));
 }
 
 inline Napi::Value stat_win_rate(const Napi::CallbackInfo& info)
 {
-  auto a = info[0].As<Napi::Float64Array>();
+  auto a = argFloat64Array(info[0], "stat_win_rate: argument 1");
   return Napi::Number::New(info.Env(), lrvx_stat_win_rate(a.Data(), a.ElementLength()));
 }
 
 inline Napi::Value stat_bootstrap_ci(const Napi::CallbackInfo& info)
 {
-  auto a = info[0].As<Napi::Float64Array>();
-  double conf = info.Length() > 1 ? info[1].As<Napi::Number>().DoubleValue() : 0.95;
-  uint32_t samples = info.Length() > 2 ? info[2].As<Napi::Number>().Uint32Value() : 10000;
+  auto a = argFloat64Array(info[0], "stat_bootstrap_ci: argument 1");
+  double conf = info.Length() > 1 ? argNumber(info[1], "stat_bootstrap_ci: argument 2") : 0.95;
+  uint32_t samples = info.Length() > 2 ? argUint32(info[2], "stat_bootstrap_ci: argument 3") : 10000;
   double lo, med, hi;
   lrvx_stat_bootstrap_ci(a.Data(), a.ElementLength(), conf, samples, &lo, &med, &hi);
   auto o = Napi::Object::New(info.Env());
@@ -48,9 +48,9 @@ inline Napi::Value stat_bootstrap_ci(const Napi::CallbackInfo& info)
 
 inline Napi::Value stat_permutation_test(const Napi::CallbackInfo& info)
 {
-  auto g1 = info[0].As<Napi::Float64Array>();
-  auto g2 = info[1].As<Napi::Float64Array>();
-  uint32_t n = info.Length() > 2 ? info[2].As<Napi::Number>().Uint32Value() : 10000;
+  auto g1 = argFloat64Array(info[0], "stat_permutation_test: argument 1");
+  auto g2 = argFloat64Array(info[1], "stat_permutation_test: argument 2");
+  uint32_t n = info.Length() > 2 ? argUint32(info[2], "stat_permutation_test: argument 3") : 10000;
   return Napi::Number::New(info.Env(), lrvx_stat_permutation_test(g1.Data(), g1.ElementLength(), g2.Data(), g2.ElementLength(), n));
 }
 
@@ -68,11 +68,11 @@ inline Napi::Value stat_permutation_test(const Napi::CallbackInfo& info)
 // Returns: { p_value: number, best_stat: number, best_index: number }.
 inline Napi::Value stat_whites_reality_check(const Napi::CallbackInfo& info)
 {
-  auto returns = info[0].As<Napi::Float64Array>();
-  size_t K = info[1].As<Napi::Number>().Uint32Value();
-  size_t T = info[2].As<Napi::Number>().Uint32Value();
-  uint32_t numBootstrap = info.Length() > 3 ? info[3].As<Napi::Number>().Uint32Value() : 10000u;
-  double avgBlock = info.Length() > 4 ? info[4].As<Napi::Number>().DoubleValue() : 0.0;
+  auto returns = argFloat64Array(info[0], "stat_whites_reality_check: argument 1");
+  size_t K = argUint32(info[1], "stat_whites_reality_check: argument 2");
+  size_t T = argUint32(info[2], "stat_whites_reality_check: argument 3");
+  uint32_t numBootstrap = info.Length() > 3 ? argUint32(info[3], "stat_whites_reality_check: argument 4") : 10000u;
+  double avgBlock = info.Length() > 4 ? argNumber(info[4], "stat_whites_reality_check: argument 5") : 0.0;
   if (returns.ElementLength() < K * T)
   {
     Napi::TypeError::New(info.Env(),
@@ -98,10 +98,10 @@ inline Napi::Value stat_whites_reality_check(const Napi::CallbackInfo& info)
 // and splits 0 when the inputs cannot be split.
 inline Napi::Value stat_pbo_cscv(const Napi::CallbackInfo& info)
 {
-  auto returns = info[0].As<Napi::Float64Array>();
-  size_t N = info[1].As<Napi::Number>().Uint32Value();
-  size_t T = info[2].As<Napi::Number>().Uint32Value();
-  uint32_t numBlocks = info.Length() > 3 ? info[3].As<Napi::Number>().Uint32Value() : 16u;
+  auto returns = argFloat64Array(info[0], "stat_pbo_cscv: argument 1");
+  size_t N = argUint32(info[1], "stat_pbo_cscv: argument 2");
+  size_t T = argUint32(info[2], "stat_pbo_cscv: argument 3");
+  uint32_t numBlocks = info.Length() > 3 ? argUint32(info[3], "stat_pbo_cscv: argument 4") : 16u;
   if (returns.ElementLength() < N * T)
   {
     Napi::TypeError::New(info.Env(), "returns array shorter than numTrials*numPeriods")
@@ -125,12 +125,12 @@ inline Napi::Value stat_pbo_cscv(const Napi::CallbackInfo& info)
 // Returns { sharpe, skewness, kurtosis, expected_max_sharpe, dsr }.
 inline Napi::Value stat_deflated_sharpe(const Napi::CallbackInfo& info)
 {
-  auto returns = info[0].As<Napi::Float64Array>();
+  auto returns = argFloat64Array(info[0], "stat_deflated_sharpe: argument 1");
   const double* trials = nullptr;
   size_t numTrials = 0;
   if (info.Length() > 1 && !info[1].IsUndefined() && !info[1].IsNull())
   {
-    auto t = info[1].As<Napi::Float64Array>();
+    auto t = argFloat64Array(info[1], "stat_deflated_sharpe: argument 2");
     trials = t.Data();
     numTrials = t.ElementLength();
   }
@@ -151,14 +151,14 @@ inline Napi::Value stat_deflated_sharpe(const Napi::CallbackInfo& info)
 // neighbor_count: Uint32Array }, both with one entry per cell.
 inline Napi::Value stat_grid_neighborhood(const Napi::CallbackInfo& info)
 {
-  auto values = info[0].As<Napi::Float64Array>();
-  auto shapeArr = info[1].As<Napi::Array>();
-  size_t radius = info.Length() > 2 ? info[2].As<Napi::Number>().Uint32Value() : 1u;
+  auto values = argFloat64Array(info[0], "stat_grid_neighborhood: argument 1");
+  auto shapeArr = argArray(info[1], "stat_grid_neighborhood: argument 2");
+  size_t radius = info.Length() > 2 ? argUint32(info[2], "stat_grid_neighborhood: argument 3") : 1u;
   std::vector<size_t> shape(shapeArr.Length());
   size_t total = shape.empty() ? 0 : 1;
   for (uint32_t i = 0; i < shapeArr.Length(); ++i)
   {
-    shape[i] = shapeArr.Get(i).As<Napi::Number>().Uint32Value();
+    shape[i] = argUint32(shapeArr.Get(i), "a dimension of shape");
     total *= shape[i];
   }
   if (values.ElementLength() < total)
@@ -185,9 +185,9 @@ inline Napi::Value stat_grid_neighborhood(const Napi::CallbackInfo& info)
 // bar_returns/trade_pnl bindings (see indicator_bindings.h).
 inline Napi::Value stat_bar_returns(const Napi::CallbackInfo& info)
 {
-  auto sl = info[0].As<Napi::Int8Array>();
-  auto ss = info[1].As<Napi::Int8Array>();
-  auto lr = info[2].As<Napi::Float64Array>();
+  auto sl = argInt8Array(info[0], "stat_bar_returns: argument 1");
+  auto ss = argInt8Array(info[1], "stat_bar_returns: argument 2");
+  auto lr = argFloat64Array(info[2], "stat_bar_returns: argument 3");
   size_t n = sl.ElementLength();
   if (!requireSameLength(info.Env(), "bar_returns", {n, ss.ElementLength(), lr.ElementLength()}))
   {
@@ -208,9 +208,9 @@ inline Napi::Value stat_bar_returns(const Napi::CallbackInfo& info)
 
 inline Napi::Value stat_trade_pnl(const Napi::CallbackInfo& info)
 {
-  auto sl = info[0].As<Napi::Int8Array>();
-  auto ss = info[1].As<Napi::Int8Array>();
-  auto lr = info[2].As<Napi::Float64Array>();
+  auto sl = argInt8Array(info[0], "stat_trade_pnl: argument 1");
+  auto ss = argInt8Array(info[1], "stat_trade_pnl: argument 2");
+  auto lr = argFloat64Array(info[2], "stat_trade_pnl: argument 3");
   size_t n = sl.ElementLength();
   if (!requireSameLength(info.Env(), "trade_pnl", {n, ss.ElementLength(), lr.ElementLength()}))
   {

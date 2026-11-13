@@ -1812,6 +1812,14 @@ class Order:
     def symbol(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
     @property
+    def trailing_bps(self) -> int:
+        """
+        Callback rate of a percent trailing stop (trailing_stop_percent), in basis points; 0 for a trailing stop with a fixed trailing_offset and for every other order.
+        """
+    @trailing_bps.setter
+    def trailing_bps(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
     def trailing_offset(self) -> float:
         ...
     @trailing_offset.setter
@@ -2618,6 +2626,10 @@ class Runner:
         ...
     def attach_trace_recorder(self, recorder: typing.Any) -> None:
         ...
+    def drain(self) -> None:
+        """
+        Return once every strategy has been handed everything published so far (trades, books, bars, order events) and whatever those callbacks published in turn. A threaded runner's barrier; a synchronous runner has nothing queued and returns at once, as does a runner that is not started. Never call it from a strategy callback.
+        """
     def on_bar(self, symbol: typing.Any, open: typing.SupportsFloat | typing.SupportsIndex, high: typing.SupportsFloat | typing.SupportsIndex, low: typing.SupportsFloat | typing.SupportsIndex, close: typing.SupportsFloat | typing.SupportsIndex, volume: typing.SupportsFloat | typing.SupportsIndex = 0.0, buy_volume: typing.SupportsFloat | typing.SupportsIndex = 0.0, start_time_ns: typing.SupportsInt | typing.SupportsIndex = 0, end_time_ns: typing.SupportsInt | typing.SupportsIndex = 0, bar_type: typing.SupportsInt | typing.SupportsIndex = 0, bar_type_param: typing.SupportsInt | typing.SupportsIndex = 0, close_reason: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
         ...
     def on_book_snapshot(self, symbol: typing.Any, bid_prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], bid_qtys: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ask_prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ask_qtys: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
@@ -2628,7 +2640,7 @@ class Runner:
         """
     def on_order_event(self, order_id: typing.SupportsInt | typing.SupportsIndex, symbol: typing.Any, side: str, status: str, order_type: str = 'limit', fill_qty: typing.SupportsFloat | typing.SupportsIndex = 0.0, fill_price: typing.SupportsFloat | typing.SupportsIndex = 0.0, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0, reject_reason: str = '', is_maker: bool = False) -> None:
         """
-        Report one order event a venue sent (a broker's order update or fill) to the strategy that issued the order, through the callbacks a backtest uses: PARTIALLY_FILLED and FILLED reach Strategy.on_fill(ctx, event) and only on_fill, every other status reaches Strategy.on_order_update(ctx, event). The runner's position tracker sees the event first, so ctx.position inside on_fill counts the fill. side is 'buy' or 'sell'; status and order_type are the names OrderEventData carries ('ACCEPTED', 'CANCELED', 'limit', ...); fill_qty and fill_price are this fill's own, not the order's running totals. An order id from no attached strategy's block goes to every strategy subscribed to the symbol. The callbacks run on the calling thread. ValueError for an unknown side, status or order type.
+        Report one order event a venue sent (a broker's order update or fill) to the strategy that issued the order, through the callbacks a backtest uses: PARTIALLY_FILLED and FILLED reach Strategy.on_fill(ctx, event) and only on_fill, every other status reaches Strategy.on_order_update(ctx, event). Each strategy has a position of its own, as in a backtest: the fill counts in the position of the strategy that issued the order, before on_fill runs, so ctx.position inside on_fill counts it. side is 'buy' or 'sell'; status and order_type are the names OrderEventData carries ('ACCEPTED', 'CANCELED', 'limit', ...); fill_qty and fill_price are this fill's own, not the order's running totals. An order id no attached strategy issued goes to every strategy subscribed to the symbol and counts in no position. On a synchronous runner the callbacks run on the calling thread. On a threaded runner the event is queued and the callbacks run on the strategy's order-event consumer thread, after every trade, book and bar published before the report has been handed to that strategy; before start() and after stop() they run on the calling thread. ValueError for an unknown side, status or order type.
         """
     def on_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
         ...
@@ -2640,9 +2652,13 @@ class Runner:
         """
         Atomically swap the strategy instance at `index` for a new one. The old strategy's on_stop fires, the bridge's internal state survives, the new strategy's on_start fires afterwards. WebSocket / gRPC connections are unaffected.
         """
-    def replay_tape(self, path: str, simulator: SimulatedExecutor, *, tape_symbol_id: typing.Any = None, symbol: typing.Any = None, lock: typing.Any = None, after_event: typing.Any = None) -> dict:
+    def replay_tape(self, path: str, simulator: SimulatedExecutor, *, tape_symbol_id: typing.Any = None, symbol: typing.Any = None, lock: typing.Any = None, after_event: typing.Any = None, on_start: typing.Any = None) -> dict:
         """
-        Replay a `.lrvx` tape into this runner's strategies with `simulator` (a SimulatedExecutor) standing in for the venue, through the loop BacktestRunner.run_tape uses: every trade, book snapshot, book delta and top-of-book frame, in the tape's time order, moves the simulator's clock and reaches the simulator before the strategies, so an order resting in the simulator fills from the books as in a backtest of the same tape. The simulator is reset first, as at the start of a backtest run. With tape_symbol_id and symbol, only that tape symbol is replayed and its events are delivered under the registered `symbol`. `lock` (anything with acquire / release) is held while the simulator is shown an event and released before the strategies see it; `after_event()` is called after each event. The strategies receive trades, book snapshots and tops; a live runner has no delta entry, so deltas reach the simulator only. Returns a dict: events, trades, books, book_deltas_not_delivered, skipped_option_quotes, skipped_pool_states.
+        Replay a `.lrvx` tape into this runner's strategies with `simulator` (a SimulatedExecutor) standing in for the venue, through the loop BacktestRunner.run_tape uses: every trade, book snapshot, book delta and top-of-book frame, in the tape's time order, moves the simulator's clock and reaches the simulator before the strategies, so an order resting in the simulator fills from the books as in a backtest of the same tape. The simulator is reset first, as at the start of a backtest run. With tape_symbol_id and symbol, only that tape symbol is replayed and its events are delivered under the registered `symbol`. `lock` (anything with acquire / release) is held while the simulator is shown an event and released before the strategies see it; `after_event()` is called after each event. `on_start()` is called once, after the simulator has been reset and before it is shown the first event: what is submitted to the simulator from then on is not wiped by the reset. On a threaded runner the replay waits, after each event, until the strategies have been handed it and again after `after_event()`, so an order meets the tape at the same event as on a synchronous runner. The strategies receive trades, book snapshots and tops; a live runner has no delta entry, so deltas reach the simulator only. Returns a dict: events, trades, books, book_deltas_not_delivered, skipped_option_quotes, skipped_pool_states.
+        """
+    def seed_position(self, strategy: Strategy, symbol: typing.Any, position: typing.SupportsFloat | typing.SupportsIndex, avg_entry_price: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:
+        """
+        Set what `strategy` holds in `symbol` before any fill is reported: the position an account already has when a host starts or restarts, which no on_order_event will tell of. `position` is signed (negative for a short) and `avg_entry_price` its average entry (0.0 when unknown). The strategy then reads it from self.position() and ctx.position, and the fills reported afterwards add to it. Positions are per strategy, so name the one the position belongs to. ValueError for a strategy that is not attached to this runner and for one that already holds a position in the symbol: a position is seeded once. 0 is accepted and changes nothing.
         """
     def set_executor(self, executor: Executor) -> None:
         ...

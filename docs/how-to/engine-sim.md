@@ -72,17 +72,26 @@ The strategy's orders reach the simulator through the runner's executor hook:
 
 | Strategy call | Simulator |
 |---------------|-----------|
-| an order (`market_buy`, `limit_sell`, ...) | `submit_order` under the order's id, with the trigger of a stop or take-profit order and the offset of a trailing stop. They used to be left out, so a stop reached the simulator without its trigger. `trailing_stop_percent` is refused (the order a runner hands an executor has no field for the rate); use `trailing_stop(offset=...)` |
+| an order (`market_buy`, `limit_sell`, ...) | `submit_order` under the order's id, with the trigger of a stop or take-profit order and the offset of a trailing stop. They used to be left out, so a stop reached the simulator without its trigger. A `trailing_stop_percent` goes with its callback rate (`trailing_bps`), which `Order.trailing_bps` carries to an executor; it used to be refused |
 | `cancel_order(id)` | `cancel_order(id)` |
 | `cancel_all_orders()` | `cancel_all(symbol)` |
 | `modify_order(id, price, qty)` | `cancel_order(id)`, then `submit_order` of the order with its new price and quantity under the same id. A modify used to be dropped: the hook had no `replace`. |
 
-After each event the orders the simulator has filled completely are reported
-to the runner (`Runner.order_closed`), which drops them from the record it
-keeps for `modify_order`. A later `modify_order` of a filled order is then
-refused by the runner with `[unknown_order]` in `lrvx.last_error()` and is
-not sent to the simulator as a new order. A partly filled order stays on
-record until the rest fills.
+After each event the simulator's new fills are reported to the runner. Every
+fill goes to the strategy that placed the order as an order event
+(`Runner.on_order_event`): `on_fill(ctx, event)` runs with `event.status`
+`"PARTIALLY_FILLED"`, or `"FILLED"` for the fill that completes the order, the
+fill's own quantity and price, and `ctx.position` already counting it, as in a
+backtest. Only the closing of an order used to be reported, so `on_fill` never
+ran and the strategy read a position of 0 for the whole replay. The simulator's
+Python surface reports fills only, so `on_order_update` (accepted, cancelled,
+rejected) is not called here.
+
+An order filled completely is then reported closed (`Runner.order_closed`),
+which drops it from the record the runner keeps for `modify_order`. A later
+`modify_order` of a filled order is refused by the runner with
+`[unknown_order]` in `lrvx.last_error()` and is not sent to the simulator as a
+new order. A partly filled order stays on record until the rest fills.
 
 Orders placed or cancelled over the control server go through the same bridge
 as the strategy's: under the same lock (the replay holds it while the simulator
@@ -94,9 +103,36 @@ with `[unknown_order]`. The control server used to call the simulator itself,
 from its own thread and with no lock, and what it cancelled stayed on the
 runner's record.
 
-With `--threaded` the strategy runs on the runner's consumer thread and the
-replay does not wait for it: an order is submitted when that thread reaches the
-event, which may be after the replay has moved on.
+With `--threaded` the strategy runs on the runner's consumer threads and the
+replay waits for them: after each event `Runner.replay_tape` returns to the
+tape only once the strategy has been handed the event and has sent whatever
+orders it made it send, and again once it has heard the fills reported after
+it (`Runner.drain`). An order therefore meets the tape at the same event as on
+the synchronous runner, and the two replays of one tape fill at the same prices
+and times. The replay used not to wait, so an order was submitted wherever the
+strategy thread happened to be, often after the tape had ended.
+
+## When the control server opens
+
+The replay resets the simulator when it starts, as a backtest run does. The
+control server and the state writer open after that reset and before the first
+event (`Runner.replay_tape(on_start=...)`), so an order placed over MCP as soon
+as the banner prints is in the simulator for the whole tape. The server used to
+open first, and an order placed before the replay began was wiped by the reset.
+
+## The state file
+
+`--state-file` is rewritten once a second from the simulator's fills:
+
+| Section | Holds |
+|---------|-------|
+| `positions` | one row per symbol with a non-zero net of the fills: `qty` (signed), `avg_price` (average entry) and `unrealized_pnl`, the position valued at the last price the strategy saw for the symbol |
+| `open_orders` | the orders sent to the simulator, by the strategy or over the control server, that it has not finished: id, side, type, the quantity still to fill and the price |
+| `pnl` | realized PnL of the closed quantity, the unrealized PnL above, and the number of fills in `trades`. `fees` is 0: the simulator charges none here |
+
+All three used to be written empty, whatever the simulator held. The account is
+the simulator's as a whole: an order placed over the control server counts in
+it like the strategy's.
 
 ## Drive it from an agent
 

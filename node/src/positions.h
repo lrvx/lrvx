@@ -20,7 +20,7 @@ class PositionTrackerWrap : public Napi::ObjectWrap<PositionTrackerWrap>
                         InstanceMethod("totalRealizedPnl", &PositionTrackerWrap::TotalPnl)});
   }
   PositionTrackerWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<PositionTrackerWrap>(info),
-                                                        _h(lrvx_position_tracker_create(info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 0)) {}
+                                                        _h(lrvx_position_tracker_create(info.Length() > 0 ? argUint32(info[0], "PositionTracker: argument 1") : 0)) {}
   ~PositionTrackerWrap()
   {
     if (_h)
@@ -32,13 +32,13 @@ class PositionTrackerWrap : public Napi::ObjectWrap<PositionTrackerWrap>
  private:
   void OnFill(const Napi::CallbackInfo& info)
   {
-    std::string side = info[1].As<Napi::String>().Utf8Value();
-    lrvx_position_tracker_on_fill(_h, info[0].As<Napi::Number>().Uint32Value(),
-                                  side == "buy" ? 0 : 1, info[2].As<Napi::Number>().DoubleValue(), info[3].As<Napi::Number>().DoubleValue());
+    std::string side = argString(info[1], "onFill: argument 2");
+    lrvx_position_tracker_on_fill(_h, argUint32(info[0], "onFill: argument 1"),
+                                  side == "buy" ? 0 : 1, argNumber(info[2], "onFill: argument 3"), argNumber(info[3], "onFill: argument 4"));
   }
-  Napi::Value Position(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_tracker_position(_h, info[0].As<Napi::Number>().Uint32Value())); }
-  Napi::Value AvgEntry(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_tracker_avg_entry(_h, info[0].As<Napi::Number>().Uint32Value())); }
-  Napi::Value Pnl(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_tracker_realized_pnl(_h, info[0].As<Napi::Number>().Uint32Value())); }
+  Napi::Value Position(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_tracker_position(_h, argUint32(info[0], "position: argument 1"))); }
+  Napi::Value AvgEntry(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_tracker_avg_entry(_h, argUint32(info[0], "avgEntry: argument 1"))); }
+  Napi::Value Pnl(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_tracker_realized_pnl(_h, argUint32(info[0], "pnl: argument 1"))); }
   Napi::Value TotalPnl(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_tracker_total_pnl(_h)); }
   LrvxPositionTrackerHandle _h;
 };
@@ -70,17 +70,17 @@ class PositionGroupTrackerWrap : public Napi::ObjectWrap<PositionGroupTrackerWra
  private:
   Napi::Value Open(const Napi::CallbackInfo& info)
   {
-    std::string side = info[2].As<Napi::String>().Utf8Value();
+    std::string side = argString(info[2], "open: argument 3");
     return Napi::Number::New(info.Env(), (double)lrvx_position_group_open(_h,
-                                                                          info[0].As<Napi::Number>().Int64Value(), info[1].As<Napi::Number>().Uint32Value(),
-                                                                          side == "buy" ? 0 : 1, info[3].As<Napi::Number>().DoubleValue(), info[4].As<Napi::Number>().DoubleValue()));
+                                                                          argInteger(info[0], "open: argument 1"), argUint32(info[1], "open: argument 2"),
+                                                                          side == "buy" ? 0 : 1, argNumber(info[3], "open: argument 4"), argNumber(info[4], "open: argument 5")));
   }
-  void Close(const Napi::CallbackInfo& info) { lrvx_position_group_close(_h, info[0].As<Napi::Number>().Int64Value(), info[1].As<Napi::Number>().DoubleValue()); }
-  void PartialClose(const Napi::CallbackInfo& info) { lrvx_position_group_partial_close(_h, info[0].As<Napi::Number>().Int64Value(), info[1].As<Napi::Number>().DoubleValue(), info[2].As<Napi::Number>().DoubleValue()); }
-  Napi::Value Net(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_group_net_position(_h, info[0].As<Napi::Number>().Uint32Value())); }
-  Napi::Value Pnl(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_group_realized_pnl(_h, info[0].As<Napi::Number>().Uint32Value())); }
+  void Close(const Napi::CallbackInfo& info) { lrvx_position_group_close(_h, argInteger(info[0], "close: argument 1"), argNumber(info[1], "close: argument 2")); }
+  void PartialClose(const Napi::CallbackInfo& info) { lrvx_position_group_partial_close(_h, argInteger(info[0], "partialClose: argument 1"), argNumber(info[1], "partialClose: argument 2"), argNumber(info[2], "partialClose: argument 3")); }
+  Napi::Value Net(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_group_net_position(_h, argUint32(info[0], "net: argument 1"))); }
+  Napi::Value Pnl(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_group_realized_pnl(_h, argUint32(info[0], "pnl: argument 1"))); }
   Napi::Value TotalPnl(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_group_total_pnl(_h)); }
-  Napi::Value OpenCount(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_group_open_count(_h, info[0].As<Napi::Number>().Uint32Value())); }
+  Napi::Value OpenCount(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_position_group_open_count(_h, argUint32(info[0], "openCount: argument 1"))); }
   void Prune(const Napi::CallbackInfo&) { lrvx_position_group_prune(_h); }
   LrvxPositionGroupHandle _h;
 };
@@ -111,14 +111,14 @@ class OrderTrackerWrap : public Napi::ObjectWrap<OrderTrackerWrap>
  private:
   Napi::Value OnSubmitted(const Napi::CallbackInfo& info)
   {
-    std::string side = info[2].As<Napi::String>().Utf8Value();
+    std::string side = argString(info[2], "onSubmitted: argument 3");
     return Napi::Boolean::New(info.Env(), lrvx_order_tracker_on_submitted(_h,
-                                                                          info[0].As<Napi::Number>().Int64Value(), info[1].As<Napi::Number>().Uint32Value(),
-                                                                          side == "buy" ? 0 : 1, info[3].As<Napi::Number>().DoubleValue(), info[4].As<Napi::Number>().DoubleValue()));
+                                                                          argInteger(info[0], "onSubmitted: argument 1"), argUint32(info[1], "onSubmitted: argument 2"),
+                                                                          side == "buy" ? 0 : 1, argNumber(info[3], "onSubmitted: argument 4"), argNumber(info[4], "onSubmitted: argument 5")));
   }
-  Napi::Value OnFilled(const Napi::CallbackInfo& info) { return Napi::Boolean::New(info.Env(), lrvx_order_tracker_on_filled(_h, info[0].As<Napi::Number>().Int64Value(), info[1].As<Napi::Number>().DoubleValue())); }
-  Napi::Value OnCanceled(const Napi::CallbackInfo& info) { return Napi::Boolean::New(info.Env(), lrvx_order_tracker_on_canceled(_h, info[0].As<Napi::Number>().Int64Value())); }
-  Napi::Value IsActive(const Napi::CallbackInfo& info) { return Napi::Boolean::New(info.Env(), lrvx_order_tracker_is_active(_h, info[0].As<Napi::Number>().Int64Value())); }
+  Napi::Value OnFilled(const Napi::CallbackInfo& info) { return Napi::Boolean::New(info.Env(), lrvx_order_tracker_on_filled(_h, argInteger(info[0], "onFilled: argument 1"), argNumber(info[1], "onFilled: argument 2"))); }
+  Napi::Value OnCanceled(const Napi::CallbackInfo& info) { return Napi::Boolean::New(info.Env(), lrvx_order_tracker_on_canceled(_h, argInteger(info[0], "onCanceled: argument 1"))); }
+  Napi::Value IsActive(const Napi::CallbackInfo& info) { return Napi::Boolean::New(info.Env(), lrvx_order_tracker_is_active(_h, argInteger(info[0], "isActive: argument 1"))); }
   Napi::Value ActiveCount(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_order_tracker_active_count(_h)); }
   Napi::Value TotalCount(const Napi::CallbackInfo& info) { return Napi::Number::New(info.Env(), lrvx_order_tracker_total_count(_h)); }
   void Prune(const Napi::CallbackInfo&) { lrvx_order_tracker_prune(_h); }
@@ -156,23 +156,23 @@ class OrderJourneyTracerWrap : public Napi::ObjectWrap<OrderJourneyTracerWrap>
     uint64_t sampleSalt = 0x9E3779B97F4A7C15ULL;
     if (info.Length() > 0 && info[0].IsObject())
     {
-      Napi::Object cfg = info[0].As<Napi::Object>();
+      Napi::Object cfg = argObject(info[0], "OrderJourneyTracer: argument 1");
       if (cfg.Has("maxOrders"))
       {
-        maxOrders = cfg.Get("maxOrders").As<Napi::Number>().Int64Value();
+        maxOrders = argInteger(cfg.Get("maxOrders"), "OrderJourneyTracer: maxOrders");
       }
       if (cfg.Has("maxRecordsPerOrder"))
       {
         maxRecordsPerOrder =
-            cfg.Get("maxRecordsPerOrder").As<Napi::Number>().Int64Value();
+            argInteger(cfg.Get("maxRecordsPerOrder"), "OrderJourneyTracer: maxRecordsPerOrder");
       }
       if (cfg.Has("sampleRate"))
       {
-        sampleRate = cfg.Get("sampleRate").As<Napi::Number>().DoubleValue();
+        sampleRate = argNumber(cfg.Get("sampleRate"), "OrderJourneyTracer: sampleRate");
       }
       if (cfg.Has("sampleSalt"))
       {
-        sampleSalt = cfg.Get("sampleSalt").As<Napi::Number>().Int64Value();
+        sampleSalt = argInteger(cfg.Get("sampleSalt"), "OrderJourneyTracer: sampleSalt");
       }
     }
     _h = lrvx_order_journey_tracer_create(maxOrders, maxRecordsPerOrder,
@@ -261,7 +261,7 @@ class OrderJourneyTracerWrap : public Napi::ObjectWrap<OrderJourneyTracerWrap>
   }
   Napi::Value Journey(const Napi::CallbackInfo& info)
   {
-    uint64_t orderId = info[0].As<Napi::Number>().Int64Value();
+    uint64_t orderId = argInteger(info[0], "journey: argument 1");
     const uint64_t n =
         lrvx_order_journey_tracer_journey(_h, orderId, nullptr, 0);
     std::vector<LrvxOrderTraceRow> buf(n);

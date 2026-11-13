@@ -2663,23 +2663,28 @@ extern "C"
   //
   // The gates of each runner, in one place.
   //
-  //   Runner and live engine. Every signal a strategy emits -- an order, a
-  //   Cancel, a CancelAll, a Modify, either liquidity signal, reduce-only or
-  //   not -- is put to the kill switch, the order validator and the risk
-  //   manager, in that order. The first that returns 0 drops it: on_signal,
-  //   the executor and the PnL / storage observers do not see it. A signal
-  //   that passes goes to on_signal, then to the executor, then to the
-  //   observers. on_signal is an observer too: with a NULL on_signal the
-  //   gates are asked and the executor is called exactly the same.
+  //   What is never asked, on any runner. A Cancel, a CancelAll and a Modify
+  //   pass unasked: they add no exposure, and a triggered kill switch must
+  //   not hold back a cancel. A reduce-only order passes unasked as well, so
+  //   that a tightened limit cannot hold a strategy in a position. The three
+  //   runners share the one rule (passesPreTradeGatesUnasked in
+  //   lrvx/strategy/signal.h).
   //
-  //   Backtest runner. Only a signal that creates an order is put to the
-  //   gates: Market, Limit, the Stop and TakeProfit pairs, TrailingStop, and
-  //   each of the two legs of an OCO (either leg refused drops the pair).
-  //   Cancel, CancelAll and Modify pass unasked: they add no exposure. A
-  //   reduce-only order passes unasked as well, so that a tightened limit
-  //   cannot hold a strategy in a position. The order is the same: kill
-  //   switch, order validator, risk manager. A kill switch that returned 0
-  //   stays triggered for the rest of the run.
+  //   Runner and live engine. Every other signal -- an order that is not
+  //   reduce-only, an OCO, either liquidity signal -- is put to the kill
+  //   switch, the order validator and the risk manager, in that order. The
+  //   first that returns 0 drops it: on_signal, the executor and the PnL /
+  //   storage observers do not see it. A signal that passes, asked or not,
+  //   goes to on_signal, then to the executor, then to the observers.
+  //   on_signal is an observer too: with a NULL on_signal the gates are
+  //   asked and the executor is called exactly the same.
+  //
+  //   Backtest runner. Every other signal that creates an order is put to
+  //   the gates: Market, Limit, the Stop and TakeProfit pairs, TrailingStop,
+  //   and each of the two legs of an OCO (either leg refused drops the
+  //   pair). The order is the same: kill switch, order validator, risk
+  //   manager. A kill switch that returned 0 stays triggered for the rest of
+  //   the run.
   //
   // What the emitter learns of a drop. The emit that produced the signal has
   // already returned an order id, so a drop by any of the three gates leaves
@@ -3336,11 +3341,34 @@ extern "C"
   LRVX_EXPORT(group = "execution")
   void lrvx_live_engine_order_closed(LrvxLiveEngineHandle engine, uint64_t order_id);
 
-  // The engine's counterpart of lrvx_runner_on_order_event. The callbacks
-  // run on the calling thread, not on a strategy's consumer thread.
+  // The engine's counterpart of lrvx_runner_on_order_event. The event is
+  // queued and returns at once; the callbacks run on the strategy's own
+  // order-event consumer thread, like its trade, book and bar callbacks run
+  // on the consumers of their buses, never on the calling thread.
+  //
+  // Ordering. A strategy hears its order events in the order they were
+  // reported. An order event is handed to a strategy only after that strategy
+  // has been handed every trade, book update and bar published to the engine
+  // before the event was reported, so a fill never overtakes the market data
+  // that preceded it. Market data published after the report may arrive on
+  // either side of the event: the four streams have a consumer each and no
+  // common sequence. lrvx_live_engine_drain is the barrier for a caller that
+  // needs more than that.
+  //
+  // Before lrvx_live_engine_start and after lrvx_live_engine_stop there is no
+  // consumer thread, and the callbacks run on the calling thread. An event
+  // queued before stop is delivered before stop returns.
   LRVX_EXPORT(group = "execution")
   void lrvx_live_engine_on_order_event(LrvxLiveEngineHandle engine,
                                        const LrvxOrderEventData* event);
+
+  // Returns once every strategy has been handed everything published to the
+  // engine so far (trades, books, bars and order events) and whatever those
+  // callbacks published in turn. Returns at once on an engine that is not
+  // running. Never call it from a strategy callback: it would wait for the
+  // callback it is in.
+  LRVX_EXPORT(group = "lrvxliveengine_disruptor")
+  void lrvx_live_engine_drain(LrvxLiveEngineHandle engine);
 
   LRVX_EXPORT(group = "lrvxliveengine_disruptor")
   void lrvx_live_engine_start(LrvxLiveEngineHandle engine);
@@ -3502,13 +3530,53 @@ extern "C"
   // lrvx::OrderType code, as in the events a strategy receives; fill_qty_raw
   // and fill_price_raw are this fill's own quantity and price, not the
   // order's running totals. The strategy that issued the order (its id is
-  // order_id >> 32) receives the event; an id from no attached strategy's
-  // block goes to every strategy subscribed to the symbol. Runs the
-  // callbacks on the calling thread. A status, side or order type outside
-  // its range is refused: nothing is delivered and the reason is in
-  // lrvx_last_error_message.
+  // order_id >> 32) receives the event, and the second leg of an OCO goes to
+  // the strategy of its first leg while the pair is on record (report a
+  // leg's events before lrvx_runner_order_closed). An id no attached
+  // strategy issued goes to every strategy subscribed to the symbol and
+  // counts in no position. Runs the callbacks on the calling thread. A
+  // status, side or order type outside its range is refused: nothing is
+  // delivered and the reason is in lrvx_last_error_message.
+  //
+  // Positions are per strategy, as in a backtest: each strategy attached to
+  // a runner or a live engine reads the net position of the fills reported
+  // for its own orders, not the account's and not another strategy's.
   LRVX_EXPORT(group = "execution")
   void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventData* event);
+
+  // The callback rate, in basis points, of a percent trailing stop
+  // (lrvx_emit_trailing_stop_percent). LrvxOrder carries a trailing stop's
+  // fixed offset in trailing_offset_raw and has no field for the rate, so a
+  // callback that is handed an LrvxOrder asks for it here: valid only for
+  // the pointer the callback received, on the thread it runs on, until it
+  // returns (LrvxExecutorCallbacks.submit / replace / submit_oco and every
+  // LrvxExecutionListenerCallbacks callback). A percent trailing stop has
+  // trailing_offset_raw 0 and a rate above 0; every other order, a copy of
+  // the struct, and any pointer outside its callback read 0. NULL reads 0
+  // and records an error.
+  LRVX_EXPORT(group = "execution")
+  int32_t lrvx_order_trailing_bps(const LrvxOrder* order);
+
+  // Sets what a strategy attached to this runner holds before any fill is
+  // reported: the position an account already has when a host starts or
+  // restarts, which no lrvx_runner_on_order_event will ever tell of.
+  // position_raw is signed (negative for a short) and avg_entry_price_raw is
+  // its average entry price (0 when unknown); the strategy then reads them
+  // from lrvx_position_raw and the LrvxSymbolContext of its next callback,
+  // and the fills reported afterwards add to them. Positions are per
+  // strategy: name the one the position belongs to. Returns 1, and 0 with
+  // the reason in lrvx_last_error_message for a strategy that is not
+  // attached to this runner or one that already holds a position in the
+  // symbol. A position of 0 is accepted and changes nothing.
+  LRVX_EXPORT(group = "execution")
+  uint8_t lrvx_runner_seed_position(LrvxRunnerHandle runner, LrvxStrategyHandle strategy,
+                                    uint32_t symbol, int64_t position_raw,
+                                    int64_t avg_entry_price_raw);
+  // The engine's counterpart of lrvx_runner_seed_position.
+  LRVX_EXPORT(group = "execution")
+  uint8_t lrvx_live_engine_seed_position(LrvxLiveEngineHandle engine,
+                                         LrvxStrategyHandle strategy, uint32_t symbol,
+                                         int64_t position_raw, int64_t avg_entry_price_raw);
 
   LRVX_EXPORT(group = "strategyrunner_synchronous")
   void lrvx_runner_start(LrvxRunnerHandle runner);

@@ -13,6 +13,7 @@
 #include "lrvx/engine/symbol_registry.h"
 #include "lrvx/log/abstract_logger.h"
 #include "lrvx/log/log_stream.h"
+#include "queued_order_event.h"
 #include "tracker_ownership.h"
 
 #include "lrvx/aggregator/bar.h"
@@ -6692,8 +6693,82 @@ struct LrvxReplaySourceImpl
   LrvxReplaySourceCallbacks cb;
 };
 
+// LrvxOrder has no field for a trailing stop's callback rate and its shape
+// is frozen, so the rate travels beside the struct: while a callback is
+// running with an LrvxOrder, that pointer answers lrvx_order_trailing_bps on
+// the thread the callback runs on.
+struct TrailingBpsInCallback
+{
+  const LrvxOrder* order;
+  int32_t bps;
+};
+inline thread_local std::vector<TrailingBpsInCallback> t_trailingBpsInCallback;
+
+class TrailingBpsScope
+{
+ public:
+  TrailingBpsScope(const LrvxOrder* order, int32_t bps) : _order(bps != 0 ? order : nullptr)
+  {
+    if (_order != nullptr)
+    {
+      t_trailingBpsInCallback.push_back({_order, bps});
+    }
+  }
+  ~TrailingBpsScope()
+  {
+    if (_order == nullptr)
+    {
+      return;
+    }
+    auto& open = t_trailingBpsInCallback;
+    for (auto it = open.rbegin(); it != open.rend(); ++it)
+    {
+      if (it->order == _order)
+      {
+        open.erase(std::next(it).base());
+        break;
+      }
+    }
+  }
+  TrailingBpsScope(const TrailingBpsScope&) = delete;
+  TrailingBpsScope& operator=(const TrailingBpsScope&) = delete;
+
+ private:
+  const LrvxOrder* _order;
+};
+
+inline int32_t trailingBpsInCallback(const LrvxOrder* order) noexcept
+{
+  const auto& open = t_trailingBpsInCallback;
+  for (auto it = open.rbegin(); it != open.rend(); ++it)
+  {
+    if (it->order == order)
+    {
+      return it->bps;
+    }
+  }
+  return 0;
+}
+
+// An LrvxOrder on its way into a binding callback, with its trailing
+// callback rate readable for as long as it lives. Lives where it was made:
+// its address is what the accessor is asked about.
+class PackedOrder : public LrvxOrder
+{
+ public:
+  PackedOrder(const LrvxOrder& order, int32_t trailingBps)
+      : LrvxOrder(order), _scope(this, trailingBps)
+  {
+  }
+  PackedOrder(const PackedOrder&) = delete;
+  PackedOrder& operator=(const PackedOrder&) = delete;
+
+ private:
+  TrailingBpsScope _scope;
+};
+
 // Pack a lrvx::Order into the ABI-stable LrvxOrder for binding callbacks.
-inline LrvxOrder packOrder(const lrvx::Order& o) noexcept
+inline PackedOrder packOrder(const lrvx::Order& o)
 {
   LrvxOrder fo{};
   fo.id = o.id;
@@ -6720,7 +6795,7 @@ inline LrvxOrder packOrder(const lrvx::Order& o) noexcept
   fo.exchange_ts_ns = o.exchangeTimestamp.has_value()
                           ? o.exchangeTimestamp->time_since_epoch().count()
                           : 0;
-  return fo;
+  return PackedOrder(fo, o.trailingCallbackRate);
 }
 
 struct LrvxExecutionListenerImpl
@@ -7183,10 +7258,22 @@ inline LrvxOrder signalToLrvxOrder(const Signal& sig) noexcept
 class ForwardedOrders
 {
  public:
-  void put(const LrvxOrder& order)
+  void put(const LrvxOrder& order, int32_t trailingBps = 0)
   {
     std::lock_guard lock(_mutex);
     _orders[order.id] = order;
+    if (trailingBps != 0)
+    {
+      _trailingBps[order.id] = trailingBps;
+    }
+  }
+  // The callback rate a percent trailing stop on record was sent with; 0 for
+  // every other order.
+  int32_t trailingBpsOf(uint64_t id)
+  {
+    std::lock_guard lock(_mutex);
+    const auto it = _trailingBps.find(id);
+    return it == _trailingBps.end() ? 0 : it->second;
   }
   // The two legs of an OCO. The venue cancels one when the other fills or
   // is cancelled, so whatever takes one off the record takes both.
@@ -7198,10 +7285,24 @@ class ForwardedOrders
     _ocoSibling[first.id] = second.id;
     _ocoSibling[second.id] = first.id;
   }
+  // The id an OCO's second leg was issued beside: the first leg's, which is
+  // in its strategy's block. nullopt for anything that is not a second leg on
+  // record.
+  std::optional<uint64_t> firstLegOf(uint64_t id)
+  {
+    if (id < lrvx::kRunnerOrderIdBase)
+    {
+      return std::nullopt;
+    }
+    std::lock_guard lock(_mutex);
+    const auto it = _ocoSibling.find(id);
+    return it == _ocoSibling.end() ? std::nullopt : std::optional<uint64_t>{it->second};
+  }
   void erase(uint64_t id)
   {
     std::lock_guard lock(_mutex);
     _orders.erase(id);
+    _trailingBps.erase(id);
     if (const auto it = _ocoSibling.find(id); it != _ocoSibling.end())
     {
       const uint64_t sibling = it->second;
@@ -7221,12 +7322,17 @@ class ForwardedOrders
     std::erase_if(_ocoSibling,
                   [&](const auto& entry)
                   { return _orders.find(entry.first) == _orders.end(); });
+    // order: not observable -- every rate whose order is gone is dropped
+    std::erase_if(_trailingBps,
+                  [&](const auto& entry)
+                  { return _orders.find(entry.first) == _orders.end(); });
   }
   void clear()
   {
     std::lock_guard lock(_mutex);
     _orders.clear();
     _ocoSibling.clear();
+    _trailingBps.clear();
   }
   // Applies `change` to the order on record under `id`, in place, and
   // returns the result; nullopt when the id is not on record.
@@ -7251,6 +7357,8 @@ class ForwardedOrders
   std::unordered_map<uint64_t, LrvxOrder> _orders;
   // Each OCO leg on record -> the other leg.
   std::unordered_map<uint64_t, uint64_t> _ocoSibling;
+  // Percent trailing stops on record -> their callback rate in bps.
+  std::unordered_map<uint64_t, int32_t> _trailingBps;
   std::atomic<uint64_t> _nextLegId{lrvx::kRunnerOrderIdBase + 1};
 };
 
@@ -7447,7 +7555,8 @@ class RunnerSignalHandler : public ISignalHandler
     // Pre-trade gates, evaluated in order: KillSwitch → OrderValidator →
     // RiskManager. Each is optional; an unset hook or a NULL fn pointer
     // is a no-op (let the signal through). Returning 0 drops the signal
-    // and skips the remaining hooks.
+    // and skips the remaining hooks. A Cancel, a CancelAll, a Modify and a
+    // reduce-only order are not put to them, as in the backtest runner.
     // Each get() below returns a strong reference that outlives whatever
     // destroy() may do concurrently on another thread for the rest of this
     // scope -- see tracker_ownership.h.
@@ -7455,28 +7564,31 @@ class RunnerSignalHandler : public ISignalHandler
     // A drop is not silent: the emit that produced the signal returned an
     // order id, so the reason is left in the last error of this thread, which
     // is the thread that emitted.
-    if (auto ks = _kill.get(); ks && ks->cb.check != nullptr)
+    if (!passesPreTradeGatesUnasked(sig))
     {
-      if (ks->cb.check(ks->cb.user_data, &fs) == 0)
+      if (auto ks = _kill.get(); ks && ks->cb.check != nullptr)
       {
-        noteDropped(sig, "kill switch", kDroppedByKillSwitch);
-        return;
+        if (ks->cb.check(ks->cb.user_data, &fs) == 0)
+        {
+          noteDropped(sig, "kill switch", kDroppedByKillSwitch);
+          return;
+        }
       }
-    }
-    if (auto ov = _validator.get(); ov && ov->cb.validate != nullptr)
-    {
-      if (ov->cb.validate(ov->cb.user_data, &fs) == 0)
+      if (auto ov = _validator.get(); ov && ov->cb.validate != nullptr)
       {
-        noteDropped(sig, "order validator", kDroppedByOrderValidator);
-        return;
+        if (ov->cb.validate(ov->cb.user_data, &fs) == 0)
+        {
+          noteDropped(sig, "order validator", kDroppedByOrderValidator);
+          return;
+        }
       }
-    }
-    if (auto rm = _risk.get(); rm && rm->cb.allow != nullptr)
-    {
-      if (rm->cb.allow(rm->cb.user_data, &fs) == 0)
+      if (auto rm = _risk.get(); rm && rm->cb.allow != nullptr)
       {
-        noteDropped(sig, "risk manager", kDroppedByRiskManager);
-        return;
+        if (rm->cb.allow(rm->cb.user_data, &fs) == 0)
+        {
+          noteDropped(sig, "risk manager", kDroppedByRiskManager);
+          return;
+        }
       }
     }
 
@@ -7510,10 +7622,11 @@ class RunnerSignalHandler : public ISignalHandler
           // the record.
           if (restsOnTheVenue(sig))
           {
-            _forwarded->put(fo);
+            _forwarded->put(fo, sig.trailingCallbackRate);
           }
           if (exec->cb.submit != nullptr)
           {
+            const TrailingBpsScope rate(&fo, sig.trailingCallbackRate);
             exec->cb.submit(exec->cb.user_data, &fo);
           }
           break;
@@ -7555,6 +7668,7 @@ class RunnerSignalHandler : public ISignalHandler
           }
           if (exec->cb.replace != nullptr)
           {
+            const TrailingBpsScope rate(&*fo, _forwarded->trailingBpsOf(sig.orderId));
             exec->cb.replace(exec->cb.user_data, sig.orderId, &*fo);
           }
           break;
@@ -7712,15 +7826,57 @@ static void mirrorBookToRecorder(LrvxMarketDataRecorderImpl* r, const BookUpdate
 }
 
 // Order events a venue reported, on their way to the strategies of a runner
-// or a live engine. The position tracker sees each event first, as in the
-// backtest runner, so the context a strategy's on_fill reads already counts
-// the fill.
+// or a live engine. Each strategy has a position tracker of its own, as it
+// has in a backtest: it counts the fills of the orders that strategy issued
+// and nothing else. The tracker sees an event before the strategy does, as
+// in the backtest runner, so the context a strategy's on_fill reads already
+// counts the fill.
 class ReportedOrderEvents
 {
  public:
-  void attach(BridgeStrategy* s) { s->sharePositionManager(_positions); }
+  void attach(BridgeStrategy* s)
+  {
+    auto positions = std::make_shared<MultiModePositionTracker>(0xFEFEFEFEu);
+    s->sharePositionManager(positions);
+    _positions[s->id()] = std::move(positions);
+  }
 
-  void deliver(const std::vector<BridgeStrategy*>& strategies, const LrvxOrderEventData& d)
+  MultiModePositionTracker* positionsOf(SubscriberId strategy) const
+  {
+    const auto it = _positions.find(strategy);
+    return it == _positions.end() ? nullptr : it->second.get();
+  }
+
+  // What the strategy holds before any fill is reported here: the position
+  // an account already has when a host starts or restarts. Signed; applied
+  // as one opening fill at the average entry price.
+  void seed(const BridgeStrategy* s, SymbolId symbol, Quantity position, Price avgEntry) const
+  {
+    auto* positions = positionsOf(s->id());
+    if (positions == nullptr)
+    {
+      throw std::invalid_argument("the strategy with subscriber id " + std::to_string(s->id()) +
+                                  " is not attached here");
+    }
+    if (const Quantity held = positions->getPosition(symbol); held.raw() != 0)
+    {
+      throw std::invalid_argument(
+          "the strategy with subscriber id " + std::to_string(s->id()) +
+          " already holds " + std::to_string(held.toDouble()) + " of symbol " +
+          std::to_string(symbol) + "; a position is seeded once, before any fill is reported");
+    }
+    if (position.raw() > 0)
+    {
+      positions->openLong(symbol, avgEntry, position);
+    }
+    else if (position.raw() < 0)
+    {
+      positions->openShort(symbol, avgEntry, Quantity::fromRaw(-position.raw()));
+    }
+  }
+
+  // Refuses a status, side or order type out of range.
+  static OrderEvent toEvent(const LrvxOrderEventData& d)
   {
     if (d.status > static_cast<uint8_t>(OrderEventStatus::REPLACED_GAS))
     {
@@ -7763,31 +7919,55 @@ class ReportedOrderEvents
     ev.isMaker = d.is_maker != 0;
     ev.marketPosition = static_cast<MarketPosition>(d.market_position);
     ev.distanceToBestTicks = d.distance_to_best_ticks;
+    return ev;
+  }
 
-    ev.dispatchTo(*_positions);
+  // An order id is (subscriber id << 32) + n: the strategy that issued the
+  // order is the one that hears of it and whose position counts it. The
+  // second leg of an OCO has an id from the runner's block and belongs to
+  // the strategy of its first leg for as long as the pair is on record.
+  // nullopt for an id no attached strategy issued (an order placed by hand):
+  // every strategy hears of it and no position counts it.
+  std::optional<SubscriberId> ownerOf(uint64_t orderId, ForwardedOrders& forwarded) const
+  {
+    const uint64_t issued = forwarded.firstLegOf(orderId).value_or(orderId);
+    const auto owner = static_cast<SubscriberId>(issued >> 32);
+    return _positions.find(owner) != _positions.end() ? std::optional<SubscriberId>{owner}
+                                                      : std::nullopt;
+  }
 
-    // An order id is (subscriber id << 32) + n: the strategy that issued the
-    // order is the one that hears of it. An id from no strategy's block (an
-    // OCO's second leg, an order placed by hand) goes to every strategy, and
-    // each ignores a symbol it is not subscribed to.
-    const auto owner = static_cast<SubscriberId>(d.order_id >> 32);
+  // Runs on the thread that hands the strategy its order events.
+  void deliverOwned(BridgeStrategy* owner, const OrderEvent& ev) const
+  {
+    if (auto* positions = positionsOf(owner->id()))
+    {
+      ev.dispatchTo(*positions);
+    }
+    owner->onOrderEvent(ev);
+  }
+
+  // The whole delivery on the calling thread.
+  void deliver(const std::vector<BridgeStrategy*>& strategies, ForwardedOrders& forwarded,
+               const OrderEvent& ev) const
+  {
+    const std::optional<SubscriberId> owner = ownerOf(ev.order.id, forwarded);
     for (BridgeStrategy* s : strategies)
     {
-      if (s->id() == owner)
+      if (!owner)
       {
         s->onOrderEvent(ev);
+      }
+      else if (s->id() == *owner)
+      {
+        deliverOwned(s, ev);
         return;
       }
-    }
-    for (BridgeStrategy* s : strategies)
-    {
-      s->onOrderEvent(ev);
     }
   }
 
  private:
-  std::shared_ptr<MultiModePositionTracker> _positions{
-      std::make_shared<MultiModePositionTracker>(0xFEFEFEFEu)};
+  // Written while strategies are attached, before any event is reported.
+  std::unordered_map<SubscriberId, std::shared_ptr<MultiModePositionTracker>> _positions;
 };
 
 struct LrvxRunnerImpl
@@ -8057,6 +8237,36 @@ struct LrvxLiveEngineImpl
   std::vector<BridgeStrategy*> strategies;
   ReportedOrderEvents orderEvents;
 
+  // A strategy's consumer on the order-event bus: its own thread, like the
+  // ones the trade, book and bar buses give it.
+  struct OrderEventConsumer
+  {
+    LrvxLiveEngineImpl* engine;
+    BridgeStrategy* strategy;
+    // The strategy's consumer index on every bus of this engine.
+    uint32_t index;
+
+    void onQueuedOrderEvent(const QueuedOrderEvent& queued)
+    {
+      if (!queued.toEveryone && queued.owner != strategy->id())
+      {
+        return;
+      }
+      engine->awaitMarketData(index, queued.marketHead);
+      if (queued.toEveryone)
+      {
+        strategy->onOrderEvent(queued.event);
+      }
+      else
+      {
+        engine->orderEvents.deliverOwned(strategy, queued.event);
+      }
+    }
+  };
+  using OrderEventBus = EventBus<QueuedOrderEvent>;
+  std::unique_ptr<OrderEventBus> orderBus;
+  std::vector<std::unique_ptr<OrderEventConsumer>> orderConsumers;
+
   // Latest pre-trade hooks attached to this engine. Stored here (rather
   // than only on the handlers) so newly-added strategies inherit the
   // existing setting. Caller owns the *Impl objects; we hold non-owning ptrs.
@@ -8074,8 +8284,85 @@ struct LrvxLiveEngineImpl
       : registry(reg),
         tradeBus(std::make_unique<TradeBus>()),
         bookBus(std::make_unique<BookUpdateBus>()),
-        barBus(std::make_unique<BarBus>())
+        barBus(std::make_unique<BarBus>()),
+        orderBus(std::make_unique<OrderEventBus>())
   {
+    // A fill reported just before stop() still reaches its strategy.
+    orderBus->enableDrainOnStop();
+  }
+
+  // Holds an order event back until consumer `index` has been handed the
+  // market data published before the event was reported. A bus that is not
+  // running or whose consumer has failed is not waited for.
+  void awaitMarketData(uint32_t index, const std::array<int64_t, 3>& head) const
+  {
+    const auto passed = [index](const auto& bus, int64_t seq)
+    {
+      return !bus.running() || bus.consumerFailed(index) || bus.consumedThrough(index) >= seq;
+    };
+    BusyBackoff backoff;
+    while (!(passed(*tradeBus, head[0]) && passed(*bookBus, head[1]) &&
+             passed(*barBus, head[2])))
+    {
+      backoff.pause();
+    }
+  }
+
+  // Queues the event for the strategies' order-event consumers. With the
+  // engine not running there is no consumer thread, and the event is
+  // delivered on the calling thread.
+  void reportOrderEvent(const OrderEvent& ev)
+  {
+    const std::optional<SubscriberId> owner = orderEvents.ownerOf(ev.order.id, *forwarded);
+    QueuedOrderEvent queued;
+    queued.event = ev;
+    queued.owner = owner.value_or(SubscriberId{});
+    queued.toEveryone = !owner.has_value();
+    queued.marketHead = {tradeBus->claimedThrough(), bookBus->claimedThrough(),
+                         barBus->claimedThrough()};
+    if (orderBus->publish(std::move(queued)) < 0)
+    {
+      orderEvents.deliver(strategies, *forwarded, ev);
+    }
+  }
+
+  // Returns once every consumer in service has handled everything published
+  // so far on the four buses, including what those callbacks published in
+  // turn. Returns at once when the engine is not running.
+  void drain() const
+  {
+    const auto heads = [this]
+    {
+      return std::array<int64_t, 4>{tradeBus->claimedThrough(), bookBus->claimedThrough(),
+                                    barBus->claimedThrough(), orderBus->claimedThrough()};
+    };
+    const auto consumed = [](const auto& bus, int64_t seq)
+    {
+      const uint32_t n = bus.consumerCount();
+      for (uint32_t i = 0; i < n; ++i)
+      {
+        if (!bus.consumerFailed(i) && bus.consumedThrough(i) < seq)
+        {
+          return false;
+        }
+      }
+      return true;
+    };
+    BusyBackoff backoff;
+    for (;;)
+    {
+      if (!orderBus->running())
+      {
+        return;
+      }
+      const auto before = heads();
+      if (consumed(*tradeBus, before[0]) && consumed(*bookBus, before[1]) &&
+          consumed(*barBus, before[2]) && consumed(*orderBus, before[3]) && heads() == before)
+      {
+        return;
+      }
+      backoff.pause();
+    }
   }
 
   void addStrategy(BridgeStrategy* s, LrvxOnSignalCallback cb, void* ud)
@@ -8094,6 +8381,11 @@ struct LrvxLiveEngineImpl
     tradeBus->subscribe(s);
     bookBus->subscribe(s);
     barBus->subscribe(s);
+    orderConsumers.push_back(std::make_unique<OrderEventConsumer>(
+        OrderEventConsumer{this, s, static_cast<uint32_t>(strategies.size())}));
+    // Parked: order events are rare next to market data, and a fourth
+    // spinning consumer per strategy would cost more than their wake-up.
+    orderBus->subscribeStatic(orderConsumers.back().get(), true, OrderEventBus::WaitMode::PARKED);
     strategies.push_back(s);
   }
 
@@ -8188,6 +8480,7 @@ struct LrvxLiveEngineImpl
     tradeBus->start();
     bookBus->start();
     barBus->start();
+    orderBus->start();
     for (auto* s : strategies)
     {
       s->start();
@@ -8224,6 +8517,8 @@ struct LrvxLiveEngineImpl
     {
       s->stop();
     }
+    // First, while the market-data consumers it may be waiting for still run.
+    orderBus->stop();
     tradeBus->stop();
     bookBus->stop();
     barBus->stop();
@@ -9476,6 +9771,40 @@ void lrvx_runner_set_executor(LrvxRunnerHandle runner, LrvxExecutorHandle execut
   LRVX_CAPI_LEAVE_VOID;
 }
 
+uint8_t lrvx_runner_seed_position(LrvxRunnerHandle runner, LrvxStrategyHandle strategy,
+                                  uint32_t symbol, int64_t position_raw,
+                                  int64_t avg_entry_price_raw)
+{
+  LRVX_CAPI_ENTER(runner);
+  LRVX_CAPI_REQUIRE(strategy);
+  toRunner(runner)->orderEvents.seed(toStrategy(strategy), symbol,
+                                     Quantity::fromRaw(position_raw),
+                                     Price::fromRaw(avg_entry_price_raw));
+  return 1;
+  LRVX_CAPI_LEAVE;
+}
+
+uint8_t lrvx_live_engine_seed_position(LrvxLiveEngineHandle engine, LrvxStrategyHandle strategy,
+                                       uint32_t symbol, int64_t position_raw,
+                                       int64_t avg_entry_price_raw)
+{
+  LRVX_CAPI_ENTER(engine);
+  LRVX_CAPI_REQUIRE(strategy);
+  toLiveEngine(engine)->orderEvents.seed(toStrategy(strategy), symbol,
+                                         Quantity::fromRaw(position_raw),
+                                         Price::fromRaw(avg_entry_price_raw));
+  return 1;
+  LRVX_CAPI_LEAVE;
+}
+
+int32_t lrvx_order_trailing_bps(const LrvxOrder* order)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  LRVX_CAPI_REQUIRE(order);
+  return trailingBpsInCallback(order);
+  LRVX_CAPI_LEAVE;
+}
+
 void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id)
 {
   LRVX_CAPI_ENTER_VOID(runner);
@@ -9488,7 +9817,8 @@ void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventDat
   LRVX_CAPI_ENTER_VOID(runner);
   LRVX_CAPI_REQUIRE_VOID(event);
   auto* impl = toRunner(runner);
-  impl->orderEvents.deliver(impl->strategies, *event);
+  impl->orderEvents.deliver(impl->strategies, impl->handler.forwarded(),
+                            ReportedOrderEvents::toEvent(*event));
   LRVX_CAPI_LEAVE_VOID;
 }
 
@@ -9737,8 +10067,14 @@ void lrvx_live_engine_on_order_event(LrvxLiveEngineHandle engine, const LrvxOrde
 {
   LRVX_CAPI_ENTER_VOID(engine);
   LRVX_CAPI_REQUIRE_VOID(event);
-  auto* impl = toLiveEngine(engine);
-  impl->orderEvents.deliver(impl->strategies, *event);
+  toLiveEngine(engine)->reportOrderEvent(ReportedOrderEvents::toEvent(*event));
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_live_engine_drain(LrvxLiveEngineHandle engine)
+{
+  LRVX_CAPI_ENTER_VOID(engine);
+  toLiveEngine(engine)->drain();
   LRVX_CAPI_LEAVE_VOID;
 }
 

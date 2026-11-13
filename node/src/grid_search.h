@@ -67,7 +67,7 @@ inline int gridSearchFactoryThunk(void* user_data, uint64_t param_index,
   auto getNs = [&](const char* key) -> int64_t
   {
     auto v = obj.Get(key);
-    return (v.IsBigInt() || v.IsNumber()) ? toInt64Ns(v) : 0;
+    return (v.IsBigInt() || v.IsNumber()) ? toInt64Ns(v, "timestamp") : 0;
   };
   out_stats->startTimeNs = getNs("startTimeNs");
   out_stats->endTimeNs = getNs("endTimeNs");
@@ -110,11 +110,11 @@ class GridSearchNode : public Napi::ObjectWrap<GridSearchNode>
 
   Napi::Value addAxis(const Napi::CallbackInfo& info)
   {
-    auto arr = info[0].As<Napi::Array>();
+    auto arr = argArray(info[0], "addAxis: argument 1");
     std::vector<double> vals(arr.Length());
     for (uint32_t i = 0; i < arr.Length(); ++i)
     {
-      vals[i] = arr.Get(i).As<Napi::Number>().DoubleValue();
+      vals[i] = argNumber(arr.Get(i), "addAxis: a value");
     }
     lrvx_grid_search_add_axis(_handle, vals.data(),
                               static_cast<uint32_t>(vals.size()));
@@ -123,7 +123,7 @@ class GridSearchNode : public Napi::ObjectWrap<GridSearchNode>
 
   Napi::Value setFactory(const Napi::CallbackInfo& info)
   {
-    _factory = Napi::Persistent(info[0].As<Napi::Function>());
+    _factory = Napi::Persistent(argFunction(info[0], "setFactory: argument 1"));
     return info.Env().Undefined();
   }
 
@@ -135,7 +135,7 @@ class GridSearchNode : public Napi::ObjectWrap<GridSearchNode>
 
   Napi::Value paramsForIndex(const Napi::CallbackInfo& info)
   {
-    uint64_t idx = static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
+    uint64_t idx = static_cast<uint64_t>(argInteger(info[0], "paramsForIndex: argument 1"));
     uint32_t total = lrvx_grid_search_params_for_index(_handle, idx, nullptr, 0);
     std::vector<double> out(total);
     if (total > 0)

@@ -1288,6 +1288,8 @@ Members:
 - *property* `strategy_id: None`
 - *property* `symbol: int`
 - *property* `symbol: None`
+- *property* `trailing_bps: int`
+- *property* `trailing_bps: None`
 - *property* `trailing_offset: float`
 - *property* `trailing_offset: None`
 - *property* `trigger_price: float`
@@ -1778,6 +1780,7 @@ Members:
 
 - `add_strategy(self, strategy: Strategy) -> None`
 - `attach_trace_recorder(self, recorder: typing.Any) -> None`
+- `drain(self) -> None`
 - `on_bar(self, symbol: typing.Any, open: typing.SupportsFloat | typing.SupportsIndex, high: typing.SupportsFloat | typing.SupportsIndex, low: typing.SupportsFloat | typing.SupportsIndex, close: typing.SupportsFloat | typing.SupportsIndex, volume: typing.SupportsFloat | typing.SupportsIndex = 0.0, buy_volume: typing.SupportsFloat | typing.SupportsIndex = 0.0, start_time_ns: typing.SupportsInt | typing.SupportsIndex = 0, end_time_ns: typing.SupportsInt | typing.SupportsIndex = 0, bar_type: typing.SupportsInt | typing.SupportsIndex = 0, bar_type_param: typing.SupportsInt | typing.SupportsIndex = 0, close_reason: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `on_book_snapshot(self, symbol: typing.Any, bid_prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], bid_qtys: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ask_prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ask_qtys: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `on_book_top(self, symbol: typing.Any, bid: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ask: tuple[typing.SupportsFloat | typing.SupportsIndex, typing.SupportsFloat | typing.SupportsIndex] | None, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
@@ -1785,7 +1788,8 @@ Members:
 - `on_trade(self, symbol: typing.Any, price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, is_buy: bool, ts_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> None`
 - `order_closed(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> None`
 - `replace_strategy(self, index: typing.SupportsInt | typing.SupportsIndex, strategy: Strategy) -> None`
-- `replay_tape(self, path: str, simulator: SimulatedExecutor, *, tape_symbol_id: typing.Any = None, symbol: typing.Any = None, lock: typing.Any = None, after_event: typing.Any = None) -> dict`
+- `replay_tape(self, path: str, simulator: SimulatedExecutor, *, tape_symbol_id: typing.Any = None, symbol: typing.Any = None, lock: typing.Any = None, after_event: typing.Any = None, on_start: typing.Any = None) -> dict`
+- `seed_position(self, strategy: Strategy, symbol: typing.Any, position: typing.SupportsFloat | typing.SupportsIndex, avg_entry_price: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None`
 - `set_executor(self, executor: Executor) -> None`
 - `set_kill_switch(self, ks: KillSwitch) -> None`
 - `set_market_data_recorder(self, recorder: MarketDataRecorderHook) -> None`

@@ -6,7 +6,7 @@ The rules belong to `lrvx::Strategy`, so every binding gets them. Python, Node, 
 
 ## One lock per symbol, held across the hook
 
-A strategy subscribes to three buses (trades, book updates, bars) and each bus runs its own consumer thread for each subscriber. So two events for the *same* symbol can arrive at the same instant on two different threads.
+A strategy subscribes to three buses (trades, book updates, bars) and each bus runs its own consumer thread for each subscriber. On a live engine the order events a venue reports (`lrvx_live_engine_on_order_event`) travel a fourth bus, again with a consumer thread per strategy, so `on_fill` and `on_order_update` take the same per-symbol lock as the market-data hooks. So two events for the *same* symbol can arrive at the same instant on two different threads.
 
 A symbol's state belongs to whoever holds that symbol's lock. A dispatch takes the lock before it touches the context and keeps it until your hook returns:
 

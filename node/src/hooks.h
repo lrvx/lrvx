@@ -109,6 +109,9 @@ inline Napi::Object orderToJs(Napi::Env env, const LrvxOrder* o)
   obj.Set("filledQuantity", Napi::Number::New(env, o->filled_quantity_raw / 1e8));
   obj.Set("triggerPrice", Napi::Number::New(env, o->trigger_price_raw / 1e8));
   obj.Set("trailingOffset", Napi::Number::New(env, o->trailing_offset_raw / 1e8));
+  // The struct has no field for it: read while the callback that was handed
+  // `o` is still running.
+  obj.Set("trailingBps", Napi::Number::New(env, lrvx_order_trailing_bps(o)));
   // Clock readings, so BigInt: a double steps 256 ns at present-day
   // magnitudes, and these are the fields a listener orders events by. The
   // prices and sizes above are not clock readings and stay Numbers.

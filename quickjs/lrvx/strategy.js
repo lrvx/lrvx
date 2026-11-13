@@ -125,7 +125,9 @@ class Strategy {
     bestBid(symbol) { return __lrvx_best_bid(this._handle, this._resolve(symbol)); }
     bestAsk(symbol) { return __lrvx_best_ask(this._handle, this._resolve(symbol)); }
     midPrice(symbol) { return __lrvx_mid_price(this._handle, this._resolve(symbol)); }
-    orderStatus(orderId) { return __lrvx_get_order_status(this._handle, orderId); }
+    orderStatus(orderId) {
+        return __lrvx_get_order_status(this._handle, _orderId("orderStatus(orderId)", orderId));
+    }
 
     // --- Multi-timeframe alignment helpers ---
     //

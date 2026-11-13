@@ -33,10 +33,16 @@
 
 #pragma once
 
+#include <pybind11/pybind11.h>
+
+#include "lrvx/common.h"
 #include "lrvx/error/lrvx_error.h"
 
 #include <cstddef>
 #include <cstring>
+#include <initializer_list>
+#include <string>
+#include <utility>
 
 // Deliberately an unnamed namespace, not `namespace lrvx`, to match
 // how the binding headers that need this already declare their other
@@ -82,6 +88,86 @@ inline void fillArray(T* dst, const T* src, size_t count)
     return;
   }
   std::memcpy(dst, src, count * sizeof(T));
+}
+
+// A string that names one of a fixed set of values, read strictly.
+//
+// The bindings used to read these with a comparison and a fallback:
+// anything but "buy" was a sell, anything but "ioc", "fok", "gtd" or
+// "post_only" a GTC order, anything but "lifo" or "average" FIFO. A typo
+// then did something nobody asked for and said nothing. Every such string
+// goes through one of these, which raise ValueError naming the value and
+// what was expected.
+template <typename E>
+inline E parseChoice(const char* what, const std::string& value,
+                     std::initializer_list<std::pair<const char*, E>> choices)
+{
+  std::string expected;
+  for (const auto& [name, choice] : choices)
+  {
+    if (value == name)
+    {
+      return choice;
+    }
+    expected += expected.empty() ? "'" : ", '";
+    expected += name;
+    expected += "'";
+  }
+  throw pybind11::value_error(std::string("unknown ") + what + " '" + value +
+                              "'; expected one of: " + expected);
+}
+
+inline lrvx::Side parseSide(const std::string& s)
+{
+  if (s == "buy")
+  {
+    return lrvx::Side::BUY;
+  }
+  if (s == "sell")
+  {
+    return lrvx::Side::SELL;
+  }
+  throw pybind11::value_error("unknown side '" + s + "'; expected 'buy' or 'sell'");
+}
+
+// For a call that can say when a GTD order expires.
+inline lrvx::TimeInForce parseTimeInForceWithExpiry(const std::string& tif)
+{
+  return parseChoice<lrvx::TimeInForce>("tif", tif,
+                                        {{"gtc", lrvx::TimeInForce::GTC},
+                                         {"ioc", lrvx::TimeInForce::IOC},
+                                         {"fok", lrvx::TimeInForce::FOK},
+                                         {"gtd", lrvx::TimeInForce::GTD},
+                                         {"post_only", lrvx::TimeInForce::POST_ONLY}});
+}
+
+// For a call that takes no expiry time, where GTD cannot be expressed.
+inline lrvx::TimeInForce parseTimeInForce(const std::string& tif)
+{
+  if (tif == "gtc")
+  {
+    return lrvx::TimeInForce::GTC;
+  }
+  if (tif == "ioc")
+  {
+    return lrvx::TimeInForce::IOC;
+  }
+  if (tif == "fok")
+  {
+    return lrvx::TimeInForce::FOK;
+  }
+  if (tif == "post_only")
+  {
+    return lrvx::TimeInForce::POST_ONLY;
+  }
+  if (tif == "gtd")
+  {
+    throw pybind11::value_error(
+        "tif 'gtd' needs an expiry time, which this method does not take; "
+        "expected 'gtc', 'ioc', 'fok' or 'post_only'");
+  }
+  throw pybind11::value_error("unknown tif '" + tif +
+                              "'; expected 'gtc', 'ioc', 'fok' or 'post_only'");
 }
 
 }  // namespace

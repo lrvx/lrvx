@@ -4562,6 +4562,10 @@ TEST(JsIntegrationTest, CallbackArgumentsHaveTheDocumentedTypes)
   const std::string statuses = str("updateStatuses");
   EXPECT_NE(statuses.find("ACCEPTED"), std::string::npos) << statuses;
   EXPECT_EQ(statuses.find("FILLED"), std::string::npos) << statuses;
+  // The names are the engine's: a submitted order read "ACCEPTED" and an
+  // accepted one "PENDING_NEW".
+  EXPECT_NE(statuses.find("SUBMITTED"), std::string::npos) << statuses;
+  EXPECT_EQ(statuses.find("PENDING_NEW"), std::string::npos) << statuses;
 }
 
 // A script's modify() goes out as a Modify signal, which names only the order
@@ -4724,6 +4728,148 @@ TEST(JsIntegrationTest, CancelAndModifyRefuseAValueThatIsNotAnOrderId)
   EXPECT_EQ(readGlobalInt32(jsStrat, "accepted"), 4) << "a Number id and a BigInt id are taken";
   EXPECT_EQ(signals.cancels, 2) << "nothing was emitted for a refused id";
   EXPECT_EQ(signals.modifies, 2);
+}
+
+// The checks on an order id lived in the JS wrapper only: the raw globals
+// below it, orderStatus, and the trace writers' ids and raw values took NaN,
+// a fraction, a negative or a string for whatever integer it converted to.
+TEST(JsIntegrationTest, TheNativeBoundaryRefusesAValueThatIsNotAnIdOrARawValue)
+{
+  const auto dir = std::filesystem::temp_directory_path() / "lrvx_quickjs_native_ids";
+  std::filesystem::remove_all(dir);
+  const std::string source = std::string(R"(
+    var refused = 0;
+    var wrongKind = 0;
+    var accepted = 0;
+    var named = 1;
+    var messages = [];
+    function attempt(fn, word) {
+      try { fn(); accepted += 1; }
+      catch (e) {
+        if (e instanceof TypeError) {
+          refused += 1;
+          if (String(e.message).indexOf(word) < 0) { named = 0; messages.push(e.message); }
+        } else {
+          wrongKind += 1;
+          messages.push(String(e));
+        }
+      }
+    }
+    var bad = [NaN, 1.5, -1, "7", -1n, 2n ** 64n, 2 ** 53 + 2, {}, Infinity];
+    class TestStrat extends Strategy {
+      constructor() { super({ exchange: "T", symbols: ["S1"] }); }
+      onTrade(ctx, trade) {
+        var id = this.limitBuy({ symbol: trade.symbol, price: 100.5, qty: 2.0 });
+        for (var i = 0; i < bad.length; i++) {
+          var v = bad[i];
+          attempt(() => __lrvx_emit_cancel(this._handle, v), "orderId");
+          attempt(() => __lrvx_emit_modify(this._handle, v, 101.0, 1.0), "orderId");
+          attempt(() => __lrvx_get_order_status(this._handle, v), "orderId");
+          attempt(() => this.orderStatus(v), "orderId");
+        }
+        globalThis.refusedAtTheBoundary = refused;
+        refused = 0;
+        accepted = 0;
+        attempt(() => this.orderStatus(id), "orderId");
+        attempt(() => this.orderStatus(BigInt(id)), "orderId");
+        attempt(() => __lrvx_emit_modify(this._handle, BigInt(id), 101.0, 1.0), "orderId");
+        attempt(() => __lrvx_emit_cancel(this._handle, id), "orderId");
+        globalThis.acceptedIds = accepted;
+
+        var rec = new lrvx.TraceRecorder({ path: ")") +
+                             dir.string() + R"(", strategyId: "s", strategyHash: "h",
+                                           runStartedNs: 1n });
+        refused = 0;
+        accepted = 0;
+        var keys = { writeSignal: ["signalId", "strengthRaw", "runTsNs"],
+                     writeOrderEvent: ["orderId", "parentSignalId", "priceRaw", "qtyRaw"],
+                     writeFill: ["orderId", "fillId", "priceRaw", "qtyRaw", "feeRaw"] };
+        var wrong = [NaN, 1.5, "7", {}, 2n ** 64n];
+        var attempts = 0;
+        for (var method in keys) {
+          for (var k = 0; k < keys[method].length; k++) {
+            for (var w = 0; w < wrong.length; w++) {
+              var opts = { runTsNs: 2n, feedTsNs: 1n, symbolId: 1 };
+              opts[keys[method][k]] = wrong[w];
+              attempts += 1;
+              attempt(() => rec[method](opts), keys[method][k]);
+            }
+          }
+        }
+        // A negative id, and a symbol id that is not one.
+        attempt(() => rec.writeFill({ orderId: -1 }), "orderId");
+        attempt(() => rec.writeOrderEvent({ orderId: 1, symbolId: -3 }), "symbolId");
+        attempt(() => rec.writeOrderEvent({ orderId: 1, side: 1.5 }), "side");
+        attempts += 3;
+        globalThis.traceAttempts = attempts;
+        globalThis.traceRefused = refused;
+        accepted = 0;
+        // What a trace does hold: ids as Number or BigInt, raw values of either sign.
+        attempt(() => rec.writeSignal({ runTsNs: 2n, feedTsNs: 1n, signalId: 2n ** 64n - 1n,
+                                        strengthRaw: -5 }), "");
+        attempt(() => rec.writeOrderEvent({ runTsNs: 3n, feedTsNs: 1n, orderId: 7,
+                                            parentSignalId: 2n ** 63n, priceRaw: -100n,
+                                            qtyRaw: 5, symbolId: 1, side: 1 }), "");
+        attempt(() => rec.writeFill({ runTsNs: 4, feedTsNs: 1, orderId: 7n, fillId: 1,
+                                      priceRaw: 100, qtyRaw: 5, feeRaw: -1, symbolId: 1 }), "");
+        globalThis.traceAccepted = accepted;
+        rec.close();
+        rec.destroy();
+        var reader = new lrvx.TraceReader(")" +
+                             dir.string() + R"(");
+        globalThis.traceCounts = reader.readAllSignals().length + "," +
+                                 reader.readAllOrderEvents().length + "," +
+                                 reader.readAllFills().length;
+        reader.destroy();
+        globalThis.problems = messages.join(" | ");
+      }
+    }
+    lrvx.register(new TestStrat());
+  )";
+  TempJsFile script(source.c_str());
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+  auto bridge = std::make_unique<BridgeStrategy>(
+      1, std::vector<SymbolId>(symIds.begin(), symIds.end()), registry, callbacks);
+  CountingSignals signals;
+  bridge->setSignalHandler(&signals);
+  jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+
+  LrvxSymbolContext fctx{};
+  fctx.symbol_id = symIds[0];
+  LrvxTradeData ftrade{};
+  ftrade.symbol = symIds[0];
+  ftrade.price_raw = lrvx_price_from_double(100.0);
+  ftrade.quantity_raw = lrvx_quantity_from_double(1.0);
+  callbacks.on_trade(callbacks.user_data, &fctx, &ftrade);
+
+  const auto text = [&](const char* name)
+  {
+    JSValue v = jsStrat.engine().getGlobalProperty(name);
+    const char* raw = JS_ToCString(jsStrat.engine().context(), v);
+    std::string out = raw != nullptr ? raw : "";
+    JS_FreeCString(jsStrat.engine().context(), raw);
+    JS_FreeValue(jsStrat.engine().context(), v);
+    return out;
+  };
+  const std::string problems = text("problems");
+  EXPECT_EQ(readGlobalInt32(jsStrat, "refusedAtTheBoundary"), 36)
+      << "nine values, four calls each: " << problems;
+  EXPECT_EQ(readGlobalInt32(jsStrat, "wrongKind"), 0) << problems;
+  EXPECT_EQ(readGlobalInt32(jsStrat, "named"), 1) << "every message names its argument: "
+                                                  << problems;
+  EXPECT_EQ(readGlobalInt32(jsStrat, "acceptedIds"), 4) << problems;
+  EXPECT_EQ(signals.cancels, 1) << "nothing was emitted for a refused id";
+  EXPECT_EQ(signals.modifies, 1);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "traceRefused"), readGlobalInt32(jsStrat, "traceAttempts"))
+      << problems;
+  EXPECT_EQ(readGlobalInt32(jsStrat, "traceAttempts"), 63);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "traceAccepted"), 3) << problems;
+  EXPECT_EQ(text("traceCounts"), "1,1,1") << "a refused record was not written";
+  std::filesystem::remove_all(dir);
 }
 
 // A name the prelude's classes do not know used to read as some default: an

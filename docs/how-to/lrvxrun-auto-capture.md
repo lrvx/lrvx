@@ -4,7 +4,7 @@ The `.lrvxrun` recorder API ships standalone. By default the strategy author cal
 
 ## Adapter classes
 
-`lrvx::run::TraceSignalHandler` wraps an existing `ISignalHandler`. Every emitted signal flows through it; the wrapper records it and then delegates to the inner handler. `lrvx::run::TraceExecutionListener` does the same for order lifecycle events on `IOrderExecutionListener`.
+`lrvx::run::TraceSignalHandler` wraps an existing `ISignalHandler`. Every emitted signal flows through it; the wrapper records it and then delegates to the inner handler. `lrvx::run::TraceExecutionListener` does the same for order lifecycle events on `IOrderExecutionListener`. A fill it records carries its own `fill_id`, the fill's number in the run (1, 2, 3, ...), and the price it filled at when the listener callback names one (`onOrderPartiallyFilled(order, qty, price)` and the three-argument `onOrderFilled`); it used to write the order id as the fill id and the order's limit price as the fill price.
 
 ```cpp
 #include "lrvx/run/trace_handlers.h"

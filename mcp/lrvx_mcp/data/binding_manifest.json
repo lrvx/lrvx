@@ -1848,6 +1848,11 @@
           "name": "lrvx_live_engine_destroy"
         },
         {
+          "group": "lrvxliveengine_disruptor",
+          "kind": "function",
+          "name": "lrvx_live_engine_drain"
+        },
+        {
           "group": "execution",
           "kind": "function",
           "name": "lrvx_live_engine_on_order_event"
@@ -1876,6 +1881,11 @@
           "group": "lrvxliveengine_disruptor",
           "kind": "function",
           "name": "lrvx_live_engine_publish_trade"
+        },
+        {
+          "group": "execution",
+          "kind": "function",
+          "name": "lrvx_live_engine_seed_position"
         },
         {
           "group": "execution",
@@ -2351,6 +2361,11 @@
           "group": "order_tracker",
           "kind": "function",
           "name": "lrvx_order_tracker_total_count"
+        },
+        {
+          "group": "execution",
+          "kind": "function",
+          "name": "lrvx_order_trailing_bps"
         },
         {
           "group": "risk",
@@ -3006,6 +3021,11 @@
           "group": "execution",
           "kind": "function",
           "name": "lrvx_runner_order_closed"
+        },
+        {
+          "group": "execution",
+          "kind": "function",
+          "name": "lrvx_runner_seed_position"
         },
         {
           "group": "execution",
@@ -7570,6 +7590,11 @@
         },
         {
           "kind": "method",
+          "name": "drain",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "on_bar",
           "parent": "Runner"
         },
@@ -7585,7 +7610,17 @@
         },
         {
           "kind": "method",
+          "name": "on_order_event",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "on_trade",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
+          "name": "seed_position",
           "parent": "Runner"
         },
         {
@@ -10356,6 +10391,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_live_engine_drain"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_live_engine_on_order_event"
         },
         {
@@ -10377,6 +10416,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_live_engine_publish_trade"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_live_engine_seed_position"
         },
         {
           "kind": "c_import",
@@ -10757,6 +10800,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_order_tracker_total_count"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_order_trailing_bps"
         },
         {
           "kind": "c_import",
@@ -11281,6 +11328,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_runner_order_closed"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_runner_seed_position"
         },
         {
           "kind": "c_import",
@@ -17749,6 +17800,16 @@
         },
         {
           "kind": "method",
+          "name": "claimedThrough",
+          "parent": "EventBus"
+        },
+        {
+          "kind": "method",
+          "name": "consumedThrough",
+          "parent": "EventBus"
+        },
+        {
+          "kind": "method",
           "name": "consumerCount",
           "parent": "EventBus"
         },
@@ -17885,6 +17946,11 @@
         {
           "kind": "method",
           "name": "runConsumer",
+          "parent": "EventBus"
+        },
+        {
+          "kind": "method",
+          "name": "running",
           "parent": "EventBus"
         },
         {
@@ -26474,6 +26540,11 @@
         },
         {
           "kind": "method",
+          "name": "denseTableEntries",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
           "name": "deserialize",
           "parent": "SymbolRegistry"
         },
@@ -26554,6 +26625,11 @@
         },
         {
           "kind": "method",
+          "name": "nameKey",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
           "name": "nextSymbolIdLocked",
           "parent": "SymbolRegistry"
         },
@@ -26585,6 +26661,11 @@
         {
           "kind": "method",
           "name": "size",
+          "parent": "SymbolRegistry"
+        },
+        {
+          "kind": "method",
+          "name": "symbolNameAboveDenseLocked",
           "parent": "SymbolRegistry"
         },
         {
@@ -28340,6 +28421,10 @@
         {
           "kind": "class",
           "name": "RateLimitPolicy"
+        },
+        {
+          "kind": "class",
+          "name": "ReportedOrderEvent"
         },
         {
           "kind": "class",
@@ -32074,6 +32159,11 @@
         },
         {
           "kind": "method",
+          "name": "trailingBps",
+          "parent": "Order"
+        },
+        {
+          "kind": "method",
           "name": "trailingOffset",
           "parent": "Order"
         },
@@ -33064,6 +33154,56 @@
         },
         {
           "kind": "method",
+          "name": "fillPrice",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "fillQty",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "isMaker",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "orderId",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "orderType",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "rejectReason",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "side",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "status",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "symbol",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
+          "name": "tsNs",
+          "parent": "ReportedOrderEvent"
+        },
+        {
+          "kind": "method",
           "name": "allow",
           "parent": "RiskManager"
         },
@@ -33154,6 +33294,11 @@
         },
         {
           "kind": "method",
+          "name": "onOrderEvent",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "onTrade",
           "parent": "Runner"
         },
@@ -33165,6 +33310,11 @@
         {
           "kind": "method",
           "name": "replaceStrategy",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
+          "name": "seedPosition",
           "parent": "Runner"
         },
         {
@@ -38155,6 +38305,11 @@
         },
         {
           "kind": "method",
+          "name": "trailing_bps",
+          "parent": "Order"
+        },
+        {
+          "kind": "method",
           "name": "trailing_offset",
           "parent": "Order"
         },
@@ -39040,6 +39195,11 @@
         },
         {
           "kind": "method",
+          "name": "drain",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "on_bar",
           "parent": "Runner"
         },
@@ -39076,6 +39236,11 @@
         {
           "kind": "method",
           "name": "replay_tape",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
+          "name": "seed_position",
           "parent": "Runner"
         },
         {
@@ -43810,9 +43975,12 @@
         "lrvx_executor_get_capabilities",
         "lrvx_live_engine_on_order_event",
         "lrvx_live_engine_order_closed",
+        "lrvx_live_engine_seed_position",
         "lrvx_live_engine_set_executor",
+        "lrvx_order_trailing_bps",
         "lrvx_runner_on_order_event",
         "lrvx_runner_order_closed",
+        "lrvx_runner_seed_position",
         "lrvx_runner_set_executor"
       ],
       "codon": {
@@ -44669,6 +44837,7 @@
         "lrvx_live_engine_add_strategy",
         "lrvx_live_engine_create",
         "lrvx_live_engine_destroy",
+        "lrvx_live_engine_drain",
         "lrvx_live_engine_publish_bar",
         "lrvx_live_engine_publish_book_snapshot",
         "lrvx_live_engine_publish_book_top",

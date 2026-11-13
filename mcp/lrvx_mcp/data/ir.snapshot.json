@@ -7793,6 +7793,17 @@
       "return_type": "void"
     },
     {
+      "group": "lrvxliveengine_disruptor",
+      "name": "lrvx_live_engine_drain",
+      "params": [
+        {
+          "name": "engine",
+          "type": "LrvxLiveEngineHandle"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
       "group": "execution",
       "name": "lrvx_live_engine_on_order_event",
       "params": [
@@ -7997,6 +8008,33 @@
         }
       ],
       "return_type": "void"
+    },
+    {
+      "group": "execution",
+      "name": "lrvx_live_engine_seed_position",
+      "params": [
+        {
+          "name": "engine",
+          "type": "LrvxLiveEngineHandle"
+        },
+        {
+          "name": "strategy",
+          "type": "LrvxStrategyHandle"
+        },
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        },
+        {
+          "name": "position_raw",
+          "type": "int64_t"
+        },
+        {
+          "name": "avg_entry_price_raw",
+          "type": "int64_t"
+        }
+      ],
+      "return_type": "uint8_t"
     },
     {
       "group": "execution",
@@ -9556,6 +9594,17 @@
         }
       ],
       "return_type": "uint32_t"
+    },
+    {
+      "group": "execution",
+      "name": "lrvx_order_trailing_bps",
+      "params": [
+        {
+          "name": "order",
+          "type": "const LrvxOrder *"
+        }
+      ],
+      "return_type": "int32_t"
     },
     {
       "group": "risk",
@@ -12121,6 +12170,33 @@
         }
       ],
       "return_type": "void"
+    },
+    {
+      "group": "execution",
+      "name": "lrvx_runner_seed_position",
+      "params": [
+        {
+          "name": "runner",
+          "type": "LrvxRunnerHandle"
+        },
+        {
+          "name": "strategy",
+          "type": "LrvxStrategyHandle"
+        },
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        },
+        {
+          "name": "position_raw",
+          "type": "int64_t"
+        },
+        {
+          "name": "avg_entry_price_raw",
+          "type": "int64_t"
+        }
+      ],
+      "return_type": "uint8_t"
     },
     {
       "group": "execution",

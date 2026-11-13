@@ -58,11 +58,11 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
     uint8_t policy = 0;
     if (info.Length() > 0 && info[0].IsObject())
     {
-      auto opts = info[0].As<Napi::Object>();
+      auto opts = argObject(info[0], "OrderGroup: argument 1");
       if (opts.Has("parentSignalId"))
       {
         parent =
-            static_cast<uint64_t>(opts.Get("parentSignalId").As<Napi::Number>().Int64Value());
+            static_cast<uint64_t>(argInteger(opts.Get("parentSignalId"), "OrderGroup: parentSignalId"));
       }
       if (opts.Has("policy"))
       {
@@ -93,7 +93,7 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
         }
         else
         {
-          policy = static_cast<uint8_t>(p.As<Napi::Number>().Uint32Value());
+          policy = static_cast<uint8_t>(argUint32(p, "OrderGroup: policy"));
         }
       }
     }
@@ -114,9 +114,9 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
 
   Napi::Value AddMarketLeg(const Napi::CallbackInfo& info)
   {
-    uint32_t sym = info[0].As<Napi::Number>().Uint32Value();
-    uint8_t side = static_cast<uint8_t>(info[1].As<Napi::Number>().Uint32Value());
-    double qty = info[2].As<Napi::Number>().DoubleValue();
+    uint32_t sym = argUint32(info[0], "addMarketLeg: argument 1");
+    uint8_t side = static_cast<uint8_t>(argUint32(info[1], "addMarketLeg: argument 2"));
+    double qty = argNumber(info[2], "addMarketLeg: argument 3");
     int64_t qty_raw = lrvx_quantity_from_double(qty);
     return Napi::Number::New(info.Env(),
                              lrvx_order_group_add_market_leg(_h, sym, side, qty_raw));
@@ -124,10 +124,10 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
 
   Napi::Value AddLimitLeg(const Napi::CallbackInfo& info)
   {
-    uint32_t sym = info[0].As<Napi::Number>().Uint32Value();
-    uint8_t side = static_cast<uint8_t>(info[1].As<Napi::Number>().Uint32Value());
-    double price = info[2].As<Napi::Number>().DoubleValue();
-    double qty = info[3].As<Napi::Number>().DoubleValue();
+    uint32_t sym = argUint32(info[0], "addLimitLeg: argument 1");
+    uint8_t side = static_cast<uint8_t>(argUint32(info[1], "addLimitLeg: argument 2"));
+    double price = argNumber(info[2], "addLimitLeg: argument 3");
+    double qty = argNumber(info[3], "addLimitLeg: argument 4");
     return Napi::Number::New(info.Env(), lrvx_order_group_add_limit_leg(
                                              _h, sym, side, lrvx_price_from_double(price),
                                              lrvx_quantity_from_double(qty)));
@@ -140,7 +140,7 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
 
   Napi::Value LegState(const Napi::CallbackInfo& info)
   {
-    uint32_t idx = info[0].As<Napi::Number>().Uint32Value();
+    uint32_t idx = argUint32(info[0], "legState: argument 1");
     static const char* const names[] = {
         "Pending", "Submitted", "PartiallyFilled", "Filled", "Cancelled", "Failed"};
     uint8_t s = lrvx_order_group_leg_state(_h, idx);
@@ -150,59 +150,59 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
 
   Napi::Value LegFilled(const Napi::CallbackInfo& info)
   {
-    uint32_t idx = info[0].As<Napi::Number>().Uint32Value();
+    uint32_t idx = argUint32(info[0], "legFilled: argument 1");
     return Napi::Number::New(
         info.Env(), lrvx_quantity_to_double(lrvx_order_group_leg_filled_raw(_h, idx)));
   }
 
   Napi::Value LegOrderId(const Napi::CallbackInfo& info)
   {
-    uint32_t idx = info[0].As<Napi::Number>().Uint32Value();
+    uint32_t idx = argUint32(info[0], "legOrderId: argument 1");
     return Napi::Number::New(
         info.Env(), static_cast<double>(lrvx_order_group_leg_order_id(_h, idx)));
   }
 
   void RecordSubmit(const Napi::CallbackInfo& info)
   {
-    uint32_t idx = info[0].As<Napi::Number>().Uint32Value();
+    uint32_t idx = argUint32(info[0], "recordSubmit: argument 1");
     uint64_t order_id =
-        static_cast<uint64_t>(info[1].As<Napi::Number>().Int64Value());
+        static_cast<uint64_t>(argInteger(info[1], "recordSubmit: argument 2"));
     lrvx_order_group_record_submit(_h, idx, order_id);
   }
 
   void RecordFill(const Napi::CallbackInfo& info)
   {
-    uint32_t idx = info[0].As<Napi::Number>().Uint32Value();
-    double cum = info[1].As<Napi::Number>().DoubleValue();
+    uint32_t idx = argUint32(info[0], "recordFill: argument 1");
+    double cum = argNumber(info[1], "recordFill: argument 2");
     lrvx_order_group_record_fill(_h, idx, lrvx_quantity_from_double(cum));
   }
 
   void RecordCancel(const Napi::CallbackInfo& info)
   {
-    lrvx_order_group_record_cancel(_h, info[0].As<Napi::Number>().Uint32Value());
+    lrvx_order_group_record_cancel(_h, argUint32(info[0], "recordCancel: argument 1"));
   }
 
   void RecordFailure(const Napi::CallbackInfo& info)
   {
-    lrvx_order_group_record_failure(_h, info[0].As<Napi::Number>().Uint32Value());
+    lrvx_order_group_record_failure(_h, argUint32(info[0], "recordFailure: argument 1"));
   }
 
   void RecordReplaceAccepted(const Napi::CallbackInfo& info)
   {
-    uint32_t idx = info[0].As<Napi::Number>().Uint32Value();
-    uint64_t new_id = static_cast<uint64_t>(info[1].As<Napi::Number>().Int64Value());
+    uint32_t idx = argUint32(info[0], "recordReplaceAccepted: argument 1");
+    uint64_t new_id = static_cast<uint64_t>(argInteger(info[1], "recordReplaceAccepted: argument 2"));
     lrvx_order_group_record_replace_accepted(_h, idx, new_id);
   }
 
   void RecordReplaceRejected(const Napi::CallbackInfo& info)
   {
     lrvx_order_group_record_replace_rejected(_h,
-                                             info[0].As<Napi::Number>().Uint32Value());
+                                             argUint32(info[0], "recordReplaceRejected: argument 1"));
   }
 
   Napi::Value FindLegByOrderId(const Napi::CallbackInfo& info)
   {
-    uint64_t order_id = static_cast<uint64_t>(info[0].As<Napi::Number>().Int64Value());
+    uint64_t order_id = static_cast<uint64_t>(argInteger(info[0], "findLegByOrderId: argument 1"));
     uint32_t idx = lrvx_order_group_find_leg_by_order_id(_h, order_id);
     if (idx == UINT32_MAX)
     {
@@ -250,23 +250,23 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
 
   void MarkActionDispatched(const Napi::CallbackInfo& info)
   {
-    uint32_t leg = info[0].As<Napi::Number>().Uint32Value();
-    std::string kind = info[1].As<Napi::String>().Utf8Value();
+    uint32_t leg = argUint32(info[0], "markActionDispatched: argument 1");
+    std::string kind = argString(info[1], "markActionDispatched: argument 2");
     uint8_t k = (kind == "cancel") ? 0 : 1;
     lrvx_order_group_mark_action_dispatched(_h, leg, k);
   }
 
   void SetRiskLimits(const Napi::CallbackInfo& info)
   {
-    auto opts = info[0].As<Napi::Object>();
+    auto opts = argObject(info[0], "setRiskLimits: argument 1");
     double max_gross = opts.Has("maxGrossNotional")
-                           ? opts.Get("maxGrossNotional").As<Napi::Number>().DoubleValue()
+                           ? argNumber(opts.Get("maxGrossNotional"), "setRiskLimits: maxGrossNotional")
                            : 0.0;
     double max_conc = opts.Has("maxConcentrationPct")
-                          ? opts.Get("maxConcentrationPct").As<Napi::Number>().DoubleValue()
+                          ? argNumber(opts.Get("maxConcentrationPct"), "setRiskLimits: maxConcentrationPct")
                           : 0.0;
     double max_leg = opts.Has("maxLegQty")
-                         ? opts.Get("maxLegQty").As<Napi::Number>().DoubleValue()
+                         ? argNumber(opts.Get("maxLegQty"), "setRiskLimits: maxLegQty")
                          : 0.0;
     lrvx_order_group_set_risk_limits(_h, lrvx_quantity_from_double(max_gross), max_conc,
                                      lrvx_quantity_from_double(max_leg));
@@ -279,19 +279,19 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
     std::vector<int64_t> ref_prices;
     if (info.Length() > 0 && info[0].IsObject())
     {
-      auto opts = info[0].As<Napi::Object>();
+      auto opts = argObject(info[0], "precheckSubmission: argument 1");
       if (opts.Has("equity"))
       {
-        equity = opts.Get("equity").As<Napi::Number>().DoubleValue();
+        equity = argNumber(opts.Get("equity"), "precheckSubmission: equity");
       }
       if (opts.Has("marketRefPrices"))
       {
-        auto arr = opts.Get("marketRefPrices").As<Napi::Array>();
+        auto arr = argArray(opts.Get("marketRefPrices"), "precheckSubmission: marketRefPrices");
         ref_prices.reserve(arr.Length());
         for (uint32_t i = 0; i < arr.Length(); ++i)
         {
           ref_prices.push_back(
-              lrvx_price_from_double(arr.Get(i).As<Napi::Number>().DoubleValue()));
+              lrvx_price_from_double(argNumber(arr.Get(i), "a leg price")));
         }
       }
     }
@@ -309,17 +309,17 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
 
   void SetPairLatencyBudgetNs(const Napi::CallbackInfo& info)
   {
-    int64_t budget = info[0].As<Napi::Number>().Int64Value();
+    int64_t budget = argInteger(info[0], "setPairLatencyBudgetNs: argument 1");
     lrvx_order_group_set_pair_latency_budget_ns(_h, budget);
   }
 
   Napi::Value PairLatencyDecision(const Napi::CallbackInfo& info)
   {
-    auto opts = info[0].As<Napi::Object>();
-    int64_t submit_ts = toInt64Ns(opts.Get("leaderSubmitTsNs"));
-    int64_t ack_ts = toInt64Ns(opts.Get("leaderAckTsNs"));
+    auto opts = argObject(info[0], "pairLatencyDecision: argument 1");
+    int64_t submit_ts = toInt64Ns(opts.Get("leaderSubmitTsNs"), "pairLatencyDecision: leaderSubmitTsNs");
+    int64_t ack_ts = toInt64Ns(opts.Get("leaderAckTsNs"), "pairLatencyDecision: leaderAckTsNs");
     bool ack_received = opts.Has("ackReceived")
-                            ? opts.Get("ackReceived").As<Napi::Boolean>().Value()
+                            ? argBool(opts.Get("ackReceived"), "pairLatencyDecision: ackReceived")
                             : false;
     uint8_t d = lrvx_order_group_pair_latency_decision(_h, submit_ts, ack_ts,
                                                        ack_received ? 1 : 0);
@@ -337,7 +337,7 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
           .ThrowAsJavaScriptException();
       return Napi::Number::New(env, 0);
     }
-    auto strategy = info[0].As<Napi::Object>();
+    auto strategy = argObject(info[0], "autoDispatch: argument 1");
 
     constexpr uint32_t kMaxActions = 32;
     int64_t buf[kMaxActions * 5];
@@ -350,7 +350,8 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
       if (slot[0] == 0)
       {
         // CancelLeg: strategy.emitCancel(orderId).
-        Napi::Function fn = strategy.Get("emitCancel").As<Napi::Function>();
+        Napi::Function fn =
+            argFunction(strategy.Get("emitCancel"), "autoDispatch: strategy.emitCancel");
         fn.Call(strategy, {Napi::Number::New(env, static_cast<double>(slot[2]))});
         lrvx_order_group_mark_action_dispatched(_h, leg, 0);
       }
@@ -358,7 +359,8 @@ class OrderGroupWrap : public Napi::ObjectWrap<OrderGroupWrap>
       {
         // RevertLeg: opposite side market order.
         const char* method = (slot[3] == 0) ? "emitMarketBuy" : "emitMarketSell";
-        Napi::Function fn = strategy.Get(method).As<Napi::Function>();
+        Napi::Function fn = argFunction(
+            strategy.Get(method), (std::string("autoDispatch: strategy.") + method).c_str());
         fn.Call(strategy, {Napi::Number::New(env, static_cast<double>(slot[2])),
                            Napi::Number::New(env, lrvx_quantity_to_double(slot[4]))});
         lrvx_order_group_mark_action_dispatched(_h, leg, 1);

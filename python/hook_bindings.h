@@ -26,6 +26,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "bindings_common.h"
 #include "callback_guard.h"
 #include "lrvx/capi/lrvx_capi.h"
 #include "lrvx/capi/order_type_names.hpp"
@@ -70,6 +71,9 @@ struct PyOrder
   double filled_quantity{0.0};
   double trigger_price{0.0};
   double trailing_offset{0.0};
+  // The callback rate of a percent trailing stop, in basis points; 0 for an
+  // order with a fixed offset and for every other order.
+  int32_t trailing_bps{0};
   int64_t created_at_ns{0};
   int64_t exchange_ts_ns{0};
 };
@@ -94,6 +98,9 @@ inline PyOrder pyOrderFromC(const LrvxOrder* o)
   po.filled_quantity = static_cast<double>(o->filled_quantity_raw) / 1e8;
   po.trigger_price = static_cast<double>(o->trigger_price_raw) / 1e8;
   po.trailing_offset = static_cast<double>(o->trailing_offset_raw) / 1e8;
+  // The struct has no field for it: read while the callback that was handed
+  // `o` is still running.
+  po.trailing_bps = lrvx_order_trailing_bps(o);
   po.created_at_ns = o->created_at_ns;
   po.exchange_ts_ns = o->exchange_ts_ns;
   return po;
@@ -107,28 +114,12 @@ inline LrvxOrder cOrderFromPy(const PyOrder& po)
   o.symbol = po.symbol;
   o.strategy_id = po.strategy_id;
   o.order_tag = po.order_tag;
-  o.side = po.side == "buy" ? 0u : 1u;
-  lrvx::capi::orderTypeCodeFromName(po.order_type, &o.type);
-  if (po.time_in_force == "gtc")
+  o.side = parseSide(po.side) == lrvx::Side::BUY ? 0u : 1u;
+  if (!lrvx::capi::orderTypeCodeFromName(po.order_type, &o.type))
   {
-    o.time_in_force = 0;
+    throw pybind11::value_error(lrvx::capi::unknownOrderTypeMessage(po.order_type));
   }
-  else if (po.time_in_force == "ioc")
-  {
-    o.time_in_force = 1;
-  }
-  else if (po.time_in_force == "fok")
-  {
-    o.time_in_force = 2;
-  }
-  else if (po.time_in_force == "gtd")
-  {
-    o.time_in_force = 3;
-  }
-  else if (po.time_in_force == "post_only")
-  {
-    o.time_in_force = 4;
-  }
+  o.time_in_force = static_cast<uint8_t>(parseTimeInForceWithExpiry(po.time_in_force));
   uint8_t flags = 0;
   if (po.reduce_only)
   {
@@ -767,7 +758,8 @@ inline uint8_t replayNextBridge(void* ud, LrvxReplayEvent* out)
     }
     else
     {
-      out->type = (ev.type == "book_snapshot") ? 2 : 3;
+      out->type = parseChoice<uint8_t>("replay event type", ev.type,
+                                       {{"book_snapshot", 2}, {"book_delta", 3}});
       out->book_symbol = ev.book_symbol;
       buf.bids.clear();
       buf.asks.clear();
@@ -1200,59 +1192,14 @@ inline lrvx::Order pyOrderToLrvx(const PyOrder& po)
   o.symbol = po.symbol;
   o.strategyId = po.strategy_id;
   o.orderTag = po.order_tag;
-  o.side = (po.side == "buy") ? lrvx::Side::BUY : lrvx::Side::SELL;
-  if (po.order_type == "limit")
+  o.side = parseSide(po.side);
+  uint8_t typeCode = 0;
+  if (!lrvx::capi::orderTypeCodeFromName(po.order_type, &typeCode))
   {
-    o.type = lrvx::OrderType::LIMIT;
+    throw pybind11::value_error(lrvx::capi::unknownOrderTypeMessage(po.order_type));
   }
-  else if (po.order_type == "market")
-  {
-    o.type = lrvx::OrderType::MARKET;
-  }
-  else if (po.order_type == "stop_market")
-  {
-    o.type = lrvx::OrderType::STOP_MARKET;
-  }
-  else if (po.order_type == "stop_limit")
-  {
-    o.type = lrvx::OrderType::STOP_LIMIT;
-  }
-  else if (po.order_type == "tp_market")
-  {
-    o.type = lrvx::OrderType::TAKE_PROFIT_MARKET;
-  }
-  else if (po.order_type == "tp_limit")
-  {
-    o.type = lrvx::OrderType::TAKE_PROFIT_LIMIT;
-  }
-  else if (po.order_type == "trailing_stop")
-  {
-    o.type = lrvx::OrderType::TRAILING_STOP;
-  }
-  else if (po.order_type == "iceberg")
-  {
-    o.type = lrvx::OrderType::ICEBERG;
-  }
-  if (po.time_in_force == "ioc")
-  {
-    o.timeInForce = lrvx::TimeInForce::IOC;
-  }
-  else if (po.time_in_force == "fok")
-  {
-    o.timeInForce = lrvx::TimeInForce::FOK;
-  }
-  else if (po.time_in_force == "gtd")
-  {
-    o.timeInForce = lrvx::TimeInForce::GTD;
-  }
-  else if (po.time_in_force == "post_only")
-  {
-    o.timeInForce = lrvx::TimeInForce::POST_ONLY;
-  }
-  else
-  {
-    o.timeInForce = lrvx::TimeInForce::GTC;
-  }
+  o.type = static_cast<lrvx::OrderType>(typeCode);
+  o.timeInForce = parseTimeInForceWithExpiry(po.time_in_force);
   o.flags.reduceOnly = po.reduce_only ? 1 : 0;
   o.flags.closePosition = po.close_position ? 1 : 0;
   o.flags.postOnly = po.post_only ? 1 : 0;
@@ -1261,6 +1208,7 @@ inline lrvx::Order pyOrderToLrvx(const PyOrder& po)
   o.filledQuantity = lrvx::Quantity::fromDouble(po.filled_quantity);
   o.triggerPrice = lrvx::Price::fromDouble(po.trigger_price);
   o.trailingOffset = lrvx::Price::fromDouble(po.trailing_offset);
+  o.trailingCallbackRate = po.trailing_bps;
   return o;
 }
 
@@ -1326,6 +1274,7 @@ inline PyOrder lrvxOrderToPy(const lrvx::Order& o)
   po.filled_quantity = o.filledQuantity.toDouble();
   po.trigger_price = o.triggerPrice.toDouble();
   po.trailing_offset = o.trailingOffset.toDouble();
+  po.trailing_bps = o.trailingCallbackRate;
   return po;
 }
 

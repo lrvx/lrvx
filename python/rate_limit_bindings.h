@@ -11,6 +11,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "bindings_common.h"
 
 #include "lrvx/backtest/rate_limit_policy.h"
 
@@ -40,24 +41,13 @@ inline void bindRateLimitPolicy(py::module_& m)
       .def("set_ban", &lrvx::RateLimitPolicy::setBan, py::arg("after_consecutive_rejects"), py::arg("ban_duration_ns"))
       .def("try_consume", [](lrvx::RateLimitPolicy& p, const std::string& action, int64_t now_ns)
            {
-             lrvx::RateLimitPolicy::ActionKind a =
-                 lrvx::RateLimitPolicy::ActionKind::Submit;
-             if (action == "cancel")
-             {
-               a = lrvx::RateLimitPolicy::ActionKind::Cancel;
-             }
-             else if (action == "replace")
-             {
-               a = lrvx::RateLimitPolicy::ActionKind::Replace;
-             }
-             else if (action == "query_account")
-             {
-               a = lrvx::RateLimitPolicy::ActionKind::QueryAccount;
-             }
-             else if (action == "query_market_data")
-             {
-               a = lrvx::RateLimitPolicy::ActionKind::QueryMarketData;
-             }
+             using Kind = lrvx::RateLimitPolicy::ActionKind;
+             const Kind a = parseChoice<Kind>("rate limit action", action,
+                                              {{"submit", Kind::Submit},
+                                               {"cancel", Kind::Cancel},
+                                               {"replace", Kind::Replace},
+                                               {"query_account", Kind::QueryAccount},
+                                               {"query_market_data", Kind::QueryMarketData}});
              return p.tryConsume(a, now_ns); }, py::arg("action"), py::arg("now_ns"))
       .def("bucket_states", [](lrvx::RateLimitPolicy& p, int64_t now_ns)
            {

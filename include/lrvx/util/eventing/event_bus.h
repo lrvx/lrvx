@@ -579,6 +579,18 @@ class EventBus : public ISubsystem
     return i < MaxConsumers && _consumers[i].failed.load(std::memory_order_acquire);
   }
 
+  // The last sequence a publisher has claimed (-1 before the first) and the
+  // last one consumer i has handled and published its progress for. With
+  // them a third party can wait for one consumer to pass a point of the
+  // stream; waitConsumed() only answers for all the required consumers
+  // together and never returns when one of them has failed.
+  int64_t claimedThrough() const noexcept { return _next.load(std::memory_order_acquire); }
+  int64_t consumedThrough(uint32_t i) const noexcept
+  {
+    return i < MaxConsumers ? _consumers[i].seq.load(std::memory_order_acquire) : INT64_MAX;
+  }
+  bool running() const noexcept { return _running.load(std::memory_order_acquire); }
+
   void start() override
   {
     if (_running.exchange(true, std::memory_order_acq_rel))

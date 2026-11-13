@@ -238,11 +238,61 @@ What is put to the gates depends on what runs the strategy:
 
 | | `Runner` and `LiveEngine` | `BacktestRunner` |
 |---|---|---|
-| Signals asked | every signal: orders, cancel, cancel-all, modify, the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
-| Pass unasked | nothing | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
+| Signals asked | signals that create an order (market, limit, stop and take-profit, trailing stop, an OCO as one signal) and the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
+| Pass unasked | cancel, cancel-all, modify, and any reduce-only order (a `close_position`): the same rule as the backtest runner, so a triggered kill switch cannot hold back a cancel | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
 | A drop skips | `onSignal`, the executor and the PnL / storage observers | the simulator or the attached executor |
 | `<outcome>` | `it reached neither on_signal nor the executor` | `it reached no executor` |
-| Kill switch | asked again for every signal | stays triggered for the rest of the run once it said no |
+| Kill switch | asked again for every signal it is asked about | stays triggered for the rest of the run once it said no |
+
+### Reporting a live order's updates and fills
+
+`runner.onOrderEvent(event)` reports one order event a venue sent to the strategy that issued the
+order, through the callbacks a backtest uses: `PARTIALLY_FILLED` and `FILLED` reach `onFill` and
+only `onFill`, every other status reaches `onOrderUpdate`.
+
+```js
+runner.onOrderEvent({
+  orderId,                 // number or bigint, as emit.limitBuy returned it
+  symbol,                  // the Symbol from addSymbol, or its numeric id
+  side: 'buy',             // 'buy' | 'sell'
+  status: 'PARTIALLY_FILLED',
+  orderType: 'limit',      // optional, 'limit' when omitted
+  fillQty: 0.5,            // this fill's own quantity and price,
+  fillPrice: 100.0,        // not the order's running totals
+  tsNs: 1700000000000000000n,
+  isMaker: true,
+});
+```
+
+Each strategy has a position of its own, as in a backtest: the fill counts in the position of the
+strategy that issued the order (its id is the high 32 bits of the order id) before `onFill` runs,
+so `ctx.position` inside `onFill` counts it, and another strategy on the same runner still reads its
+own. An order id no attached strategy issued goes to every strategy subscribed to the symbol and
+counts in no position.
+
+On a sync runner the callbacks run inside the call. On a threaded runner the event is queued behind
+the trades, books and bars published before it and the callbacks run later on the JS thread, like
+every other callback of that runner; `onOrderEvent` throws unless the runner is started. A missing
+or mistyped field, or an unknown side, status or order type, throws a `TypeError` that names the
+value.
+
+The status names are the `OrderEventStatus` names of the engine: `NEW`, `SUBMITTED`, `ACCEPTED`,
+`PARTIALLY_FILLED`, `FILLED`, `PENDING_CANCEL`, `CANCELED`, `EXPIRED`, `REJECTED`, `REPLACED`,
+`PENDING_TRIGGER`, `TRIGGERED`, `TRAILING_UPDATED`, `QUEUE_POSITION_UPDATED`,
+`MARKET_POSITION_CHANGED`, `REPLACE_SUBMITTED`, `REPLACE_ACCEPTED`, `REPLACE_REJECTED`,
+`REJECTED_RATE_LIMIT`, `PENDING_ONCHAIN`, `REVERTED`, `REPLACED_GAS`. Node and QuickJS used to read a
+`SUBMITTED` event as `"ACCEPTED"`, an `ACCEPTED` event as `"PENDING_NEW"` and
+`REJECTED_RATE_LIMIT` as `"UNKNOWN"`; Python read the last as `"UNKNOWN"` too. All three now read
+the one table.
+
+### A position the account already holds
+
+`runner.seedPosition(strategyIndex, symbol, position, avgEntryPrice?)` sets what the strategy at
+`strategyIndex` (the order of `addStrategy`, from 0) holds before any fill is reported: after a
+restart the account may not be flat, and no `onOrderEvent` will tell of that position. `position`
+is signed, negative for a short. The strategy reads it from `ctx.position` and the fills reported
+afterwards add to it. A position is seeded once: a strategy that already holds one in the symbol,
+or an index the runner does not hold, throws.
 
 `onSignal` is an observer: a runner created without one gates and forwards its signals the same way.
 
@@ -305,6 +355,16 @@ most 2^53) or a BigInt below 2^64`). The same holds for `emit.lastClosedBar`,
 `emit.lastNClosedBars` and `emit.setBarRingCapacity` inside a strategy. These reads used to be
 unchecked: the call threw a bare `A number was expected`, or went ahead with whatever the
 conversion produced.
+
+The same rule holds across the Node module. A clock reading or a count is a finite Number
+(truncated toward zero) or a BigInt; a BigInt that does not fit 64 signed bits is a `RangeError`
+(it used to wrap), and anything else is a `TypeError` naming the argument. `addSymbol` refuses an
+exchange or symbol that is not a string and a tick or lot that is not a number (a non-number tick
+was taken as "no tick"). The `BacktestRunner`, `Runner` and `WalkForwardRunner` constructors
+refuse a registry that is not a `SymbolRegistry` with a `TypeError` (a plain object threw a bare
+`Invalid argument`, and an instance of another class was read as a registry). A typed array of
+the wrong element type is a `TypeError`, and these errors keep their class when a method turns
+native errors into JS ones.
 
 ### Signal callback
 

@@ -233,6 +233,9 @@ add_codon_executable(codon_funding_schedule_smoke
 add_codon_executable(codon_runner_strategy_ids_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/runner_strategy_ids_smoke.codon)
 
+add_codon_executable(codon_runner_order_event_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/runner_order_event_smoke.codon)
+
 add_codon_executable(codon_last_error_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/last_error_smoke.codon)
 

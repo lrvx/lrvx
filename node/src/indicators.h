@@ -92,7 +92,7 @@ T checkedIndicator(Napi::Env env, const char* row, A... args)
 template <typename Indicator>
 Napi::Value batchSingle(const Napi::CallbackInfo& info, Indicator ind)
 {
-  auto in = info[0].As<Napi::Float64Array>();
+  auto in = argFloat64Array(info[0], "argument 1");
   size_t n = in.ElementLength();
   std::vector<double> out(n);
   ind.compute(std::span<const double>(in.Data(), n), std::span<double>(out.data(), n));
@@ -102,7 +102,7 @@ Napi::Value batchSingle(const Napi::CallbackInfo& info, Indicator ind)
 #define BATCH_SINGLE(name, Ind)                                                             \
   inline Napi::Value batch_##name(const Napi::CallbackInfo& info)                           \
   {                                                                                         \
-    size_t p = info[1].As<Napi::Number>().Uint32Value();                                    \
+    size_t p = argUint32(info[1], #name ": period");                                        \
     return batchSingle(info, checkedIndicator<lrvx::indicator::Ind>(info.Env(), #name, p)); \
   }
 
@@ -116,23 +116,23 @@ BATCH_SINGLE(slope, Slope)
 
 inline Napi::Value batch_kama(const Napi::CallbackInfo& info)
 {
-  size_t p = info[1].As<Napi::Number>().Uint32Value();
+  size_t p = argUint32(info[1], "batch_kama: argument 2");
   return batchSingle(info, checkedIndicator<lrvx::indicator::KAMA>(info.Env(), "kama", p,
                                                                    size_t{2}, size_t{30}));
 }
 
 inline Napi::Value batch_dema(const Napi::CallbackInfo& info)
 {
-  auto in = info[0].As<Napi::Float64Array>();
-  size_t p = info[1].As<Napi::Number>().Uint32Value();
+  auto in = argFloat64Array(info[0], "batch_dema: argument 1");
+  size_t p = argUint32(info[1], "batch_dema: argument 2");
   auto r = checkedIndicator<lrvx::indicator::DEMA>(info.Env(), "dema", p).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
 inline Napi::Value batch_tema(const Napi::CallbackInfo& info)
 {
-  auto in = info[0].As<Napi::Float64Array>();
-  size_t p = info[1].As<Napi::Number>().Uint32Value();
+  auto in = argFloat64Array(info[0], "batch_tema: argument 1");
+  size_t p = argUint32(info[1], "batch_tema: argument 2");
   auto r = checkedIndicator<lrvx::indicator::TEMA>(info.Env(), "tema", p).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
@@ -141,10 +141,10 @@ inline Napi::Value batch_tema(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_atr(const Napi::CallbackInfo& info)
 {
-  auto h = info[0].As<Napi::Float64Array>();
-  auto l = info[1].As<Napi::Float64Array>();
-  auto c = info[2].As<Napi::Float64Array>();
-  size_t n = h.ElementLength(), p = info[3].As<Napi::Number>().Uint32Value();
+  auto h = argFloat64Array(info[0], "batch_atr: argument 1");
+  auto l = argFloat64Array(info[1], "batch_atr: argument 2");
+  auto c = argFloat64Array(info[2], "batch_atr: argument 3");
+  size_t n = h.ElementLength(), p = argUint32(info[3], "batch_atr: argument 4");
   if (!requireSameLength(info.Env(), "atr", {n, l.ElementLength(), c.ElementLength()}))
   {
     return info.Env().Undefined();
@@ -156,10 +156,10 @@ inline Napi::Value batch_atr(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_adx(const Napi::CallbackInfo& info)
 {
-  auto h = info[0].As<Napi::Float64Array>();
-  auto l = info[1].As<Napi::Float64Array>();
-  auto c = info[2].As<Napi::Float64Array>();
-  size_t n = h.ElementLength(), p = info[3].As<Napi::Number>().Uint32Value();
+  auto h = argFloat64Array(info[0], "batch_adx: argument 1");
+  auto l = argFloat64Array(info[1], "batch_adx: argument 2");
+  auto c = argFloat64Array(info[2], "batch_adx: argument 3");
+  size_t n = h.ElementLength(), p = argUint32(info[3], "batch_adx: argument 4");
   if (!requireSameLength(info.Env(), "adx", {n, l.ElementLength(), c.ElementLength()}))
   {
     return info.Env().Undefined();
@@ -174,12 +174,12 @@ inline Napi::Value batch_adx(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_stochastic(const Napi::CallbackInfo& info)
 {
-  auto h = info[0].As<Napi::Float64Array>();
-  auto l = info[1].As<Napi::Float64Array>();
-  auto c = info[2].As<Napi::Float64Array>();
+  auto h = argFloat64Array(info[0], "batch_stochastic: argument 1");
+  auto l = argFloat64Array(info[1], "batch_stochastic: argument 2");
+  auto c = argFloat64Array(info[2], "batch_stochastic: argument 3");
   size_t n = h.ElementLength();
-  size_t kp = info[3].As<Napi::Number>().Uint32Value();
-  size_t dp = info[4].As<Napi::Number>().Uint32Value();
+  size_t kp = argUint32(info[3], "batch_stochastic: argument 4");
+  size_t dp = argUint32(info[4], "batch_stochastic: argument 5");
   if (!requireSameLength(info.Env(), "stochastic", {n, l.ElementLength(), c.ElementLength()}))
   {
     return info.Env().Undefined();
@@ -193,10 +193,10 @@ inline Napi::Value batch_stochastic(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_cci(const Napi::CallbackInfo& info)
 {
-  auto h = info[0].As<Napi::Float64Array>();
-  auto l = info[1].As<Napi::Float64Array>();
-  auto c = info[2].As<Napi::Float64Array>();
-  size_t n = h.ElementLength(), p = info[3].As<Napi::Number>().Uint32Value();
+  auto h = argFloat64Array(info[0], "batch_cci: argument 1");
+  auto l = argFloat64Array(info[1], "batch_cci: argument 2");
+  auto c = argFloat64Array(info[2], "batch_cci: argument 3");
+  size_t n = h.ElementLength(), p = argUint32(info[3], "batch_cci: argument 4");
   if (!requireSameLength(info.Env(), "cci", {n, l.ElementLength(), c.ElementLength()}))
   {
     return info.Env().Undefined();
@@ -207,10 +207,10 @@ inline Napi::Value batch_cci(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_chop(const Napi::CallbackInfo& info)
 {
-  auto h = info[0].As<Napi::Float64Array>();
-  auto l = info[1].As<Napi::Float64Array>();
-  auto c = info[2].As<Napi::Float64Array>();
-  size_t n = h.ElementLength(), p = info[3].As<Napi::Number>().Uint32Value();
+  auto h = argFloat64Array(info[0], "batch_chop: argument 1");
+  auto l = argFloat64Array(info[1], "batch_chop: argument 2");
+  auto c = argFloat64Array(info[2], "batch_chop: argument 3");
+  size_t n = h.ElementLength(), p = argUint32(info[3], "batch_chop: argument 4");
   if (!requireSameLength(info.Env(), "chop", {n, l.ElementLength(), c.ElementLength()}))
   {
     return info.Env().Undefined();
@@ -223,11 +223,11 @@ inline Napi::Value batch_chop(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_macd(const Napi::CallbackInfo& info)
 {
-  auto in = info[0].As<Napi::Float64Array>();
+  auto in = argFloat64Array(info[0], "batch_macd: argument 1");
   size_t n = in.ElementLength();
-  size_t f = info[1].As<Napi::Number>().Uint32Value();
-  size_t s = info[2].As<Napi::Number>().Uint32Value();
-  size_t sg = info[3].As<Napi::Number>().Uint32Value();
+  size_t f = argUint32(info[1], "batch_macd: argument 2");
+  size_t s = argUint32(info[2], "batch_macd: argument 3");
+  size_t sg = argUint32(info[3], "batch_macd: argument 4");
   std::vector<double> line(n), sig(n), hist(n);
   checkedIndicator<lrvx::indicator::MACD>(info.Env(), "macd", f, s, sg).compute({in.Data(), n}, {line.data(), n}, {sig.data(), n}, {hist.data(), n});
   auto o = Napi::Object::New(info.Env());
@@ -239,9 +239,9 @@ inline Napi::Value batch_macd(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_bollinger(const Napi::CallbackInfo& info)
 {
-  auto in = info[0].As<Napi::Float64Array>();
-  size_t n = in.ElementLength(), p = info[1].As<Napi::Number>().Uint32Value();
-  double sd = info[2].As<Napi::Number>().DoubleValue();
+  auto in = argFloat64Array(info[0], "batch_bollinger: argument 1");
+  size_t n = in.ElementLength(), p = argUint32(info[1], "batch_bollinger: argument 2");
+  double sd = argNumber(info[2], "batch_bollinger: argument 3");
   auto r = checkedIndicator<lrvx::indicator::Bollinger>(info.Env(), "bollinger", p, sd).compute({in.Data(), n});
   auto o = Napi::Object::New(info.Env());
   o.Set("upper", vec2arr(info.Env(), r.upper));
@@ -252,8 +252,8 @@ inline Napi::Value batch_bollinger(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_obv(const Napi::CallbackInfo& info)
 {
-  auto c = info[0].As<Napi::Float64Array>();
-  auto v = info[1].As<Napi::Float64Array>();
+  auto c = argFloat64Array(info[0], "batch_obv: argument 1");
+  auto v = argFloat64Array(info[1], "batch_obv: argument 2");
   size_t n = c.ElementLength();
   if (!requireSameLength(info.Env(), "obv", {n, v.ElementLength()}))
   {
@@ -266,9 +266,9 @@ inline Napi::Value batch_obv(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_vwap(const Napi::CallbackInfo& info)
 {
-  auto c = info[0].As<Napi::Float64Array>();
-  auto v = info[1].As<Napi::Float64Array>();
-  size_t n = c.ElementLength(), w = info[2].As<Napi::Number>().Uint32Value();
+  auto c = argFloat64Array(info[0], "batch_vwap: argument 1");
+  auto v = argFloat64Array(info[1], "batch_vwap: argument 2");
+  size_t n = c.ElementLength(), w = argUint32(info[2], "batch_vwap: argument 3");
   if (!requireSameLength(info.Env(), "vwap", {n, v.ElementLength()}))
   {
     return info.Env().Undefined();
@@ -279,11 +279,11 @@ inline Napi::Value batch_vwap(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_cvd(const Napi::CallbackInfo& info)
 {
-  auto o = info[0].As<Napi::Float64Array>();
-  auto h = info[1].As<Napi::Float64Array>();
-  auto l = info[2].As<Napi::Float64Array>();
-  auto c = info[3].As<Napi::Float64Array>();
-  auto v = info[4].As<Napi::Float64Array>();
+  auto o = argFloat64Array(info[0], "batch_cvd: argument 1");
+  auto h = argFloat64Array(info[1], "batch_cvd: argument 2");
+  auto l = argFloat64Array(info[2], "batch_cvd: argument 3");
+  auto c = argFloat64Array(info[3], "batch_cvd: argument 4");
+  auto v = argFloat64Array(info[4], "batch_cvd: argument 5");
   size_t n = c.ElementLength();
   if (!requireSameLength(info.Env(), "cvd",
                          {n, o.ElementLength(), h.ElementLength(), l.ElementLength(), v.ElementLength()}))
@@ -299,42 +299,42 @@ inline Napi::Value batch_cvd(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_skewness(const Napi::CallbackInfo& info)
 {
-  auto in = info[0].As<Napi::Float64Array>();
-  size_t p = info[1].As<Napi::Number>().Uint32Value();
+  auto in = argFloat64Array(info[0], "batch_skewness: argument 1");
+  size_t p = argUint32(info[1], "batch_skewness: argument 2");
   auto r = checkedIndicator<lrvx::indicator::Skewness>(info.Env(), "skewness", p).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
 inline Napi::Value batch_kurtosis(const Napi::CallbackInfo& info)
 {
-  auto in = info[0].As<Napi::Float64Array>();
-  size_t p = info[1].As<Napi::Number>().Uint32Value();
+  auto in = argFloat64Array(info[0], "batch_kurtosis: argument 1");
+  size_t p = argUint32(info[1], "batch_kurtosis: argument 2");
   auto r = checkedIndicator<lrvx::indicator::Kurtosis>(info.Env(), "kurtosis", p).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
 inline Napi::Value batch_rolling_zscore(const Napi::CallbackInfo& info)
 {
-  auto in = info[0].As<Napi::Float64Array>();
-  size_t p = info[1].As<Napi::Number>().Uint32Value();
+  auto in = argFloat64Array(info[0], "batch_rolling_zscore: argument 1");
+  size_t p = argUint32(info[1], "batch_rolling_zscore: argument 2");
   auto r = checkedIndicator<lrvx::indicator::RollingZScore>(info.Env(), "rolling_zscore", p).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
 inline Napi::Value batch_shannon_entropy(const Napi::CallbackInfo& info)
 {
-  auto in = info[0].As<Napi::Float64Array>();
-  size_t p = info[1].As<Napi::Number>().Uint32Value();
-  size_t bins = info[2].As<Napi::Number>().Uint32Value();
+  auto in = argFloat64Array(info[0], "batch_shannon_entropy: argument 1");
+  size_t p = argUint32(info[1], "batch_shannon_entropy: argument 2");
+  size_t bins = argUint32(info[2], "batch_shannon_entropy: argument 3");
   auto r = checkedIndicator<lrvx::indicator::ShannonEntropy>(info.Env(), "shannon_entropy", p, bins).compute(arr2span(in));
   return vec2arr(info.Env(), r);
 }
 
 inline Napi::Value batch_parkinson_vol(const Napi::CallbackInfo& info)
 {
-  auto h = info[0].As<Napi::Float64Array>();
-  auto l = info[1].As<Napi::Float64Array>();
-  size_t n = h.ElementLength(), p = info[2].As<Napi::Number>().Uint32Value();
+  auto h = argFloat64Array(info[0], "batch_parkinson_vol: argument 1");
+  auto l = argFloat64Array(info[1], "batch_parkinson_vol: argument 2");
+  size_t n = h.ElementLength(), p = argUint32(info[2], "batch_parkinson_vol: argument 3");
   if (!requireSameLength(info.Env(), "parkinson_vol", {n, l.ElementLength()}))
   {
     return info.Env().Undefined();
@@ -346,11 +346,11 @@ inline Napi::Value batch_parkinson_vol(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_rogers_satchell_vol(const Napi::CallbackInfo& info)
 {
-  auto o = info[0].As<Napi::Float64Array>();
-  auto h = info[1].As<Napi::Float64Array>();
-  auto l = info[2].As<Napi::Float64Array>();
-  auto c = info[3].As<Napi::Float64Array>();
-  size_t n = o.ElementLength(), p = info[4].As<Napi::Number>().Uint32Value();
+  auto o = argFloat64Array(info[0], "batch_rogers_satchell_vol: argument 1");
+  auto h = argFloat64Array(info[1], "batch_rogers_satchell_vol: argument 2");
+  auto l = argFloat64Array(info[2], "batch_rogers_satchell_vol: argument 3");
+  auto c = argFloat64Array(info[3], "batch_rogers_satchell_vol: argument 4");
+  size_t n = o.ElementLength(), p = argUint32(info[4], "batch_rogers_satchell_vol: argument 5");
   if (!requireSameLength(info.Env(), "rogers_satchell_vol",
                          {n, h.ElementLength(), l.ElementLength(), c.ElementLength()}))
   {
@@ -363,9 +363,9 @@ inline Napi::Value batch_rogers_satchell_vol(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_correlation(const Napi::CallbackInfo& info)
 {
-  auto x = info[0].As<Napi::Float64Array>();
-  auto y = info[1].As<Napi::Float64Array>();
-  size_t n = x.ElementLength(), p = info[2].As<Napi::Number>().Uint32Value();
+  auto x = argFloat64Array(info[0], "batch_correlation: argument 1");
+  auto y = argFloat64Array(info[1], "batch_correlation: argument 2");
+  size_t n = x.ElementLength(), p = argUint32(info[2], "batch_correlation: argument 3");
   if (!requireSameLength(info.Env(), "correlation", {n, y.ElementLength()}))
   {
     return info.Env().Undefined();
@@ -380,11 +380,11 @@ inline Napi::Value batch_adf(const Napi::CallbackInfo& info)
   // index.d.ts declared this `(input, lag) => number`; the real signature
   // takes an optional regression term (default "c", matching Python and
   // Codon) and returns { testStat, pValue, usedLag }.
-  auto in = info[0].As<Napi::Float64Array>();
+  auto in = argFloat64Array(info[0], "batch_adf: argument 1");
   size_t n = in.ElementLength();
-  size_t maxLag = info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 4u;
+  size_t maxLag = info.Length() > 1 ? argUint32(info[1], "batch_adf: argument 2") : 4u;
   std::string regression =
-      info.Length() > 2 && info[2].IsString() ? info[2].As<Napi::String>().Utf8Value() : "c";
+      info.Length() > 2 && info[2].IsString() ? argString(info[2], "batch_adf: argument 3") : "c";
   lrvx::indicator::AdfResult r =
       lrvx::indicator::adf(std::span<const double>(in.Data(), n), maxLag, regression);
   auto o = Napi::Object::New(info.Env());
@@ -396,10 +396,10 @@ inline Napi::Value batch_adf(const Napi::CallbackInfo& info)
 
 inline Napi::Value batch_autocorrelation(const Napi::CallbackInfo& info)
 {
-  auto in = info[0].As<Napi::Float64Array>();
+  auto in = argFloat64Array(info[0], "batch_autocorrelation: argument 1");
   size_t n = in.ElementLength();
-  size_t window = info[1].As<Napi::Number>().Uint32Value();
-  size_t lag = info[2].As<Napi::Number>().Uint32Value();
+  size_t window = argUint32(info[1], "batch_autocorrelation: argument 2");
+  size_t lag = argUint32(info[2], "batch_autocorrelation: argument 3");
   std::vector<double> out(n);
   checkedIndicator<lrvx::indicator::AutoCorrelation>(info.Env(), "autocorrelation", window, lag)
       .compute(std::span<const double>(in.Data(), n), std::span<double>(out.data(), n));
@@ -424,51 +424,51 @@ inline Napi::Value optNum(Napi::Env env, double v)
 }  // namespace
 
 // Macro for indicators that take ONE size_t in their constructor.
-#define WRAP_SINGLE_1(Name, row)                                                                   \
-  class Name##Wrap : public Napi::ObjectWrap<Name##Wrap>                                           \
-  {                                                                                                \
-   public:                                                                                         \
-    static Napi::Function Init(Napi::Env env)                                                      \
-    {                                                                                              \
-      return DefineClass(                                                                          \
-          env, #Name,                                                                              \
-          {InstanceMethod("compute", &Name##Wrap::Compute),                                        \
-           InstanceMethod("update", &Name##Wrap::Update),                                          \
-           InstanceMethod("reset", &Name##Wrap::Reset),                                            \
-           InstanceAccessor("value", &Name##Wrap::Value, nullptr),                                 \
-           InstanceAccessor("ready", &Name##Wrap::Ready, nullptr),                                 \
-           InstanceAccessor("count", &Name##Wrap::Count, nullptr)});                               \
-    }                                                                                              \
-    Name##Wrap(const Napi::CallbackInfo& info)                                                     \
-        : Napi::ObjectWrap<Name##Wrap>(info),                                                      \
-          _ind(checkedIndicator<lrvx::indicator::Name>(info.Env(), #row,                           \
-                                                       info[0].As<Napi::Number>().Uint32Value()))  \
-    {                                                                                              \
-    }                                                                                              \
-                                                                                                   \
-   private:                                                                                        \
-    lrvx::indicator::Name _ind;                                                                    \
-    Napi::Value Compute(const Napi::CallbackInfo& info)                                            \
-    {                                                                                              \
-      auto in = info[0].As<Napi::Float64Array>();                                                  \
-      auto r = _ind.compute(arr2span(in));                                                         \
-      return vec2arr(info.Env(), r);                                                               \
-    }                                                                                              \
-    Napi::Value Update(const Napi::CallbackInfo& info)                                             \
-    {                                                                                              \
-      _ind.update(info[0].As<Napi::Number>().DoubleValue());                                       \
-      return optNum(info.Env(), _ind.value());                                                     \
-    }                                                                                              \
-    Napi::Value Value(const Napi::CallbackInfo& info) { return optNum(info.Env(), _ind.value()); } \
-    Napi::Value Ready(const Napi::CallbackInfo& info)                                              \
-    {                                                                                              \
-      return Napi::Boolean::New(info.Env(), _ind.ready());                                         \
-    }                                                                                              \
-    Napi::Value Count(const Napi::CallbackInfo& info)                                              \
-    {                                                                                              \
-      return Napi::Number::New(info.Env(), static_cast<double>(_ind.count()));                     \
-    }                                                                                              \
-    void Reset(const Napi::CallbackInfo&) { _ind.reset(); }                                        \
+#define WRAP_SINGLE_1(Name, row)                                                                                 \
+  class Name##Wrap : public Napi::ObjectWrap<Name##Wrap>                                                         \
+  {                                                                                                              \
+   public:                                                                                                       \
+    static Napi::Function Init(Napi::Env env)                                                                    \
+    {                                                                                                            \
+      return DefineClass(                                                                                        \
+          env, #Name,                                                                                            \
+          {InstanceMethod("compute", &Name##Wrap::Compute),                                                      \
+           InstanceMethod("update", &Name##Wrap::Update),                                                        \
+           InstanceMethod("reset", &Name##Wrap::Reset),                                                          \
+           InstanceAccessor("value", &Name##Wrap::Value, nullptr),                                               \
+           InstanceAccessor("ready", &Name##Wrap::Ready, nullptr),                                               \
+           InstanceAccessor("count", &Name##Wrap::Count, nullptr)});                                             \
+    }                                                                                                            \
+    Name##Wrap(const Napi::CallbackInfo& info)                                                                   \
+        : Napi::ObjectWrap<Name##Wrap>(info),                                                                    \
+          _ind(checkedIndicator<lrvx::indicator::Name>(info.Env(), #row,                                         \
+                                                       argUint32(info[0], "batch_autocorrelation: argument 1"))) \
+    {                                                                                                            \
+    }                                                                                                            \
+                                                                                                                 \
+   private:                                                                                                      \
+    lrvx::indicator::Name _ind;                                                                                  \
+    Napi::Value Compute(const Napi::CallbackInfo& info)                                                          \
+    {                                                                                                            \
+      auto in = argFloat64Array(info[0], "compute: argument 1");                                                 \
+      auto r = _ind.compute(arr2span(in));                                                                       \
+      return vec2arr(info.Env(), r);                                                                             \
+    }                                                                                                            \
+    Napi::Value Update(const Napi::CallbackInfo& info)                                                           \
+    {                                                                                                            \
+      _ind.update(argNumber(info[0], "update: argument 1"));                                                     \
+      return optNum(info.Env(), _ind.value());                                                                   \
+    }                                                                                                            \
+    Napi::Value Value(const Napi::CallbackInfo& info) { return optNum(info.Env(), _ind.value()); }               \
+    Napi::Value Ready(const Napi::CallbackInfo& info)                                                            \
+    {                                                                                                            \
+      return Napi::Boolean::New(info.Env(), _ind.ready());                                                       \
+    }                                                                                                            \
+    Napi::Value Count(const Napi::CallbackInfo& info)                                                            \
+    {                                                                                                            \
+      return Napi::Number::New(info.Env(), static_cast<double>(_ind.count()));                                   \
+    }                                                                                                            \
+    void Reset(const Napi::CallbackInfo&) { _ind.reset(); }                                                      \
   };
 
 WRAP_SINGLE_1(SMA, sma)
@@ -500,9 +500,9 @@ class KAMAWrap : public Napi::ObjectWrap<KAMAWrap>
   }
   KAMAWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<KAMAWrap>(info),
-        _ind(checkedIndicator<lrvx::indicator::KAMA>(info.Env(), "kama", info[0].As<Napi::Number>().Uint32Value(),
-                                                     info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 2u,
-                                                     info.Length() > 2 ? info[2].As<Napi::Number>().Uint32Value() : 30u))
+        _ind(checkedIndicator<lrvx::indicator::KAMA>(info.Env(), "kama", argUint32(info[0], "KAMA: argument 1"),
+                                                     info.Length() > 1 ? argUint32(info[1], "KAMA: argument 2") : 2u,
+                                                     info.Length() > 2 ? argUint32(info[2], "KAMA: argument 3") : 30u))
   {
   }
 
@@ -510,13 +510,13 @@ class KAMAWrap : public Napi::ObjectWrap<KAMAWrap>
   lrvx::indicator::KAMA _ind;
   Napi::Value Compute(const Napi::CallbackInfo& info)
   {
-    auto in = info[0].As<Napi::Float64Array>();
+    auto in = argFloat64Array(info[0], "compute: argument 1");
     auto r = _ind.compute(arr2span(in));
     return vec2arr(info.Env(), r);
   }
   Napi::Value Update(const Napi::CallbackInfo& info)
   {
-    _ind.update(info[0].As<Napi::Number>().DoubleValue());
+    _ind.update(argNumber(info[0], "update: argument 1"));
     return optNum(info.Env(), _ind.value());
   }
   Napi::Value Value(const Napi::CallbackInfo& info) { return optNum(info.Env(), _ind.value()); }
@@ -544,8 +544,8 @@ class ShannonEntropyWrap : public Napi::ObjectWrap<ShannonEntropyWrap>
   }
   ShannonEntropyWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<ShannonEntropyWrap>(info),
-        _ind(checkedIndicator<lrvx::indicator::ShannonEntropy>(info.Env(), "shannon_entropy", info[0].As<Napi::Number>().Uint32Value(),
-                                                               info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 10u))
+        _ind(checkedIndicator<lrvx::indicator::ShannonEntropy>(info.Env(), "shannon_entropy", argUint32(info[0], "ShannonEntropy: argument 1"),
+                                                               info.Length() > 1 ? argUint32(info[1], "ShannonEntropy: argument 2") : 10u))
   {
   }
 
@@ -553,13 +553,13 @@ class ShannonEntropyWrap : public Napi::ObjectWrap<ShannonEntropyWrap>
   lrvx::indicator::ShannonEntropy _ind;
   Napi::Value Compute(const Napi::CallbackInfo& info)
   {
-    auto in = info[0].As<Napi::Float64Array>();
+    auto in = argFloat64Array(info[0], "compute: argument 1");
     auto r = _ind.compute(arr2span(in));
     return vec2arr(info.Env(), r);
   }
   Napi::Value Update(const Napi::CallbackInfo& info)
   {
-    _ind.update(info[0].As<Napi::Number>().DoubleValue());
+    _ind.update(argNumber(info[0], "update: argument 1"));
     return optNum(info.Env(), _ind.value());
   }
   Napi::Value Value(const Napi::CallbackInfo& info) { return optNum(info.Env(), _ind.value()); }
@@ -587,8 +587,8 @@ class AutoCorrelationWrap : public Napi::ObjectWrap<AutoCorrelationWrap>
   }
   AutoCorrelationWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<AutoCorrelationWrap>(info),
-        _ind(checkedIndicator<lrvx::indicator::AutoCorrelation>(info.Env(), "autocorrelation", info[0].As<Napi::Number>().Uint32Value(),
-                                                                info[1].As<Napi::Number>().Uint32Value()))
+        _ind(checkedIndicator<lrvx::indicator::AutoCorrelation>(info.Env(), "autocorrelation", argUint32(info[0], "AutoCorrelation: argument 1"),
+                                                                argUint32(info[1], "AutoCorrelation: argument 2")))
   {
   }
 
@@ -596,13 +596,13 @@ class AutoCorrelationWrap : public Napi::ObjectWrap<AutoCorrelationWrap>
   lrvx::indicator::AutoCorrelation _ind;
   Napi::Value Compute(const Napi::CallbackInfo& info)
   {
-    auto in = info[0].As<Napi::Float64Array>();
+    auto in = argFloat64Array(info[0], "compute: argument 1");
     auto r = _ind.compute(arr2span(in));
     return vec2arr(info.Env(), r);
   }
   Napi::Value Update(const Napi::CallbackInfo& info)
   {
-    _ind.update(info[0].As<Napi::Number>().DoubleValue());
+    _ind.update(argNumber(info[0], "update: argument 1"));
     return optNum(info.Env(), _ind.value());
   }
   Napi::Value Value(const Napi::CallbackInfo& info) { return optNum(info.Env(), _ind.value()); }
@@ -632,7 +632,7 @@ class AutoCorrelationWrap : public Napi::ObjectWrap<AutoCorrelationWrap>
     Name##Wrap(const Napi::CallbackInfo& info)                                                     \
         : Napi::ObjectWrap<Name##Wrap>(info),                                                      \
           _ind(checkedIndicator<lrvx::indicator::Name>(info.Env(), #row,                           \
-                                                       info[0].As<Napi::Number>().Uint32Value()))  \
+                                                       argUint32(info[0], "reset: argument 1")))   \
     {                                                                                              \
     }                                                                                              \
                                                                                                    \
@@ -640,17 +640,17 @@ class AutoCorrelationWrap : public Napi::ObjectWrap<AutoCorrelationWrap>
     lrvx::indicator::Name _ind;                                                                    \
     Napi::Value Compute(const Napi::CallbackInfo& info)                                            \
     {                                                                                              \
-      auto h = info[0].As<Napi::Float64Array>();                                                   \
-      auto l = info[1].As<Napi::Float64Array>();                                                   \
-      auto c = info[2].As<Napi::Float64Array>();                                                   \
+      auto h = argFloat64Array(info[0], "compute: argument 1");                                    \
+      auto l = argFloat64Array(info[1], "compute: argument 2");                                    \
+      auto c = argFloat64Array(info[2], "compute: argument 3");                                    \
       auto r = _ind.compute(arr2span(h), arr2span(l), arr2span(c));                                \
       return vec2arr(info.Env(), r);                                                               \
     }                                                                                              \
     Napi::Value Update(const Napi::CallbackInfo& info)                                             \
     {                                                                                              \
-      _ind.update(info[0].As<Napi::Number>().DoubleValue(),                                        \
-                  info[1].As<Napi::Number>().DoubleValue(),                                        \
-                  info[2].As<Napi::Number>().DoubleValue());                                       \
+      _ind.update(argNumber(info[0], "update: argument 1"),                                        \
+                  argNumber(info[1], "update: argument 2"),                                        \
+                  argNumber(info[2], "update: argument 3"));                                       \
       return optNum(info.Env(), _ind.value());                                                     \
     }                                                                                              \
     Napi::Value Value(const Napi::CallbackInfo& info) { return optNum(info.Env(), _ind.value()); } \
@@ -686,7 +686,7 @@ class ParkinsonVolWrap : public Napi::ObjectWrap<ParkinsonVolWrap>
                         InstanceAccessor("count", &ParkinsonVolWrap::Count, nullptr)});
   }
   ParkinsonVolWrap(const Napi::CallbackInfo& info)
-      : Napi::ObjectWrap<ParkinsonVolWrap>(info), _ind(checkedIndicator<lrvx::indicator::ParkinsonVol>(info.Env(), "parkinson_vol", info[0].As<Napi::Number>().Uint32Value()))
+      : Napi::ObjectWrap<ParkinsonVolWrap>(info), _ind(checkedIndicator<lrvx::indicator::ParkinsonVol>(info.Env(), "parkinson_vol", argUint32(info[0], "ParkinsonVol: argument 1")))
   {
   }
 
@@ -694,15 +694,15 @@ class ParkinsonVolWrap : public Napi::ObjectWrap<ParkinsonVolWrap>
   lrvx::indicator::ParkinsonVol _ind;
   Napi::Value Compute(const Napi::CallbackInfo& info)
   {
-    auto h = info[0].As<Napi::Float64Array>();
-    auto l = info[1].As<Napi::Float64Array>();
+    auto h = argFloat64Array(info[0], "compute: argument 1");
+    auto l = argFloat64Array(info[1], "compute: argument 2");
     auto r = _ind.compute(arr2span(h), arr2span(l));
     return vec2arr(info.Env(), r);
   }
   Napi::Value Update(const Napi::CallbackInfo& info)
   {
-    _ind.update(info[0].As<Napi::Number>().DoubleValue(),
-                info[1].As<Napi::Number>().DoubleValue());
+    _ind.update(argNumber(info[0], "update: argument 1"),
+                argNumber(info[1], "update: argument 2"));
     return optNum(info.Env(), _ind.value());
   }
   Napi::Value Value(const Napi::CallbackInfo& info) { return optNum(info.Env(), _ind.value()); }
@@ -730,7 +730,7 @@ class RogersSatchellVolWrap : public Napi::ObjectWrap<RogersSatchellVolWrap>
   }
   RogersSatchellVolWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<RogersSatchellVolWrap>(info),
-        _ind(checkedIndicator<lrvx::indicator::RogersSatchellVol>(info.Env(), "rogers_satchell_vol", info[0].As<Napi::Number>().Uint32Value()))
+        _ind(checkedIndicator<lrvx::indicator::RogersSatchellVol>(info.Env(), "rogers_satchell_vol", argUint32(info[0], "RogersSatchellVol: argument 1")))
   {
   }
 
@@ -738,19 +738,19 @@ class RogersSatchellVolWrap : public Napi::ObjectWrap<RogersSatchellVolWrap>
   lrvx::indicator::RogersSatchellVol _ind;
   Napi::Value Compute(const Napi::CallbackInfo& info)
   {
-    auto o = info[0].As<Napi::Float64Array>();
-    auto h = info[1].As<Napi::Float64Array>();
-    auto l = info[2].As<Napi::Float64Array>();
-    auto c = info[3].As<Napi::Float64Array>();
+    auto o = argFloat64Array(info[0], "compute: argument 1");
+    auto h = argFloat64Array(info[1], "compute: argument 2");
+    auto l = argFloat64Array(info[2], "compute: argument 3");
+    auto c = argFloat64Array(info[3], "compute: argument 4");
     auto r = _ind.compute(arr2span(o), arr2span(h), arr2span(l), arr2span(c));
     return vec2arr(info.Env(), r);
   }
   Napi::Value Update(const Napi::CallbackInfo& info)
   {
-    _ind.update(info[0].As<Napi::Number>().DoubleValue(),
-                info[1].As<Napi::Number>().DoubleValue(),
-                info[2].As<Napi::Number>().DoubleValue(),
-                info[3].As<Napi::Number>().DoubleValue());
+    _ind.update(argNumber(info[0], "update: argument 1"),
+                argNumber(info[1], "update: argument 2"),
+                argNumber(info[2], "update: argument 3"),
+                argNumber(info[3], "update: argument 4"));
     return optNum(info.Env(), _ind.value());
   }
   Napi::Value Value(const Napi::CallbackInfo& info) { return optNum(info.Env(), _ind.value()); }
@@ -777,7 +777,7 @@ class CorrelationWrap : public Napi::ObjectWrap<CorrelationWrap>
                         InstanceAccessor("count", &CorrelationWrap::Count, nullptr)});
   }
   CorrelationWrap(const Napi::CallbackInfo& info)
-      : Napi::ObjectWrap<CorrelationWrap>(info), _ind(checkedIndicator<lrvx::indicator::Correlation>(info.Env(), "correlation", info[0].As<Napi::Number>().Uint32Value()))
+      : Napi::ObjectWrap<CorrelationWrap>(info), _ind(checkedIndicator<lrvx::indicator::Correlation>(info.Env(), "correlation", argUint32(info[0], "Correlation: argument 1")))
   {
   }
 
@@ -785,15 +785,15 @@ class CorrelationWrap : public Napi::ObjectWrap<CorrelationWrap>
   lrvx::indicator::Correlation _ind;
   Napi::Value Compute(const Napi::CallbackInfo& info)
   {
-    auto x = info[0].As<Napi::Float64Array>();
-    auto y = info[1].As<Napi::Float64Array>();
+    auto x = argFloat64Array(info[0], "compute: argument 1");
+    auto y = argFloat64Array(info[1], "compute: argument 2");
     auto r = _ind.compute(arr2span(x), arr2span(y));
     return vec2arr(info.Env(), r);
   }
   Napi::Value Update(const Napi::CallbackInfo& info)
   {
-    _ind.update(info[0].As<Napi::Number>().DoubleValue(),
-                info[1].As<Napi::Number>().DoubleValue());
+    _ind.update(argNumber(info[0], "update: argument 1"),
+                argNumber(info[1], "update: argument 2"));
     return optNum(info.Env(), _ind.value());
   }
   Napi::Value Value(const Napi::CallbackInfo& info) { return optNum(info.Env(), _ind.value()); }
@@ -824,9 +824,9 @@ class MACDWrap : public Napi::ObjectWrap<MACDWrap>
   }
   MACDWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<MACDWrap>(info),
-        _ind(checkedIndicator<lrvx::indicator::MACD>(info.Env(), "macd", info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 12u,
-                                                     info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 26u,
-                                                     info.Length() > 2 ? info[2].As<Napi::Number>().Uint32Value() : 9u))
+        _ind(checkedIndicator<lrvx::indicator::MACD>(info.Env(), "macd", info.Length() > 0 ? argUint32(info[0], "MACD: argument 1") : 12u,
+                                                     info.Length() > 1 ? argUint32(info[1], "MACD: argument 2") : 26u,
+                                                     info.Length() > 2 ? argUint32(info[2], "MACD: argument 3") : 9u))
   {
   }
 
@@ -834,7 +834,7 @@ class MACDWrap : public Napi::ObjectWrap<MACDWrap>
   lrvx::indicator::MACD _ind;
   Napi::Value Compute(const Napi::CallbackInfo& info)
   {
-    auto in = info[0].As<Napi::Float64Array>();
+    auto in = argFloat64Array(info[0], "compute: argument 1");
     auto r = _ind.compute(arr2span(in));
     auto out = Napi::Object::New(info.Env());
     out.Set("line", vec2arr(info.Env(), r.line));
@@ -848,7 +848,7 @@ class MACDWrap : public Napi::ObjectWrap<MACDWrap>
     // returning optNum() here made `macd.update(x).line` throw on
     // "Cannot read properties of null" whenever update() itself came
     // back null-ish, since the declared object never existed.
-    _ind.update(info[0].As<Napi::Number>().DoubleValue());
+    _ind.update(argNumber(info[0], "update: argument 1"));
     auto out = Napi::Object::New(info.Env());
     out.Set("line", optNum(info.Env(), _ind.value()));
     out.Set("signal", optNum(info.Env(), _ind.signalValue()));
@@ -886,8 +886,8 @@ class BollingerWrap : public Napi::ObjectWrap<BollingerWrap>
   }
   BollingerWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<BollingerWrap>(info),
-        _ind(checkedIndicator<lrvx::indicator::Bollinger>(info.Env(), "bollinger", info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 20u,
-                                                          info.Length() > 1 ? info[1].As<Napi::Number>().DoubleValue() : 2.0))
+        _ind(checkedIndicator<lrvx::indicator::Bollinger>(info.Env(), "bollinger", info.Length() > 0 ? argUint32(info[0], "Bollinger: argument 1") : 20u,
+                                                          info.Length() > 1 ? argNumber(info[1], "Bollinger: argument 2") : 2.0))
   {
   }
 
@@ -895,7 +895,7 @@ class BollingerWrap : public Napi::ObjectWrap<BollingerWrap>
   lrvx::indicator::Bollinger _ind;
   Napi::Value Compute(const Napi::CallbackInfo& info)
   {
-    auto in = info[0].As<Napi::Float64Array>();
+    auto in = argFloat64Array(info[0], "compute: argument 1");
     auto r = _ind.compute(arr2span(in));
     auto out = Napi::Object::New(info.Env());
     out.Set("upper", vec2arr(info.Env(), r.upper));
@@ -906,7 +906,7 @@ class BollingerWrap : public Napi::ObjectWrap<BollingerWrap>
   Napi::Value Update(const Napi::CallbackInfo& info)
   {
     // See MACDWrap::Update -- same fix, same declared-object contract.
-    _ind.update(info[0].As<Napi::Number>().DoubleValue());
+    _ind.update(argNumber(info[0], "update: argument 1"));
     auto out = Napi::Object::New(info.Env());
     out.Set("upper", optNum(info.Env(), _ind.upperValue()));
     out.Set("middle", optNum(info.Env(), _ind.middleValue()));
@@ -943,8 +943,8 @@ class StochasticWrap : public Napi::ObjectWrap<StochasticWrap>
   }
   StochasticWrap(const Napi::CallbackInfo& info)
       : Napi::ObjectWrap<StochasticWrap>(info),
-        _ind(checkedIndicator<lrvx::indicator::Stochastic>(info.Env(), "stochastic", info.Length() > 0 ? info[0].As<Napi::Number>().Uint32Value() : 14u,
-                                                           info.Length() > 1 ? info[1].As<Napi::Number>().Uint32Value() : 3u))
+        _ind(checkedIndicator<lrvx::indicator::Stochastic>(info.Env(), "stochastic", info.Length() > 0 ? argUint32(info[0], "Stochastic: argument 1") : 14u,
+                                                           info.Length() > 1 ? argUint32(info[1], "Stochastic: argument 2") : 3u))
   {
   }
 
@@ -952,9 +952,9 @@ class StochasticWrap : public Napi::ObjectWrap<StochasticWrap>
   lrvx::indicator::Stochastic _ind;
   Napi::Value Compute(const Napi::CallbackInfo& info)
   {
-    auto h = info[0].As<Napi::Float64Array>();
-    auto l = info[1].As<Napi::Float64Array>();
-    auto c = info[2].As<Napi::Float64Array>();
+    auto h = argFloat64Array(info[0], "compute: argument 1");
+    auto l = argFloat64Array(info[1], "compute: argument 2");
+    auto c = argFloat64Array(info[2], "compute: argument 3");
     auto r = _ind.compute(arr2span(h), arr2span(l), arr2span(c));
     auto out = Napi::Object::New(info.Env());
     out.Set("k", vec2arr(info.Env(), r.k));
@@ -964,9 +964,9 @@ class StochasticWrap : public Napi::ObjectWrap<StochasticWrap>
   Napi::Value Update(const Napi::CallbackInfo& info)
   {
     // See MACDWrap::Update -- same fix, same declared-object contract.
-    _ind.update(info[0].As<Napi::Number>().DoubleValue(),
-                info[1].As<Napi::Number>().DoubleValue(),
-                info[2].As<Napi::Number>().DoubleValue());
+    _ind.update(argNumber(info[0], "update: argument 1"),
+                argNumber(info[1], "update: argument 2"),
+                argNumber(info[2], "update: argument 3"));
     auto out = Napi::Object::New(info.Env());
     out.Set("k", optNum(info.Env(), _ind.kValue()));
     out.Set("d", optNum(info.Env(), _ind.dValue()));

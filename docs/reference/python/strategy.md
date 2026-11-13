@@ -142,7 +142,7 @@ These methods use the first registered symbol when `symbol` is omitted. `symbol`
 | `cancel_all_orders(symbol=None)` | Cancel every order for a symbol |
 | `modify_order(order_id, new_price, new_qty)` | Modify a resting order, or a stop / take-profit / trailing order still waiting on its trigger. It keeps its id, symbol, side and type; `new_qty` is the quantity left to work. `new_price` is the trigger of a stop-market, take-profit-market or trailing-stop order and the limit price of every other type. A refused modify (off-tick price, an order already filled or cancelled) arrives in `on_order_update` as `REPLACE_REJECTED` with `reject_reason` set |
 
-`tif` accepts `"gtc"`, `"ioc"`, `"fok"` and `"post_only"`. Any other value raises `ValueError` naming it, and nothing is emitted; it used to place a GTC order, `"gtd"` included (these methods take no expiry time, so a good-till-date order cannot be expressed through them). The `side` of the stop, take-profit and trailing methods is `"buy"` or `"sell"`; anything else raises `ValueError` where it used to mean sell.
+`tif` accepts `"gtc"`, `"ioc"`, `"fok"` and `"post_only"`. Any other value raises `ValueError` naming it, and nothing is emitted; it used to place a GTC order, `"gtd"` included (these methods take no expiry time, so a good-till-date order cannot be expressed through them). The `side` of the stop, take-profit and trailing methods is `"buy"` or `"sell"`; anything else raises `ValueError` where it used to mean sell. Both are checked before anything else: a strategy that is not attached to a runner returns 0 from an emit, and it used to return that 0 for an unknown `side` or `tif` too, without looking at it.
 
 In a backtest, `price`, `trigger`, `limit_price`, `offset` and `modify_order`'s `new_price` must be whole numbers of the symbol's tick when the symbol was registered with one. An order off the tick is rejected: `on_order_update` receives `status == "REJECTED"` and `reject_reason` `"price_off_tick"`, `"trigger_off_tick"` or `"trailing_offset_off_tick"` (a modify gets `"REPLACE_REJECTED"`). Round a computed price before sending it, for example `round(price / tick) * tick`. See [SimulatedExecutor](../api/backtest/simulated_executor.md#order-prices-and-the-tick).
 
@@ -285,22 +285,53 @@ runner.stop()
 | `set_market_data_recorder(recorder)` | Attach a `MarketDataRecorderHook` or `BinaryLogRecorderHook` |
 | `set_executor(executor)` | Replace the executor |
 | `order_closed(order_id)` | Tell the runner an order it sent to the executor is finished |
-| `replay_tape(path, simulator, *, tape_symbol_id=None, symbol=None, lock=None, after_event=None)` | Replay a `.lrvx` tape into the runner's strategies with a `SimulatedExecutor` standing in for the venue, through the loop `BacktestRunner.run_tape` uses: every trade and book event, in time order, reaches the simulator before the strategies. Returns a dict of counts. `lrvx engine sim` is built on it: see [What the simulator sees and does](../../how-to/engine-sim.md#what-the-simulator-sees-and-does) |
+| `on_order_event(order_id, symbol, side, status, ...)` | Report a venue's order update or fill to the strategy that issued the order |
+| `seed_position(strategy, symbol, position, avg_entry_price=0.0)` | Set what a strategy holds before any fill is reported |
+| `drain()` | Wait until a threaded runner's strategies have been handed everything published so far |
+| `replay_tape(path, simulator, *, tape_symbol_id=None, symbol=None, lock=None, after_event=None, on_start=None)` | Replay a `.lrvx` tape into the runner's strategies with a `SimulatedExecutor` standing in for the venue, through the loop `BacktestRunner.run_tape` uses: every trade and book event, in time order, reaches the simulator before the strategies. `on_start()` is called once the simulator has been reset and before its first event; `after_event()` after each event. On a threaded runner the replay waits after each event until the strategies have been handed it, so it fills where a synchronous replay does. Returns a dict of counts. `lrvx engine sim` is built on it: see [What the simulator sees and does](../../how-to/engine-sim.md#what-the-simulator-sees-and-does) |
 | `on_order_event(order_id, symbol, side, status, order_type='limit', fill_qty=0.0, fill_price=0.0, ts_ns=0, reject_reason='', is_maker=False)` | Report one order event a venue sent. `PARTIALLY_FILLED` / `FILLED` reach the strategy's `on_fill(ctx, event)` and only `on_fill`; every other status reaches `on_order_update(ctx, event)` |
 
 With an executor attached the runner keeps every order that can rest, by id, so that a strategy's `modify_order` reaches `Executor.replace` as that order with its price and quantity changed. Nothing tells the runner of a fill, so call `order_closed(order_id)` from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. A `cancel_order` from the strategy drops the entry by itself, and market, IOC and FOK orders are never kept. The two legs of an OCO leave the record together: a cancel of either leg, or `order_closed` with either leg's id, drops both, because the venue cancels the other leg when one fills or is cancelled.
 
+The `Order` an `Executor` is handed carries a trailing stop's fixed distance in `trailing_offset` and the callback rate of a `trailing_stop_percent` in `trailing_bps` (basis points); exactly one of the two is above 0 for a trailing stop. `trailing_bps` used to be missing, so a percent trailing stop reached an executor with nothing to trail by. In C the order struct keeps its shape and the rate is read with `lrvx_order_trailing_bps(order)` inside the callback that was handed the order.
+
 `CcxtBroker` calls `order_closed` for every terminal status (`closed`, `canceled`, `expired`, `rejected`) its orders stream reports, and for an order the exchange already reports finished in the answer to its placement. It drops the order from its own maps at the same moment, so they hold open orders only; they used to hold every order ever placed. A `cancel_order` or `modify_order` the strategy still sends for such an order is not sent to the exchange and is reported through `on_error` as `ValueError("CANCEL: no ccxt order id tracked ...")` / `"MODIFY: ..."`.
 
 `on_order_event` is how a live order's updates reach a strategy through the callbacks a backtest
-uses. The runner keeps a position tracker of its own and shows it each event first, so
+uses. The runner keeps a position tracker for each strategy and shows it the event first, so
 `ctx.position` and `self.position()` inside `on_fill` count the fill; before this a live runner's
-strategies always read a position of 0. `side` is `'buy'` or `'sell'`, `status` and `order_type` are
+strategies always read a position of 0. Positions are per strategy, as in a backtest: a strategy
+reads the net of the fills reported for its own orders, not the account's and not another
+strategy's on the same runner. `side` is `'buy'` or `'sell'`, `status` and `order_type` are
 the names `OrderEventData` carries, and `fill_qty` / `fill_price` are this fill's own, not the
 order's running totals. The strategy that issued the order receives the event (an order id is the
-strategy's id shifted left 32 bits, plus a counter); an id from no attached strategy's block goes to
-every strategy subscribed to the symbol. The callbacks run on the calling thread, on a threaded
-runner too. An unknown side, status or order type raises `ValueError`. `CcxtBroker` calls it for
+strategy's id shifted left 32 bits, plus a counter), and the second leg of an OCO goes to the
+strategy of its first leg while the pair is on record, so report a leg's events before
+`order_closed`. An id no attached strategy issued goes to every strategy subscribed to the symbol
+and counts in no position.
+
+`seed_position(strategy, symbol, position, avg_entry_price=0.0)` sets what a strategy holds before
+any fill is reported: after a restart the account may not be flat, and no `on_order_event` will tell
+of that position. `position` is signed, negative for a short. The strategy reads it from
+`self.position()` and `ctx.position`, and the fills reported afterwards add to it. A position is
+seeded once: `ValueError` for a strategy that already holds one in the symbol and for one that is
+not attached to this runner. `CcxtBroker` seeds the position it finds at start.
+
+Which thread runs the callbacks depends on the runner:
+
+| | `Runner(..., threaded=False)` | `Runner(..., threaded=True)` |
+|---|---|---|
+| Thread | the calling thread, inside `on_order_event` | the strategy's order-event consumer thread; `on_order_event` queues the event and returns |
+| Order among order events | as reported | as reported |
+| Order against market data | as called | after every trade, book and bar published before the report has been handed to that strategy; market data published after the report may arrive on either side of it |
+| Not started, or stopped | the calling thread | the calling thread; an event queued before `stop()` is delivered before `stop()` returns |
+
+`runner.drain()` returns once every strategy has been handed everything published so far and
+whatever those callbacks published in turn; it is the barrier for a feeder that needs a threaded
+strategy to have finished with one event before it sends the next. Never call it from a strategy
+callback.
+
+An unknown side, status or order type raises `ValueError`. `CcxtBroker` calls it for
 every order the exchange reports: see [Order updates and fills](../../how-to/ccxt-adapter.md#order-updates-and-fills).
 
 A `modify_order` that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor, and after it `lrvx.last_error()` reads `modify: order <id> is not on record with this executor ... [unknown_order]`.
@@ -322,11 +353,11 @@ What is put to the gates depends on what runs the strategy:
 
 | | `Runner` and `LiveEngine` | `BacktestRunner` (and `PaperBroker`, which runs one) |
 |---|---|---|
-| Signals asked | every signal: orders, cancel, cancel-all, modify, the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
-| Pass unasked | nothing | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
+| Signals asked | signals that create an order (market, limit, stop and take-profit, trailing stop, an OCO as one signal) and the liquidity pair | signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO |
+| Pass unasked | cancel, cancel-all, modify, and any reduce-only order (a `close_position`): the same rule as the backtest runner, so a triggered kill switch cannot hold back a cancel | cancel, cancel-all, modify, and any reduce-only order (a `close_position`), so a tightened limit cannot hold a strategy in a position |
 | A drop skips | `on_signal`, the executor and the PnL / storage observers | the simulator or the attached executor |
 | `<outcome>` | `it reached neither on_signal nor the executor` | `it reached no executor` |
-| Kill switch | asked again for every signal | stays triggered for the rest of the run once it said no |
+| Kill switch | asked again for every signal it is asked about | stays triggered for the rest of the run once it said no |
 
 `on_signal` is an observer: a runner created without one gates and forwards its signals the same way.
 

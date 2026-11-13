@@ -12,6 +12,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "bindings_common.h"
 #include "lrvx/aggregator/events/bar_event.h"
 #include "lrvx/backtest/walk_forward.h"
 #include "lrvx/common.h"
@@ -121,8 +122,10 @@ class PyWalkForwardRunner
     _bcfg.feeRate = feeRate;
     _bcfg.initialCapital = initialCapital;
     _bcfg.usePercentageFee = true;
-    _wcfg.mode = (mode == "sliding") ? lrvx::WalkForwardMode::Sliding
-                                     : lrvx::WalkForwardMode::Anchored;
+    _wcfg.mode = parseChoice<lrvx::WalkForwardMode>(
+        "walk-forward mode", mode,
+        {{"anchored", lrvx::WalkForwardMode::Anchored},
+         {"sliding", lrvx::WalkForwardMode::Sliding}});
     _wcfg.trainSize = trainSize;
     _wcfg.testSize = testSize;
     _wcfg.step = step;
