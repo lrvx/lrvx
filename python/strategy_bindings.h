@@ -1206,6 +1206,7 @@ class PyStrategyRunner
   void stop() { lrvx_runner_stop(_runner); }
 
   LrvxRunnerHandle handle() const noexcept { return _runner; }
+  const std::vector<std::unique_ptr<PyStrategyHost>>& hosts() const noexcept { return _hosts; }
 
   void set_pnl_tracker(std::shared_ptr<lrvx::PyPnLTracker> tracker)
   {
@@ -1695,6 +1696,9 @@ class PyLiveEngine
     }
   }
 
+  LrvxLiveEngineHandle handle() const noexcept { return _engine; }
+  const std::vector<std::unique_ptr<PyStrategyHost>>& hosts() const noexcept { return _hosts; }
+
   void order_closed(uint64_t order_id) { lrvx_live_engine_order_closed(_engine, order_id); }
   // Released like the publish_* methods: the event is queued behind a ring a
   // consumer drains, and on an engine that is not running the callbacks run
@@ -1864,6 +1868,42 @@ class PyRunner
     else
     {
       _sync->order_closed(order_id);
+    }
+  }
+
+  // The position `strat` holds before any fill is reported to this runner.
+  void seed_position(PyStrategyBase* strat, uint32_t symbol, double position,
+                     double avg_entry_price)
+  {
+    const auto bridgeOf = [strat](const auto& hosts) -> BridgeStrategy*
+    {
+      for (const auto& host : hosts)
+      {
+        if (host->strategy.load(std::memory_order_acquire) == strat)
+        {
+          return host->bridge.get();
+        }
+      }
+      return nullptr;
+    };
+    BridgeStrategy* bridge = _live ? bridgeOf(_live->hosts()) : bridgeOf(_sync->hosts());
+    if (bridge == nullptr)
+    {
+      throw py::value_error("Runner.seed_position: the strategy is not attached to this runner");
+    }
+    const int64_t positionRaw = Quantity::fromDouble(position).raw();
+    const int64_t avgRaw = Price::fromDouble(avg_entry_price).raw();
+    lrvx_clear_last_error();
+    const uint8_t ok =
+        _live ? lrvx_live_engine_seed_position(_live->handle(),
+                                               static_cast<LrvxStrategyHandle>(bridge), symbol,
+                                               positionRaw, avgRaw)
+              : lrvx_runner_seed_position(_sync->handle(),
+                                          static_cast<LrvxStrategyHandle>(bridge), symbol,
+                                          positionRaw, avgRaw);
+    if (ok == 0)
+    {
+      throw py::value_error(std::string("Runner.seed_position: ") + lrvx_last_error_message());
     }
   }
 
@@ -3822,6 +3862,16 @@ inline void bindStrategy(py::module_& m)
            "order-event consumer thread, after every trade, book and bar published before the "
            "report has been handed to that strategy; before start() and after stop() they run "
            "on the calling thread. ValueError for an unknown side, status or order type.")
+      .def("seed_position", [](PyRunner& r, PyStrategyBase* strategy, py::object sym, double position, double avg_entry_price)
+           { r.seed_position(strategy, symId(sym), position, avg_entry_price); }, py::arg("strategy"), py::arg("symbol"), py::arg("position"), py::arg("avg_entry_price") = 0.0,
+           "Set what `strategy` holds in `symbol` before any fill is reported: the position an "
+           "account already has when a host starts or restarts, which no on_order_event will "
+           "tell of. `position` is signed (negative for a short) and `avg_entry_price` its "
+           "average entry (0.0 when unknown). The strategy then reads it from self.position() "
+           "and ctx.position, and the fills reported afterwards add to it. Positions are per "
+           "strategy, so name the one the position belongs to. ValueError for a strategy that "
+           "is not attached to this runner and for one that already holds a position in the "
+           "symbol: a position is seeded once. 0 is accepted and changes nothing.")
       .def("drain", &PyRunner::drain,
            "Return once every strategy has been handed everything published so far (trades, "
            "books, bars, order events) and whatever those callbacks published in turn. A "

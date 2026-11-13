@@ -2515,6 +2515,7 @@ allowlist_functions:
     lrvx_live_engine_publish_book_top: *no_quickjs_global
     lrvx_live_engine_publish_trade: *no_quickjs_global
     lrvx_live_engine_order_closed: *no_quickjs_global
+    lrvx_live_engine_seed_position: *no_quickjs_global
     lrvx_order_trailing_bps: "QuickJS has no executor hook: nothing there is handed an LrvxOrder"
     lrvx_live_engine_set_executor: *no_quickjs_global
     lrvx_live_engine_set_kill_switch: *no_quickjs_global
@@ -2586,6 +2587,7 @@ allowlist_functions:
     lrvx_runner_destroy: *no_quickjs_global
     lrvx_runner_on_bar: *no_quickjs_global
     lrvx_runner_on_book_snapshot: *no_quickjs_global
+    lrvx_runner_seed_position: *no_quickjs_global
     lrvx_runner_on_book_top: *no_quickjs_global
     lrvx_runner_on_order_event: *no_quickjs_global
     lrvx_runner_on_trade: *no_quickjs_global

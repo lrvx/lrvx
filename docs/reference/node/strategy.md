@@ -285,6 +285,15 @@ The status names are the `OrderEventStatus` names of the engine: `NEW`, `SUBMITT
 `REJECTED_RATE_LIMIT` as `"UNKNOWN"`; Python read the last as `"UNKNOWN"` too. All three now read
 the one table.
 
+### A position the account already holds
+
+`runner.seedPosition(strategyIndex, symbol, position, avgEntryPrice?)` sets what the strategy at
+`strategyIndex` (the order of `addStrategy`, from 0) holds before any fill is reported: after a
+restart the account may not be flat, and no `onOrderEvent` will tell of that position. `position`
+is signed, negative for a short. The strategy reads it from `ctx.position` and the fills reported
+afterwards add to it. A position is seeded once: a strategy that already holds one in the symbol,
+or an index the runner does not hold, throws.
+
 `onSignal` is an observer: a runner created without one gates and forwards its signals the same way.
 
 #### Argument checks

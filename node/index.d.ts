@@ -765,6 +765,20 @@ export class Runner {
    *  side, status or order type. */
   onOrderEvent(event: ReportedOrderEvent): void;
 
+  /** Set what the strategy at `strategyIndex` (the order of `addStrategy`,
+   *  from 0) holds in `symbol` before any fill is reported: the position
+   *  an account already has when a host starts or restarts. `position` is
+   *  signed, negative for a short; `avgEntryPrice` is 0 when omitted. The
+   *  strategy reads it from `ctx.position`, and fills reported afterwards
+   *  add to it. Throws for an index this runner does not hold and for a
+   *  strategy that already holds a position in the symbol. */
+  seedPosition(
+    strategyIndex: number,
+    symbol: Symbol | number,
+    position: number,
+    avgEntryPrice?: number,
+  ): void;
+
   /** Every hook failure this Runner has seen, oldest first.
    *
    *  A pre-trade gate (`RiskManager.allow`, `KillSwitch.check`,

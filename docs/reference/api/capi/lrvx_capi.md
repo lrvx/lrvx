@@ -697,6 +697,18 @@ subscribed to the symbol and counts in no position.
 | Order against market data | as called | after every trade, book update and bar published before the report has been handed to that strategy; market data published after the report may arrive on either side of it |
 | Engine not started, or stopped | | the calling thread; an event queued before `lrvx_live_engine_stop` is delivered before it returns |
 
+`lrvx_runner_seed_position(runner, strategy, symbol, position_raw, avg_entry_price_raw)` and
+`lrvx_live_engine_seed_position(...)` set what an attached strategy holds before any fill is
+reported, for a host that starts with the account not flat. `position_raw` is signed. They return 1,
+and 0 with the reason in the last error for a strategy that is not attached there or one that
+already holds a position in the symbol.
+
+`lrvx_order_trailing_bps(order)` reads the callback rate, in basis points, of a percent trailing
+stop. `LrvxOrder` has no field for it and keeps its shape, so the rate is asked for with the pointer
+a callback was handed (`LrvxExecutorCallbacks.submit` / `replace` / `submit_oco` and the execution
+listener callbacks), on the thread the callback runs on, before it returns. A copy of the struct and
+a pointer outside its callback read 0.
+
 `lrvx_live_engine_drain(engine)` returns once every strategy has been handed everything published so
 far (trades, books, bars, order events) and whatever those callbacks published in turn, and at once
 on an engine that is not running. It must not be called from a strategy callback.

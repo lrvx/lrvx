@@ -81,6 +81,8 @@ from C import lrvx_live_engine_set_market_data_recorder(cobj, cobj)
 from C import lrvx_runner_on_order_event(cobj, cobj)
 from C import lrvx_live_engine_on_order_event(cobj, cobj)
 from C import lrvx_live_engine_drain(cobj)
+from C import lrvx_runner_seed_position(cobj, cobj, u32, i64, i64) -> u8
+from C import lrvx_live_engine_seed_position(cobj, cobj, u32, i64, i64) -> u8
 from C import lrvx_price_from_double(float) -> i64
 from C import lrvx_quantity_from_double(float) -> i64
 
@@ -458,6 +460,31 @@ class Runner[F]:
         if int(lrvx_last_error_code()) != 0:
             raise ValueError(
                 "Runner.on_order_event: " + str.from_ptr(lrvx_last_error_message()))
+
+    def seed_position(self, strategy, symbol: int, position: float,
+                      avg_entry_price: float = 0.0):
+        """Set what ``strategy`` holds in ``symbol`` before any fill is
+        reported: the position an account already has when a host starts
+        or restarts. ``position`` is signed, negative for a short. The
+        strategy reads it from ``position()`` and the context, and fills
+        reported afterwards add to it. Raises ValueError for a strategy
+        that is not attached to this runner and for one that already holds
+        a position in the symbol."""
+        lrvx_clear_last_error()
+        ok = u8(0)
+        if self._threaded:
+            ok = lrvx_live_engine_seed_position(
+                self._live_handle, strategy._handle, u32(symbol),
+                lrvx_quantity_from_double(position),
+                lrvx_price_from_double(avg_entry_price))
+        else:
+            ok = lrvx_runner_seed_position(
+                self._sync_handle, strategy._handle, u32(symbol),
+                lrvx_quantity_from_double(position),
+                lrvx_price_from_double(avg_entry_price))
+        if int(ok) == 0:
+            raise ValueError(
+                "Runner.seed_position: " + str.from_ptr(lrvx_last_error_message()))
 
     def drain(self):
         """Return once every strategy of a threaded runner has been handed

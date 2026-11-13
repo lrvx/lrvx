@@ -1798,6 +1798,7 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
             InstanceMethod("setExecutor", &RunnerNode::setExecutor),
             InstanceMethod("orderClosed", &RunnerNode::orderClosed),
             InstanceMethod("onOrderEvent", &RunnerNode::onOrderEvent),
+            InstanceMethod("seedPosition", &RunnerNode::seedPosition),
             InstanceMethod("hookErrors", &RunnerNode::hookErrors),
             InstanceMethod("attachTraceRecorder", &RunnerNode::attachTraceRecorder),
             InstanceMethod("setTraceFeedTsNs", &RunnerNode::setTraceFeedTsNs),
@@ -2471,6 +2472,44 @@ class RunnerNode : public Napi::ObjectWrap<RunnerNode>, public TsfnHost
     else
     {
       lrvx_live_engine_order_closed(_engine, orderId);
+    }
+    return env.Undefined();
+  }
+
+  // What the strategy at `index` holds before any fill is reported.
+  Napi::Value seedPosition(const Napi::CallbackInfo& info)
+  {
+    auto env = info.Env();
+    if (info.Length() < 3)
+    {
+      throw Napi::TypeError::New(
+          env, "seedPosition(strategyIndex, symbol, position, avgEntryPrice?) expected");
+    }
+    const uint32_t idx = argUint32(info[0], "seedPosition: strategyIndex");
+    if (idx >= _hosts.size())
+    {
+      throw Napi::RangeError::New(env, "seedPosition: strategyIndex " + std::to_string(idx) +
+                                           " is not a strategy of this runner (it has " +
+                                           std::to_string(_hosts.size()) + ")");
+    }
+    const uint32_t sym = symId(info[1]);
+    const double position = argNumber(info[2], "seedPosition: position");
+    const double avg = info.Length() > 3 && !info[3].IsUndefined()
+                           ? argNumber(info[3], "seedPosition: avgEntryPrice")
+                           : 0.0;
+    const auto strategy = static_cast<LrvxStrategyHandle>(_hosts[idx]->bridge.get());
+    lrvx_clear_last_error();
+    const uint8_t ok =
+        _mode == Mode::Sync
+            ? lrvx_runner_seed_position(_runner, strategy, sym,
+                                        lrvx_quantity_from_double(position),
+                                        lrvx_price_from_double(avg))
+            : lrvx_live_engine_seed_position(_engine, strategy, sym,
+                                             lrvx_quantity_from_double(position),
+                                             lrvx_price_from_double(avg));
+    if (ok == 0)
+    {
+      throw Napi::Error::New(env, "seedPosition: " + capiReason());
     }
     return env.Undefined();
   }

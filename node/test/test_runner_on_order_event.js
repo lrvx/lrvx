@@ -109,6 +109,26 @@ console.log('=== sync runner: events reach the strategy that issued the order ==
   runner.stop();
 }
 
+console.log('=== a seeded position is what the strategy reads ===');
+{
+  const {sym, runner, heard, ids} = build(false);
+  runner.seedPosition(1, sym, -1.5, 100);
+  runner.start();
+  runner.onTrade(Number(sym), 100, 1, true, 1000n);
+  runner.onOrderEvent({orderId: ids[1], symbol: sym, side: 'buy', status: 'FILLED',
+                       fillQty: 2, fillPrice: 100});
+  const fill = heard[1].find((e) => e.kind === 'fill');
+  check(fill && Math.abs(fill.position - 0.5) < 1e-9,
+        `the fill adds to the seeded short of 1.5 (${fill && fill.position})`);
+  throwsWith(() => runner.seedPosition(1, sym, 1, 100), Error, 'already holds',
+             'a second seed is refused');
+  throwsWith(() => runner.seedPosition(7, sym, 1, 100), RangeError, 'strategyIndex 7',
+             'an index the runner does not hold');
+  throwsWith(() => runner.seedPosition(0, sym, '1'), TypeError, 'position',
+             'a string position');
+  runner.stop();
+}
+
 console.log('=== an order handed to an executor names its trailing callback rate ===');
 {
   const reg = new lrvx.SymbolRegistry();

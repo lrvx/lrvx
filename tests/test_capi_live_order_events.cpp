@@ -257,6 +257,52 @@ TEST_P(LiveOrderEvents, TheSecondLegOfAnOcoBelongsToTheStrategyOfTheFirst)
   EXPECT_EQ(lrvx_position_raw(strategies[0], symbol), 0);
 }
 
+// A host that restarts with the account not flat had no way to tell the
+// runner: the strategy read 0 until its next fill.
+TEST_P(LiveOrderEvents, ASeededPositionIsWhatTheStrategyReadsAndFillsAddToIt)
+{
+  using Status = lrvx::OrderEventStatus;
+  const auto seed = [this](LrvxStrategyHandle s, int64_t position, int64_t avg)
+  {
+    return engine != nullptr ? lrvx_live_engine_seed_position(engine, s, symbol, position, avg)
+                             : lrvx_runner_seed_position(runner, s, symbol, position, avg);
+  };
+  start();
+  ASSERT_EQ(seed(strategies[1], -200000000LL, kPrice), 1) << lrvx_last_error_message();
+  EXPECT_EQ(lrvx_position_raw(strategies[1], symbol), -200000000LL);
+  EXPECT_EQ(lrvx_position_raw(strategies[0], symbol), 0) << "the other strategy's is its own";
+
+  const uint64_t id = lrvx_emit_limit_buy(strategies[1], symbol, kPrice, kQty);
+  report(id, Status::FILLED, kQty);
+  settle();
+  const auto fills = heard[1].of('f');
+  ASSERT_EQ(fills.size(), 1u);
+  EXPECT_EQ(fills[0].position, 100000000LL) << "the fill adds to the seeded position";
+
+  // Once: a second seed would count the position twice.
+  lrvx_clear_last_error();
+  EXPECT_EQ(seed(strategies[1], 100000000LL, kPrice), 0);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("already holds"), std::string::npos)
+      << lrvx_last_error_message();
+  EXPECT_EQ(lrvx_position_raw(strategies[1], symbol), 100000000LL);
+
+  // Zero is accepted and changes nothing.
+  lrvx_clear_last_error();
+  EXPECT_EQ(seed(strategies[0], 0, 0), 1);
+  EXPECT_EQ(lrvx_position_raw(strategies[0], symbol), 0);
+
+  // A strategy that is attached nowhere here.
+  uint32_t syms[] = {symbol};
+  LrvxStrategyCallbacks scb{};
+  LrvxStrategyHandle stranger = lrvx_strategy_create(9, syms, 1, registry, scb);
+  lrvx_clear_last_error();
+  EXPECT_EQ(seed(stranger, 100000000LL, kPrice), 0);
+  EXPECT_NE(std::string(lrvx_last_error_message()).find("not attached"), std::string::npos)
+      << lrvx_last_error_message();
+  lrvx_strategy_destroy(stranger);
+  lrvx_clear_last_error();
+}
+
 INSTANTIATE_TEST_SUITE_P(RunnerAndLiveEngine, LiveOrderEvents, ::testing::Bool());
 
 class LiveEngineOrderEvents : public LiveOrderEvents

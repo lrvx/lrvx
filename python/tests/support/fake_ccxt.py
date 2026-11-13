@@ -22,6 +22,11 @@ class FakeOrderExchange:
         self.calls = []
         self.orders_watched = 0
         self.fail_cancel = set()
+        # What fetch_positions answers, as unified ccxt position dicts.
+        self.positions = []
+        # Applied to an order while edit_order runs: {"fill": (qty, price)}
+        # fills that much of it, {"replace": True} answers under a new id.
+        self.on_edit = {}
         self._next_id = 100
         self._queues = {}
 
@@ -54,7 +59,7 @@ class FakeOrderExchange:
         return {}
 
     async def fetch_positions(self):
-        return []
+        return [dict(p) for p in self.positions]
 
     async def close(self):
         pass
@@ -97,6 +102,32 @@ class FakeOrderExchange:
             return {"id": oid}
         return dict(self.orders[oid])
 
+    async def edit_order(self, oid, sym, type_, side, qty, price=None, params=None):
+        self.calls.append(("edit", oid, sym, type_, side, qty, price))
+        order = self.orders[oid]
+        if self.on_edit.get("replace"):
+            del self.orders[oid]
+            oid = str(self._next_id)
+            self._next_id += 1
+            order = dict(order, id=oid, filled=0.0, average=None)
+            self.orders[oid] = order
+        order.update(amount=qty, remaining=qty - order["filled"])
+        if price is not None:
+            order["price"] = price
+        if "fill" in self.on_edit:
+            fill_qty, fill_price = self.on_edit["fill"]
+            self._apply_fill(order, fill_qty, fill_price)
+        return dict(order)
+
+    @staticmethod
+    def _apply_fill(order, qty, price):
+        cost = (order["average"] or 0.0) * order["filled"] + qty * price
+        order["filled"] += qty
+        order["remaining"] = order["amount"] - order["filled"]
+        order["average"] = cost / order["filled"]
+        if order["remaining"] <= 1e-12:
+            order["status"] = "closed"
+
     # Driven by the test.
     def push(self, oid):
         """Deliver the order's present state on the orders stream."""
@@ -104,13 +135,7 @@ class FakeOrderExchange:
 
     def fill(self, oid, qty, price):
         """Fill `qty` of the order at `price` and deliver the update."""
-        order = self.orders[oid]
-        cost = (order["average"] or 0.0) * order["filled"] + qty * price
-        order["filled"] += qty
-        order["remaining"] = order["amount"] - order["filled"]
-        order["average"] = cost / order["filled"]
-        if order["remaining"] <= 1e-12:
-            order["status"] = "closed"
+        self._apply_fill(self.orders[oid], qty, price)
         self.push(oid)
 
     def end(self, oid, status):

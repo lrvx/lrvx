@@ -7847,6 +7847,34 @@ class ReportedOrderEvents
     return it == _positions.end() ? nullptr : it->second.get();
   }
 
+  // What the strategy holds before any fill is reported here: the position
+  // an account already has when a host starts or restarts. Signed; applied
+  // as one opening fill at the average entry price.
+  void seed(const BridgeStrategy* s, SymbolId symbol, Quantity position, Price avgEntry) const
+  {
+    auto* positions = positionsOf(s->id());
+    if (positions == nullptr)
+    {
+      throw std::invalid_argument("the strategy with subscriber id " + std::to_string(s->id()) +
+                                  " is not attached here");
+    }
+    if (const Quantity held = positions->getPosition(symbol); held.raw() != 0)
+    {
+      throw std::invalid_argument(
+          "the strategy with subscriber id " + std::to_string(s->id()) +
+          " already holds " + std::to_string(held.toDouble()) + " of symbol " +
+          std::to_string(symbol) + "; a position is seeded once, before any fill is reported");
+    }
+    if (position.raw() > 0)
+    {
+      positions->openLong(symbol, avgEntry, position);
+    }
+    else if (position.raw() < 0)
+    {
+      positions->openShort(symbol, avgEntry, Quantity::fromRaw(-position.raw()));
+    }
+  }
+
   // Refuses a status, side or order type out of range.
   static OrderEvent toEvent(const LrvxOrderEventData& d)
   {
@@ -9741,6 +9769,32 @@ void lrvx_runner_set_executor(LrvxRunnerHandle runner, LrvxExecutorHandle execut
   toRunner(runner)->setExecutor(
       static_cast<capi_impl::LrvxExecutorImpl*>(executor));
   LRVX_CAPI_LEAVE_VOID;
+}
+
+uint8_t lrvx_runner_seed_position(LrvxRunnerHandle runner, LrvxStrategyHandle strategy,
+                                  uint32_t symbol, int64_t position_raw,
+                                  int64_t avg_entry_price_raw)
+{
+  LRVX_CAPI_ENTER(runner);
+  LRVX_CAPI_REQUIRE(strategy);
+  toRunner(runner)->orderEvents.seed(toStrategy(strategy), symbol,
+                                     Quantity::fromRaw(position_raw),
+                                     Price::fromRaw(avg_entry_price_raw));
+  return 1;
+  LRVX_CAPI_LEAVE;
+}
+
+uint8_t lrvx_live_engine_seed_position(LrvxLiveEngineHandle engine, LrvxStrategyHandle strategy,
+                                       uint32_t symbol, int64_t position_raw,
+                                       int64_t avg_entry_price_raw)
+{
+  LRVX_CAPI_ENTER(engine);
+  LRVX_CAPI_REQUIRE(strategy);
+  toLiveEngine(engine)->orderEvents.seed(toStrategy(strategy), symbol,
+                                         Quantity::fromRaw(position_raw),
+                                         Price::fromRaw(avg_entry_price_raw));
+  return 1;
+  LRVX_CAPI_LEAVE;
 }
 
 int32_t lrvx_order_trailing_bps(const LrvxOrder* order)

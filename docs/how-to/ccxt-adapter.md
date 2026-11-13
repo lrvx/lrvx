@@ -163,7 +163,9 @@ Order types outside the table dispatch to `on_error(sym, UnsupportedOrderType(..
 
 ## Position reconciliation
 
-`run(reconcile=True)` (default) calls `fetch_balance()` and `fetch_positions()` before streams start. For each non-zero position on a registered symbol the broker calls `strategy.on_initial_position(ccxt_sym, qty, avg_price)`. If the strategy has no such method the position is just logged.
+`run(reconcile=True)` (default) calls `fetch_balance()` and `fetch_positions()` before streams start. For each non-zero position on a registered symbol the broker seeds the runner with it (`Runner.seed_position`), so the strategy reads the position from `ctx.position` and `self.position()` from its first callback and later fills add to it, and it calls `strategy.on_initial_position(ccxt_sym, qty, avg_price)`. The callback used to be all there was: after a restart the strategy read a position of 0 while the account was not flat.
+
+The seed is signed: a position ccxt reports with `side: "short"` is negative (`qty` in the callback is the size the exchange reports, as before). A runner keeps a position per strategy and an account's position names none, so the seed goes to the one attached strategy that trades the symbol. With several strategies on the symbol none is seeded and `on_error` reports it; call `broker.runner.seed_position(strategy, symbol, position, avg_entry_price)` for the one that holds the position, from `on_initial_position` or after `run()` has started the runner.
 
 `fetch_positions` is a derivatives concept. Spot exchanges raise `NotSupported`; the broker swallows it and proceeds with an empty position list.
 

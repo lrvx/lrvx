@@ -1885,6 +1885,11 @@
         {
           "group": "execution",
           "kind": "function",
+          "name": "lrvx_live_engine_seed_position"
+        },
+        {
+          "group": "execution",
+          "kind": "function",
           "name": "lrvx_live_engine_set_executor"
         },
         {
@@ -3016,6 +3021,11 @@
           "group": "execution",
           "kind": "function",
           "name": "lrvx_runner_order_closed"
+        },
+        {
+          "group": "execution",
+          "kind": "function",
+          "name": "lrvx_runner_seed_position"
         },
         {
           "group": "execution",
@@ -7610,6 +7620,11 @@
         },
         {
           "kind": "method",
+          "name": "seed_position",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "set_market_data_recorder",
           "parent": "Runner"
         },
@@ -10404,6 +10419,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_live_engine_seed_position"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_live_engine_set_executor"
         },
         {
@@ -11309,6 +11328,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_runner_order_closed"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_runner_seed_position"
         },
         {
           "kind": "c_import",
@@ -33276,6 +33299,11 @@
         },
         {
           "kind": "method",
+          "name": "seedPosition",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "setExecutor",
           "parent": "Runner"
         },
@@ -39197,6 +39225,11 @@
         },
         {
           "kind": "method",
+          "name": "seed_position",
+          "parent": "Runner"
+        },
+        {
+          "kind": "method",
           "name": "set_executor",
           "parent": "Runner"
         },
@@ -43927,10 +43960,12 @@
         "lrvx_executor_get_capabilities",
         "lrvx_live_engine_on_order_event",
         "lrvx_live_engine_order_closed",
+        "lrvx_live_engine_seed_position",
         "lrvx_live_engine_set_executor",
         "lrvx_order_trailing_bps",
         "lrvx_runner_on_order_event",
         "lrvx_runner_order_closed",
+        "lrvx_runner_seed_position",
         "lrvx_runner_set_executor"
       ],
       "codon": {

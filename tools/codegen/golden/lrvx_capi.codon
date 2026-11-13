@@ -265,6 +265,8 @@ from C import lrvx_runner_set_executor(cobj, cobj)
 from C import lrvx_runner_order_closed(cobj, u64)
 from C import lrvx_runner_on_order_event(cobj, cobj)
 from C import lrvx_order_trailing_bps(cobj) -> i32
+from C import lrvx_runner_seed_position(cobj, cobj, u32, i64, i64) -> u8
+from C import lrvx_live_engine_seed_position(cobj, cobj, u32, i64, i64) -> u8
 from C import lrvx_backtest_runner_add_execution_listener(cobj, cobj)
 from C import lrvx_backtest_runner_set_executor(cobj, cobj)
 

@@ -2656,6 +2656,10 @@ class Runner:
         """
         Replay a `.lrvx` tape into this runner's strategies with `simulator` (a SimulatedExecutor) standing in for the venue, through the loop BacktestRunner.run_tape uses: every trade, book snapshot, book delta and top-of-book frame, in the tape's time order, moves the simulator's clock and reaches the simulator before the strategies, so an order resting in the simulator fills from the books as in a backtest of the same tape. The simulator is reset first, as at the start of a backtest run. With tape_symbol_id and symbol, only that tape symbol is replayed and its events are delivered under the registered `symbol`. `lock` (anything with acquire / release) is held while the simulator is shown an event and released before the strategies see it; `after_event()` is called after each event. The strategies receive trades, book snapshots and tops; a live runner has no delta entry, so deltas reach the simulator only. Returns a dict: events, trades, books, book_deltas_not_delivered, skipped_option_quotes, skipped_pool_states.
         """
+    def seed_position(self, strategy: Strategy, symbol: typing.Any, position: typing.SupportsFloat | typing.SupportsIndex, avg_entry_price: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:
+        """
+        Set what `strategy` holds in `symbol` before any fill is reported: the position an account already has when a host starts or restarts, which no on_order_event will tell of. `position` is signed (negative for a short) and `avg_entry_price` its average entry (0.0 when unknown). The strategy then reads it from self.position() and ctx.position, and the fills reported afterwards add to it. Positions are per strategy, so name the one the position belongs to. ValueError for a strategy that is not attached to this runner and for one that already holds a position in the symbol: a position is seeded once. 0 is accepted and changes nothing.
+        """
     def set_executor(self, executor: Executor) -> None:
         ...
     def set_kill_switch(self, ks: KillSwitch) -> None:

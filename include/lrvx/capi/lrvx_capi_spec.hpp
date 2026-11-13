@@ -3557,6 +3557,27 @@ extern "C"
   LRVX_EXPORT(group = "execution")
   int32_t lrvx_order_trailing_bps(const LrvxOrder* order);
 
+  // Sets what a strategy attached to this runner holds before any fill is
+  // reported: the position an account already has when a host starts or
+  // restarts, which no lrvx_runner_on_order_event will ever tell of.
+  // position_raw is signed (negative for a short) and avg_entry_price_raw is
+  // its average entry price (0 when unknown); the strategy then reads them
+  // from lrvx_position_raw and the LrvxSymbolContext of its next callback,
+  // and the fills reported afterwards add to them. Positions are per
+  // strategy: name the one the position belongs to. Returns 1, and 0 with
+  // the reason in lrvx_last_error_message for a strategy that is not
+  // attached to this runner or one that already holds a position in the
+  // symbol. A position of 0 is accepted and changes nothing.
+  LRVX_EXPORT(group = "execution")
+  uint8_t lrvx_runner_seed_position(LrvxRunnerHandle runner, LrvxStrategyHandle strategy,
+                                    uint32_t symbol, int64_t position_raw,
+                                    int64_t avg_entry_price_raw);
+  // The engine's counterpart of lrvx_runner_seed_position.
+  LRVX_EXPORT(group = "execution")
+  uint8_t lrvx_live_engine_seed_position(LrvxLiveEngineHandle engine,
+                                         LrvxStrategyHandle strategy, uint32_t symbol,
+                                         int64_t position_raw, int64_t avg_entry_price_raw);
+
   LRVX_EXPORT(group = "strategyrunner_synchronous")
   void lrvx_runner_start(LrvxRunnerHandle runner);
   LRVX_EXPORT(group = "strategyrunner_synchronous")

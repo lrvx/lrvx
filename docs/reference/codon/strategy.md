@@ -357,3 +357,9 @@ A synchronous runner runs the callbacks inside the call. A threaded runner queue
 them on the strategy's order-event consumer thread, after the market data published before the
 report; `Runner.drain()` returns once everything published so far has been handed over. An unknown
 side, or a status or order type that is not a code, raises `ValueError`.
+
+`Runner.seed_position(strategy, symbol, position, avg_entry_price=0.0)` sets what `strategy` holds
+before any fill is reported: after a restart the account may not be flat, and no `on_order_event`
+will tell of that position. `position` is signed, negative for a short. A position is seeded once;
+a strategy that already holds one in the symbol, or one that is not attached to the runner, raises
+`ValueError`.

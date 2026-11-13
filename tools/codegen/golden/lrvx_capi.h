@@ -1362,6 +1362,12 @@ extern "C"
   void lrvx_runner_order_closed(LrvxRunnerHandle runner, uint64_t order_id);
   void lrvx_runner_on_order_event(LrvxRunnerHandle runner, const LrvxOrderEventData* event);
   int32_t lrvx_order_trailing_bps(const LrvxOrder* order);
+  uint8_t lrvx_runner_seed_position(LrvxRunnerHandle runner, LrvxStrategyHandle strategy,
+                                    uint32_t symbol, int64_t position_raw,
+                                    int64_t avg_entry_price_raw);
+  uint8_t lrvx_live_engine_seed_position(LrvxLiveEngineHandle engine, LrvxStrategyHandle strategy,
+                                         uint32_t symbol, int64_t position_raw,
+                                         int64_t avg_entry_price_raw);
   void lrvx_backtest_runner_add_execution_listener(LrvxBacktestRunnerHandle runner,
                                                    LrvxExecutionListenerHandle listener);
   void lrvx_backtest_runner_set_executor(LrvxBacktestRunnerHandle runner,

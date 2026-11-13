@@ -285,6 +285,9 @@ runner.stop()
 | `set_market_data_recorder(recorder)` | Attach a `MarketDataRecorderHook` or `BinaryLogRecorderHook` |
 | `set_executor(executor)` | Replace the executor |
 | `order_closed(order_id)` | Tell the runner an order it sent to the executor is finished |
+| `on_order_event(order_id, symbol, side, status, ...)` | Report a venue's order update or fill to the strategy that issued the order |
+| `seed_position(strategy, symbol, position, avg_entry_price=0.0)` | Set what a strategy holds before any fill is reported |
+| `drain()` | Wait until a threaded runner's strategies have been handed everything published so far |
 | `replay_tape(path, simulator, *, tape_symbol_id=None, symbol=None, lock=None, after_event=None)` | Replay a `.lrvx` tape into the runner's strategies with a `SimulatedExecutor` standing in for the venue, through the loop `BacktestRunner.run_tape` uses: every trade and book event, in time order, reaches the simulator before the strategies. Returns a dict of counts. `lrvx engine sim` is built on it: see [What the simulator sees and does](../../how-to/engine-sim.md#what-the-simulator-sees-and-does) |
 | `on_order_event(order_id, symbol, side, status, order_type='limit', fill_qty=0.0, fill_price=0.0, ts_ns=0, reject_reason='', is_maker=False)` | Report one order event a venue sent. `PARTIALLY_FILLED` / `FILLED` reach the strategy's `on_fill(ctx, event)` and only `on_fill`; every other status reaches `on_order_update(ctx, event)` |
 
@@ -306,6 +309,13 @@ strategy's id shifted left 32 bits, plus a counter), and the second leg of an OC
 strategy of its first leg while the pair is on record, so report a leg's events before
 `order_closed`. An id no attached strategy issued goes to every strategy subscribed to the symbol
 and counts in no position.
+
+`seed_position(strategy, symbol, position, avg_entry_price=0.0)` sets what a strategy holds before
+any fill is reported: after a restart the account may not be flat, and no `on_order_event` will tell
+of that position. `position` is signed, negative for a short. The strategy reads it from
+`self.position()` and `ctx.position`, and the fills reported afterwards add to it. A position is
+seeded once: `ValueError` for a strategy that already holds one in the symbol and for one that is
+not attached to this runner. `CcxtBroker` seeds the position it finds at start.
 
 Which thread runs the callbacks depends on the runner:
 

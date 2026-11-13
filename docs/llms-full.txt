@@ -11482,6 +11482,7 @@ Members:
 - `order_closed(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> None`
 - `replace_strategy(self, index: typing.SupportsInt | typing.SupportsIndex, strategy: Strategy) -> None`
 - `replay_tape(self, path: str, simulator: SimulatedExecutor, *, tape_symbol_id: typing.Any = None, symbol: typing.Any = None, lock: typing.Any = None, after_event: typing.Any = None) -> dict`
+- `seed_position(self, strategy: Strategy, symbol: typing.Any, position: typing.SupportsFloat | typing.SupportsIndex, avg_entry_price: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None`
 - `set_executor(self, executor: Executor) -> None`
 - `set_kill_switch(self, ks: KillSwitch) -> None`
 - `set_market_data_recorder(self, recorder: MarketDataRecorderHook) -> None`
@@ -12582,6 +12583,9 @@ runner.stop()
 | `set_market_data_recorder(recorder)` | Attach a `MarketDataRecorderHook` or `BinaryLogRecorderHook` |
 | `set_executor(executor)` | Replace the executor |
 | `order_closed(order_id)` | Tell the runner an order it sent to the executor is finished |
+| `on_order_event(order_id, symbol, side, status, ...)` | Report a venue's order update or fill to the strategy that issued the order |
+| `seed_position(strategy, symbol, position, avg_entry_price=0.0)` | Set what a strategy holds before any fill is reported |
+| `drain()` | Wait until a threaded runner's strategies have been handed everything published so far |
 | `replay_tape(path, simulator, *, tape_symbol_id=None, symbol=None, lock=None, after_event=None)` | Replay a `.lrvx` tape into the runner's strategies with a `SimulatedExecutor` standing in for the venue, through the loop `BacktestRunner.run_tape` uses: every trade and book event, in time order, reaches the simulator before the strategies. Returns a dict of counts. `lrvx engine sim` is built on it: see [What the simulator sees and does](../../how-to/engine-sim.md#what-the-simulator-sees-and-does) |
 | `on_order_event(order_id, symbol, side, status, order_type='limit', fill_qty=0.0, fill_price=0.0, ts_ns=0, reject_reason='', is_maker=False)` | Report one order event a venue sent. `PARTIALLY_FILLED` / `FILLED` reach the strategy's `on_fill(ctx, event)` and only `on_fill`; every other status reaches `on_order_update(ctx, event)` |
 
@@ -12603,6 +12607,13 @@ strategy's id shifted left 32 bits, plus a counter), and the second leg of an OC
 strategy of its first leg while the pair is on record, so report a leg's events before
 `order_closed`. An id no attached strategy issued goes to every strategy subscribed to the symbol
 and counts in no position.
+
+`seed_position(strategy, symbol, position, avg_entry_price=0.0)` sets what a strategy holds before
+any fill is reported: after a restart the account may not be flat, and no `on_order_event` will tell
+of that position. `position` is signed, negative for a short. The strategy reads it from
+`self.position()` and `ctx.position`, and the fills reported afterwards add to it. A position is
+seeded once: `ValueError` for a strategy that already holds one in the symbol and for one that is
+not attached to this runner. `CcxtBroker` seeds the position it finds at start.
 
 Which thread runs the callbacks depends on the runner:
 
@@ -15814,6 +15825,15 @@ The status names are the `OrderEventStatus` names of the engine: `NEW`, `SUBMITT
 `REJECTED_RATE_LIMIT` as `"UNKNOWN"`; Python read the last as `"UNKNOWN"` too. All three now read
 the one table.
 
+### A position the account already holds
+
+`runner.seedPosition(strategyIndex, symbol, position, avgEntryPrice?)` sets what the strategy at
+`strategyIndex` (the order of `addStrategy`, from 0) holds before any fill is reported: after a
+restart the account may not be flat, and no `onOrderEvent` will tell of that position. `position`
+is signed, negative for a short. The strategy reads it from `ctx.position` and the fills reported
+afterwards add to it. A position is seeded once: a strategy that already holds one in the symbol,
+or an index the runner does not hold, throws.
+
 `onSignal` is an observer: a runner created without one gates and forwards its signals the same way.
 
 #### Argument checks
@@ -17178,6 +17198,12 @@ A synchronous runner runs the callbacks inside the call. A threaded runner queue
 them on the strategy's order-event consumer thread, after the market data published before the
 report; `Runner.drain()` returns once everything published so far has been handed over. An unknown
 side, or a status or order type that is not a code, raises `ValueError`.
+
+`Runner.seed_position(strategy, symbol, position, avg_entry_price=0.0)` sets what `strategy` holds
+before any fill is reported: after a restart the account may not be flat, and no `on_order_event`
+will tell of that position. `position` is signed, negative for a short. A position is seeded once;
+a strategy that already holds one in the symbol, or one that is not attached to the runner, raises
+`ValueError`.
 
 ------------------------------------------------------------------------------
 # Source: docs/reference/codon/types.md
@@ -19888,6 +19914,18 @@ subscribed to the symbol and counts in no position.
 | Order among order events | as reported | as reported |
 | Order against market data | as called | after every trade, book update and bar published before the report has been handed to that strategy; market data published after the report may arrive on either side of it |
 | Engine not started, or stopped | | the calling thread; an event queued before `lrvx_live_engine_stop` is delivered before it returns |
+
+`lrvx_runner_seed_position(runner, strategy, symbol, position_raw, avg_entry_price_raw)` and
+`lrvx_live_engine_seed_position(...)` set what an attached strategy holds before any fill is
+reported, for a host that starts with the account not flat. `position_raw` is signed. They return 1,
+and 0 with the reason in the last error for a strategy that is not attached there or one that
+already holds a position in the symbol.
+
+`lrvx_order_trailing_bps(order)` reads the callback rate, in basis points, of a percent trailing
+stop. `LrvxOrder` has no field for it and keeps its shape, so the rate is asked for with the pointer
+a callback was handed (`LrvxExecutorCallbacks.submit` / `replace` / `submit_oco` and the execution
+listener callbacks), on the thread the callback runs on, before it returns. A copy of the struct and
+a pointer outside its callback read 0.
 
 `lrvx_live_engine_drain(engine)` returns once every strategy has been handed everything published so
 far (trades, books, bars, order events) and whatever those callbacks published in turn, and at once

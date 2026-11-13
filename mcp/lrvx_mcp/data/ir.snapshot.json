@@ -8011,6 +8011,33 @@
     },
     {
       "group": "execution",
+      "name": "lrvx_live_engine_seed_position",
+      "params": [
+        {
+          "name": "engine",
+          "type": "LrvxLiveEngineHandle"
+        },
+        {
+          "name": "strategy",
+          "type": "LrvxStrategyHandle"
+        },
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        },
+        {
+          "name": "position_raw",
+          "type": "int64_t"
+        },
+        {
+          "name": "avg_entry_price_raw",
+          "type": "int64_t"
+        }
+      ],
+      "return_type": "uint8_t"
+    },
+    {
+      "group": "execution",
       "name": "lrvx_live_engine_set_executor",
       "params": [
         {
@@ -12143,6 +12170,33 @@
         }
       ],
       "return_type": "void"
+    },
+    {
+      "group": "execution",
+      "name": "lrvx_runner_seed_position",
+      "params": [
+        {
+          "name": "runner",
+          "type": "LrvxRunnerHandle"
+        },
+        {
+          "name": "strategy",
+          "type": "LrvxStrategyHandle"
+        },
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        },
+        {
+          "name": "position_raw",
+          "type": "int64_t"
+        },
+        {
+          "name": "avg_entry_price_raw",
+          "type": "int64_t"
+        }
+      ],
+      "return_type": "uint8_t"
     },
     {
       "group": "execution",

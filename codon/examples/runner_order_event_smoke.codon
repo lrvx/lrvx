@@ -7,6 +7,8 @@
 #   * the fill counts in the position of the strategy that issued the order,
 #     and only in that one
 #   * an unknown side is refused before anything is delivered
+#   * Runner.seed_position gives a strategy the position its account already
+#     holds, once
 
 from C import lrvx_registry_create() -> cobj
 from C import lrvx_registry_destroy(cobj)
@@ -113,6 +115,22 @@ try:
 except ValueError as e:
     out_of_range = True
 check(out_of_range, "a status that is not a status is refused")
+
+# A position the account already held: the strategy reads it, a fill adds to it.
+seeded = Runner(reg, on_signal)
+holder = Listening([sym])
+seeded.add_strategy(holder)
+seeded.seed_position(holder, sym, -1.5, 100.0)
+check(abs(holder.position() + 1.5) < 1e-9, "a seeded short of 1.5 is what the strategy reads")
+bought = holder.emit_limit_buy(sym, 100.0, 2.0)
+seeded.on_order_event(bought, sym, "buy", ORDER_STATUS_FILLED, fill_qty=2.0, fill_price=100.0)
+check(abs(holder.position_in_fill - 0.5) < 1e-9, "and a fill adds to it")
+twice = False
+try:
+    seeded.seed_position(holder, sym, 1.0, 100.0)
+except ValueError as e:
+    twice = True
+check(twice, "a second seed is refused")
 
 runner.drain()
 runner.stop()
