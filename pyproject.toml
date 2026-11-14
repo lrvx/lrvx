@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "lrvx"
-version = "0.11.0"
+version = "0.12.0"
 authors = [{name = "lrvx contributors"}]
 description = "Framework for building trading systems."
 readme = "python/README.md"
