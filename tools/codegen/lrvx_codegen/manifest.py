@@ -143,6 +143,9 @@ _CPP_METHOD = re.compile(
 _QJS_GLOBAL = re.compile(r'addGlobalFunc\(\s*ctx\s*,\s*"([^"]+)"')
 _QJS_PRELUDE_FN = re.compile(r"^\s{6}([a-zA-Z_][A-Za-z_0-9]*)\s*:\s*function")
 _QJS_PRELUDE_CLASS = re.compile(r"^\s{4}class\s+([A-Za-z_][A-Za-z_0-9]*)")
+# A top-level class of the embedded JS standard library (quickjs/lrvx/*.js).
+# A leading underscore marks an internal base, which is not a binding class.
+_QJS_STDLIB_CLASS = re.compile(r"^class\s+([A-Za-z][A-Za-z_0-9]*)")
 
 
 def scan_pyi(text: str) -> Tuple[List[str], List[str]]:
@@ -278,11 +281,17 @@ def scan_cpp(headers: Dict[str, str]) -> Tuple[List[Tuple[str, str]], List[Tuple
     return sorted(set(types)), sorted(set(methods))
 
 
-def scan_quickjs(bindings_text: str, prelude_text: str) -> Tuple[List[str], List[str], List[str]]:
+def scan_quickjs(bindings_text: str, prelude_text: str,
+                 stdlib_texts: Iterable[str] = ()) -> Tuple[List[str], List[str], List[str]]:
     """(registered globals, prelude classes, prelude functions).
 
     QuickJS recorded zero symbols, so list_bindings answered "No QuickJS
     exports recorded yet" for a surface with ~500 registered globals.
+
+    `stdlib_texts` are the files of quickjs/lrvx/. They are compiled into the
+    engine and evaluated at global scope before a script loads, so their
+    top-level classes (the indicators, the exit rules, History) are QuickJS
+    classes as much as the prelude's.
     """
     globals_ = sorted(set(_QJS_GLOBAL.findall(bindings_text)))
     classes: List[str] = []
@@ -295,6 +304,11 @@ def scan_quickjs(bindings_text: str, prelude_text: str) -> Tuple[List[str], List
         m = _QJS_PRELUDE_FN.match(line)
         if m:
             funcs.append(m.group(1))
+    for text in stdlib_texts:
+        for line in text.splitlines():
+            m = _QJS_STDLIB_CLASS.match(line)
+            if m:
+                classes.append(m.group(1))
     return globals_, sorted(set(classes)), sorted(set(funcs))
 
 
@@ -327,6 +341,7 @@ def build_binding_manifest(
     cpp_headers: Dict[str, str] | None = None,
     quickjs_bindings_text: str = "",
     quickjs_prelude_text: str = "",
+    quickjs_stdlib_texts: Iterable[str] = (),
 ) -> Dict[str, Any]:
     """Compose the cross-binding symbol manifest.
 
@@ -425,7 +440,7 @@ def build_binding_manifest(
     )
 
     qjs_globals, qjs_classes, qjs_funcs = scan_quickjs(
-        quickjs_bindings_text, quickjs_prelude_text)
+        quickjs_bindings_text, quickjs_prelude_text, quickjs_stdlib_texts)
     quickjs_symbols = (
         [{"name": c, "kind": "class"} for c in qjs_classes]
         + [{"name": f, "kind": "function"} for f in qjs_funcs]

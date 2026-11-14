@@ -100,6 +100,11 @@ struct PySymbolCtx
   // last_update_ns, so it can be the fresher of the two.
   int64_t last_update_ns;
   int64_t last_touch_ns;
+  // The quantity-weighted average entry of the open position (None when
+  // flat), and the bar callbacks received while holding it, the bar on which
+  // it is first seen counting as 1.
+  std::optional<double> entry_price;
+  uint32_t bars_in_position{0};
 
   std::optional<double> book_spread() const
   {
@@ -133,10 +138,18 @@ inline void fillQuotes(PySymbolCtx& pc, const LrvxBookSnapshot& book)
   }
 }
 
-inline void fillStamps(PySymbolCtx& pc, const LrvxSymbolContext& ctx)
+// The position facts are not on LrvxSymbolContext; the strategy handle
+// answers them for the symbol, as the context holds them in this callback.
+inline void fillStamps(PySymbolCtx& pc, const LrvxSymbolContext& ctx, LrvxStrategyHandle s)
 {
   pc.last_update_ns = ctx.last_update_ns;
   pc.last_touch_ns = ctx.last_touch_ns;
+  int64_t entry = 0;
+  if (s != nullptr && lrvx_entry_price_raw_opt(s, ctx.symbol_id, &entry))
+  {
+    pc.entry_price = lrvx_price_to_double(entry);
+  }
+  pc.bars_in_position = s != nullptr ? lrvx_bars_in_position(s, ctx.symbol_id) : 0;
 }
 
 // Order-event payload exposed to the Python `on_fill` /
@@ -443,6 +456,11 @@ class PyStrategyBase
         c.unrealizedPnl().value_or(std::numeric_limits<double>::quiet_NaN());
     result.last_update_ns = c.lastUpdateNs;
     result.last_touch_ns = c.lastTouchNs;
+    if (c.entryPrice)
+    {
+      result.entry_price = c.entryPrice->toDouble();
+    }
+    result.bars_in_position = c.barsInPosition;
     return result;
   }
 
@@ -884,7 +902,7 @@ struct PyStrategyHost
       pc.position = lrvx_quantity_to_double(ctx->position_raw);
       pc.last_trade_price = lrvx_price_to_double(ctx->last_trade_price_raw);
       fillQuotes(pc, ctx->book);
-      fillStamps(pc, *ctx);
+      fillStamps(pc, *ctx, static_cast<LrvxStrategyHandle>(self->bridge.get()));
 
       PyTradeData pt{};
       pt.symbol = trade->symbol;
@@ -911,7 +929,7 @@ struct PyStrategyHost
       pc.position = lrvx_quantity_to_double(ctx->position_raw);
       pc.last_trade_price = lrvx_price_to_double(ctx->last_trade_price_raw);
       fillQuotes(pc, ctx->book);
-      fillStamps(pc, *ctx);
+      fillStamps(pc, *ctx, static_cast<LrvxStrategyHandle>(self->bridge.get()));
       self->strategy.load(std::memory_order_acquire)->on_book_update(pc);
     };
     dispatch(self, "Strategy.on_book_update", call);
@@ -932,7 +950,7 @@ struct PyStrategyHost
       pc.position = lrvx_quantity_to_double(ctx->position_raw);
       pc.last_trade_price = lrvx_price_to_double(ctx->last_trade_price_raw);
       fillQuotes(pc, ctx->book);
-      fillStamps(pc, *ctx);
+      fillStamps(pc, *ctx, static_cast<LrvxStrategyHandle>(self->bridge.get()));
       self->strategy.load(std::memory_order_acquire)->on_touch(pc);
     };
     dispatch(self, "Strategy.on_touch", call);
@@ -949,7 +967,7 @@ struct PyStrategyHost
       pc.position = lrvx_quantity_to_double(ctx->position_raw);
       pc.last_trade_price = lrvx_price_to_double(ctx->last_trade_price_raw);
       fillQuotes(pc, ctx->book);
-      fillStamps(pc, *ctx);
+      fillStamps(pc, *ctx, static_cast<LrvxStrategyHandle>(self->bridge.get()));
 
       PyBarData pb{};
       pb.symbol = bar->symbol;
@@ -1050,7 +1068,7 @@ struct PyStrategyHost
       pc.position = lrvx_quantity_to_double(ctx->position_raw);
       pc.last_trade_price = lrvx_price_to_double(ctx->last_trade_price_raw);
       fillQuotes(pc, ctx->book);
-      fillStamps(pc, *ctx);
+      fillStamps(pc, *ctx, static_cast<LrvxStrategyHandle>(self->bridge.get()));
       PyOrderEventData pe = toPyOrderEvent(ev);
       self->strategy.load(std::memory_order_acquire)->on_fill(pc, pe);
     };
@@ -1068,7 +1086,7 @@ struct PyStrategyHost
       pc.position = lrvx_quantity_to_double(ctx->position_raw);
       pc.last_trade_price = lrvx_price_to_double(ctx->last_trade_price_raw);
       fillQuotes(pc, ctx->book);
-      fillStamps(pc, *ctx);
+      fillStamps(pc, *ctx, static_cast<LrvxStrategyHandle>(self->bridge.get()));
       PyOrderEventData pe = toPyOrderEvent(ev);
       self->strategy.load(std::memory_order_acquire)->on_order_update(pc, pe);
     };
@@ -1086,7 +1104,7 @@ struct PyStrategyHost
       pc.position = lrvx_quantity_to_double(ctx->position_raw);
       pc.last_trade_price = lrvx_price_to_double(ctx->last_trade_price_raw);
       fillQuotes(pc, ctx->book);
-      fillStamps(pc, *ctx);
+      fillStamps(pc, *ctx, static_cast<LrvxStrategyHandle>(self->bridge.get()));
       PyOrderEventData pe = toPyOrderEvent(ev);
       self->strategy.load(std::memory_order_acquire)->on_queue_position_change(pc, pe);
     };
@@ -1104,7 +1122,7 @@ struct PyStrategyHost
       pc.position = lrvx_quantity_to_double(ctx->position_raw);
       pc.last_trade_price = lrvx_price_to_double(ctx->last_trade_price_raw);
       fillQuotes(pc, ctx->book);
-      fillStamps(pc, *ctx);
+      fillStamps(pc, *ctx, static_cast<LrvxStrategyHandle>(self->bridge.get()));
       PyOrderEventData pe = toPyOrderEvent(ev);
       self->strategy.load(std::memory_order_acquire)
           ->on_market_position_change(pc, pe);
@@ -3513,6 +3531,13 @@ inline void bindStrategy(py::module_& m)
       .def_readwrite("unrealized_pnl", &PySymbolCtx::unrealized_pnl)
       .def_readwrite("last_update_ns", &PySymbolCtx::last_update_ns)
       .def_readwrite("last_touch_ns", &PySymbolCtx::last_touch_ns)
+      .def_readwrite("entry_price", &PySymbolCtx::entry_price,
+                     "Quantity-weighted average entry of the open position: an add moves it, "
+                     "a partial close leaves it, a flip sets it to the flipping fill's price. "
+                     "None when flat.")
+      .def_readwrite("bars_in_position", &PySymbolCtx::bars_in_position,
+                     "Bar callbacks received while holding the current position, the bar on "
+                     "which it is first seen counting as 1; 0 when flat, 1 again after a flip.")
       .def("book_spread", &PySymbolCtx::book_spread)
       .def("is_long", &PySymbolCtx::is_long)
       .def("is_short", &PySymbolCtx::is_short)

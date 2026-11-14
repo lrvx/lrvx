@@ -949,6 +949,21 @@ groups:
     quickjs:
       status: required
       classes: [AtrStop, ChandelierExit, BreakEvenTrail, PercentStop, TakeProfit, TimeStop]
+      functions:
+        lrvx_exit_atr_stop_create: __lrvx_exit_atr_stop_create
+        lrvx_exit_break_even_trail_create: __lrvx_exit_break_even_trail_create
+        lrvx_exit_chandelier_create: __lrvx_exit_chandelier_create
+        lrvx_exit_percent_stop_create: __lrvx_exit_percent_stop_create
+        lrvx_exit_rule_arm: __lrvx_exit_rule_arm
+        lrvx_exit_rule_armed: __lrvx_exit_rule_armed
+        lrvx_exit_rule_at_break_even: __lrvx_exit_rule_at_break_even
+        lrvx_exit_rule_bars: __lrvx_exit_rule_bars
+        lrvx_exit_rule_destroy: __lrvx_exit_rule_destroy
+        lrvx_exit_rule_disarm: __lrvx_exit_rule_disarm
+        lrvx_exit_rule_level: __lrvx_exit_rule_level
+        lrvx_exit_rule_update: __lrvx_exit_rule_update
+        lrvx_exit_take_profit_create: __lrvx_exit_take_profit_create
+        lrvx_exit_time_stop_create: __lrvx_exit_time_stop_create
 
   # A fixed-capacity ring of the last values, newest first, and the
   # crossed_above / crossed_below helpers.
@@ -964,6 +979,16 @@ groups:
     quickjs:
       status: required
       classes: [History]
+      functions:
+        lrvx_crossed_above: __lrvx_crossed_above
+        lrvx_crossed_below: __lrvx_crossed_below
+        lrvx_history_capacity: __lrvx_history_capacity
+        lrvx_history_create: __lrvx_history_create
+        lrvx_history_destroy: __lrvx_history_destroy
+        lrvx_history_full: __lrvx_history_full
+        lrvx_history_get: __lrvx_history_get
+        lrvx_history_push: __lrvx_history_push
+        lrvx_history_size: __lrvx_history_size
 
   multi_tf_helpers:
     pybind11: { status: not_applicable }  # surfaced via Strategy class methods
@@ -1644,6 +1669,7 @@ allowlist_functions:
     lrvx_indicator_cvd: *cpp_direct
     lrvx_indicator_dema: *cpp_direct
     lrvx_indicator_ema: *cpp_direct
+    lrvx_indicator_highest: *cpp_direct
     lrvx_indicator_graph_add_node: *cpp_direct
     lrvx_indicator_graph_bar_count: *cpp_direct
     lrvx_indicator_graph_close: *cpp_direct
@@ -1663,6 +1689,7 @@ allowlist_functions:
     lrvx_indicator_graph_volume: *cpp_direct
     lrvx_indicator_kama: *cpp_direct
     lrvx_indicator_kurtosis: *cpp_direct
+    lrvx_indicator_lowest: *cpp_direct
     lrvx_indicator_macd: *cpp_direct
     lrvx_indicator_obv: *cpp_direct
     lrvx_indicator_parkinson_vol: *cpp_direct
@@ -2169,6 +2196,7 @@ allowlist_functions:
     lrvx_indicator_cvd: *no_napi_wrapper
     lrvx_indicator_dema: *no_napi_wrapper
     lrvx_indicator_ema: *no_napi_wrapper
+    lrvx_indicator_highest: *no_napi_wrapper
     lrvx_indicator_graph_add_node: *no_napi_wrapper
     lrvx_indicator_graph_bar_count: *no_napi_wrapper
     lrvx_indicator_graph_close: *no_napi_wrapper
@@ -2188,6 +2216,7 @@ allowlist_functions:
     lrvx_indicator_graph_volume: *no_napi_wrapper
     lrvx_indicator_kama: *no_napi_wrapper
     lrvx_indicator_kurtosis: *no_napi_wrapper
+    lrvx_indicator_lowest: *no_napi_wrapper
     lrvx_indicator_macd: *no_napi_wrapper
     lrvx_indicator_obv: *no_napi_wrapper
     lrvx_indicator_parkinson_vol: *no_napi_wrapper

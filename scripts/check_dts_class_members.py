@@ -40,7 +40,7 @@ QJS_SRC = REPO_ROOT / "quickjs" / "lrvx"
 # The prelude files whose classes lrvx.d.ts declares. The others (latency,
 # feed clock, order group, and the Strategy hooks such as onBar) are not
 # declared there yet; add a file here once its classes are.
-QJS_FILES = ["indicators.js"]
+QJS_FILES = ["indicators.js", "exits.js", "history.js"]
 QJS_DTS = REPO_ROOT / "quickjs" / "types" / "lrvx.d.ts"
 
 # JS class name -> reason it has no type declaration.

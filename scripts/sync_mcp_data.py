@@ -70,6 +70,7 @@ SRC_CODON_API = REPO_ROOT / "codon" / "lrvx"
 SRC_CPP_HEADERS = REPO_ROOT / "include" / "lrvx"
 SRC_QUICKJS_BINDINGS = REPO_ROOT / "src" / "quickjs" / "js_bindings.cpp"
 SRC_QUICKJS_PRELUDE = REPO_ROOT / "src" / "quickjs" / "js_strategy.cpp"
+SRC_QUICKJS_STDLIB = REPO_ROOT / "quickjs" / "lrvx"
 SRC_PARITY = REPO_ROOT / "tools" / "codegen" / "binding_parity.yaml"
 SRC_EXAMPLES = REPO_ROOT / "docs" / "examples"
 SRC_DOCS = REPO_ROOT / "docs"
@@ -153,6 +154,8 @@ def _build_binding_manifest_json() -> str:
                                if SRC_QUICKJS_BINDINGS.exists() else ""),
         quickjs_prelude_text=(SRC_QUICKJS_PRELUDE.read_text(errors="ignore")
                               if SRC_QUICKJS_PRELUDE.exists() else ""),
+        quickjs_stdlib_texts=[p.read_text(errors="ignore")
+                              for p in sorted(SRC_QUICKJS_STDLIB.glob("*.js"))],
     )
     return manifest.dumps_canonical(payload)
 

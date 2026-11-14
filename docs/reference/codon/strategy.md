@@ -244,6 +244,33 @@ Get a `SymbolContext` for querying per-symbol state. Besides `position()`,
 moves the second and not the first (it fires `on_touch`, never
 `on_book_update`), so the second can be the fresher.
 
+It also answers the position facts. `entry_price()` is the quantity-weighted
+average entry of the open position (an add moves it, a partial close leaves
+it, a fill that flips the position sets it to that fill's price), `None` when
+flat. `bars_in_position()` counts the bar callbacks received while holding the
+position, the bar on which it is first seen as 1; it is 0 when flat and 1 again
+after a flip.
+
+### Strategy helpers
+
+`lrvx.exits` holds `AtrStop`, `ChandelierExit`, `BreakEvenTrail`,
+`PercentStop`, `TakeProfit` and `TimeStop`, each over the C++ rule (see the
+[exit rules page](../api/strategy/exits.md)): `arm(...)`, `update(...) -> bool`,
+`armed`, `disarm()`, and the level as `stop` (`target` for the take-profit,
+`bars` for the time stop). The side is `"long"` or `"short"`; anything else
+raises `ValueError`, as do a `pct` not above 0 and fewer than one bar.
+
+`lrvx.history` holds `History(capacity)` (newest first: `h[0]`, `get(i)`,
+`len(h)`, `capacity`, `full`; `IndexError` outside the range) and
+`crossed_above(a_prev, a, b_prev, b)` / `crossed_below(...)`. `Highest(period)`
+and `Lowest(period)` are in `lrvx.indicators`.
+
+```codon
+from lrvx.exits import PercentStop, TimeStop
+from lrvx.history import History, crossed_above
+from lrvx.indicators import Highest
+```
+
 #### `get_order_status(order_id) -> int`
 
 Get order status. Returns -1 if not found.

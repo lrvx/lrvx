@@ -1,0 +1,75 @@
+# lrvx/history.codon -- History and the crossing helpers.
+#
+# History(capacity) holds the last `capacity` values of a series, newest
+# first: h[0] is the value pushed last, h[1] the one before. It holds one
+# lrvx_history_* handle owning the C++ lrvx::History.
+#
+# crossed_above(a_prev, a, b_prev, b): a was at or below b on the previous
+# step and is strictly above it now; crossed_below the mirror. Compare
+# against a level by passing it as both b_prev and b. A NaN anywhere is no
+# cross.
+
+# The C ABI handshake runs when this module is imported: see
+# lrvx/abi.codon. Every module that declares a `from C import`
+# pulls it in, so no entry point into the binding skips it.
+from lrvx.abi import check_abi_version
+
+from C import lrvx_history_create(u32) -> cobj
+from C import lrvx_history_destroy(cobj)
+from C import lrvx_history_push(cobj, f64)
+from C import lrvx_history_get(cobj, u32) -> f64
+from C import lrvx_history_size(cobj) -> u32
+from C import lrvx_history_capacity(cobj) -> u32
+from C import lrvx_history_full(cobj) -> u8
+from C import lrvx_crossed_above(f64, f64, f64, f64) -> u8
+from C import lrvx_crossed_below(f64, f64, f64, f64) -> u8
+from C import lrvx_last_error_message() -> cobj
+
+
+class History:
+    _h: cobj
+
+    def __init__(self, capacity: int):
+        if capacity < 1:
+            raise ValueError(f"History capacity must be >= 1; got {capacity}")
+        self._h = lrvx_history_create(u32(capacity))
+        if self._h == cobj():
+            raise ValueError(str.from_ptr(lrvx_last_error_message()))
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._h != cobj():
+            lrvx_history_destroy(self._h)
+            self._h = cobj()
+
+    def push(self, value: float):
+        lrvx_history_push(self._h, value)
+
+    def get(self, index: int) -> float:
+        """0 is the newest value. Raises IndexError outside 0 .. len - 1."""
+        n = int(lrvx_history_size(self._h))
+        if index < 0 or index >= n:
+            raise IndexError(f"History index {index} out of range (size {n})")
+        return lrvx_history_get(self._h, u32(index))
+
+    def __getitem__(self, index: int) -> float:
+        return self.get(index)
+
+    def __len__(self) -> int:
+        return int(lrvx_history_size(self._h))
+
+    @property
+    def capacity(self) -> int: return int(lrvx_history_capacity(self._h))
+
+    @property
+    def full(self) -> bool: return lrvx_history_full(self._h) != u8(0)
+
+
+def crossed_above(a_prev: float, a: float, b_prev: float, b: float) -> bool:
+    return lrvx_crossed_above(a_prev, a, b_prev, b) != u8(0)
+
+
+def crossed_below(a_prev: float, a: float, b_prev: float, b: float) -> bool:
+    return lrvx_crossed_below(a_prev, a, b_prev, b) != u8(0)

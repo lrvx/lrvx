@@ -1,14 +1,14 @@
-"""Exit rules for bar strategies: an ATR stop, a Chandelier exit and a
-break-even trail.
+"""Exit rules for bar strategies: an ATR stop, a Chandelier exit, a
+break-even trail, a percent stop, a take-profit and a time stop.
 
 Each one tracks one open position and answers, bar by bar, where the stop is
 and whether the bar reached it. The strategy owns the entry, the ATR (an
 ``lrvx.ATR`` fed with the same bars) and the exit order; these classes own the
 arithmetic of the level. The C++ header ``lrvx/strategy/exits.h`` carries the
-same three classes with the same arithmetic, and tests on both sides pin one
+same classes with the same arithmetic, and tests on both sides pin one
 scenario to the same levels.
 
-One shape for the three::
+One shape for the three ATR rules::
 
     rule.arm(side, entry_price, atr)   # when the position opens
     hit = rule.update(high, low, atr)  # once per closed bar from the fill bar on
@@ -19,6 +19,12 @@ One shape for the three::
 cannot be stopped out by a level its own high raised. A long (``side ==
 "long"``) is stopped when ``low <= stop``, a short when ``high >= stop``. A
 hit does not disarm; the strategy exits and disarms.
+
+``PercentStop`` and ``TakeProfit`` take no ATR: ``arm(side, entry_price)``
+and ``update(high, low)``, with the level at ``entry_price * (1 -/+ pct /
+100)``; a hit is latched and reported until ``disarm()`` or the next
+``arm()``. ``TimeStop`` takes no prices: ``arm()`` and ``update()``, true
+from the ``max_bars``-th update on.
 """
 
 from __future__ import annotations
@@ -161,4 +167,109 @@ class BreakEvenTrail:
         self.stop = math.nan
 
 
-__all__ = ["AtrStop", "ChandelierExit", "BreakEvenTrail"]
+def _positive_pct(rule: str, pct: float) -> float:
+    pct = float(pct)
+    if not pct > 0.0:
+        raise ValueError(f"{rule}: pct must be > 0; got {pct!r}")
+    return pct
+
+
+class PercentStop:
+    """A stop ``pct`` percent from the entry, frozen there:
+    ``entry_price * (1 - pct / 100)`` for a long, ``entry_price * (1 + pct /
+    100)`` for a short. Raises ValueError unless ``pct > 0``."""
+
+    def __init__(self, pct: float) -> None:
+        self.pct = _positive_pct("PercentStop", pct)
+        self._side = "long"
+        self._hit = False
+        self.stop = math.nan
+        self.armed = False
+
+    def arm(self, side: str, entry_price: float) -> None:
+        self._side = _side(side)
+        if self._side == "long":
+            self.stop = entry_price * (1.0 - self.pct / 100.0)
+        else:
+            self.stop = entry_price * (1.0 + self.pct / 100.0)
+        self._hit = False
+        self.armed = True
+
+    def update(self, high: float, low: float) -> bool:
+        if not self.armed:
+            return False
+        self._hit = self._hit or _reached(self._side, high, low, self.stop)
+        return self._hit
+
+    def disarm(self) -> None:
+        self.armed = False
+        self._hit = False
+        self.stop = math.nan
+
+
+class TakeProfit:
+    """A profit target ``pct`` percent from the entry: ``entry_price * (1 +
+    pct / 100)`` for a long, reached when ``high >= target``; ``entry_price *
+    (1 - pct / 100)`` for a short, reached when ``low <= target``. Raises
+    ValueError unless ``pct > 0``."""
+
+    def __init__(self, pct: float) -> None:
+        self.pct = _positive_pct("TakeProfit", pct)
+        self._side = "long"
+        self._hit = False
+        self.target = math.nan
+        self.armed = False
+
+    def arm(self, side: str, entry_price: float) -> None:
+        self._side = _side(side)
+        if self._side == "long":
+            self.target = entry_price * (1.0 + self.pct / 100.0)
+        else:
+            self.target = entry_price * (1.0 - self.pct / 100.0)
+        self._hit = False
+        self.armed = True
+
+    def update(self, high: float, low: float) -> bool:
+        if not self.armed:
+            return False
+        if self._side == "long":
+            self._hit = self._hit or high >= self.target
+        else:
+            self._hit = self._hit or low <= self.target
+        return self._hit
+
+    def disarm(self) -> None:
+        self.armed = False
+        self._hit = False
+        self.target = math.nan
+
+
+class TimeStop:
+    """Exit after a number of bars: ``update()`` counts the bars since
+    ``arm()`` and is true from the ``max_bars``-th one on. Raises ValueError
+    for fewer than one bar."""
+
+    def __init__(self, max_bars: int) -> None:
+        max_bars = int(max_bars)
+        if max_bars < 1:
+            raise ValueError(f"TimeStop: max_bars must be >= 1; got {max_bars}")
+        self.max_bars = max_bars
+        self.bars = 0
+        self.armed = False
+
+    def arm(self) -> None:
+        self.bars = 0
+        self.armed = True
+
+    def update(self) -> bool:
+        if not self.armed:
+            return False
+        self.bars += 1
+        return self.bars >= self.max_bars
+
+    def disarm(self) -> None:
+        self.armed = False
+        self.bars = 0
+
+
+__all__ = ["AtrStop", "ChandelierExit", "BreakEvenTrail", "PercentStop", "TakeProfit", "TimeStop"]

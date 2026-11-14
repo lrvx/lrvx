@@ -286,3 +286,16 @@ class AutoCorrelation extends _Stream1 {
     compute(data) { return __lrvx_indicator_autocorrelation(data, this._window, this._lag); }
     static compute(data, window, lag) { return __lrvx_indicator_autocorrelation(data, window, lag); }
 }
+
+// Highest(period) / Lowest(period): the max / min of the last `period`
+// inputs, the current one included. null until `period` inputs are in and
+// while a NaN is in the window.
+class Highest extends _Stream1 {
+    constructor(period) { super('highest', [_u(period)]); }
+    static compute(data, period) { return __lrvx_indicator_highest(data, period); }
+}
+
+class Lowest extends _Stream1 {
+    constructor(period) { super('lowest', [_u(period)]); }
+    static compute(data, period) { return __lrvx_indicator_lowest(data, period); }
+}

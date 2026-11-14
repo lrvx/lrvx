@@ -130,6 +130,10 @@ class Paths:
     def quickjs_prelude(self) -> Path:
         return self.root / "src" / "quickjs" / "js_strategy.cpp"
 
+    @property
+    def quickjs_stdlib(self) -> Path:
+        return self.root / "quickjs" / "lrvx"
+
 
 # ── IDL parsing ────────────────────────────────────────────────────────
 
@@ -267,7 +271,8 @@ def scan_quickjs_globals(path: Path) -> set[str]:
     return set(re.findall(r'addGlobalFunc\(\s*ctx\s*,\s*"([^"]+)"', text))
 
 
-def scan_quickjs_classes(bindings_path: Path, prelude_path: Path) -> set[str]:
+def scan_quickjs_classes(bindings_path: Path, prelude_path: Path,
+                         stdlib_dir: Path | None = None) -> set[str]:
     """Classes declared in the QuickJS embedded JS standard library.
 
     Delegates to `lrvx_codegen.manifest.scan_quickjs`, the extractor
@@ -275,13 +280,17 @@ def scan_quickjs_classes(bindings_path: Path, prelude_path: Path) -> set[str]:
     MCP tools query -- reusing it instead of a second regex kept in sync by
     hand. It reads the raw-string JS literal in `js_strategy.cpp`
     (`quickjs_prelude`), not `js_bindings.cpp`, since that is where the
-    classes -- as opposed to the C++ registration calls -- are written.
+    classes -- as opposed to the C++ registration calls -- are written, and
+    the top-level classes of the files under quickjs/lrvx/ (`stdlib_dir`),
+    which the engine evaluates before a script the same way.
     """
     if not bindings_path.exists() or not prelude_path.exists():
         return set()
+    stdlib = sorted(stdlib_dir.glob("*.js")) if stdlib_dir and stdlib_dir.is_dir() else []
     _globals, classes, _funcs = codegen_manifest.scan_quickjs(
         bindings_path.read_text(encoding="utf-8", errors="ignore"),
-        prelude_path.read_text(encoding="utf-8", errors="ignore"))
+        prelude_path.read_text(encoding="utf-8", errors="ignore"),
+        [p.read_text(encoding="utf-8", errors="ignore") for p in stdlib])
     return set(classes)
 
 
@@ -303,7 +312,8 @@ def read_surface(paths: Paths) -> BindingSurface:
             "napi": dts_classes,
             "codon": set(),
             "quickjs": scan_quickjs_classes(paths.quickjs_bindings,
-                                            paths.quickjs_prelude),
+                                            paths.quickjs_prelude,
+                                            paths.quickjs_stdlib),
         },
         stub_functions={
             "pybind11": pyi_funcs,

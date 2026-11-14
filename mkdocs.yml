@@ -422,6 +422,7 @@ nav:
               - SymbolContext: reference/api/strategy/symbol_context.md
               - SymbolStateMap: reference/api/strategy/symbol_state_map.md
               - Exit rules: reference/api/strategy/exits.md
+              - History and crossings: reference/api/strategy/history.md
           - Risk:
               - IRiskManager: reference/api/risk/abstract_risk_manager.md
           - KillSwitch:

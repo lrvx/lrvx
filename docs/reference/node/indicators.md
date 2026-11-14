@@ -109,6 +109,8 @@ for (const v of stream) {
 | `RollingZScore` | `new lrvx.RollingZScore(period)` | SingleInput |
 | `ShannonEntropy` | `new lrvx.ShannonEntropy(period, bins)` | SingleInput |
 | `AutoCorrelation` | `new lrvx.AutoCorrelation(window, lag)` | SingleInput |
+| `Highest` | `new lrvx.Highest(period)` | SingleInput |
+| `Lowest` | `new lrvx.Lowest(period)` | SingleInput |
 | `ATR` | `new lrvx.ATR(period)` | BarInput |
 | `CCI` | `new lrvx.CCI(period)` | BarInput |
 | `CHOP` | `new lrvx.CHOP(period)` | BarInput |

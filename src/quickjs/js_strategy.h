@@ -69,6 +69,8 @@ class LrvxJsStrategy
   LrvxJsEngine _engine;
   SymbolRegistry& _registry;
   JSValue _strategyObj = JS_UNDEFINED;
+  // The handle injectHandle() received; borrowed, as there.
+  LrvxStrategyHandle _handle = nullptr;
   std::vector<uint32_t> _symbolIds;
   std::vector<std::string> _symbolNames;
   bool _wantsTouch = false;

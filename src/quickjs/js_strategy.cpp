@@ -38,6 +38,14 @@ static const char* const FEED_CLOCK_JS =
 #include "js_stdlib_feed_clock.inc"
     ;
 
+static const char* const EXITS_JS =
+#include "js_stdlib_exits.inc"
+    ;
+
+static const char* const HISTORY_JS =
+#include "js_stdlib_history.inc"
+    ;
+
 namespace lrvx
 {
 
@@ -109,6 +117,14 @@ void LrvxJsStrategy::loadStdlib()
   if (!_engine.eval(FEED_CLOCK_JS, "lrvx/feed_clock.js"))
   {
     throw std::runtime_error("Failed to load feed_clock.js: " + _engine.getErrorMessage());
+  }
+  if (!_engine.eval(EXITS_JS, "lrvx/exits.js"))
+  {
+    throw std::runtime_error("Failed to load exits.js: " + _engine.getErrorMessage());
+  }
+  if (!_engine.eval(HISTORY_JS, "lrvx/history.js"))
+  {
+    throw std::runtime_error("Failed to load history.js: " + _engine.getErrorMessage());
   }
 
   // Create lrvx global object with register() and batch indicators
@@ -1163,6 +1179,7 @@ void LrvxJsStrategy::injectHandle(LrvxStrategyHandle handle)
   // lrvx_strategy_destroy.
   JSValue handleVal = createHandleObject(ctx, handle, nullptr);
   JS_SetPropertyStr(ctx, _strategyObj, "_handle", handleVal);
+  _handle = handle;
 }
 
 LrvxStrategyCallbacks LrvxJsStrategy::getCallbacks()
@@ -1289,6 +1306,15 @@ JSValue LrvxJsStrategy::makeCtxObject(const LrvxSymbolContext* ctx)
                     JS_NewFloat64(c, ctx->has_avg_entry_price
                                          ? lrvx_price_to_double(ctx->avg_entry_price_raw)
                                          : std::numeric_limits<double>::quiet_NaN()));
+  // The position facts are not on LrvxSymbolContext; the strategy handle
+  // answers them. null / 0 before a handle is injected.
+  int64_t entryRaw = 0;
+  const bool hasEntry =
+      _handle != nullptr && lrvx_entry_price_raw_opt(_handle, ctx->symbol_id, &entryRaw) != 0;
+  JS_SetPropertyStr(c, obj, "entryPrice",
+                    hasEntry ? JS_NewFloat64(c, lrvx_price_to_double(entryRaw)) : JS_NULL);
+  JS_SetPropertyStr(c, obj, "barsInPosition",
+                    JS_NewUint32(c, _handle ? lrvx_bars_in_position(_handle, ctx->symbol_id) : 0));
   JS_SetPropertyStr(c, obj, "lastTradePrice",
                     JS_NewFloat64(c, lrvx_price_to_double(ctx->last_trade_price_raw)));
   JS_SetPropertyStr(c, obj, "lastUpdateNs",

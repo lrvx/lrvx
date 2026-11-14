@@ -19,7 +19,7 @@ The script:
    - NAPI: a call site under `node/src/`
    - Codon: a `from C import lrvx_x` in a module under `codon/lrvx/` — the code a strategy links, not the generated golden
    - QuickJS: a `lrvx_x: __lrvx_x` entry in the group's `functions:` map, whose global is registered with `addGlobalFunc` in `src/quickjs/js_bindings.cpp`
-4. **Checks the declared names too**: the `classes:` of a `required` entry must appear in `.pyi` / `.d.ts` / the QuickJS prelude, and a `functions:` list under `pybind11` / `napi` still names top-level functions in those stubs. QuickJS classes are read through `lrvx_codegen.manifest.scan_quickjs`, the same extractor `scripts/sync_mcp_data.py` uses for the MCP `binding_manifest`, so the two never diverge.
+4. **Checks the declared names too**: the `classes:` of a `required` entry must appear in `.pyi` / `.d.ts` / the QuickJS prelude or the top level of a `quickjs/lrvx/*.js` file, and a `functions:` list under `pybind11` / `napi` still names top-level functions in those stubs. QuickJS classes are read through `lrvx_codegen.manifest.scan_quickjs`, the same extractor `scripts/sync_mcp_data.py` uses for the MCP `binding_manifest`, so the two never diverge.
 5. **Fails loudly** on a function that is neither reachable nor allowlisted.
 
 Run locally:

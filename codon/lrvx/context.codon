@@ -12,6 +12,8 @@ from C import lrvx_best_bid_raw_opt(cobj, u32, Ptr[i64]) -> u8
 from C import lrvx_best_ask_raw_opt(cobj, u32, Ptr[i64]) -> u8
 from C import lrvx_mid_price_raw_opt(cobj, u32, Ptr[i64]) -> u8
 from C import lrvx_get_symbol_context(cobj, u32, cobj)
+from C import lrvx_entry_price_raw_opt(cobj, u32, Ptr[i64]) -> u8
+from C import lrvx_bars_in_position(cobj, u32) -> u32
 
 from lrvx.layout import _CTX_LAST_TOUCH_NS, _CTX_LAST_UPDATE_NS, _CTX_SIZE
 from lrvx.types import SCALE, Price, Quantity
@@ -89,6 +91,21 @@ class SymbolContext:
         A TOP_OF_BOOK frame moves it and leaves last_update_ns() alone, so
         it can be the fresher of the two."""
         return self._stamp_at(_CTX_LAST_TOUCH_NS)
+
+    def entry_price(self) -> Optional[float]:
+        """Quantity-weighted average entry of the open position: an add
+        moves it, a partial close leaves it, a flip sets it to the flipping
+        fill's price. None when flat."""
+        raw = i64(0)
+        if lrvx_entry_price_raw_opt(self._handle, self.symbol_id, __ptr__(raw)) == u8(0):
+            return None
+        return float(raw) / float(SCALE)
+
+    def bars_in_position(self) -> int:
+        """Bar callbacks received while holding the current position, the
+        bar on which it is first seen counting as 1; 0 when flat, 1 again
+        after a flip."""
+        return int(lrvx_bars_in_position(self._handle, self.symbol_id))
 
     def book_spread(self) -> Optional[float]:
         """Bid-ask spread, or None unless both sides have a level."""

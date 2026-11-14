@@ -13,6 +13,14 @@ interface SymbolContext {
     readonly symbol: string;
     readonly position: number;
     readonly avgEntryPrice: number;
+    /** Quantity-weighted average entry of the open position: an add moves
+     *  it, a partial close leaves it, a flip sets it to the flipping fill's
+     *  price. `null` when flat. */
+    readonly entryPrice: number | null;
+    /** Bar callbacks received while holding the current position, the bar
+     *  on which it is first seen counting as 1; 0 when flat, 1 again after a
+     *  flip. */
+    readonly barsInPosition: number;
     readonly lastTradePrice: number;
     readonly lastUpdateNs: bigint;
     readonly lastTouchNs: bigint;
@@ -362,6 +370,35 @@ declare class AutoCorrelation {
     /** Frees the C handle now; otherwise the finalizer frees it. */
     destroy(): void;
     static compute(data: number[], window: number, lag: number): number[];
+}
+
+/** The highest of the last `period` inputs, the current one included; `null`
+ *  until `period` inputs are in and while a NaN is in the window. */
+declare class Highest {
+    constructor(period: number);
+    update(value: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(data: number[], period: number): number[];
+}
+
+/** The lowest of the last `period` inputs; same contract as Highest. */
+declare class Lowest {
+    constructor(period: number);
+    update(value: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(data: number[], period: number): number[];
 }
 
 declare class Stochastic {
@@ -1373,3 +1410,114 @@ declare class BinaryLogRecorderHook {
     // Private — passed to runner attach API.
     _asRecorderHandle(): unknown;
 }
+
+// --- Exit rules (lrvx/exits.js) ---
+//
+// Each holds one C handle owning the C++ rule of lrvx/strategy/exits.h.
+// update() tests the bar against the level resting before it; a hit does
+// not disarm and is reported until disarm(). The level reads `null` when
+// disarmed. A side other than "long" / "short" throws.
+
+type ExitSide = "long" | "short";
+
+/** A stop `atrMultiple` ATRs from the entry, frozen there. */
+declare class AtrStop {
+    constructor(atrMultiple: number);
+    readonly atrMultiple: number;
+    arm(side: ExitSide, entryPrice: number, atr: number): void;
+    update(high: number, low: number, atr: number): boolean;
+    readonly stop: number | null;
+    readonly armed: boolean;
+    disarm(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+}
+
+/** The stop hangs `atrMultiple` ATRs from the best price of the last
+ *  `lookback` bars (0: since the entry) and only moves in the position's
+ *  favour. */
+declare class ChandelierExit {
+    constructor(lookback: number, atrMultiple: number);
+    readonly lookback: number;
+    readonly atrMultiple: number;
+    arm(side: ExitSide, entryPrice: number, atr: number): void;
+    update(high: number, low: number, atr: number): boolean;
+    readonly stop: number | null;
+    readonly armed: boolean;
+    disarm(): void;
+    destroy(): void;
+}
+
+/** A hard stop that moves to the entry once the position is `breakEvenAtr`
+ *  ATRs in profit, then trails the best price at `trailAtr` ATRs. */
+declare class BreakEvenTrail {
+    constructor(hardStopAtr: number, breakEvenAtr: number, trailAtr: number);
+    arm(side: ExitSide, entryPrice: number, atr: number): void;
+    update(high: number, low: number, atr: number): boolean;
+    readonly stop: number | null;
+    readonly atBreakEven: boolean;
+    readonly armed: boolean;
+    disarm(): void;
+    destroy(): void;
+}
+
+/** A stop at entry * (1 - pct / 100) for a long, entry * (1 + pct / 100)
+ *  for a short. Throws unless pct > 0. */
+declare class PercentStop {
+    constructor(pct: number);
+    readonly pct: number;
+    arm(side: ExitSide, entryPrice: number): void;
+    update(high: number, low: number): boolean;
+    readonly stop: number | null;
+    readonly armed: boolean;
+    disarm(): void;
+    destroy(): void;
+}
+
+/** A target at entry * (1 + pct / 100) for a long, entry * (1 - pct / 100)
+ *  for a short. Throws unless pct > 0. */
+declare class TakeProfit {
+    constructor(pct: number);
+    readonly pct: number;
+    arm(side: ExitSide, entryPrice: number): void;
+    update(high: number, low: number): boolean;
+    readonly target: number | null;
+    readonly armed: boolean;
+    disarm(): void;
+    destroy(): void;
+}
+
+/** True from the `maxBars`-th update after arm() on. Throws for 0. */
+declare class TimeStop {
+    constructor(maxBars: number);
+    readonly maxBars: number;
+    arm(): void;
+    update(): boolean;
+    /** Updates since arm(); 0 after disarm(). */
+    readonly bars: number;
+    readonly armed: boolean;
+    disarm(): void;
+    destroy(): void;
+}
+
+// --- History (lrvx/history.js) ---
+
+/** The last `capacity` values of a series, newest first. */
+declare class History {
+    /** Throws RangeError unless capacity is a whole number >= 1. */
+    constructor(capacity: number);
+    push(value: number): void;
+    /** 0 is the newest value; throws RangeError outside 0 .. length - 1. */
+    get(index: number): number;
+    readonly length: number;
+    readonly capacity: number;
+    readonly full: boolean;
+    destroy(): void;
+}
+
+/** a was at or below b on the previous step and is strictly above it now.
+ *  For a level, pass it as both bPrev and b. A NaN, null or undefined
+ *  anywhere is no cross. */
+declare function crossedAbove(aPrev: number, a: number, bPrev: number, b: number): boolean;
+/** a was at or above b on the previous step and is strictly below it now. */
+declare function crossedBelow(aPrev: number, a: number, bPrev: number, b: number): boolean;

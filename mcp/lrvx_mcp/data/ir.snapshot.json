@@ -2217,6 +2217,21 @@
     },
     {
       "group": "context_queries",
+      "name": "lrvx_bars_in_position",
+      "params": [
+        {
+          "name": "s",
+          "type": "LrvxStrategyHandle"
+        },
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        }
+      ],
+      "return_type": "uint32_t"
+    },
+    {
+      "group": "context_queries",
       "name": "lrvx_best_ask_raw",
       "params": [
         {
@@ -2998,6 +3013,52 @@
         }
       ],
       "return_type": "void"
+    },
+    {
+      "group": "history",
+      "name": "lrvx_crossed_above",
+      "params": [
+        {
+          "name": "a_prev",
+          "type": "double"
+        },
+        {
+          "name": "a",
+          "type": "double"
+        },
+        {
+          "name": "b_prev",
+          "type": "double"
+        },
+        {
+          "name": "b",
+          "type": "double"
+        }
+      ],
+      "return_type": "uint8_t"
+    },
+    {
+      "group": "history",
+      "name": "lrvx_crossed_below",
+      "params": [
+        {
+          "name": "a_prev",
+          "type": "double"
+        },
+        {
+          "name": "a",
+          "type": "double"
+        },
+        {
+          "name": "b_prev",
+          "type": "double"
+        },
+        {
+          "name": "b",
+          "type": "double"
+        }
+      ],
+      "return_type": "uint8_t"
     },
     {
       "group": "amm_curve",
@@ -4495,6 +4556,25 @@
       "return_type": "uint64_t"
     },
     {
+      "group": "context_queries",
+      "name": "lrvx_entry_price_raw_opt",
+      "params": [
+        {
+          "name": "s",
+          "type": "LrvxStrategyHandle"
+        },
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        },
+        {
+          "name": "price_out",
+          "type": "int64_t *"
+        }
+      ],
+      "return_type": "uint8_t"
+    },
+    {
       "group": "tape_aggregator",
       "name": "lrvx_event_type_stats_aggregator_create",
       "params": [
@@ -4908,6 +4988,196 @@
         }
       ],
       "return_type": "void"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_atr_stop_create",
+      "params": [
+        {
+          "name": "atr_multiple",
+          "type": "double"
+        }
+      ],
+      "return_type": "LrvxExitRuleHandle"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_break_even_trail_create",
+      "params": [
+        {
+          "name": "hard_stop_atr",
+          "type": "double"
+        },
+        {
+          "name": "break_even_atr",
+          "type": "double"
+        },
+        {
+          "name": "trail_atr",
+          "type": "double"
+        }
+      ],
+      "return_type": "LrvxExitRuleHandle"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_chandelier_create",
+      "params": [
+        {
+          "name": "lookback",
+          "type": "uint32_t"
+        },
+        {
+          "name": "atr_multiple",
+          "type": "double"
+        }
+      ],
+      "return_type": "LrvxExitRuleHandle"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_percent_stop_create",
+      "params": [
+        {
+          "name": "pct",
+          "type": "double"
+        }
+      ],
+      "return_type": "LrvxExitRuleHandle"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_rule_arm",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxExitRuleHandle"
+        },
+        {
+          "name": "side",
+          "type": "uint8_t"
+        },
+        {
+          "name": "entry_price",
+          "type": "double"
+        },
+        {
+          "name": "atr",
+          "type": "double"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_rule_armed",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxExitRuleHandle"
+        }
+      ],
+      "return_type": "uint8_t"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_rule_at_break_even",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxExitRuleHandle"
+        }
+      ],
+      "return_type": "uint8_t"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_rule_bars",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxExitRuleHandle"
+        }
+      ],
+      "return_type": "uint32_t"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_rule_destroy",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxExitRuleHandle"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_rule_disarm",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxExitRuleHandle"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_rule_level",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxExitRuleHandle"
+        }
+      ],
+      "return_type": "double"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_rule_update",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxExitRuleHandle"
+        },
+        {
+          "name": "high",
+          "type": "double"
+        },
+        {
+          "name": "low",
+          "type": "double"
+        },
+        {
+          "name": "atr",
+          "type": "double"
+        }
+      ],
+      "return_type": "uint8_t"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_take_profit_create",
+      "params": [
+        {
+          "name": "pct",
+          "type": "double"
+        }
+      ],
+      "return_type": "LrvxExitRuleHandle"
+    },
+    {
+      "group": "exit_rules",
+      "name": "lrvx_exit_time_stop_create",
+      "params": [
+        {
+          "name": "max_bars",
+          "type": "uint32_t"
+        }
+      ],
+      "return_type": "LrvxExitRuleHandle"
     },
     {
       "group": "fee_schedule",
@@ -5732,6 +6002,91 @@
       "return_type": "uint64_t"
     },
     {
+      "group": "history",
+      "name": "lrvx_history_capacity",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxHistoryHandle"
+        }
+      ],
+      "return_type": "uint32_t"
+    },
+    {
+      "group": "history",
+      "name": "lrvx_history_create",
+      "params": [
+        {
+          "name": "capacity",
+          "type": "uint32_t"
+        }
+      ],
+      "return_type": "LrvxHistoryHandle"
+    },
+    {
+      "group": "history",
+      "name": "lrvx_history_destroy",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxHistoryHandle"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "history",
+      "name": "lrvx_history_full",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxHistoryHandle"
+        }
+      ],
+      "return_type": "uint8_t"
+    },
+    {
+      "group": "history",
+      "name": "lrvx_history_get",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxHistoryHandle"
+        },
+        {
+          "name": "index",
+          "type": "uint32_t"
+        }
+      ],
+      "return_type": "double"
+    },
+    {
+      "group": "history",
+      "name": "lrvx_history_push",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxHistoryHandle"
+        },
+        {
+          "name": "value",
+          "type": "double"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "history",
+      "name": "lrvx_history_size",
+      "params": [
+        {
+          "name": "h",
+          "type": "LrvxHistoryHandle"
+        }
+      ],
+      "return_type": "uint32_t"
+    },
+    {
       "group": "dex_amount",
       "name": "lrvx_i256_roundtrip",
       "params": [
@@ -6415,6 +6770,29 @@
     },
     {
       "group": "indicator_functions",
+      "name": "lrvx_indicator_highest",
+      "params": [
+        {
+          "name": "input",
+          "type": "const double *"
+        },
+        {
+          "name": "len",
+          "type": "size_t"
+        },
+        {
+          "name": "period",
+          "type": "size_t"
+        },
+        {
+          "name": "output",
+          "type": "double *"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "indicator_functions",
       "name": "lrvx_indicator_kama",
       "params": [
         {
@@ -6447,6 +6825,29 @@
     {
       "group": "indicator_functions",
       "name": "lrvx_indicator_kurtosis",
+      "params": [
+        {
+          "name": "input",
+          "type": "const double *"
+        },
+        {
+          "name": "len",
+          "type": "size_t"
+        },
+        {
+          "name": "period",
+          "type": "size_t"
+        },
+        {
+          "name": "output",
+          "type": "double *"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "indicator_functions",
+      "name": "lrvx_indicator_lowest",
       "params": [
         {
           "name": "input",
@@ -18108,6 +18509,10 @@
       "target": "void*"
     },
     {
+      "name": "LrvxExitRuleHandle",
+      "target": "void*"
+    },
+    {
       "name": "LrvxFeeScheduleHandle",
       "target": "void*"
     },
@@ -18125,6 +18530,10 @@
     },
     {
       "name": "LrvxGridSearchHandle",
+      "target": "void*"
+    },
+    {
+      "name": "LrvxHistoryHandle",
       "target": "void*"
     },
     {

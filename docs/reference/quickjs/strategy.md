@@ -51,6 +51,8 @@ super({ symbols: ['Binance:BTCUSDT', 'Bybit:ETHUSDT'] })
 | `ctx.symbolId` | `number` | Numeric symbol ID |
 | `ctx.position` | `number` | Current position size. In `onFill` and `onOrderUpdate` it already counts the fill being delivered, as `this.position()` does |
 | `ctx.avgEntryPrice` | `number` | Average entry price, `NaN` when the position manager reports none |
+| `ctx.entryPrice` | `number \| null` | Quantity-weighted average entry of the open position: an add moves it, a partial close leaves it, a fill that flips the position sets it to that fill's price. `null` when flat |
+| `ctx.barsInPosition` | `number` | Bar callbacks received while holding the current position, the bar on which it is first seen counting as 1; `0` when flat, `1` again after a flip |
 | `ctx.lastTradePrice` | `number` | Price of the symbol's last trade |
 | `ctx.lastUpdateNs`, `ctx.lastTouchNs` | `bigint` | Stamp of the last frame that updated the book, and of the last one that moved the touch |
 | `ctx.book.bidPrice` | `number \| null` | Best bid; `null` when the bid side has no level (`0` is a price) |
@@ -217,3 +219,50 @@ integer it converted to.
 number. A price below zero is a quote -- WTI settled at -37.63 in April 2020,
 day-ahead power clears below zero -- and so is a price of exactly 0, so no
 number is free to stand for "no quote". Test with `=== null`, not `=== 0`.
+
+## Strategy helpers
+
+Globals from `lrvx/exits.js` and `lrvx/history.js`, each holding one C handle
+over the C++ class, so the levels are those of the
+[exit rules page](../api/strategy/exits.md).
+
+| Class | arm / update | Level |
+|---|---|---|
+| `AtrStop(atrMultiple)` | `arm(side, entryPrice, atr)`, `update(high, low, atr)` | `stop` |
+| `ChandelierExit(lookback, atrMultiple)` | same | `stop` |
+| `BreakEvenTrail(hardStopAtr, breakEvenAtr, trailAtr)` | same | `stop`, `atBreakEven` |
+| `PercentStop(pct)` | `arm(side, entryPrice)`, `update(high, low)` | `stop` |
+| `TakeProfit(pct)` | same | `target` |
+| `TimeStop(maxBars)` | `arm()`, `update()` | `bars` |
+
+All have `armed`, `disarm()` and `destroy()`. The level reads `null` when
+disarmed. The side is `'long'` or `'short'`; anything else throws, as do a `pct`
+not above 0 and a `maxBars` of 0. A hit does not disarm.
+
+`new History(capacity)` keeps the last `capacity` values, newest first:
+`get(0)` is the value pushed last; `length`, `capacity`, `full`; `get` outside
+`0 .. length - 1` throws `RangeError`. `crossedAbove(aPrev, a, bPrev, b)` and
+`crossedBelow(...)` answer whether `a` crossed `b`; a fixed level is passed as
+both `bPrev` and `b`, and `NaN`, `null` or `undefined` is no cross.
+
+```javascript
+class Exits extends Strategy {
+    constructor() {
+        super({ exchange: 'Binance', symbols: ['BTCUSDT'] });
+        this.stop = new PercentStop(2);
+        this.timeout = new TimeStop(30);
+    }
+    onBar(ctx, bar) {
+        if (ctx.position === 0) return;
+        if (ctx.barsInPosition === 1) {
+            this.stop.arm(ctx.position > 0 ? 'long' : 'short', ctx.entryPrice);
+            this.timeout.arm();
+        }
+        if (this.stop.update(bar.high, bar.low) || this.timeout.update()) {
+            this.closePosition();
+            this.stop.disarm();
+            this.timeout.disarm();
+        }
+    }
+}
+```

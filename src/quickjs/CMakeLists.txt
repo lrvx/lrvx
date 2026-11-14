@@ -139,6 +139,26 @@ add_custom_command(
   COMMENT "Embedding feed_clock.js"
 )
 
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_exits.inc
+  COMMAND ${CMAKE_COMMAND}
+    -DIN_FILE=${JS_STDLIB_DIR}/exits.js
+    -DOUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_exits.inc
+    -P ${GEN_INC_SCRIPT}
+  DEPENDS ${JS_STDLIB_DIR}/exits.js ${GEN_INC_SCRIPT}
+  COMMENT "Embedding exits.js"
+)
+
+add_custom_command(
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_history.inc
+  COMMAND ${CMAKE_COMMAND}
+    -DIN_FILE=${JS_STDLIB_DIR}/history.js
+    -DOUT_FILE=${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_history.inc
+    -P ${GEN_INC_SCRIPT}
+  DEPENDS ${JS_STDLIB_DIR}/history.js ${GEN_INC_SCRIPT}
+  COMMENT "Embedding history.js"
+)
+
 add_custom_target(js_stdlib_gen DEPENDS
   ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_strategy.inc
   ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_indicators.inc
@@ -147,6 +167,8 @@ add_custom_target(js_stdlib_gen DEPENDS
   ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_composite.inc
   ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_order_group.inc
   ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_feed_clock.inc
+  ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_exits.inc
+  ${CMAKE_CURRENT_BINARY_DIR}/js_stdlib_history.inc
 )
 
 # lrvx_quickjs static library

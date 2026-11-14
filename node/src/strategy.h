@@ -394,9 +394,38 @@ struct NodeStrategyHost : TsfnHost
     return (_handlers.load(std::memory_order_acquire) & bit) != 0;
   }
 
+  // The position facts of the callback's symbol, read through the C API on
+  // the thread that delivers the callback: a threaded host calls JS later,
+  // when the context may have moved on.
+  struct PositionFacts
+  {
+    bool hasEntry{false};
+    double entry{0.0};
+    uint32_t bars{0};
+  };
+
+  static PositionFacts factsOf(NodeStrategyHost* self, uint32_t symbol)
+  {
+    PositionFacts f;
+    auto handle = static_cast<LrvxStrategyHandle>(self->bridge.get());
+    if (handle == nullptr)
+    {
+      return f;
+    }
+    int64_t raw = 0;
+    if (lrvx_entry_price_raw_opt(handle, symbol, &raw))
+    {
+      f.hasEntry = true;
+      f.entry = lrvx_price_to_double(raw);
+    }
+    f.bars = lrvx_bars_in_position(handle, symbol);
+    return f;
+  }
+
   struct TradeCallData
   {
     LrvxSymbolContext ctx;
+    PositionFacts facts;
     LrvxTradeData trade;
     NodeStrategyHost* host;
     TsfnOwnerPtr owner;
@@ -404,12 +433,14 @@ struct NodeStrategyHost : TsfnHost
   struct BookCallData
   {
     LrvxSymbolContext ctx;
+    PositionFacts facts;
     NodeStrategyHost* host;
     TsfnOwnerPtr owner;
   };
   struct BarCallData
   {
     LrvxSymbolContext ctx;
+    PositionFacts facts;
     LrvxBarData bar;
     NodeStrategyHost* host;
     TsfnOwnerPtr owner;
@@ -425,6 +456,7 @@ struct NodeStrategyHost : TsfnHost
   struct OrderEventCallData
   {
     LrvxSymbolContext ctx;
+    PositionFacts facts;
     LrvxOrderEventData ev;
     // reject_reason is a borrowed pointer in the C ABI struct; copy
     // it onto the heap so the TSFN consumer can outlive the caller.
@@ -685,7 +717,8 @@ struct NodeStrategyHost : TsfnHost
     emitter.SuppressDestruct();
   }
 
-  static void buildCtxObj(Napi::Env env, Napi::Object& o, const LrvxSymbolContext* ctx)
+  static void buildCtxObj(Napi::Env env, Napi::Object& o, const LrvxSymbolContext* ctx,
+                          const PositionFacts& facts)
   {
     o.Set("symbolId", Napi::Number::New(env, ctx->symbol_id));
     o.Set("position", Napi::Number::New(env, lrvx_quantity_to_double(ctx->position_raw)));
@@ -707,6 +740,11 @@ struct NodeStrategyHost : TsfnHost
     // lastUpdateNs alone.
     o.Set("lastUpdateNs", Napi::BigInt::New(env, static_cast<int64_t>(ctx->last_update_ns)));
     o.Set("lastTouchNs", Napi::BigInt::New(env, static_cast<int64_t>(ctx->last_touch_ns)));
+    // Quantity-weighted average entry of the open position (null when flat)
+    // and the bar callbacks received while holding it.
+    o.Set("entryPrice", facts.hasEntry ? Napi::Value(Napi::Number::New(env, facts.entry))
+                                       : Napi::Value(env.Null()));
+    o.Set("barsInPosition", Napi::Number::New(env, facts.bars));
   }
 
   static void callOnTrade(Napi::Env env, Napi::Function, TradeCallData* d)
@@ -726,7 +764,7 @@ struct NodeStrategyHost : TsfnHost
     if (!self->on_trade_fn.IsEmpty())
     {
       auto ctxObj = Napi::Object::New(env);
-      buildCtxObj(env, ctxObj, &d->ctx);
+      buildCtxObj(env, ctxObj, &d->ctx, d->facts);
       auto tradeObj = Napi::Object::New(env);
       tradeObj.Set("symbol", Napi::Number::New(env, d->trade.symbol));
       tradeObj.Set("price", Napi::Number::New(env, lrvx_price_to_double(d->trade.price_raw)));
@@ -751,7 +789,7 @@ struct NodeStrategyHost : TsfnHost
     if (!self->on_book_fn.IsEmpty())
     {
       auto ctxObj = Napi::Object::New(env);
-      buildCtxObj(env, ctxObj, &d->ctx);
+      buildCtxObj(env, ctxObj, &d->ctx, d->facts);
       self->on_book_fn.Call({ctxObj, self->emitter.Value()});
     }
   }
@@ -767,7 +805,7 @@ struct NodeStrategyHost : TsfnHost
     if (!self->on_touch_fn.IsEmpty())
     {
       auto ctxObj = Napi::Object::New(env);
-      buildCtxObj(env, ctxObj, &d->ctx);
+      buildCtxObj(env, ctxObj, &d->ctx, d->facts);
       self->on_touch_fn.Call({ctxObj, self->emitter.Value()});
     }
   }
@@ -801,7 +839,7 @@ struct NodeStrategyHost : TsfnHost
     if (!self->on_bar_fn.IsEmpty())
     {
       auto ctxObj = Napi::Object::New(env);
-      buildCtxObj(env, ctxObj, &d->ctx);
+      buildCtxObj(env, ctxObj, &d->ctx, d->facts);
       auto barObj = Napi::Object::New(env);
       buildBarObj(env, barObj, &d->bar);
       self->on_bar_fn.Call({ctxObj, barObj, self->emitter.Value()});
@@ -819,14 +857,14 @@ struct NodeStrategyHost : TsfnHost
 
     if (self->_threaded.load(std::memory_order_acquire))
     {
-      auto* d = new TradeCallData{*ctx, *trade, self, self->owner()};
+      auto* d = new TradeCallData{*ctx, factsOf(self, ctx->symbol_id), *trade, self, self->owner()};
       self->post(d, &NodeStrategyHost::callOnTrade);
     }
     else
     {
       auto env = self->env;
       auto ctxObj = Napi::Object::New(env);
-      buildCtxObj(env, ctxObj, ctx);
+      buildCtxObj(env, ctxObj, ctx, factsOf(self, ctx->symbol_id));
       auto tradeObj = Napi::Object::New(env);
       tradeObj.Set("symbol", Napi::Number::New(env, trade->symbol));
       tradeObj.Set("price", Napi::Number::New(env, lrvx_price_to_double(trade->price_raw)));
@@ -850,14 +888,14 @@ struct NodeStrategyHost : TsfnHost
 
     if (self->_threaded.load(std::memory_order_acquire))
     {
-      auto* d = new BookCallData{*ctx, self, self->owner()};
+      auto* d = new BookCallData{*ctx, factsOf(self, ctx->symbol_id), self, self->owner()};
       self->post(d, &NodeStrategyHost::callOnBook);
     }
     else
     {
       auto env = self->env;
       auto ctxObj = Napi::Object::New(env);
-      buildCtxObj(env, ctxObj, ctx);
+      buildCtxObj(env, ctxObj, ctx, factsOf(self, ctx->symbol_id));
       self->on_book_fn.Call({ctxObj, self->emitter.Value()});
     }
   }
@@ -873,14 +911,14 @@ struct NodeStrategyHost : TsfnHost
 
     if (self->_threaded.load(std::memory_order_acquire))
     {
-      auto* d = new BookCallData{*ctx, self, self->owner()};
+      auto* d = new BookCallData{*ctx, factsOf(self, ctx->symbol_id), self, self->owner()};
       self->post(d, &NodeStrategyHost::callOnTouch);
     }
     else
     {
       auto env = self->env;
       auto ctxObj = Napi::Object::New(env);
-      buildCtxObj(env, ctxObj, ctx);
+      buildCtxObj(env, ctxObj, ctx, factsOf(self, ctx->symbol_id));
       self->on_touch_fn.Call({ctxObj, self->emitter.Value()});
     }
   }
@@ -896,14 +934,14 @@ struct NodeStrategyHost : TsfnHost
 
     if (self->_threaded.load(std::memory_order_acquire))
     {
-      auto* d = new BarCallData{*ctx, *bar, self, self->owner()};
+      auto* d = new BarCallData{*ctx, factsOf(self, ctx->symbol_id), *bar, self, self->owner()};
       self->post(d, &NodeStrategyHost::callOnBar);
     }
     else
     {
       auto env = self->env;
       auto ctxObj = Napi::Object::New(env);
-      buildCtxObj(env, ctxObj, ctx);
+      buildCtxObj(env, ctxObj, ctx, factsOf(self, ctx->symbol_id));
       auto barObj = Napi::Object::New(env);
       buildBarObj(env, barObj, bar);
       self->on_bar_fn.Call({ctxObj, barObj, self->emitter.Value()});
@@ -1051,7 +1089,7 @@ struct NodeStrategyHost : TsfnHost
     if (!fn.IsEmpty())
     {
       auto ctxObj = Napi::Object::New(env);
-      buildCtxObj(env, ctxObj, &d->ctx);
+      buildCtxObj(env, ctxObj, &d->ctx, d->facts);
       auto evObj = Napi::Object::New(env);
       buildOrderEventObj(env, evObj, &d->ev, &d->reject_reason_owned);
       fn.Call({ctxObj, evObj, self->emitter.Value()});
@@ -1070,7 +1108,7 @@ struct NodeStrategyHost : TsfnHost
     if (self->_threaded.load(std::memory_order_acquire))
     {
       auto* d = new OrderEventCallData{
-          *ctx, *ev,
+          *ctx, factsOf(self, ctx->symbol_id), *ev,
           ev->reject_reason ? std::string(ev->reject_reason) : std::string{},
           self, kind, self->owner()};
       self->post(d, &NodeStrategyHost::callOnOrderEvent);
@@ -1080,7 +1118,7 @@ struct NodeStrategyHost : TsfnHost
       auto& fn = pickFnRef(self, kind);
       auto env = self->env;
       auto ctxObj = Napi::Object::New(env);
-      buildCtxObj(env, ctxObj, ctx);
+      buildCtxObj(env, ctxObj, ctx, factsOf(self, ctx->symbol_id));
       auto evObj = Napi::Object::New(env);
       buildOrderEventObj(env, evObj, ev, nullptr);
       fn.Call({ctxObj, evObj, self->emitter.Value()});

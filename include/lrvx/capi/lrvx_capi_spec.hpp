@@ -386,6 +386,21 @@ extern "C"
    * against either. */
   // lrvx::export_macro(group="feature_flags")
   #define LRVX_HAS_OPTIONAL_RAW_BEST_QUOTE 1
+  /* The position facts of a symbol, as the strategy's context holds them in
+   * the current callback. lrvx_entry_price_raw_opt answers the quantity-
+   * weighted average entry of the open position: an add moves it, a partial
+   * close leaves it, a fill that flips the position sets it to that fill's
+   * price. Returns 1 with the raw price written to price_out (which may be
+   * NULL), or 0 with price_out untouched when the position is flat.
+   * lrvx_bars_in_position answers how many bar callbacks the strategy has
+   * received while holding the current position, the bar on which it is
+   * first seen counting as 1; 0 when flat, and 1 again on the first bar after
+   * a flip. Neither changes anything, so asking twice in one callback gives
+   * the same answer. A NULL strategy returns 0 with code 1. */
+  LRVX_EXPORT(group = "context_queries")
+  uint8_t lrvx_entry_price_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* price_out);
+  LRVX_EXPORT(group = "context_queries")
+  uint32_t lrvx_bars_in_position(LrvxStrategyHandle s, uint32_t symbol);
   LRVX_EXPORT(group = "context_queries")
   void lrvx_get_symbol_context(LrvxStrategyHandle s, uint32_t symbol, LrvxSymbolContext* out);
   LRVX_EXPORT(group = "context_queries")
@@ -496,6 +511,14 @@ extern "C"
   void lrvx_indicator_correlation(const double* x, const double* y, size_t len, size_t period,
                                   double* output);
 
+  // Rolling extremes: the highest / lowest of the last `period` inputs, the
+  // current one included. NaN until `period` inputs are in, and for every
+  // window a NaN input sits in.
+  LRVX_EXPORT(group = "indicator_functions")
+  void lrvx_indicator_highest(const double* input, size_t len, size_t period, double* output);
+  LRVX_EXPORT(group = "indicator_functions")
+  void lrvx_indicator_lowest(const double* input, size_t len, size_t period, double* output);
+
   // Augmented Dickey-Fuller test. `regression` accepts: "n", "c", "ct".
   // Writes the t-statistic, approximate p-value, and AIC-selected lag.
   LRVX_EXPORT(group = "indicator_functions")
@@ -596,6 +619,104 @@ extern "C"
   // Back to the freshly created state, same parameters.
   LRVX_EXPORT(group = "streaming_indicator")
   void lrvx_streaming_indicator_reset(LrvxStreamingIndicatorHandle h);
+
+  // ============================================================
+  // History
+  //
+  // A fixed-capacity ring of the last values of a series, indexed newest
+  // first: index 0 is the value pushed last, 1 the one before. Once full, a
+  // push drops the oldest. A NaN is stored as given. Same class as
+  // lrvx::History (include/lrvx/strategy/history.h).
+  //
+  // lrvx_crossed_above(a_prev, a, b_prev, b) is 1 when a was at or below b on
+  // the previous step and is strictly above it now; lrvx_crossed_below the
+  // mirror. Compare against a level by passing it as both b_prev and b. A
+  // NaN anywhere is no cross.
+  // ============================================================
+
+  typedef void* LrvxHistoryHandle;
+
+  // NULL with code 2 for a capacity of 0.
+  LRVX_EXPORT(group = "history")
+  LrvxHistoryHandle lrvx_history_create(uint32_t capacity);
+  LRVX_EXPORT(group = "history")
+  void lrvx_history_destroy(LrvxHistoryHandle h);
+  LRVX_EXPORT(group = "history")
+  void lrvx_history_push(LrvxHistoryHandle h, double value);
+  // 0 with code 2 for an index at or past size.
+  LRVX_EXPORT(group = "history")
+  double lrvx_history_get(LrvxHistoryHandle h, uint32_t index);
+  LRVX_EXPORT(group = "history")
+  uint32_t lrvx_history_size(LrvxHistoryHandle h);
+  LRVX_EXPORT(group = "history")
+  uint32_t lrvx_history_capacity(LrvxHistoryHandle h);
+  LRVX_EXPORT(group = "history")
+  uint8_t lrvx_history_full(LrvxHistoryHandle h);
+  LRVX_EXPORT(group = "history")
+  uint8_t lrvx_crossed_above(double a_prev, double a, double b_prev, double b);
+  LRVX_EXPORT(group = "history")
+  uint8_t lrvx_crossed_below(double a_prev, double a, double b_prev, double b);
+
+  // ============================================================
+  // Exit rules
+  //
+  // One handle per exit rule of include/lrvx/strategy/exits.h; each forwards
+  // to an instance of the C++ class, so the levels are the class's. One shape
+  // for all six:
+  //   arm(side, entry_price, atr)  when the position opens; side 0 is a long
+  //                                (buy), 1 a short (sell). Any other side
+  //                                records code 2 and leaves the rule as it
+  //                                was. The percent stop and take-profit
+  //                                ignore atr; the time stop ignores all three.
+  //   update(high, low, atr)       once per closed bar; 1 when the bar reached
+  //                                the level (the time stop: from the
+  //                                max_bars-th update on). 0 before arm. A hit
+  //                                does not disarm.
+  //   level()                      the stop (the target, for a take-profit);
+  //                                NaN when disarmed, and always for a time
+  //                                stop.
+  //   armed() / disarm()
+  //   at_break_even()              1 once a break-even trail's stop reached
+  //                                the entry; 0 for the other rules.
+  //   bars()                       updates since arm for a time stop (0 after
+  //                                disarm); 0 for the other rules.
+  // A NULL handle returns 0 (or nothing) with code 1.
+  // ============================================================
+
+  typedef void* LrvxExitRuleHandle;
+
+  LRVX_EXPORT(group = "exit_rules")
+  LrvxExitRuleHandle lrvx_exit_atr_stop_create(double atr_multiple);
+  LRVX_EXPORT(group = "exit_rules")
+  LrvxExitRuleHandle lrvx_exit_chandelier_create(uint32_t lookback, double atr_multiple);
+  LRVX_EXPORT(group = "exit_rules")
+  LrvxExitRuleHandle lrvx_exit_break_even_trail_create(double hard_stop_atr,
+                                                       double break_even_atr, double trail_atr);
+  // NULL with code 2 unless pct > 0.
+  LRVX_EXPORT(group = "exit_rules")
+  LrvxExitRuleHandle lrvx_exit_percent_stop_create(double pct);
+  // NULL with code 2 unless pct > 0.
+  LRVX_EXPORT(group = "exit_rules")
+  LrvxExitRuleHandle lrvx_exit_take_profit_create(double pct);
+  // NULL with code 2 for 0 bars.
+  LRVX_EXPORT(group = "exit_rules")
+  LrvxExitRuleHandle lrvx_exit_time_stop_create(uint32_t max_bars);
+  LRVX_EXPORT(group = "exit_rules")
+  void lrvx_exit_rule_destroy(LrvxExitRuleHandle h);
+  LRVX_EXPORT(group = "exit_rules")
+  void lrvx_exit_rule_arm(LrvxExitRuleHandle h, uint8_t side, double entry_price, double atr);
+  LRVX_EXPORT(group = "exit_rules")
+  uint8_t lrvx_exit_rule_update(LrvxExitRuleHandle h, double high, double low, double atr);
+  LRVX_EXPORT(group = "exit_rules")
+  double lrvx_exit_rule_level(LrvxExitRuleHandle h);
+  LRVX_EXPORT(group = "exit_rules")
+  uint8_t lrvx_exit_rule_armed(LrvxExitRuleHandle h);
+  LRVX_EXPORT(group = "exit_rules")
+  void lrvx_exit_rule_disarm(LrvxExitRuleHandle h);
+  LRVX_EXPORT(group = "exit_rules")
+  uint8_t lrvx_exit_rule_at_break_even(LrvxExitRuleHandle h);
+  LRVX_EXPORT(group = "exit_rules")
+  uint32_t lrvx_exit_rule_bars(LrvxExitRuleHandle h);
 
   // ============================================================
   // Targets (forward-looking labels, batch only)

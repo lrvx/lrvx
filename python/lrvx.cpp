@@ -21,6 +21,7 @@
 #include "graph_bindings.h"
 #include "grid_search_bindings.h"
 #include "heatmap_bindings.h"
+#include "history_bindings.h"
 #include "indicator_bindings.h"
 #include "latency_bindings.h"
 #include "liquidation_engine_bindings.h"
@@ -889,6 +890,7 @@ PYBIND11_MODULE(_lrvx, m)
   lrvx::bindLiveQueuePositionEstimator(m);
   lrvx::bindBarDispatchRecorder(m);
   lrvx::bindFeedClock(m);
+  lrvx::bindHistory(m);
   lrvx::bindExecutionAlgos(m);
   lrvx::bindDeltaBook(m);
   lrvx::bindDexAmount(m);

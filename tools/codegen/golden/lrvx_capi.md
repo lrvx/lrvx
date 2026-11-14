@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 799 functions, 60 handles, 60 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
+**Surface:** 826 functions, 62 handles, 60 structs, 44 callback typedefs, 3 enums, 17 macro constants, 76 groups.
 
 ## Opaque handles
 
@@ -24,6 +24,8 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `LrvxPoolTapeHandle`
 - `LrvxPoolReplayHandle`
 - `LrvxStreamingIndicatorHandle`
+- `LrvxHistoryHandle`
+- `LrvxExitRuleHandle`
 - `LrvxIndicatorGraphHandle`
 - `LrvxStreamingGraphHandle` (alias of `LrvxIndicatorGraphHandle`)
 - `LrvxOrderGroupHandle`
@@ -1103,6 +1105,8 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `uint8_t lrvx_best_bid_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t * price_out)`
 - `uint8_t lrvx_best_ask_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t * price_out)`
 - `uint8_t lrvx_mid_price_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t * price_out)`
+- `uint8_t lrvx_entry_price_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t * price_out)`
+- `uint32_t lrvx_bars_in_position(LrvxStrategyHandle s, uint32_t symbol)`
 - `void lrvx_get_symbol_context(LrvxStrategyHandle s, uint32_t symbol, LrvxSymbolContext * out)`
 - `int32_t lrvx_get_order_status(LrvxStrategyHandle s, uint64_t order_id)`
 
@@ -1212,6 +1216,23 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 
 - `uint32_t lrvx_simulated_executor_get_fills(LrvxSimulatedExecutorHandle executor, LrvxFill * fills_out, uint32_t max_fills)`
 
+### exit_rules
+
+- `LrvxExitRuleHandle lrvx_exit_atr_stop_create(double atr_multiple)`
+- `LrvxExitRuleHandle lrvx_exit_chandelier_create(uint32_t lookback, double atr_multiple)`
+- `LrvxExitRuleHandle lrvx_exit_break_even_trail_create(double hard_stop_atr, double break_even_atr, double trail_atr)`
+- `LrvxExitRuleHandle lrvx_exit_percent_stop_create(double pct)`
+- `LrvxExitRuleHandle lrvx_exit_take_profit_create(double pct)`
+- `LrvxExitRuleHandle lrvx_exit_time_stop_create(uint32_t max_bars)`
+- `void lrvx_exit_rule_destroy(LrvxExitRuleHandle h)`
+- `void lrvx_exit_rule_arm(LrvxExitRuleHandle h, uint8_t side, double entry_price, double atr)`
+- `uint8_t lrvx_exit_rule_update(LrvxExitRuleHandle h, double high, double low, double atr)`
+- `double lrvx_exit_rule_level(LrvxExitRuleHandle h)`
+- `uint8_t lrvx_exit_rule_armed(LrvxExitRuleHandle h)`
+- `void lrvx_exit_rule_disarm(LrvxExitRuleHandle h)`
+- `uint8_t lrvx_exit_rule_at_break_even(LrvxExitRuleHandle h)`
+- `uint32_t lrvx_exit_rule_bars(LrvxExitRuleHandle h)`
+
 ### fee_schedule
 
 - `LrvxFeeScheduleHandle lrvx_fee_schedule_create(void)`
@@ -1291,6 +1312,18 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 
 - `uint32_t lrvx_aggregate_heikin_ashi_bars(const int64_t * timestamps, const double * prices, const double * quantities, const uint8_t * is_buy, size_t len, double interval_seconds, LrvxBar * bars_out, uint32_t max_bars)`
 
+### history
+
+- `LrvxHistoryHandle lrvx_history_create(uint32_t capacity)`
+- `void lrvx_history_destroy(LrvxHistoryHandle h)`
+- `void lrvx_history_push(LrvxHistoryHandle h, double value)`
+- `double lrvx_history_get(LrvxHistoryHandle h, uint32_t index)`
+- `uint32_t lrvx_history_size(LrvxHistoryHandle h)`
+- `uint32_t lrvx_history_capacity(LrvxHistoryHandle h)`
+- `uint8_t lrvx_history_full(LrvxHistoryHandle h)`
+- `uint8_t lrvx_crossed_above(double a_prev, double a, double b_prev, double b)`
+- `uint8_t lrvx_crossed_below(double a_prev, double a, double b_prev, double b)`
+
 ### indicator_functions
 
 - `void lrvx_indicator_ema(const double * input, size_t len, size_t period, double * output)`
@@ -1318,6 +1351,8 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `void lrvx_indicator_rolling_zscore(const double * input, size_t len, size_t period, double * output)`
 - `void lrvx_indicator_shannon_entropy(const double * input, size_t len, size_t period, size_t bins, double * output)`
 - `void lrvx_indicator_correlation(const double * x, const double * y, size_t len, size_t period, double * output)`
+- `void lrvx_indicator_highest(const double * input, size_t len, size_t period, double * output)`
+- `void lrvx_indicator_lowest(const double * input, size_t len, size_t period, double * output)`
 - `void lrvx_indicator_adf(const double * input, size_t len, size_t max_lag, const char * regression, double * test_stat_out, double * p_value_out, size_t * used_lag_out)`
 - `void lrvx_indicator_autocorrelation(const double * input, size_t len, size_t window, size_t lag, double * output)`
 

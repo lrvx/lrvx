@@ -248,6 +248,7 @@ class Strategy : public IStrategy
     c.lastTradePrice = ev.bar.close;
     c.lastUpdateNs = ev.bar.endTime.time_since_epoch().count();
     refreshPosition(c, sym);
+    countBarInPosition(c, sym);
 
     // Push into the per-(symbol, timeframe) ring so multi-TF strategies
     // can recall the last N closed bars without bookkeeping by hand.
@@ -282,9 +283,10 @@ class Strategy : public IStrategy
     // The runner hands a fill to the position manager before it reaches the
     // strategy, so the context a fill or order-update hook reads already
     // counts that fill, as position() does.
-    refreshPosition(c, sym);
-    if (ev.status == OrderEventStatus::FILLED ||
-        ev.status == OrderEventStatus::PARTIALLY_FILLED)
+    const bool isFill = ev.status == OrderEventStatus::FILLED ||
+                        ev.status == OrderEventStatus::PARTIALLY_FILLED;
+    refreshPosition(c, sym, isFill ? &ev.fillPrice : nullptr);
+    if (isFill)
     {
       onSymbolFill(c, ev);
     }
@@ -664,14 +666,98 @@ class Strategy : public IStrategy
   // also wants -- and two passes over the symbol's lots, on the market-data
   // thread, for a pair of values that come from the same state under the same
   // lock.
-  void refreshPosition(SymbolContext& c, SymbolId sym) noexcept
+  void refreshPosition(SymbolContext& c, SymbolId sym, const Price* fillPrice = nullptr) noexcept
   {
     if (_positionManager)
     {
       const PositionSnapshot snap = _positionManager->positionSnapshot(sym);
       c.position = snap.position;
       c.avgEntryPrice = snap.avgEntryPrice;
+      followEntry(c, sym, snap, fillPrice);
     }
+  }
+
+  // Per-symbol bookkeeping behind SymbolContext::entryPrice and
+  // barsInPosition. Written under the symbol's lock only.
+  struct PositionFacts
+  {
+    int64_t positionRaw{0};
+    // Bumped each time a position opens from flat or flips.
+    uint64_t opened{0};
+    // The value of `opened` the bar count belongs to.
+    uint64_t counted{0};
+  };
+
+  // Moves the entry price by the change in position since the last refresh.
+  // `fillPrice` is the price of the fill that caused it, when the caller
+  // knows one. A change that arrives without one (a seeded position, or a
+  // fill that reached the manager before its event reached the strategy)
+  // takes the manager's cost basis instead.
+  void followEntry(SymbolContext& c, SymbolId sym, const PositionSnapshot& snap,
+                   const Price* fillPrice) noexcept
+  {
+    PositionFacts& f = _positionFacts[sym];
+    const int64_t prev = f.positionRaw;
+    const int64_t now = snap.position.raw();
+    if (now == prev && (now == 0 || c.entryPrice))
+    {
+      return;
+    }
+    f.positionRaw = now;
+    if (now == 0)
+    {
+      c.entryPrice.reset();
+      c.barsInPosition = 0;
+      return;
+    }
+    const bool opened = prev == 0 || (prev > 0) != (now > 0);
+    if (opened)
+    {
+      ++f.opened;
+      c.barsInPosition = 0;
+      c.entryPrice = fillPrice ? std::optional<Price>(*fillPrice) : snap.avgEntryPrice;
+      return;
+    }
+    const int64_t prevAbs = prev > 0 ? prev : -prev;
+    const int64_t nowAbs = now > 0 ? now : -now;
+    if (nowAbs > prevAbs || !c.entryPrice)
+    {
+      if (fillPrice && c.entryPrice && nowAbs > prevAbs)
+      {
+#if LRVX_HAS_NATIVE_INT128
+        const __int128_t cost = static_cast<__int128_t>(c.entryPrice->raw()) * prevAbs +
+                                static_cast<__int128_t>(fillPrice->raw()) * (nowAbs - prevAbs);
+        c.entryPrice = Price::fromRaw(static_cast<int64_t>(cost / nowAbs));
+#else
+        const long double cost =
+            static_cast<long double>(c.entryPrice->raw()) * prevAbs +
+            static_cast<long double>(fillPrice->raw()) * (nowAbs - prevAbs);
+        c.entryPrice = Price::fromRaw(static_cast<int64_t>(cost / nowAbs));
+#endif
+      }
+      else
+      {
+        c.entryPrice = snap.avgEntryPrice;
+      }
+    }
+  }
+
+  // Caller holds the symbol lock and has refreshed the position for a bar.
+  void countBarInPosition(SymbolContext& c, SymbolId sym) noexcept
+  {
+    PositionFacts& f = _positionFacts[sym];
+    if (c.position.isZero())
+    {
+      c.barsInPosition = 0;
+      return;
+    }
+    if (f.counted != f.opened)
+    {
+      f.counted = f.opened;
+      c.barsInPosition = 1;
+      return;
+    }
+    ++c.barsInPosition;
   }
 
   // Caller holds the symbol lock and has just applied a depth frame: the
@@ -822,6 +908,7 @@ class Strategy : public IStrategy
   // roughly 2 MB in a release build and 4 MB with LRVX_SCALE_CHECKS on, and
   // two of them in one frame overran a default 8 MB stack.
   mutable SymbolStateMap<SymbolContext> _contexts;
+  SymbolStateMap<PositionFacts> _positionFacts;
 
   // Per-(symbol, timeframe) ring of the most recent closed bars.
   // Capacity is the same for every (symbol, tf) slot; tune with

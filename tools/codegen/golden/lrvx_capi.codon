@@ -196,6 +196,8 @@ from C import lrvx_mid_price_raw(cobj, u32) -> i64
 from C import lrvx_best_bid_raw_opt(cobj, u32, Ptr[i64]) -> u8
 from C import lrvx_best_ask_raw_opt(cobj, u32, Ptr[i64]) -> u8
 from C import lrvx_mid_price_raw_opt(cobj, u32, Ptr[i64]) -> u8
+from C import lrvx_entry_price_raw_opt(cobj, u32, Ptr[i64]) -> u8
+from C import lrvx_bars_in_position(cobj, u32) -> u32
 from C import lrvx_get_symbol_context(cobj, u32, cobj)
 from C import lrvx_get_order_status(cobj, u64) -> i32
 
@@ -296,6 +298,22 @@ from C import lrvx_exec_is_done(cobj) -> u8
 # ── executor_fill ──
 from C import lrvx_simulated_executor_get_fills(cobj, cobj, u32) -> u32
 
+# ── exit_rules ──
+from C import lrvx_exit_atr_stop_create(float) -> cobj
+from C import lrvx_exit_chandelier_create(u32, float) -> cobj
+from C import lrvx_exit_break_even_trail_create(float, float, float) -> cobj
+from C import lrvx_exit_percent_stop_create(float) -> cobj
+from C import lrvx_exit_take_profit_create(float) -> cobj
+from C import lrvx_exit_time_stop_create(u32) -> cobj
+from C import lrvx_exit_rule_destroy(cobj)
+from C import lrvx_exit_rule_arm(cobj, u8, float, float)
+from C import lrvx_exit_rule_update(cobj, float, float, float) -> u8
+from C import lrvx_exit_rule_level(cobj) -> float
+from C import lrvx_exit_rule_armed(cobj) -> u8
+from C import lrvx_exit_rule_disarm(cobj)
+from C import lrvx_exit_rule_at_break_even(cobj) -> u8
+from C import lrvx_exit_rule_bars(cobj) -> u32
+
 # ── fee_schedule ──
 from C import lrvx_fee_schedule_create() -> cobj
 from C import lrvx_fee_schedule_destroy(cobj)
@@ -367,6 +385,17 @@ from C import lrvx_render_heatmap_html(cobj, cobj, u64) -> u64
 # ── heikin_ashi ──
 from C import lrvx_aggregate_heikin_ashi_bars(Ptr[i64], Ptr[float], Ptr[float], Ptr[u8], int, float, cobj, u32) -> u32
 
+# ── history ──
+from C import lrvx_history_create(u32) -> cobj
+from C import lrvx_history_destroy(cobj)
+from C import lrvx_history_push(cobj, float)
+from C import lrvx_history_get(cobj, u32) -> float
+from C import lrvx_history_size(cobj) -> u32
+from C import lrvx_history_capacity(cobj) -> u32
+from C import lrvx_history_full(cobj) -> u8
+from C import lrvx_crossed_above(float, float, float, float) -> u8
+from C import lrvx_crossed_below(float, float, float, float) -> u8
+
 # ── indicator_functions ──
 from C import lrvx_indicator_ema(Ptr[float], int, int, Ptr[float])
 from C import lrvx_indicator_sma(Ptr[float], int, int, Ptr[float])
@@ -393,6 +422,8 @@ from C import lrvx_indicator_rogers_satchell_vol(Ptr[float], Ptr[float], Ptr[flo
 from C import lrvx_indicator_rolling_zscore(Ptr[float], int, int, Ptr[float])
 from C import lrvx_indicator_shannon_entropy(Ptr[float], int, int, int, Ptr[float])
 from C import lrvx_indicator_correlation(Ptr[float], Ptr[float], int, int, Ptr[float])
+from C import lrvx_indicator_highest(Ptr[float], int, int, Ptr[float])
+from C import lrvx_indicator_lowest(Ptr[float], int, int, Ptr[float])
 from C import lrvx_indicator_adf(Ptr[float], int, int, cobj, Ptr[float], Ptr[float], Ptr[int])
 from C import lrvx_indicator_autocorrelation(Ptr[float], int, int, int, Ptr[float])
 

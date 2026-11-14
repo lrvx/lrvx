@@ -140,6 +140,14 @@ export interface SymbolContext {
    *  TOP_OF_BOOK frame moves it without firing `onBookUpdate`, so it can
    *  be fresher than `lastUpdateNs`. */
   lastTouchNs: bigint;
+  /** Quantity-weighted average entry of the open position: an add moves it,
+   *  a partial close leaves it, a flip sets it to the flipping fill's price.
+   *  `null` when flat. */
+  entryPrice: number | null;
+  /** Bar callbacks received while holding the current position, the bar on
+   *  which it is first seen counting as 1; 0 when flat, 1 again after a
+   *  flip, and 0 throughout a replay without bars. */
+  barsInPosition: number;
 }
 
 /** Trade tick passed to `onTrade`. */
@@ -1653,6 +1661,27 @@ interface StreamingSingleInput {
   compute(input: Float64Array): Float64Array;
 }
 
+/** The highest of the last `period` inputs, the current one included;
+ *  `null` until `period` inputs are in and while a NaN is in the window. */
+export class Highest implements StreamingSingleInput {
+  constructor(period: number);
+  update(value: number): number | null;
+  readonly value: number;
+  readonly ready: boolean;
+  readonly count: number;
+  reset(): void;
+  compute(input: Float64Array): Float64Array;
+}
+/** The lowest of the last `period` inputs; same contract as `Highest`. */
+export class Lowest implements StreamingSingleInput {
+  constructor(period: number);
+  update(value: number): number | null;
+  readonly value: number;
+  readonly ready: boolean;
+  readonly count: number;
+  reset(): void;
+  compute(input: Float64Array): Float64Array;
+}
 export class SMA implements StreamingSingleInput {
   constructor(period: number);
   update(value: number): number | null;
@@ -1892,6 +1921,11 @@ export function kurtosis(input: Float64Array, period: number): Float64Array;
 export function rolling_zscore(input: Float64Array, period: number): Float64Array;
 export function shannon_entropy(input: Float64Array, period: number, bins: number): Float64Array;
 export function autocorrelation(input: Float64Array, window: number, lag: number): Float64Array;
+/** Rolling maximum of the last `period` inputs (NaN while warming up or
+ *  while a NaN is in the window). */
+export function highest(input: Float64Array, period: number): Float64Array;
+/** Rolling minimum of the last `period` inputs. */
+export function lowest(input: Float64Array, period: number): Float64Array;
 /** Rolling Pearson correlation over a moving `period` window. */
 export function rollingCorrelation(x: Float64Array, y: Float64Array, period: number): Float64Array;
 /** Augmented Dickey-Fuller unit-root test. `regression` is the
@@ -3367,6 +3401,101 @@ export interface FeedClockSnapshot {
   /** Symbol id → staleness in nanoseconds at the moment of this tick. */
   stalenessNs: Record<number, number>;
 }
+
+// ── Exit rules ───────────────────────────────────────────────────────
+//
+// Each wraps one C++ rule of lrvx/strategy/exits.h. update() tests the bar
+// against the level resting before it; a hit does not disarm and is reported
+// until disarm(). The level reads NaN when disarmed. A side other than
+// 'long' / 'short' throws RangeError.
+
+export type ExitSide = 'long' | 'short';
+
+/** A stop `atrMultiple` ATRs from the entry, frozen there. */
+export class AtrStop {
+  constructor(atrMultiple: number);
+  readonly atrMultiple: number;
+  arm(side: ExitSide, entryPrice: number, atr: number): void;
+  update(high: number, low: number, atr: number): boolean;
+  readonly stop: number;
+  readonly armed: boolean;
+  disarm(): void;
+}
+/** The stop hangs `atrMultiple` ATRs from the best price of the last
+ *  `lookback` bars (0: since the entry); it only moves in the position's
+ *  favour. */
+export class ChandelierExit {
+  constructor(lookback: number, atrMultiple: number);
+  readonly lookback: number;
+  readonly atrMultiple: number;
+  arm(side: ExitSide, entryPrice: number, atr: number): void;
+  update(high: number, low: number, atr: number): boolean;
+  readonly stop: number;
+  readonly armed: boolean;
+  disarm(): void;
+}
+/** A hard stop that moves to the entry once the position is `breakEvenAtr`
+ *  ATRs in profit, then trails the best price at `trailAtr` ATRs. */
+export class BreakEvenTrail {
+  constructor(hardStopAtr: number, breakEvenAtr: number, trailAtr: number);
+  arm(side: ExitSide, entryPrice: number, atr: number): void;
+  update(high: number, low: number, atr: number): boolean;
+  readonly stop: number;
+  readonly atBreakEven: boolean;
+  readonly armed: boolean;
+  disarm(): void;
+}
+/** A stop at entry * (1 - pct / 100) for a long, entry * (1 + pct / 100)
+ *  for a short. RangeError unless pct > 0. */
+export class PercentStop {
+  constructor(pct: number);
+  readonly pct: number;
+  arm(side: ExitSide, entryPrice: number): void;
+  update(high: number, low: number): boolean;
+  readonly stop: number;
+  readonly armed: boolean;
+  disarm(): void;
+}
+/** A target at entry * (1 + pct / 100) for a long, entry * (1 - pct / 100)
+ *  for a short. RangeError unless pct > 0. */
+export class TakeProfit {
+  constructor(pct: number);
+  readonly pct: number;
+  arm(side: ExitSide, entryPrice: number): void;
+  update(high: number, low: number): boolean;
+  readonly target: number;
+  readonly armed: boolean;
+  disarm(): void;
+}
+/** True from the `maxBars`-th update after arm() on. RangeError for 0. */
+export class TimeStop {
+  constructor(maxBars: number);
+  readonly maxBars: number;
+  arm(): void;
+  update(): boolean;
+  /** Updates since arm(); 0 after disarm(). */
+  readonly bars: number;
+  readonly armed: boolean;
+  disarm(): void;
+}
+
+/** The last `capacity` values of a series, newest first. RangeError for a
+ *  capacity below 1. */
+export class History {
+  constructor(capacity: number);
+  push(value: number): void;
+  /** 0 is the newest value; RangeError outside 0 .. size - 1. */
+  get(index: number): number;
+  readonly size: number;
+  readonly capacity: number;
+  readonly full: boolean;
+}
+/** a was at or below b on the previous step and is strictly above it now.
+ *  For a level, pass it as both bPrev and b. A NaN or null anywhere is no
+ *  cross. */
+export function crossedAbove(aPrev: number, a: number, bPrev: number, b: number): boolean;
+/** a was at or above b on the previous step and is strictly below it now. */
+export function crossedBelow(aPrev: number, a: number, bPrev: number, b: number): boolean;
 
 export class MultiFeedClock {
   constructor(opts: MultiFeedClockOptions);

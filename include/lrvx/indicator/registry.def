@@ -31,6 +31,8 @@ LRVX_INDICATOR(Kurtosis,          kurtosis,            SingleInput,  (size_t per
 LRVX_INDICATOR(RollingZScore,     rolling_zscore,      SingleInput,  (size_t period))
 LRVX_INDICATOR(ShannonEntropy,    shannon_entropy,     SingleInput,  (size_t period, size_t bins))
 LRVX_INDICATOR(AutoCorrelation,   autocorrelation,     SingleInput,  (size_t window, size_t lag))
+LRVX_INDICATOR(Highest,           highest,             SingleInput,  (size_t period))
+LRVX_INDICATOR(Lowest,            lowest,              SingleInput,  (size_t period))
 
 // ---- Bar (high, low, close) ----------------------------------------------
 LRVX_INDICATOR(ATR,               atr,                 BarInput,     (size_t period))

@@ -48,6 +48,8 @@ from C import lrvx_indicator_correlation(Ptr[f64], Ptr[f64], int, int, Ptr[f64])
 from C import lrvx_indicator_adf(Ptr[f64], int, int, cobj,
                                   Ptr[f64], Ptr[f64], Ptr[int])
 from C import lrvx_indicator_autocorrelation(Ptr[f64], int, int, int, Ptr[f64])
+from C import lrvx_indicator_highest(Ptr[f64], int, int, Ptr[f64])
+from C import lrvx_indicator_lowest(Ptr[f64], int, int, Ptr[f64])
 from C import lrvx_clear_last_error()
 from C import lrvx_last_error_code() -> i32
 from C import lrvx_last_error_message() -> cobj
@@ -258,6 +260,22 @@ def autocorrelation(data: List[float], window: int, lag: int) -> List[float]:
     n = len(data); out = [0.0] * n
     lrvx_clear_last_error()
     lrvx_indicator_autocorrelation(data.arr.ptr, n, window, lag, out.arr.ptr)
+    _refused()
+    return out
+
+# The highest / lowest of the last `period` inputs, the current one
+# included; NaN while warming up and for every window a NaN sits in.
+def highest(data: List[float], period: int) -> List[float]:
+    n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
+    lrvx_indicator_highest(data.arr.ptr, n, period, out.arr.ptr)
+    _refused()
+    return out
+
+def lowest(data: List[float], period: int) -> List[float]:
+    n = len(data); out = [0.0] * n
+    lrvx_clear_last_error()
+    lrvx_indicator_lowest(data.arr.ptr, n, period, out.arr.ptr)
     _refused()
     return out
 
@@ -864,3 +882,43 @@ class AutoCorrelation:
     def count(self) -> int: return self._s.count()
     def reset(self): self._s.reset()
     def close(self): self._s.close()
+
+
+class Highest:
+    _period: int
+    _s: _Stream
+    def __init__(self, period: int):
+        self._period = period
+        self._s = _Stream("highest", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
+    @property
+    def value(self) -> float: return self._s.value()
+    @property
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
+    def compute(self, data: List[float]) -> List[float]: return highest(data, self._period)
+    @staticmethod
+    def compute_static(data: List[float], period: int) -> List[float]: return highest(data, period)
+
+
+class Lowest:
+    _period: int
+    _s: _Stream
+    def __init__(self, period: int):
+        self._period = period
+        self._s = _Stream("lowest", [float(period)])
+    def update(self, v: float) -> float: return self._s.update(v)
+    @property
+    def value(self) -> float: return self._s.value()
+    @property
+    def ready(self) -> bool: return self._s.ready()
+    @property
+    def count(self) -> int: return self._s.count()
+    def reset(self): self._s.reset()
+    def close(self): self._s.close()
+    def compute(self, data: List[float]) -> List[float]: return lowest(data, self._period)
+    @staticmethod
+    def compute_static(data: List[float], period: int) -> List[float]: return lowest(data, period)

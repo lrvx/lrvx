@@ -125,6 +125,51 @@ difference: `Number(ev.acceptedAtNs - ev.submittedAtNs)`.
 | `midPrice` | `number \| null` | Mid price; `null` unless both sides have a level |
 | `lastUpdateNs` | `bigint` | Exchange timestamp (ns) of the last dispatched event: trade, depth frame or bar |
 | `lastTouchNs` | `bigint` | Exchange timestamp (ns) of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it without firing `onBookUpdate`, so it can be fresher than `lastUpdateNs` |
+| `entryPrice` | `number \| null` | Quantity-weighted average entry of the open position: an add moves it, a partial close leaves it, a fill that flips the position sets it to that fill's price. `null` when flat |
+| `barsInPosition` | `number` | Bar callbacks received while holding the current position, the bar on which it is first seen counting as 1. `0` when flat, `1` again on the first bar after a flip |
+
+Both are read when the engine delivers the callback, so a threaded host (a
+`LiveEngine`) hands the strategy the facts of that moment, not of the moment
+JavaScript runs.
+
+### Strategy helpers
+
+The exit rules of [`lrvx/strategy/exits.h`](../api/strategy/exits.md), each over
+the C++ class: `AtrStop(atrMultiple)`, `ChandelierExit(lookback, atrMultiple)`,
+`BreakEvenTrail(hardStopAtr, breakEvenAtr, trailAtr)` take `arm(side,
+entryPrice, atr)` and `update(high, low, atr)` and read `stop`;
+`PercentStop(pct)` and `TakeProfit(pct)` take `arm(side, entryPrice)` and
+`update(high, low)` and read `stop` / `target`; `TimeStop(maxBars)` takes
+`arm()` and `update()` and reads `bars`. All have `armed` and `disarm()`; the
+level is `NaN` when disarmed. The side is `'long'` or `'short'`; anything else,
+a `pct` not above 0 or a `maxBars` of 0 throws `RangeError`.
+
+`new History(capacity)` keeps the last `capacity` values, newest first:
+`get(0)` is the value pushed last; `size`, `capacity`, `full`. `crossedAbove(aPrev,
+a, bPrev, b)` / `crossedBelow(...)` answer whether `a` crossed `b` (a level is
+passed as both `bPrev` and `b`); `NaN` or `null` is no cross. `Highest(period)` /
+`Lowest(period)` are streaming indicators like `SMA`.
+
+```javascript
+const lrvx = require('@lrvx/lrvx');
+const stop = new lrvx.PercentStop(2);
+const timeout = new lrvx.TimeStop(30);
+const strategy = {
+  symbols: [1],
+  onBar(ctx, bar, emit) {
+    if (ctx.position === 0) return;
+    if (ctx.barsInPosition === 1) {
+      stop.arm(ctx.position > 0 ? 'long' : 'short', ctx.entryPrice);
+      timeout.arm();
+    }
+    if (stop.update(bar.high, bar.low) || timeout.update()) {
+      emit.closePosition();
+      stop.disarm();
+      timeout.disarm();
+    }
+  },
+};
+```
 
 ### TradeData (`trade`)
 
