@@ -10,7 +10,7 @@ description = "Deprecated: flox-mcp is renamed to lrvx-mcp. This release install
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-dependencies = ["lrvx-mcp==0.12.0"]
+dependencies = ["lrvx-mcp==0.12.1"]
 classifiers = [
     "Development Status :: 7 - Inactive",
     "Programming Language :: Python :: 3",

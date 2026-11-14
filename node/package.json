@@ -1,6 +1,6 @@
 {
   "name": "@lrvx/lrvx",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Framework for building trading systems.",
   "main": "index.js",
   "types": "index.d.ts",

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(lrvx VERSION 0.12.0 LANGUAGES CXX C)
+project(lrvx VERSION 0.12.1 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
