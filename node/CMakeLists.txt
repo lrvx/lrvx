@@ -40,8 +40,12 @@ find_library(LRVX_LIB lrvx HINTS
 # build/Release/lrvx.lib rather than build/lrvx.lib. Demanding
 # CMAKE_BUILD_TYPE from those generators broke the Windows leg of
 # node-publish.yml and blocked a release.
+# A foreach variable is restored when the loop ends, so the directory found is
+# kept in _lrvx_core_cache_dir for the lz4 check further down.
+set(_lrvx_core_cache_dir "")
 foreach(_lrvx_core_dir "${CMAKE_SOURCE_DIR}/../build" "${CMAKE_SOURCE_DIR}/../build/Release")
   if(EXISTS "${_lrvx_core_dir}/CMakeCache.txt")
+    set(_lrvx_core_cache_dir "${_lrvx_core_dir}")
     file(STRINGS "${_lrvx_core_dir}/CMakeCache.txt" _lrvx_core_build_type
          REGEX "^CMAKE_BUILD_TYPE:STRING=")
     string(REPLACE "CMAKE_BUILD_TYPE:STRING=" "" _lrvx_core_build_type "${_lrvx_core_build_type}")
@@ -116,6 +120,9 @@ set_target_properties(lrvx_node PROPERTIES PREFIX "" SUFFIX ".node")
 # Match the runtime library used by lrvx.lib (/MD) — cmake-js defaults to /MT
 if(MSVC)
   set_property(TARGET lrvx_node PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+  # The addon and the C API compile into two very large objects; without
+  # /bigobj cl stops at C1128 (section count limit).
+  target_compile_options(lrvx_node PRIVATE /bigobj)
 endif()
 target_link_libraries(lrvx_node ${CMAKE_JS_LIB} ${LRVX_LIB})
 # NODE_ADDON_API_CPP_EXCEPTIONS_ALL widens node-addon-api's callback wrapper
@@ -181,41 +188,58 @@ endif()
 # Try the three discovery methods used in the core build (vcpkg, brew/Linux
 # system, pkg-config) and link whichever one matches.
 set(LRVX_NODE_LZ4_FOUND OFF)
-# The config's target name follows the packager (lz4::lz4 from vcpkg; LZ4::lz4
-# over the _shared/_static pair from lz4's own CMake build, which is what
-# Homebrew installs), so it is picked by existence, as the core build does.
-find_package(lz4 CONFIG QUIET)
-set(LRVX_NODE_LZ4_TARGET "")
-foreach(_lrvx_lz4_candidate lz4::lz4 LZ4::lz4 LZ4::lz4_shared LZ4::lz4_static)
-  if(TARGET ${_lrvx_lz4_candidate})
-    set(LRVX_NODE_LZ4_TARGET ${_lrvx_lz4_candidate})
-    break()
+# A core build configured with LRVX_VENDOR_LZ4=ON compiled lz4 into the
+# archive; linking a system lz4 as well would put a second copy, and a
+# runtime dependency, into the addon. Only the header is needed then.
+set(_lrvx_core_vendor_lz4 "")
+if(EXISTS "${_lrvx_core_cache_dir}/CMakeCache.txt")
+  file(STRINGS "${_lrvx_core_cache_dir}/CMakeCache.txt" _lrvx_core_vendor_lz4
+       REGEX "^LRVX_VENDOR_LZ4:BOOL=(ON|TRUE|1)$")
+endif()
+if(_lrvx_core_vendor_lz4)
+  if(NOT EXISTS "${_lrvx_core_cache_dir}/_deps/lz4_src-src/lib/lz4.h")
+    message(FATAL_ERROR "lrvx_node: the core build vendors lz4 but ${_lrvx_core_cache_dir}/_deps/lz4_src-src/lib/lz4.h is missing")
   endif()
-endforeach()
-if(LRVX_NODE_LZ4_TARGET)
-  target_link_libraries(lrvx_node ${LRVX_NODE_LZ4_TARGET})
+  target_include_directories(lrvx_node PRIVATE "${_lrvx_core_cache_dir}/_deps/lz4_src-src/lib")
   set(LRVX_NODE_LZ4_FOUND ON)
-  message(STATUS "lrvx_node: LZ4 via find_package: ${LRVX_NODE_LZ4_TARGET}")
+  message(STATUS "lrvx_node: LZ4 compiled into the core archive")
 else()
-  find_library(LZ4_LIBRARY NAMES lz4)
-  find_path(LZ4_INCLUDE_DIR NAMES lz4.h)
-  if(LZ4_LIBRARY AND LZ4_INCLUDE_DIR)
-    target_include_directories(lrvx_node PRIVATE ${LZ4_INCLUDE_DIR})
-    target_link_libraries(lrvx_node ${LZ4_LIBRARY})
-    set(LRVX_NODE_LZ4_FOUND ON)
-    message(STATUS "lrvx_node: LZ4 via find_library: ${LZ4_LIBRARY}")
-  else()
-    find_package(PkgConfig QUIET)
-    if(PkgConfig_FOUND)
-      pkg_check_modules(LZ4 QUIET liblz4)
+  # The config's target name follows the packager (lz4::lz4 from vcpkg; LZ4::lz4
+  # over the _shared/_static pair from lz4's own CMake build, which is what
+  # Homebrew installs), so it is picked by existence, as the core build does.
+  find_package(lz4 CONFIG QUIET)
+  set(LRVX_NODE_LZ4_TARGET "")
+  foreach(_lrvx_lz4_candidate lz4::lz4 LZ4::lz4 LZ4::lz4_shared LZ4::lz4_static)
+    if(TARGET ${_lrvx_lz4_candidate})
+      set(LRVX_NODE_LZ4_TARGET ${_lrvx_lz4_candidate})
+      break()
     endif()
-    if(LZ4_FOUND)
-      target_include_directories(lrvx_node PRIVATE ${LZ4_INCLUDE_DIRS})
-      target_link_libraries(lrvx_node ${LZ4_LINK_LIBRARIES})
+  endforeach()
+  if(LRVX_NODE_LZ4_TARGET)
+    target_link_libraries(lrvx_node ${LRVX_NODE_LZ4_TARGET})
+    set(LRVX_NODE_LZ4_FOUND ON)
+    message(STATUS "lrvx_node: LZ4 via find_package: ${LRVX_NODE_LZ4_TARGET}")
+  else()
+    find_library(LZ4_LIBRARY NAMES lz4)
+    find_path(LZ4_INCLUDE_DIR NAMES lz4.h)
+    if(LZ4_LIBRARY AND LZ4_INCLUDE_DIR)
+      target_include_directories(lrvx_node PRIVATE ${LZ4_INCLUDE_DIR})
+      target_link_libraries(lrvx_node ${LZ4_LIBRARY})
       set(LRVX_NODE_LZ4_FOUND ON)
-      message(STATUS "lrvx_node: LZ4 via pkg-config")
+      message(STATUS "lrvx_node: LZ4 via find_library: ${LZ4_LIBRARY}")
     else()
-      message(STATUS "lrvx_node: LZ4 not found — compressed segment reads will fail at runtime")
+      find_package(PkgConfig QUIET)
+      if(PkgConfig_FOUND)
+        pkg_check_modules(LZ4 QUIET liblz4)
+      endif()
+      if(LZ4_FOUND)
+        target_include_directories(lrvx_node PRIVATE ${LZ4_INCLUDE_DIRS})
+        target_link_libraries(lrvx_node ${LZ4_LINK_LIBRARIES})
+        set(LRVX_NODE_LZ4_FOUND ON)
+        message(STATUS "lrvx_node: LZ4 via pkg-config")
+      else()
+        message(STATUS "lrvx_node: LZ4 not found — compressed segment reads will fail at runtime")
+      endif()
     endif()
   endif()
 endif()

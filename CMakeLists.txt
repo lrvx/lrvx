@@ -425,6 +425,10 @@ else()
 endif()
 
 option(LRVX_ENABLE_LZ4 "Enable LZ4 compression for binary logs" ON)
+# Distributed packages turn this on: lz4 is compiled into lrvx from source, so
+# the published binary needs no lz4 on the user's machine and inherits no
+# minimum OS version from the build host's copy.
+option(LRVX_VENDOR_LZ4 "Compile lz4 from source into lrvx instead of linking a system lz4" OFF)
 # The imported target lrvx was linked against when lz4 came from a config
 # package; lrvxConfig.cmake.in re-finds that package for consumers, since the
 # export file names the target and nothing else defines it. Empty for every
@@ -438,61 +442,68 @@ if(LRVX_ENABLE_LZ4)
   # was read, so the target is picked by existence, and a config that defines
   # none of these falls through to the lookups below instead of failing the
   # generate step on a name that was never there.
-  find_package(lz4 CONFIG QUIET)
-  foreach(_lrvx_lz4_candidate lz4::lz4 LZ4::lz4 LZ4::lz4_shared LZ4::lz4_static)
-    if(TARGET ${_lrvx_lz4_candidate})
-      set(LRVX_LZ4_TARGET ${_lrvx_lz4_candidate})
-      break()
-    endif()
-  endforeach()
-  if(LRVX_LZ4_TARGET)
-    target_link_libraries(${LRVX} PUBLIC ${LRVX_LZ4_TARGET})
-    message(STATUS "LZ4 found via find_package: ${LRVX_LZ4_TARGET}")
-  else()
-    # Try find_library (a system lz4 that ships no package files)
-    find_library(LZ4_LIBRARY NAMES lz4)
-    find_path(LZ4_INCLUDE_DIR NAMES lz4.h)
-    if(LZ4_LIBRARY AND LZ4_INCLUDE_DIR)
-      target_include_directories(${LRVX} PUBLIC ${LZ4_INCLUDE_DIR})
-      target_link_libraries(${LRVX} PUBLIC ${LZ4_LIBRARY})
-      message(STATUS "LZ4 found via find_library: ${LZ4_LIBRARY}")
+  set(_lrvx_lz4_linked OFF)
+  if(NOT LRVX_VENDOR_LZ4)
+    find_package(lz4 CONFIG QUIET)
+    foreach(_lrvx_lz4_candidate lz4::lz4 LZ4::lz4 LZ4::lz4_shared LZ4::lz4_static)
+      if(TARGET ${_lrvx_lz4_candidate})
+        set(LRVX_LZ4_TARGET ${_lrvx_lz4_candidate})
+        break()
+      endif()
+    endforeach()
+    if(LRVX_LZ4_TARGET)
+      target_link_libraries(${LRVX} PUBLIC ${LRVX_LZ4_TARGET})
+      message(STATUS "LZ4 found via find_package: ${LRVX_LZ4_TARGET}")
+      set(_lrvx_lz4_linked ON)
     else()
-      # Try pkg-config (Linux with liblz4-devel installed)
-      find_package(PkgConfig QUIET)
-      if(PkgConfig_FOUND)
-        pkg_check_modules(LZ4 QUIET liblz4)
-      endif()
-      if(LZ4_FOUND)
-        target_include_directories(${LRVX} PUBLIC ${LZ4_INCLUDE_DIRS})
-        target_link_libraries(${LRVX} PUBLIC ${LZ4_LINK_LIBRARIES})
-        message(STATUS "LZ4 found via pkg-config")
+      # Try find_library (a system lz4 that ships no package files)
+      find_library(LZ4_LIBRARY NAMES lz4)
+      find_path(LZ4_INCLUDE_DIR NAMES lz4.h)
+      if(LZ4_LIBRARY AND LZ4_INCLUDE_DIR)
+        target_include_directories(${LRVX} PUBLIC ${LZ4_INCLUDE_DIR})
+        target_link_libraries(${LRVX} PUBLIC ${LZ4_LIBRARY})
+        message(STATUS "LZ4 found via find_library: ${LZ4_LIBRARY}")
+        set(_lrvx_lz4_linked ON)
       else()
-        # Last resort: vendor lz4 source and compile it directly into lrvx.
-        # We avoid lz4's own cmake build because lz4_static lands in lz4's own
-        # export set, conflicting with install(EXPORT lrvxTargets) below
-        # (a target can belong to only one export set in CMake). Compiling
-        # lz4.c into ${LRVX} sidesteps the issue and keeps lz4 symbols
-        # available to compression.h consumers without a separate target.
-        include(FetchContent)
-        FetchContent_Declare(
-          lz4_src
-          GIT_REPOSITORY https://github.com/lz4/lz4.git
-          GIT_TAG v1.10.0
-          GIT_SHALLOW TRUE
-        )
-        FetchContent_GetProperties(lz4_src)
-        if(NOT lz4_src_POPULATED)
-          FetchContent_Populate(lz4_src)
+        # Try pkg-config (Linux with liblz4-devel installed)
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+          pkg_check_modules(LZ4 QUIET liblz4)
         endif()
-        target_sources(${LRVX} PRIVATE ${lz4_src_SOURCE_DIR}/lib/lz4.c)
-        target_include_directories(${LRVX} PUBLIC
-          $<BUILD_INTERFACE:${lz4_src_SOURCE_DIR}/lib>
-        )
-        # Install vendored lz4 header so installed lrvx consumers can include it.
-        install(FILES ${lz4_src_SOURCE_DIR}/lib/lz4.h DESTINATION include)
-        message(STATUS "LZ4 vendored from sources (compiled into lrvx)")
+        if(LZ4_FOUND)
+          target_include_directories(${LRVX} PUBLIC ${LZ4_INCLUDE_DIRS})
+          target_link_libraries(${LRVX} PUBLIC ${LZ4_LINK_LIBRARIES})
+          message(STATUS "LZ4 found via pkg-config")
+          set(_lrvx_lz4_linked ON)
+        endif()
       endif()
     endif()
+  endif()
+  if(NOT _lrvx_lz4_linked)
+    # Last resort: vendor lz4 source and compile it directly into lrvx.
+    # We avoid lz4's own cmake build because lz4_static lands in lz4's own
+    # export set, conflicting with install(EXPORT lrvxTargets) below
+    # (a target can belong to only one export set in CMake). Compiling
+    # lz4.c into ${LRVX} sidesteps the issue and keeps lz4 symbols
+    # available to compression.h consumers without a separate target.
+    include(FetchContent)
+    FetchContent_Declare(
+      lz4_src
+      GIT_REPOSITORY https://github.com/lz4/lz4.git
+      GIT_TAG v1.10.0
+      GIT_SHALLOW TRUE
+    )
+    FetchContent_GetProperties(lz4_src)
+    if(NOT lz4_src_POPULATED)
+      FetchContent_Populate(lz4_src)
+    endif()
+    target_sources(${LRVX} PRIVATE ${lz4_src_SOURCE_DIR}/lib/lz4.c)
+    target_include_directories(${LRVX} PUBLIC
+      $<BUILD_INTERFACE:${lz4_src_SOURCE_DIR}/lib>
+    )
+    # Install vendored lz4 header so installed lrvx consumers can include it.
+    install(FILES ${lz4_src_SOURCE_DIR}/lib/lz4.h DESTINATION include)
+    message(STATUS "LZ4 vendored from sources (compiled into lrvx)")
   endif()
   target_compile_definitions(${LRVX} PUBLIC LRVX_LZ4_ENABLED=1)
   message(STATUS "LZ4 compression enabled")
