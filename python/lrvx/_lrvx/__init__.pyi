@@ -3199,6 +3199,9 @@ class Stats:
     def final_capital(self) -> float:
         ...
     @property
+    def final_equity(self) -> float:
+        ...
+    @property
     def gross_loss(self) -> float:
         ...
     @property
@@ -3239,6 +3242,9 @@ class Stats:
         ...
     @property
     def total_trades(self) -> int:
+        ...
+    @property
+    def unrealized_pnl(self) -> float:
         ...
     @property
     def win_rate(self) -> float:

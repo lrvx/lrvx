@@ -698,10 +698,12 @@ void LrvxJsStrategy::loadStdlib()
         var sorted = signals.sorted();
         var sigIdx = 0;
         var orderId = 1;
+        var lastClose = {};
 
         for (var mi = 0; mi < merged.length; mi++) {
           var ref = merged[mi];
           var sid = getSid(ref.key);
+          lastClose[sid] = ref.bar.close;
           // Advance clock (ns) and fill pending orders at this bar's close.
           // Signals are submitted AFTER onBar to match Python Engine semantics.
           executor.advanceClock(ref.tsNs);
@@ -727,6 +729,8 @@ void LrvxJsStrategy::loadStdlib()
           sigIdx++;
         }
         result.ingestExecutor(executor);
+        // An open position is valued at the last close the run replayed.
+        for (var ms in lastClose) { result.markPrice(Number(ms), lastClose[ms]); }
         var stats = result.stats();
         result.destroy();
         executor.destroy();

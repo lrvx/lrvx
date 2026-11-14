@@ -1999,6 +1999,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - *property* `avg_win: float`
 - *property* `calmar_ratio: float`
 - *property* `final_capital: float`
+- *property* `final_equity: float`
 - *property* `gross_loss: float`
 - *property* `gross_profit: float`
 - *property* `initial_capital: float`
@@ -2013,6 +2014,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - *property* `total_fees: float`
 - *property* `total_pnl: float`
 - *property* `total_trades: int`
+- *property* `unrealized_pnl: float`
 - *property* `win_rate: float`
 - *property* `winning_trades: int`
 

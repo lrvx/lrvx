@@ -288,6 +288,9 @@ struct PyStats
   double gross_profit, gross_loss, max_drawdown, max_drawdown_pct;
   double win_rate, profit_factor, avg_win, avg_loss;
   double sharpe_ratio, sortino_ratio, calmar_ratio, return_pct;
+  // The position still open at the end, marked at the last close the run
+  // replayed; net_pnl, final_capital and return_pct leave it out.
+  double unrealized_pnl, final_equity;
 
   static PyStats fromBacktest(const BacktestStats& s)
   {
@@ -295,7 +298,8 @@ struct PyStats
             s.finalCapital, s.totalPnl, s.totalFees, s.netPnl,
             s.grossProfit, s.grossLoss, s.maxDrawdown, s.maxDrawdownPct,
             s.winRate, s.profitFactor, s.avgWin, s.avgLoss,
-            s.sharpeRatio, s.sortinoRatio, s.calmarRatio, s.returnPct};
+            s.sharpeRatio, s.sortinoRatio, s.calmarRatio, s.returnPct,
+            s.unrealizedPnl, s.finalEquity};
   }
 
   py::dict toDict() const
@@ -321,6 +325,8 @@ struct PyStats
     d["sortino_ratio"] = sortino_ratio;
     d["calmar_ratio"] = calmar_ratio;
     d["return_pct"] = return_pct;
+    d["unrealized_pnl"] = unrealized_pnl;
+    d["final_equity"] = final_equity;
     return d;
   }
 
@@ -555,11 +561,13 @@ class Engine
     SimulatedExecutor executor(clock);
     OrderId nextOrderId = 1;
     size_t sigIdx = 0;
+    std::map<uint32_t, int64_t> lastClose;
 
     for (const auto& mb : merged)
     {
       clock.advanceTo(UnixNanos::fromRaw(mb.timestamp_ns));
       executor.onBar(mb.symbol_id, Price::fromRaw(mb.close_raw));
+      lastClose[mb.symbol_id] = mb.close_raw;
 
       while (sigIdx < sigs.size() &&
              sigs[sigOrder[sigIdx]].timestamp_ns <= mb.timestamp_ns)
@@ -580,6 +588,11 @@ class Engine
     for (const auto& fill : executor.fills())
     {
       result.recordFill(fill);
+    }
+    // An open position is valued at the last close the run replayed.
+    for (const auto& [sym, close] : lastClose)
+    {
+      result.markPrice(sym, Price::fromRaw(close));
     }
     return PyStats::fromBacktest(result.computeStats());
   }
@@ -807,6 +820,8 @@ PYBIND11_MODULE(_lrvx, m)
       .def_readonly("sortino_ratio", &PyStats::sortino_ratio)
       .def_readonly("calmar_ratio", &PyStats::calmar_ratio)
       .def_readonly("return_pct", &PyStats::return_pct)
+      .def_readonly("unrealized_pnl", &PyStats::unrealized_pnl)
+      .def_readonly("final_equity", &PyStats::final_equity)
       .def("to_dict", &PyStats::toDict)
       .def("__repr__", &PyStats::repr)
       .def("__getitem__",

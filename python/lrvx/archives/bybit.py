@@ -165,9 +165,9 @@ def check_symbol(symbol: str, market: str) -> None:
 
 
 def _hash_trade_id(token: str) -> int:
-    """Bybit's `trdMatchID` is a UUID string. Fold it to an int64 via
-    the low 8 bytes of MD5 so the lrvx ``trade_id`` field (uint64)
-    can carry it. The folded ids are unordered, so append dedup checks
+    """Bybit's `trdMatchID` is a UUID string. Fold it to an unsigned
+    64-bit int, the first 8 bytes of its MD5 digest read big-endian, so
+    the lrvx ``trade_id`` field (uint64) can carry it. The folded ids are unordered, so append dedup checks
     membership, never ``<= max``. Collisions are vanishingly rare
     within a single symbol's daily volume; one would only matter when
     a new trade collides with a trade already on the tape in the same

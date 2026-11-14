@@ -61,6 +61,8 @@ _SUMMARY_LAYOUT = [
     ("Total fees", "total_fees"),
     ("Initial capital", "initial_capital"),
     ("Final capital", "final_capital"),
+    ("Unrealized PnL", "unrealized_pnl"),
+    ("Final equity", "final_equity"),
 ]
 
 

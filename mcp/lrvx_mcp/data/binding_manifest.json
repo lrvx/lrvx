@@ -40015,6 +40015,11 @@
         },
         {
           "kind": "method",
+          "name": "final_equity",
+          "parent": "Stats"
+        },
+        {
+          "kind": "method",
           "name": "gross_loss",
           "parent": "Stats"
         },
@@ -40086,6 +40091,11 @@
         {
           "kind": "method",
           "name": "total_trades",
+          "parent": "Stats"
+        },
+        {
+          "kind": "method",
+          "name": "unrealized_pnl",
           "parent": "Stats"
         },
         {

@@ -138,7 +138,7 @@ Linear and inverse files:
 timestamp,symbol,side,size,price,tickDirection,trdMatchID,grossValue,homeNotional,foreignNotional
 ```
 
-Recent files add a trailing `RPI` column. `timestamp` is Unix seconds with a decimal fraction. `side` is the taker side, `Buy` / `Sell`, mapped to lrvx's `Side::BUY` / `Side::SELL`. `trdMatchID` is a UUID string that the importer folds into the 64-bit lrvx `trade_id` (low 8 bytes of its MD5); the folded ids carry no order, which the membership dedup above does not need. `size` is in the base coin for linear and in USD contracts for inverse. Older files list trades newest first.
+Recent files add a trailing `RPI` column. `timestamp` is Unix seconds with a decimal fraction. `side` is the taker side, `Buy` / `Sell`, mapped to lrvx's `Side::BUY` / `Side::SELL`. `trdMatchID` is a UUID string that the importer folds into the 64-bit lrvx `trade_id` (the first 8 bytes of its MD5 digest, read big-endian); the folded ids carry no order, which the membership dedup above does not need. `size` is in the base coin for linear and in USD contracts for inverse. Older files list trades newest first.
 
 Spot files:
 

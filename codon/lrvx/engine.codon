@@ -305,10 +305,12 @@ class Engine:
         sorted_signals = signals._sorted()
         sig_idx = 0
         order_id = 1
+        last_close = dict[int, float]()
 
         for ref in merged:
             bar = self._symbols[ref.key][ref.idx]
             sym_id = self._sym_id(ref.key)
+            last_close[sym_id] = bar.close()
 
             # Advance clock and fill any pending orders at this bar's close.
             # Signals are submitted AFTER on_bar so they fill at the next bar,
@@ -357,6 +359,9 @@ class Engine:
             sig_idx += 1
 
         result.ingest_executor(executor)
+        # An open position is valued at the last close the run replayed.
+        for sym_id, close in last_close.items():
+            result.mark_price(sym_id, close)
         stats = result.stats()
         result.close()
         executor.close()
