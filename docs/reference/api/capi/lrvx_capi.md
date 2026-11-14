@@ -72,6 +72,7 @@ typedef void* LrvxLiveEngineHandle;
 typedef void* LrvxRunnerHandle;
 typedef void* LrvxBacktestRunnerHandle;
 typedef void* LrvxGridSearchHandle;
+typedef void* LrvxWalkForwardResultHandle;
 typedef void* LrvxLatencyModelHandle;
 typedef void* LrvxTapeDiffHandle;
 typedef void* LrvxPortfolioRiskHandle;

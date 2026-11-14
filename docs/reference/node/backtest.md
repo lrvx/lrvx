@@ -92,8 +92,9 @@ search result's `stats` -- also carries:
 | `startTimeNs` | `bigint` | Timestamp of the run's first fill; `0n` when nothing filled |
 | `endTimeNs` | `bigint` | Timestamp of the run's last fill |
 
-A `BacktestRunner` run, `BacktestResult.stats()` and `Engine.run()` also value the position still
-open when the data ended:
+A `BacktestRunner` run, `BacktestResult.stats()`, `Engine.run()`, a walk-forward fold's
+`trainStats` / `testStats` and a grid search result's `stats` also value the position still open
+when the data ended:
 
 | Key | Type | Description |
 |-----|------|-------------|
@@ -106,6 +107,13 @@ bar's close on bar replay (`runBars`, `runTapeBars`; a bar still open when a tap
 replayed), the last trade on tick replay (`runTape`, `runTapes`, `runOhlcv`, `runCsv`,
 `runTapeBarsOnTicks`); book records do not move it. A symbol never priced is valued at its last
 fill. `openPositions()` lists the rows.
+
+A `WalkForwardRunner` fold values each leg on its own: `trainStats` the position open at the end
+of the train window, `testStats` the one open at the end of the test window, each marked at its
+window's last close (`runCsv` replays closes as trades). A `GridSearch` result's `stats` carry the
+`unrealizedPnl` and `finalEquity` its factory returned, so a `BacktestRunner` stats object returned
+as is keeps them; a factory that leaves them out reads 0, like every other key, and a value that is
+not a number is a `TypeError` naming the key.
 
 ---
 

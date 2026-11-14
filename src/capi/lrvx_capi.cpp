@@ -10565,6 +10565,118 @@ void lrvx_backtest_runner_set_pnl_tracker(LrvxBacktestRunnerHandle h,
 // Walk-forward
 // ============================================================
 
+namespace
+{
+
+// What one walk-forward run over a CSV produced, kept in core form so a fold
+// keeps the valuation LrvxWalkForwardFold has no field for.
+struct LrvxWalkForwardResultImpl
+{
+  std::vector<WalkForwardFold> folds;
+};
+
+WalkForwardConfig toWalkForwardConfig(const LrvxWalkForwardConfig& cfg)
+{
+  WalkForwardConfig wcfg{};
+  wcfg.mode = (cfg.mode == 0) ? WalkForwardMode::Anchored : WalkForwardMode::Sliding;
+  wcfg.trainSize = cfg.train_size;
+  wcfg.testSize = cfg.test_size;
+  wcfg.step = cfg.step;
+  wcfg.minTrainSize = cfg.min_train_size;
+  return wcfg;
+}
+
+// The close bars of the CSV for `symbol`. Throws with the path for a file that
+// cannot be read and with the name for a symbol the registry does not hold.
+std::vector<OhlcvReplaySource::Bar> readWalkForwardBars(const SymbolRegistry* registry,
+                                                        const char* csv_path, const char* symbol)
+{
+  const uint32_t symId = resolveRunSymbol(registry, symbol);
+  std::vector<OhlcvReplaySource::Bar> bars;
+  readOhlcvCsv(csv_path, [&](int64_t ts, double close)
+               {
+                 OhlcvReplaySource::Bar bar;
+                 bar.ts_ns = ts;
+                 bar.price_raw = Price::fromDouble(close).raw();
+                 bar.symbol_id = symId;
+                 bars.push_back(bar); });
+  return bars;
+}
+
+// The fold count `bars` bars give under `wcfg`, without running anything.
+uint32_t countWalkForwardFolds(uint64_t n, const WalkForwardConfig& wcfg)
+{
+  const uint64_t step = wcfg.step == 0 ? wcfg.testSize : wcfg.step;
+  if (wcfg.testSize == 0 || step == 0)
+  {
+    return 0;
+  }
+  if (wcfg.mode == WalkForwardMode::Anchored)
+  {
+    const uint64_t firstSplit = wcfg.minTrainSize > 0 ? wcfg.minTrainSize : wcfg.testSize;
+    if (firstSplit + wcfg.testSize > n)
+    {
+      return 0;
+    }
+    return static_cast<uint32_t>((n - firstSplit - wcfg.testSize) / step + 1);
+  }
+  if (wcfg.trainSize + wcfg.testSize > n)
+  {
+    return 0;
+  }
+  return static_cast<uint32_t>((n - wcfg.trainSize - wcfg.testSize) / step + 1);
+}
+
+// Runs every fold over `bars`, asking `factory` for a strategy per window.
+std::vector<WalkForwardFold> runWalkForwardFolds(const std::vector<OhlcvReplaySource::Bar>& bars,
+                                                 double fee_rate, double initial_capital,
+                                                 const WalkForwardConfig& wcfg,
+                                                 LrvxWalkForwardFactoryFn factory,
+                                                 void* user_data)
+{
+  // A file with a header and no rows is no data, not an error: zero folds,
+  // like any file too short for one.
+  if (bars.empty())
+  {
+    return {};
+  }
+  BacktestConfig bcfg{};
+  bcfg.feeRate = fee_rate;
+  bcfg.initialCapital = initial_capital;
+  bcfg.usePercentageFee = true;
+
+  WalkForwardRunner wfr(bcfg, wcfg);
+  wfr.setStrategyFactory([factory, user_data](std::size_t foldIdx) -> IStrategy*
+                         {
+                           LrvxStrategyHandle h = factory(user_data, foldIdx);
+                           return reinterpret_cast<BridgeStrategy*>(h); });
+  return wfr.run(bars);
+}
+
+void fillFoldStruct(const WalkForwardFold& f, LrvxWalkForwardFold* out)
+{
+  out->fold_index = f.foldIndex;
+  out->train_start_bar = f.trainStartBar;
+  out->train_end_bar = f.trainEndBar;
+  out->test_start_bar = f.testStartBar;
+  out->test_end_bar = f.testEndBar;
+  out->train_start_ns = static_cast<int64_t>(f.trainStartNs);
+  out->train_end_ns = static_cast<int64_t>(f.trainEndNs);
+  out->test_start_ns = static_cast<int64_t>(f.testStartNs);
+  out->test_end_ns = static_cast<int64_t>(f.testEndNs);
+  fillStatsStruct(f.trainStats, &out->train_stats);
+  fillStatsStruct(f.testStats, &out->test_stats);
+}
+
+// The fold at `index`, or nullptr past the end: a read there is 0, not an error.
+const WalkForwardFold* walkForwardFoldAt(LrvxWalkForwardResultHandle h, uint32_t index)
+{
+  const auto& folds = static_cast<LrvxWalkForwardResultImpl*>(h)->folds;
+  return index < folds.size() ? &folds[index] : nullptr;
+}
+
+}  // namespace
+
 uint32_t lrvx_walk_forward_run_csv(LrvxRegistryHandle reg_handle,
                                    const char* csv_path, const char* symbol,
                                    double fee_rate, double initial_capital,
@@ -10578,90 +10690,104 @@ uint32_t lrvx_walk_forward_run_csv(LrvxRegistryHandle reg_handle,
   LRVX_CAPI_REQUIRE(csv_path);
   LRVX_CAPI_REQUIRE(cfg);
   LRVX_CAPI_REQUIRE(factory);
-  const uint32_t symId = resolveRunSymbol(toRegistry(reg_handle), symbol);
-  std::vector<OhlcvReplaySource::Bar> bars;
-  readOhlcvCsv(csv_path, [&](int64_t ts, double close)
-               {
-                 OhlcvReplaySource::Bar bar;
-                 bar.ts_ns = ts;
-                 bar.price_raw = Price::fromDouble(close).raw();
-                 bar.symbol_id = symId;
-                 bars.push_back(bar); });
-  // A file with a header and no rows is no data, not an error: zero folds,
-  // like any file too short for one.
-  if (bars.empty())
-  {
-    return 0;
-  }
-
-  BacktestConfig bcfg{};
-  bcfg.feeRate = fee_rate;
-  bcfg.initialCapital = initial_capital;
-  bcfg.usePercentageFee = true;
-
-  WalkForwardConfig wcfg{};
-  wcfg.mode = (cfg->mode == 0) ? WalkForwardMode::Anchored
-                               : WalkForwardMode::Sliding;
-  wcfg.trainSize = cfg->train_size;
-  wcfg.testSize = cfg->test_size;
-  wcfg.step = cfg->step;
-  wcfg.minTrainSize = cfg->min_train_size;
+  const auto bars = readWalkForwardBars(toRegistry(reg_handle), csv_path, symbol);
+  const WalkForwardConfig wcfg = toWalkForwardConfig(*cfg);
 
   // If the caller only wants a count, compute it from the config + bar
   // count without invoking the factory or running anything. This lets
   // bindings size the output buffer cheaply.
   if (!folds_out || max_folds == 0)
   {
-    const uint64_t n = static_cast<uint64_t>(bars.size());
-    const uint64_t step = wcfg.step == 0 ? wcfg.testSize : wcfg.step;
-    if (wcfg.testSize == 0 || step == 0)
-    {
-      return 0;
-    }
-    if (wcfg.mode == WalkForwardMode::Anchored)
-    {
-      const uint64_t firstSplit =
-          wcfg.minTrainSize > 0 ? wcfg.minTrainSize : wcfg.testSize;
-      if (firstSplit + wcfg.testSize > n)
-      {
-        return 0;
-      }
-      return static_cast<uint32_t>(
-          (n - firstSplit - wcfg.testSize) / step + 1);
-    }
-    if (wcfg.trainSize + wcfg.testSize > n)
-    {
-      return 0;
-    }
-    return static_cast<uint32_t>(
-        (n - wcfg.trainSize - wcfg.testSize) / step + 1);
+    return bars.empty() ? 0 : countWalkForwardFolds(bars.size(), wcfg);
   }
 
-  WalkForwardRunner wfr(bcfg, wcfg);
-  wfr.setStrategyFactory([factory, user_data](std::size_t foldIdx) -> IStrategy*
-                         {
-                           LrvxStrategyHandle h = factory(user_data, foldIdx);
-                           return reinterpret_cast<BridgeStrategy*>(h); });
-
-  auto folds = wfr.run(bars);
+  const auto folds = runWalkForwardFolds(bars, fee_rate, initial_capital, wcfg, factory, user_data);
   const uint32_t total = static_cast<uint32_t>(folds.size());
   const uint32_t n = (total < max_folds) ? total : max_folds;
   for (uint32_t i = 0; i < n; ++i)
   {
-    const auto& f = folds[i];
-    folds_out[i].fold_index = f.foldIndex;
-    folds_out[i].train_start_bar = f.trainStartBar;
-    folds_out[i].train_end_bar = f.trainEndBar;
-    folds_out[i].test_start_bar = f.testStartBar;
-    folds_out[i].test_end_bar = f.testEndBar;
-    folds_out[i].train_start_ns = static_cast<int64_t>(f.trainStartNs);
-    folds_out[i].train_end_ns = static_cast<int64_t>(f.trainEndNs);
-    folds_out[i].test_start_ns = static_cast<int64_t>(f.testStartNs);
-    folds_out[i].test_end_ns = static_cast<int64_t>(f.testEndNs);
-    fillStatsStruct(f.trainStats, &folds_out[i].train_stats);
-    fillStatsStruct(f.testStats, &folds_out[i].test_stats);
+    fillFoldStruct(folds[i], &folds_out[i]);
   }
   return n;
+  LRVX_CAPI_LEAVE;
+}
+
+LrvxWalkForwardResultHandle lrvx_walk_forward_run_csv_result(
+    LrvxRegistryHandle reg_handle, const char* csv_path, const char* symbol, double fee_rate,
+    double initial_capital, const LrvxWalkForwardConfig* cfg, LrvxWalkForwardFactoryFn factory,
+    void* user_data)
+{
+  LRVX_CAPI_ENTER(reg_handle);
+  LRVX_CAPI_REQUIRE(csv_path);
+  LRVX_CAPI_REQUIRE(cfg);
+  LRVX_CAPI_REQUIRE(factory);
+  const auto bars = readWalkForwardBars(toRegistry(reg_handle), csv_path, symbol);
+  auto out = std::make_unique<LrvxWalkForwardResultImpl>();
+  out->folds = runWalkForwardFolds(bars, fee_rate, initial_capital, toWalkForwardConfig(*cfg),
+                                   factory, user_data);
+  return static_cast<LrvxWalkForwardResultHandle>(out.release());
+  LRVX_CAPI_LEAVE;
+}
+
+void lrvx_walk_forward_result_destroy(LrvxWalkForwardResultHandle result)
+{
+  LRVX_CAPI_ENTER_DESTROY(result);
+  delete static_cast<LrvxWalkForwardResultImpl*>(result);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+uint32_t lrvx_walk_forward_result_folds(LrvxWalkForwardResultHandle result,
+                                        LrvxWalkForwardFold* folds_out, uint32_t max_folds)
+{
+  LRVX_CAPI_ENTER(result);
+  const auto& folds = static_cast<LrvxWalkForwardResultImpl*>(result)->folds;
+  const uint32_t total = static_cast<uint32_t>(folds.size());
+  if (!folds_out)
+  {
+    return total;
+  }
+  const uint32_t n = (total < max_folds) ? total : max_folds;
+  for (uint32_t i = 0; i < n; ++i)
+  {
+    fillFoldStruct(folds[i], &folds_out[i]);
+  }
+  return n;
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_walk_forward_result_train_unrealized_pnl(LrvxWalkForwardResultHandle result,
+                                                     uint32_t fold_index)
+{
+  LRVX_CAPI_ENTER(result);
+  const auto* f = walkForwardFoldAt(result, fold_index);
+  return f ? f->trainStats.unrealizedPnl : 0.0;
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_walk_forward_result_train_final_equity(LrvxWalkForwardResultHandle result,
+                                                   uint32_t fold_index)
+{
+  LRVX_CAPI_ENTER(result);
+  const auto* f = walkForwardFoldAt(result, fold_index);
+  return f ? f->trainStats.finalEquity : 0.0;
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_walk_forward_result_test_unrealized_pnl(LrvxWalkForwardResultHandle result,
+                                                    uint32_t fold_index)
+{
+  LRVX_CAPI_ENTER(result);
+  const auto* f = walkForwardFoldAt(result, fold_index);
+  return f ? f->testStats.unrealizedPnl : 0.0;
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_walk_forward_result_test_final_equity(LrvxWalkForwardResultHandle result,
+                                                  uint32_t fold_index)
+{
+  LRVX_CAPI_ENTER(result);
+  const auto* f = walkForwardFoldAt(result, fold_index);
+  return f ? f->testStats.finalEquity : 0.0;
   LRVX_CAPI_LEAVE;
 }
 
@@ -10672,6 +10798,18 @@ uint32_t lrvx_walk_forward_run_csv(LrvxRegistryHandle reg_handle,
 struct LrvxGridSearchImpl
 {
   GridSearch core;
+
+  // The valuation of each combination the last run produced. A factory may
+  // record from whatever thread it runs a combination on, so the store has
+  // its own lock; the factory is never called with it held.
+  struct Valuation
+  {
+    double unrealizedPnl{0.0};
+    double finalEquity{0.0};
+    bool recorded{false};
+  };
+  std::mutex valuationMutex;
+  std::vector<Valuation> valuations;
 };
 
 LrvxGridSearchHandle lrvx_grid_search_create()
@@ -10753,6 +10891,10 @@ uint64_t lrvx_grid_search_run(LrvxGridSearchHandle gs,
   // GridSearch::run because the factory expects a C-side stats fill,
   // not a BacktestResult.
   const uint64_t n = std::min<uint64_t>(total, max_results);
+  {
+    const std::lock_guard<std::mutex> lock(impl->valuationMutex);
+    impl->valuations.assign(n, {});
+  }
   for (uint64_t i = 0; i < n; ++i)
   {
     auto params = impl->core.paramsForIndex(i);
@@ -10760,8 +10902,52 @@ uint64_t lrvx_grid_search_run(LrvxGridSearchHandle gs,
     factory(user_data, i, params.data(),
             static_cast<uint32_t>(params.size()), &s);
     stats_out[i] = s;
+    // Nothing recorded means nothing open: equity is what the closed trades
+    // left.
+    const std::lock_guard<std::mutex> lock(impl->valuationMutex);
+    auto& v = impl->valuations[i];
+    if (!v.recorded)
+    {
+      v.unrealizedPnl = 0.0;
+      v.finalEquity = s.initialCapital + s.netPnl;
+    }
   }
   return n;
+  LRVX_CAPI_LEAVE;
+}
+
+void lrvx_grid_search_record_valuation(LrvxGridSearchHandle gs, uint64_t index,
+                                       double unrealized_pnl, double final_equity)
+{
+  LRVX_CAPI_ENTER_VOID(gs);
+  auto* impl = static_cast<LrvxGridSearchImpl*>(gs);
+  const std::lock_guard<std::mutex> lock(impl->valuationMutex);
+  if (index >= impl->valuations.size())
+  {
+    return;
+  }
+  auto& v = impl->valuations[index];
+  v.unrealizedPnl = unrealized_pnl;
+  v.finalEquity = final_equity;
+  v.recorded = true;
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+double lrvx_grid_search_result_unrealized_pnl(LrvxGridSearchHandle gs, uint64_t index)
+{
+  LRVX_CAPI_ENTER(gs);
+  auto* impl = static_cast<LrvxGridSearchImpl*>(gs);
+  const std::lock_guard<std::mutex> lock(impl->valuationMutex);
+  return index < impl->valuations.size() ? impl->valuations[index].unrealizedPnl : 0.0;
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_grid_search_result_final_equity(LrvxGridSearchHandle gs, uint64_t index)
+{
+  LRVX_CAPI_ENTER(gs);
+  auto* impl = static_cast<LrvxGridSearchImpl*>(gs);
+  const std::lock_guard<std::mutex> lock(impl->valuationMutex);
+  return index < impl->valuations.size() ? impl->valuations[index].finalEquity : 0.0;
   LRVX_CAPI_LEAVE;
 }
 

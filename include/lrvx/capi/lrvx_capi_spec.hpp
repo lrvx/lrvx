@@ -3913,6 +3913,54 @@ extern "C"
                                      LrvxWalkForwardFold* folds_out,
                                      uint32_t max_folds);
 
+  // An owned walk-forward result: the folds of one run, each leg also valued
+  // at the end of its window. LrvxWalkForwardFold keeps its shape; the
+  // valuation is read through the accessors below.
+  typedef void* LrvxWalkForwardResultHandle;
+
+  // The same run as lrvx_walk_forward_run_csv, kept in an owned handle. Fails
+  // where lrvx_walk_forward_run_csv does (a CSV that cannot be opened or
+  // parsed, a symbol the registry does not hold, a NULL registry, path,
+  // config or factory): NULL, the reason in lrvx_last_error_message. A file
+  // too short for one fold is a handle with zero folds and no error. Free
+  // with lrvx_walk_forward_result_destroy.
+  LRVX_EXPORT(group = "walk_forward")
+  LrvxWalkForwardResultHandle lrvx_walk_forward_run_csv_result(
+      LrvxRegistryHandle registry, const char* csv_path, const char* symbol,
+      double fee_rate, double initial_capital, const LrvxWalkForwardConfig* cfg,
+      LrvxWalkForwardFactoryFn factory, void* user_data);
+
+  LRVX_EXPORT(group = "walk_forward")
+  void lrvx_walk_forward_result_destroy(LrvxWalkForwardResultHandle result);
+
+  // Returns the fold count. If folds_out is non-NULL, writes up to max_folds
+  // folds -- the same lrvx_walk_forward_run_csv writes for the run -- and
+  // returns the number written.
+  LRVX_EXPORT(group = "walk_forward")
+  uint32_t lrvx_walk_forward_result_folds(LrvxWalkForwardResultHandle result,
+                                          LrvxWalkForwardFold* folds_out,
+                                          uint32_t max_folds);
+
+  // Each leg's open position at the end of its window, marked at the
+  // window's last close ((mark - entry) * qty long, (entry - mark) * qty
+  // short, no exit fee), and initial_capital + net_pnl + unrealized_pnl of
+  // that leg. A fold_index past the last fold reads 0 with no error.
+  LRVX_EXPORT(group = "walk_forward")
+  double lrvx_walk_forward_result_train_unrealized_pnl(LrvxWalkForwardResultHandle result,
+                                                       uint32_t fold_index);
+
+  LRVX_EXPORT(group = "walk_forward")
+  double lrvx_walk_forward_result_train_final_equity(LrvxWalkForwardResultHandle result,
+                                                     uint32_t fold_index);
+
+  LRVX_EXPORT(group = "walk_forward")
+  double lrvx_walk_forward_result_test_unrealized_pnl(LrvxWalkForwardResultHandle result,
+                                                      uint32_t fold_index);
+
+  LRVX_EXPORT(group = "walk_forward")
+  double lrvx_walk_forward_result_test_final_equity(LrvxWalkForwardResultHandle result,
+                                                    uint32_t fold_index);
+
   // ============================================================
   // Grid search (sequential)
   // ============================================================
@@ -3958,6 +4006,25 @@ extern "C"
                                 void* user_data,
                                 LrvxBacktestStats* stats_out,
                                 uint32_t max_results);
+
+  // The open position at the end of combination `index`, recorded by the
+  // factory that ran it: LrvxBacktestStats has no field for it. A record for
+  // an index the current run does not produce is dropped without an error.
+  // Safe to call from whichever thread the factory runs a combination on.
+  LRVX_EXPORT(group = "grid_search")
+  void lrvx_grid_search_record_valuation(LrvxGridSearchHandle gs, uint64_t index,
+                                         double unrealized_pnl, double final_equity);
+
+  // The valuation of a combination of the last lrvx_grid_search_run that was
+  // handed stats_out; each such run starts afresh. A combination whose
+  // factory recorded nothing reads unrealized_pnl 0 and final_equity
+  // initialCapital + netPnl of the stats it wrote. An index the last run did
+  // not produce, or any index before a run, reads 0 with no error.
+  LRVX_EXPORT(group = "grid_search")
+  double lrvx_grid_search_result_unrealized_pnl(LrvxGridSearchHandle gs, uint64_t index);
+
+  LRVX_EXPORT(group = "grid_search")
+  double lrvx_grid_search_result_final_equity(LrvxGridSearchHandle gs, uint64_t index);
 
   // ============================================================
   // Heatmap rendering
@@ -5618,7 +5685,7 @@ extern "C"
 
   // Text for the code above: the function that failed, and what the exception
   // said. The functions that open a path -- the run_* calls,
-  // lrvx_walk_forward_run_csv, lrvx_run_reader_open,
+  // lrvx_walk_forward_run_csv and _run_csv_result, lrvx_run_reader_open,
   // lrvx_run_recorder_create, lrvx_tape_diff_create,
   // lrvx_merged_tape_reader_create, lrvx_funding_schedule_load_tape, a
   // segment merge, split or export that ends with success = 0 (every error

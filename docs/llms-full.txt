@@ -5460,6 +5460,12 @@ const results = gs.run();  // [{index, params, stats}, ...]
 
 A key the factory leaves out reads 0. A key of another type (a string where a number belongs), a return value that is not an object, or an error the factory throws stops the run, and `run()` throws that error.
 
+Each result's `stats` also carry `unrealizedPnl` and `finalEquity`, the position the combination's run left open at the end, as the factory returned them: a `BacktestRunner` stats object returned as is keeps its own, and a factory that leaves them out reads 0.
+
+### C API
+
+`LrvxBacktestStats` has no field for the open position at the end of a run, so a factory hands it over separately: `lrvx_grid_search_record_valuation(gs, index, unrealized_pnl, final_equity)` with the `index` it was called with, and after the run `lrvx_grid_search_result_unrealized_pnl(gs, index)` and `lrvx_grid_search_result_final_equity(gs, index)` read it back. Each `lrvx_grid_search_run` that is handed `stats_out` starts afresh. A combination whose factory recorded nothing reads `unrealized_pnl` 0 and `final_equity` `initialCapital + netPnl` of the stats it wrote. A record for an index the run does not produce is dropped, and a read past what the last run produced (or before any run) returns 0, neither with an error. The record store has its own lock, so a factory may record from whichever thread it runs a combination on.
+
 ### Pairs with walk-forward
 
 Compose with [walk-forward](walk-forward.md): run a `GridSearch` on each fold's train slice, pick the best params by your criterion, evaluate on test. The two primitives stay separate so the choice of "best" stays opinionated to the caller (sharpe vs. profit factor vs. drawdown-aware).
@@ -16131,8 +16137,9 @@ search result's `stats` -- also carries:
 | `startTimeNs` | `bigint` | Timestamp of the run's first fill; `0n` when nothing filled |
 | `endTimeNs` | `bigint` | Timestamp of the run's last fill |
 
-A `BacktestRunner` run, `BacktestResult.stats()` and `Engine.run()` also value the position still
-open when the data ended:
+A `BacktestRunner` run, `BacktestResult.stats()`, `Engine.run()`, a walk-forward fold's
+`trainStats` / `testStats` and a grid search result's `stats` also value the position still open
+when the data ended:
 
 | Key | Type | Description |
 |-----|------|-------------|
@@ -16145,6 +16152,13 @@ bar's close on bar replay (`runBars`, `runTapeBars`; a bar still open when a tap
 replayed), the last trade on tick replay (`runTape`, `runTapes`, `runOhlcv`, `runCsv`,
 `runTapeBarsOnTicks`); book records do not move it. A symbol never priced is valued at its last
 fill. `openPositions()` lists the rows.
+
+A `WalkForwardRunner` fold values each leg on its own: `trainStats` the position open at the end
+of the train window, `testStats` the one open at the end of the test window, each marked at its
+window's last close (`runCsv` replays closes as trades). A `GridSearch` result's `stats` carry the
+`unrealizedPnl` and `finalEquity` its factory returned, so a `BacktestRunner` stats object returned
+as is keeps them; a factory that leaves them out reads 0, like every other key, and a value that is
+not a number is a `TypeError` naming the key.
 
 ---
 
@@ -19444,6 +19458,7 @@ typedef void* LrvxLiveEngineHandle;
 typedef void* LrvxRunnerHandle;
 typedef void* LrvxBacktestRunnerHandle;
 typedef void* LrvxGridSearchHandle;
+typedef void* LrvxWalkForwardResultHandle;
 typedef void* LrvxLatencyModelHandle;
 typedef void* LrvxTapeDiffHandle;
 typedef void* LrvxPortfolioRiskHandle;

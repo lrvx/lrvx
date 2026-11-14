@@ -64,7 +64,10 @@ inline LrvxStrategyHandle walkForwardFactoryThunk(void* user_data,
   }
 }
 
-inline Napi::Object statsToJsObj(Napi::Env env, const LrvxBacktestStats& s)
+// LrvxBacktestStats has no field for the open position at the end; the
+// caller reads it through the C API accessor of the run that produced `s`.
+inline Napi::Object statsToJsObj(Napi::Env env, const LrvxBacktestStats& s,
+                                 double unrealizedPnl, double finalEquity)
 {
   auto obj = Napi::Object::New(env);
   obj.Set("totalTrades", Napi::Number::New(env, static_cast<double>(s.totalTrades)));
@@ -83,8 +86,20 @@ inline Napi::Object statsToJsObj(Napi::Env env, const LrvxBacktestStats& s)
   obj.Set("winRate", Napi::Number::New(env, s.winRate));
   obj.Set("profitFactor", Napi::Number::New(env, s.profitFactor));
   setTradeTimeStats(env, obj, s);
+  obj.Set("unrealizedPnl", Napi::Number::New(env, unrealizedPnl));
+  obj.Set("finalEquity", Napi::Number::New(env, finalEquity));
   return obj;
 }
+
+// Owns a walk-forward result handle for the length of runCsv.
+struct WalkForwardResultGuard
+{
+  LrvxWalkForwardResultHandle handle{nullptr};
+  WalkForwardResultGuard() = default;
+  WalkForwardResultGuard(const WalkForwardResultGuard&) = delete;
+  WalkForwardResultGuard& operator=(const WalkForwardResultGuard&) = delete;
+  ~WalkForwardResultGuard() { lrvx_walk_forward_result_destroy(handle); }
+};
 
 class WalkForwardRunnerNode
     : public Napi::ObjectWrap<WalkForwardRunnerNode>
@@ -161,35 +176,28 @@ class WalkForwardRunnerNode
                                  1};
       ctx.factory_fn = Napi::Persistent(_factory.Value());
 
-      // First call with NULL out_buf to get the count. Zero is also what a
-      // file too short for one fold gives, so the error is what tells an
-      // unreadable file or an unknown symbol from that.
+      // One run, kept in a handle: the folds and each leg's valuation come
+      // from it. NULL with an error is an unreadable file or an unknown
+      // symbol; a file too short for one fold is a handle with no folds.
       lrvx_clear_last_error();
-      uint32_t total = lrvx_walk_forward_run_csv(
-          static_cast<LrvxRegistryHandle>(_reg), path.c_str(),
-          symbol.c_str(), _fee, _cap, &_cfg,
-          &walkForwardFactoryThunk, &ctx, nullptr, 0);
-      if (total == 0 && lrvx_last_error_code() != 0)
+      WalkForwardResultGuard result;
+      result.handle = lrvx_walk_forward_run_csv_result(
+          static_cast<LrvxRegistryHandle>(_reg), path.c_str(), symbol.c_str(), _fee, _cap,
+          &_cfg, &walkForwardFactoryThunk, &ctx);
+      // A run that failed part way used to hand back zeroed folds.
+      if (!ctx.error.IsEmpty())
+      {
+        throw Napi::Error(env, ctx.error.Value());
+      }
+      if (result.handle == nullptr)
       {
         throw lrvx::LrvxError("E_VAL_002", "WalkForwardRunner.runCsv: " + capiReason());
       }
+      const uint32_t total = lrvx_walk_forward_result_folds(result.handle, nullptr, 0);
       std::vector<LrvxWalkForwardFold> folds(total);
       if (total > 0)
       {
-        lrvx_clear_last_error();
-        const uint32_t ran = lrvx_walk_forward_run_csv(
-            static_cast<LrvxRegistryHandle>(_reg), path.c_str(),
-            symbol.c_str(), _fee, _cap, &_cfg,
-            &walkForwardFactoryThunk, &ctx, folds.data(), total);
-        // A run that failed part way used to hand back `total` zeroed folds.
-        if (!ctx.error.IsEmpty())
-        {
-          throw Napi::Error(env, ctx.error.Value());
-        }
-        if (ran == 0 && lrvx_last_error_code() != 0)
-        {
-          throw lrvx::LrvxError("E_VAL_002", "WalkForwardRunner.runCsv: " + capiReason());
-        }
+        lrvx_walk_forward_result_folds(result.handle, folds.data(), total);
       }
       auto arr = Napi::Array::New(env, total);
       for (uint32_t i = 0; i < total; ++i)
@@ -205,8 +213,14 @@ class WalkForwardRunnerNode
         o.Set("trainEndNs", Napi::BigInt::New(env, f.train_end_ns));
         o.Set("testStartNs", Napi::BigInt::New(env, f.test_start_ns));
         o.Set("testEndNs", Napi::BigInt::New(env, f.test_end_ns));
-        o.Set("trainStats", statsToJsObj(env, f.train_stats));
-        o.Set("testStats", statsToJsObj(env, f.test_stats));
+        o.Set("trainStats",
+              statsToJsObj(env, f.train_stats,
+                           lrvx_walk_forward_result_train_unrealized_pnl(result.handle, i),
+                           lrvx_walk_forward_result_train_final_equity(result.handle, i)));
+        o.Set("testStats",
+              statsToJsObj(env, f.test_stats,
+                           lrvx_walk_forward_result_test_unrealized_pnl(result.handle, i),
+                           lrvx_walk_forward_result_test_final_equity(result.handle, i)));
         arr[i] = o;
       }
       return arr; });

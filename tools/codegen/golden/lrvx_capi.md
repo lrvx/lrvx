@@ -2,7 +2,7 @@
 
 Generated from `include/lrvx/capi/lrvx_capi_spec.hpp`. Source of truth for FFI consumers (Codon, QuickJS, Rust, Go cgo, Python ctypes). The pybind11 (Python) and NAPI (Node) bindings wrap this surface but expose richer language-native APIs that live in `python/` and `node/` respectively — see those for the Python/TS-flavored interfaces.
 
-**Surface:** 789 functions, 59 handles, 60 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
+**Surface:** 799 functions, 60 handles, 60 structs, 44 callback typedefs, 3 enums, 17 macro constants, 74 groups.
 
 ## Opaque handles
 
@@ -50,6 +50,7 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `LrvxLiveEngineHandle`
 - `LrvxRunnerHandle`
 - `LrvxBacktestRunnerHandle`
+- `LrvxWalkForwardResultHandle`
 - `LrvxGridSearchHandle`
 - `LrvxLatencyModelHandle`
 - `LrvxTapeDiffHandle`
@@ -1278,6 +1279,9 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 - `uint64_t lrvx_grid_search_total(LrvxGridSearchHandle gs)`
 - `uint32_t lrvx_grid_search_params_for_index(LrvxGridSearchHandle gs, uint64_t index, double * params_out, uint32_t max_params)`
 - `uint64_t lrvx_grid_search_run(LrvxGridSearchHandle gs, LrvxGridSearchFactoryFn factory, void * user_data, LrvxBacktestStats * stats_out, uint32_t max_results)`
+- `void lrvx_grid_search_record_valuation(LrvxGridSearchHandle gs, uint64_t index, double unrealized_pnl, double final_equity)`
+- `double lrvx_grid_search_result_unrealized_pnl(LrvxGridSearchHandle gs, uint64_t index)`
+- `double lrvx_grid_search_result_final_equity(LrvxGridSearchHandle gs, uint64_t index)`
 
 ### heatmap
 
@@ -1933,4 +1937,11 @@ All handles are typedef'd `void*`. Treat them as opaque; manage lifetime via the
 ### walk_forward
 
 - `uint32_t lrvx_walk_forward_run_csv(LrvxRegistryHandle registry, const char * csv_path, const char * symbol, double fee_rate, double initial_capital, const LrvxWalkForwardConfig * cfg, LrvxWalkForwardFactoryFn factory, void * user_data, LrvxWalkForwardFold * folds_out, uint32_t max_folds)`
+- `LrvxWalkForwardResultHandle lrvx_walk_forward_run_csv_result(LrvxRegistryHandle registry, const char * csv_path, const char * symbol, double fee_rate, double initial_capital, const LrvxWalkForwardConfig * cfg, LrvxWalkForwardFactoryFn factory, void * user_data)`
+- `void lrvx_walk_forward_result_destroy(LrvxWalkForwardResultHandle result)`
+- `uint32_t lrvx_walk_forward_result_folds(LrvxWalkForwardResultHandle result, LrvxWalkForwardFold * folds_out, uint32_t max_folds)`
+- `double lrvx_walk_forward_result_train_unrealized_pnl(LrvxWalkForwardResultHandle result, uint32_t fold_index)`
+- `double lrvx_walk_forward_result_train_final_equity(LrvxWalkForwardResultHandle result, uint32_t fold_index)`
+- `double lrvx_walk_forward_result_test_unrealized_pnl(LrvxWalkForwardResultHandle result, uint32_t fold_index)`
+- `double lrvx_walk_forward_result_test_final_equity(LrvxWalkForwardResultHandle result, uint32_t fold_index)`
 

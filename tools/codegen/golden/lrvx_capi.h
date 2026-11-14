@@ -67,6 +67,7 @@ extern "C"
   typedef void* LrvxLiveEngineHandle;
   typedef void* LrvxRunnerHandle;
   typedef void* LrvxBacktestRunnerHandle;
+  typedef void* LrvxWalkForwardResultHandle;
   typedef void* LrvxGridSearchHandle;
   typedef void* LrvxLatencyModelHandle;
   typedef void* LrvxTapeDiffHandle;
@@ -1518,6 +1519,10 @@ extern "C"
   uint64_t lrvx_grid_search_run(LrvxGridSearchHandle gs, LrvxGridSearchFactoryFn factory,
                                 void* user_data, LrvxBacktestStats* stats_out,
                                 uint32_t max_results);
+  void lrvx_grid_search_record_valuation(LrvxGridSearchHandle gs, uint64_t index,
+                                         double unrealized_pnl, double final_equity);
+  double lrvx_grid_search_result_unrealized_pnl(LrvxGridSearchHandle gs, uint64_t index);
+  double lrvx_grid_search_result_final_equity(LrvxGridSearchHandle gs, uint64_t index);
 
   // ============================================================
   // Heatmap
@@ -2619,6 +2624,24 @@ extern "C"
                                      const LrvxWalkForwardConfig* cfg,
                                      LrvxWalkForwardFactoryFn factory, void* user_data,
                                      LrvxWalkForwardFold* folds_out, uint32_t max_folds);
+  LrvxWalkForwardResultHandle lrvx_walk_forward_run_csv_result(LrvxRegistryHandle registry,
+                                                               const char* csv_path,
+                                                               const char* symbol, double fee_rate,
+                                                               double initial_capital,
+                                                               const LrvxWalkForwardConfig* cfg,
+                                                               LrvxWalkForwardFactoryFn factory,
+                                                               void* user_data);
+  void lrvx_walk_forward_result_destroy(LrvxWalkForwardResultHandle result);
+  uint32_t lrvx_walk_forward_result_folds(LrvxWalkForwardResultHandle result,
+                                          LrvxWalkForwardFold* folds_out, uint32_t max_folds);
+  double lrvx_walk_forward_result_train_unrealized_pnl(LrvxWalkForwardResultHandle result,
+                                                       uint32_t fold_index);
+  double lrvx_walk_forward_result_train_final_equity(LrvxWalkForwardResultHandle result,
+                                                     uint32_t fold_index);
+  double lrvx_walk_forward_result_test_unrealized_pnl(LrvxWalkForwardResultHandle result,
+                                                      uint32_t fold_index);
+  double lrvx_walk_forward_result_test_final_equity(LrvxWalkForwardResultHandle result,
+                                                    uint32_t fold_index);
 
 #ifdef __cplusplus
 }

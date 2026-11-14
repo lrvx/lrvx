@@ -1334,6 +1334,10 @@ allowlist_reasons:
   napi_single_pass: &napi_single_pass
     the Node DataReader walks the C++ reader once per read (DataReaderWrap::walk
     in node/src/data_ops.h); this count-then-fill pair would read the tape twice
+  napi_result_handle: &napi_result_handle
+    the Node WalkForwardRunner runs through lrvx_walk_forward_run_csv_result,
+    whose handle also carries each leg's valuation; the fold-array call
+    has no field for it
 
 allowlist_functions:
   pybind11:
@@ -1590,6 +1594,9 @@ allowlist_functions:
     lrvx_grid_search_create: *cpp_direct
     lrvx_grid_search_destroy: *cpp_direct
     lrvx_grid_search_params_for_index: *cpp_direct
+    lrvx_grid_search_record_valuation: *cpp_direct
+    lrvx_grid_search_result_final_equity: *cpp_direct
+    lrvx_grid_search_result_unrealized_pnl: *cpp_direct
     lrvx_grid_search_run: *cpp_direct
     lrvx_grid_search_total: *cpp_direct
     lrvx_i256_roundtrip: *cpp_direct
@@ -2042,7 +2049,14 @@ allowlist_functions:
     lrvx_volume_profile_total_volume: *cpp_direct
     lrvx_volume_profile_vah: *cpp_direct
     lrvx_volume_profile_val: *cpp_direct
+    lrvx_walk_forward_result_destroy: *cpp_direct
+    lrvx_walk_forward_result_folds: *cpp_direct
+    lrvx_walk_forward_result_test_final_equity: *cpp_direct
+    lrvx_walk_forward_result_test_unrealized_pnl: *cpp_direct
+    lrvx_walk_forward_result_train_final_equity: *cpp_direct
+    lrvx_walk_forward_result_train_unrealized_pnl: *cpp_direct
     lrvx_walk_forward_run_csv: *cpp_direct
+    lrvx_walk_forward_run_csv_result: *cpp_direct
 
     lrvx_streaming_indicator_count: *cpp_direct
     lrvx_streaming_indicator_create: *cpp_direct
@@ -2226,6 +2240,7 @@ allowlist_functions:
     lrvx_venue_stack_venue: *no_napi_wrapper
     lrvx_volume_profile_num_levels: *no_napi_wrapper
     lrvx_volume_profile_total_delta: *no_napi_wrapper
+    lrvx_walk_forward_run_csv: *napi_result_handle
 
     lrvx_streaming_indicator_count: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
     lrvx_streaming_indicator_create: "Node wraps the C++ streaming indicator classes directly (node/src/indicators.h), not these handles"
@@ -2246,6 +2261,9 @@ allowlist_functions:
     lrvx_best_ask_raw: "the Codon context reads the _opt variants, which tell no quote from a price of zero"
     lrvx_best_bid_raw: "the Codon context reads the _opt variants, which tell no quote from a price of zero"
     lrvx_funding_schedule_tick: *no_codon_import
+    lrvx_grid_search_record_valuation: *no_codon_import
+    lrvx_grid_search_result_final_equity: *no_codon_import
+    lrvx_grid_search_result_unrealized_pnl: *no_codon_import
     lrvx_mid_price_raw: "the Codon context reads the _opt variants, which tell no quote from a price of zero"
     lrvx_backtest_runner_add_execution_listener: *no_codon_import
     lrvx_backtest_runner_add_journey_tracer: *no_codon_import
@@ -2413,6 +2431,13 @@ allowlist_functions:
     lrvx_volume_bin_read_result: *no_codon_import
     lrvx_volume_profile_num_levels: *no_codon_import
     lrvx_volume_profile_total_delta: *no_codon_import
+    lrvx_walk_forward_result_destroy: *no_codon_import
+    lrvx_walk_forward_result_folds: *no_codon_import
+    lrvx_walk_forward_result_test_final_equity: *no_codon_import
+    lrvx_walk_forward_result_test_unrealized_pnl: *no_codon_import
+    lrvx_walk_forward_result_train_final_equity: *no_codon_import
+    lrvx_walk_forward_result_train_unrealized_pnl: *no_codon_import
+    lrvx_walk_forward_run_csv_result: *no_codon_import
 
     lrvx_streaming_indicator_input_count: "the indicator classes know their own inputs and outputs, so the handle's arity queries are not called"
     lrvx_streaming_indicator_output_count: "the indicator classes know their own inputs and outputs, so the handle's arity queries are not called"
@@ -2495,6 +2520,9 @@ allowlist_functions:
     lrvx_grid_search_create: *no_quickjs_global
     lrvx_grid_search_destroy: *no_quickjs_global
     lrvx_grid_search_params_for_index: *no_quickjs_global
+    lrvx_grid_search_record_valuation: *no_quickjs_global
+    lrvx_grid_search_result_final_equity: *no_quickjs_global
+    lrvx_grid_search_result_unrealized_pnl: *no_quickjs_global
     lrvx_grid_search_run: *no_quickjs_global
     lrvx_grid_search_total: *no_quickjs_global
     lrvx_i256_roundtrip: *no_quickjs_global
@@ -2653,6 +2681,13 @@ allowlist_functions:
     lrvx_volume_bin_read_result: *no_quickjs_global
     lrvx_volume_profile_num_levels: *no_quickjs_global
     lrvx_volume_profile_total_delta: *no_quickjs_global
+    lrvx_walk_forward_result_destroy: *no_quickjs_global
+    lrvx_walk_forward_result_folds: *no_quickjs_global
+    lrvx_walk_forward_result_test_final_equity: *no_quickjs_global
+    lrvx_walk_forward_result_test_unrealized_pnl: *no_quickjs_global
+    lrvx_walk_forward_result_train_final_equity: *no_quickjs_global
+    lrvx_walk_forward_result_train_unrealized_pnl: *no_quickjs_global
     lrvx_walk_forward_run_csv: *no_quickjs_global
+    lrvx_walk_forward_run_csv_result: *no_quickjs_global
     lrvx_streaming_indicator_input_count: "the indicator classes know their own inputs and outputs, so the handle's arity queries are not called"
     lrvx_streaming_indicator_output_count: "the indicator classes know their own inputs and outputs, so the handle's arity queries are not called"

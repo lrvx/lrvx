@@ -637,6 +637,15 @@ export interface FoldStats {
   /** Timestamps of the run's first and last fill; `0n` when nothing filled. */
   startTimeNs: bigint;
   endTimeNs: bigint;
+  /** The position still open at the end of the window, marked at the
+   *  window's last close: (mark - entry) * qty for a long, (entry - mark) *
+   *  qty for a short, no exit fee. A grid search result carries the value
+   *  its factory returned. `netPnl`, `finalCapital` and `returnPct` leave it
+   *  out. */
+  unrealizedPnl: number;
+  /** `initialCapital + netPnl + unrealizedPnl`; a grid search result
+   *  carries the value its factory returned. */
+  finalEquity: number;
 }
 
 // ── Symbol & registry ─────────────────────────────────────────────────
