@@ -1,0 +1,29 @@
+# Smoke test: lrvx.abi.version() is the release the library was built from,
+# lrvx_version() through the C API -- the same string Python's
+# lrvx.__version__, Node's lrvx.version() and QuickJS's lrvx.version()
+# report, and a separate thing from the C ABI number.
+
+from lrvx.abi import version, LRVX_CAPI_ABI_VERSION
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+v = version()
+check(len(v) > 0, "version() is not empty: " + v)
+parts = v.split("-")[0].split(".")
+check(len(parts) >= 3 and all(len(p) > 0 and p.isdigit() for p in parts[:3]),
+      "version() starts MAJOR.MINOR.PATCH: " + v)
+check(v != str(LRVX_CAPI_ABI_VERSION), "version() is not the C ABI number")
+
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")

@@ -71,7 +71,12 @@ fail=0
 # path cannot drift into proving something weaker than the wheel path.
 LRVX_PY_SMOKE='
 import sys
+import importlib.metadata
 import lrvx
+installed = importlib.metadata.version("lrvx")
+assert getattr(lrvx, "__version__", None) == installed, (
+    f"lrvx.__version__ is {getattr(lrvx, '__version__', None)!r}, "
+    f"the installed distribution is {installed!r}")
 reg = lrvx.SymbolRegistry()
 sid = reg.add_symbol("bybit", "BTCUSDT", 0.01)
 assert lrvx.SLIPPAGE_NONE == 0
@@ -101,6 +106,10 @@ check_npm_tarball() {
   echo "[npm-check] requiring the package and calling into the native addon..."
   if ! node -e "
     const lrvx = require('$work/node_modules/@lrvx/lrvx');
+    const pkgVersion = require('$work/node_modules/@lrvx/lrvx/package.json').version;
+    if (lrvx.version() !== pkgVersion) {
+      throw new Error('lrvx.version() is ' + lrvx.version() + ', package.json says ' + pkgVersion);
+    }
     const reg = new lrvx.SymbolRegistry();
     const sym = reg.addSymbol('bybit', 'BTCUSDT', 0.01);
     if (sym === undefined || sym === null) {

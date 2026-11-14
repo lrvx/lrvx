@@ -227,6 +227,12 @@ add_codon_executable(codon_base_strategy_callbacks_smoke
 add_codon_executable(codon_backtest_runner_stats_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/backtest_runner_stats_smoke.codon)
 
+add_codon_executable(codon_open_position_at_end_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/open_position_at_end_smoke.codon)
+
+add_codon_executable(codon_version_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/version_smoke.codon)
+
 add_codon_executable(codon_funding_schedule_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/funding_schedule_smoke.codon)
 

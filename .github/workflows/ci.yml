@@ -202,6 +202,10 @@ jobs:
       # lrvx-mcp shipped `mcp>=1.0` while this file installed `mcp>=1.0,<2`, so
       # CI was green on 1.x and users got the 2.0 SDK, which crashes on start.
       run: python3 scripts/check_dep_pins.py
+    - name: Wheel matrix covers every Python the package claims
+      # 0.12.0 claimed requires-python >=3.10 and built no cp314 wheel, so
+      # pip on Python 3.14 compiled the sdist instead.
+      run: python3 scripts/check_wheel_matrix.py
 
     - name: Verify the sanitizer transcript scan is wired into every job that needs it
       # `ctest --output-on-failure` prints the output of the tests it decided
@@ -583,6 +587,7 @@ jobs:
                    codon_trace_attach_smoke codon_modify_order_smoke \
                    codon_base_strategy_callbacks_smoke \
                    codon_backtest_runner_stats_smoke \
+                   codon_open_position_at_end_smoke codon_version_smoke \
                    codon_funding_schedule_smoke \
                    codon_runner_strategy_ids_smoke codon_last_error_smoke \
                    codon_runner_order_event_smoke \

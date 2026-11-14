@@ -1,0 +1,174 @@
+# Smoke test: the position still open when a backtest ends, valued.
+# Mirrors python/tests/test_backtest_unrealized_at_end.py:
+#   * BacktestStats keeps net_pnl / total_pnl / total_fees as they are and
+#     gains unrealized_pnl (sum over symbols of (mark - entry) * qty for a
+#     long, (entry - mark) * qty for a short, no exit fee) and final_equity
+#     (initial_capital + net_pnl + unrealized_pnl)
+#   * the mark is the last price the run saw: the last close for run_ohlcv
+#     and run_bars
+#   * BacktestRunner.open_positions() and BacktestResult.open_positions()
+#     return (symbol, side, quantity, entry_price, mark_price,
+#     unrealized_pnl) parallel lists, ascending symbol id, side 0 long /
+#     1 short; BacktestResult.mark_price(symbol, price) marks by hand and an
+#     unmarked symbol is valued at its last fill
+
+from C import lrvx_registry_create() -> cobj
+from C import lrvx_registry_destroy(cobj)
+from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+
+from lrvx.runner import BacktestRunner
+from lrvx.backtest import BacktestResult
+from lrvx.strategy import Strategy, SymbolContext
+from lrvx.types import BarData, TradeData
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+def near(a: float, b: float) -> bool:
+    return abs(a - b) <= 1e-9
+
+
+class FirstTrade(Strategy):
+    qty: float
+    n: int
+
+    def __init__(self, symbols: List[int], qty: float):
+        super().__init__(symbols)
+        self.qty = qty
+        self.n = 0
+
+    def on_trade(self, ctx: SymbolContext, trade: TradeData):
+        if self.n == 0:
+            if self.qty > 0.0:
+                self.market_buy(self.qty)
+            else:
+                self.market_sell(-self.qty)
+        self.n += 1
+
+
+class RoundTrip(Strategy):
+    n: int
+
+    def __init__(self, symbols: List[int]):
+        super().__init__(symbols)
+        self.n = 0
+
+    def on_trade(self, ctx: SymbolContext, trade: TradeData):
+        if self.n == 0:
+            self.market_buy(1.0)
+        elif self.n == 2:
+            self.market_sell(1.0)
+        self.n += 1
+
+
+class FirstBar(Strategy):
+    qty: float
+    n: int
+
+    def __init__(self, symbols: List[int], qty: float):
+        super().__init__(symbols)
+        self.qty = qty
+        self.n = 0
+
+    def on_bar(self, ctx: SymbolContext, bar: BarData):
+        if self.n == 0:
+            if self.qty > 0.0:
+                self.market_buy(self.qty)
+            else:
+                self.market_sell(-self.qty)
+        self.n += 1
+
+
+SEC = 1_000_000_000
+MIN = 60 * SEC
+T0 = 1_767_225_600 * SEC
+
+reg = lrvx_registry_create()
+sym = int(lrvx_registry_add_symbol(reg, "test".c_str(), "BTCUSDT".c_str(), 0.01))
+
+# run_ohlcv: every price before the last two is 100, so the entry is 100.
+for qty in [0.5, -0.5]:
+    tag = "run_ohlcv " + ("long" if qty > 0.0 else "short")
+    bt = BacktestRunner(reg, 0.0004, 10_000.0)
+    bt.set_strategy(FirstTrade([sym], qty))
+    st = bt.run_ohlcv([T0 + i * MIN for i in range(5)], [100.0, 100.0, 100.0, 104.0, 107.0],
+                      "BTCUSDT")
+    expected = 3.5 if qty > 0.0 else -3.5
+    check(near(st.unrealized_pnl, expected), tag + ": unrealized_pnl " + str(st.unrealized_pnl))
+    check(near(st.final_equity, st.initial_capital + st.net_pnl + st.unrealized_pnl),
+          tag + ": final_equity = initial_capital + net_pnl + unrealized_pnl")
+    op = bt.open_positions()
+    check(len(op[0]) == 1 and op[0][0] == sym, tag + ": one open position")
+    if len(op[0]) == 1:
+        check(op[1][0] == (0 if qty > 0.0 else 1), tag + ": side")
+        check(near(op[2][0], 0.5), tag + ": quantity")
+        check(near(op[3][0], 100.0), tag + ": entry_price")
+        check(near(op[4][0], 107.0), tag + ": mark_price is the last close")
+        check(near(op[5][0], expected), tag + ": row unrealized_pnl")
+    bt.close()
+
+bt = BacktestRunner(reg, 0.0004, 10_000.0)
+bt.set_strategy(RoundTrip([sym]))
+st = bt.run_ohlcv([T0 + i * MIN for i in range(5)], [100.0, 101.0, 102.0, 103.0, 150.0],
+                  "BTCUSDT")
+check(st.total_trades == 1, "flat: one closed trade")
+check(st.unrealized_pnl == 0.0, "flat: unrealized_pnl is 0")
+check(near(st.final_equity, st.final_capital), "flat: final_equity == final_capital")
+check(len(bt.open_positions()[0]) == 0, "flat: no open position")
+bt.close()
+
+# run_bars: filled at bar 1's open (101), marked at bar 2's close (97).
+for qty in [2.0, -2.0]:
+    tag = "run_bars " + ("long" if qty > 0.0 else "short")
+    bt = BacktestRunner(reg, 0.0004, 10_000.0)
+    bt.set_strategy(FirstBar([sym], qty))
+    st = bt.run_bars([T0, T0 + MIN, T0 + 2 * MIN], [T0 + MIN, T0 + 2 * MIN, T0 + 3 * MIN],
+                     [100.0, 101.0, 103.0], [100.5, 103.0, 108.0], [99.5, 100.0, 96.0],
+                     [100.0, 102.0, 97.0], [10.0, 10.0, 10.0], "BTCUSDT")
+    expected = -8.0 if qty > 0.0 else 8.0
+    check(near(st.unrealized_pnl, expected), tag + ": unrealized_pnl " + str(st.unrealized_pnl))
+    check(near(st.final_equity, st.initial_capital + st.net_pnl + expected), tag + ": final_equity")
+    op = bt.open_positions()
+    check(len(op[0]) == 1 and near(op[3][0], 101.0) and near(op[4][0], 97.0),
+          tag + ": entry 101, mark 97")
+    bt.close()
+
+# BacktestResult by hand: two symbols summed.
+r = BacktestResult(10_000.0, 0.0004)
+r.record_fill(1, 1, "buy", 100.0, 1.0, T0)
+r.record_fill(2, 1, "sell", 110.0, 1.0, T0 + SEC)
+r.record_fill(3, 1, "buy", 105.0, 2.0, T0 + 2 * SEC)
+r.record_fill(4, 2, "sell", 50.0, 3.0, T0 + 3 * SEC)
+r.mark_price(1, 108.5)
+r.mark_price(2, 52.0)
+st = r.stats()
+check(near(st.unrealized_pnl, 1.0), "BacktestResult: unrealized_pnl sums the symbols")
+check(near(st.final_equity, st.initial_capital + st.net_pnl + 1.0), "BacktestResult: final_equity")
+op = r.open_positions()
+check(op[0] == [1, 2] and op[1] == [0, 1], "BacktestResult: symbols and sides")
+check(len(op[0]) == 2 and near(op[2][0], 2.0) and near(op[2][1], 3.0), "BacktestResult: quantities")
+check(len(op[0]) == 2 and near(op[3][0], 105.0) and near(op[3][1], 50.0), "BacktestResult: entries")
+check(len(op[0]) == 2 and near(op[4][0], 108.5) and near(op[4][1], 52.0), "BacktestResult: marks")
+check(len(op[0]) == 2 and near(op[5][0], 7.0) and near(op[5][1], -6.0), "BacktestResult: rows")
+r.close()
+
+u = BacktestResult(10_000.0, 0.0)
+u.record_fill(1, 1, "buy", 100.0, 2.0, T0)
+u.record_fill(2, 1, "sell", 104.0, 1.0, T0 + SEC)
+check(near(u.stats().unrealized_pnl, 4.0), "BacktestResult: an unmarked symbol is valued at its last fill")
+u.close()
+
+lrvx_registry_destroy(reg)
+
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")
