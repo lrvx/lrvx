@@ -22,8 +22,8 @@ hit does not disarm; the strategy exits and disarms.
 
 ``PercentStop`` and ``TakeProfit`` take no ATR: ``arm(side, entry_price)``
 and ``update(high, low)``, with the level at ``entry_price * (1 -/+ pct /
-100)``; a hit is latched and reported until ``disarm()`` or the next
-``arm()``. ``TimeStop`` takes no prices: ``arm()`` and ``update()``, true
+100)``; like the ATR rules, ``update`` reports whether this bar reached the
+level. ``TimeStop`` takes no prices: ``arm()`` and ``update()``, true
 from the ``max_bars``-th update on.
 """
 
@@ -182,7 +182,6 @@ class PercentStop:
     def __init__(self, pct: float) -> None:
         self.pct = _positive_pct("PercentStop", pct)
         self._side = "long"
-        self._hit = False
         self.stop = math.nan
         self.armed = False
 
@@ -192,18 +191,15 @@ class PercentStop:
             self.stop = entry_price * (1.0 - self.pct / 100.0)
         else:
             self.stop = entry_price * (1.0 + self.pct / 100.0)
-        self._hit = False
         self.armed = True
 
     def update(self, high: float, low: float) -> bool:
         if not self.armed:
             return False
-        self._hit = self._hit or _reached(self._side, high, low, self.stop)
-        return self._hit
+        return _reached(self._side, high, low, self.stop)
 
     def disarm(self) -> None:
         self.armed = False
-        self._hit = False
         self.stop = math.nan
 
 
@@ -216,7 +212,6 @@ class TakeProfit:
     def __init__(self, pct: float) -> None:
         self.pct = _positive_pct("TakeProfit", pct)
         self._side = "long"
-        self._hit = False
         self.target = math.nan
         self.armed = False
 
@@ -226,21 +221,17 @@ class TakeProfit:
             self.target = entry_price * (1.0 + self.pct / 100.0)
         else:
             self.target = entry_price * (1.0 - self.pct / 100.0)
-        self._hit = False
         self.armed = True
 
     def update(self, high: float, low: float) -> bool:
         if not self.armed:
             return False
         if self._side == "long":
-            self._hit = self._hit or high >= self.target
-        else:
-            self._hit = self._hit or low <= self.target
-        return self._hit
+            return high >= self.target
+        return low <= self.target
 
     def disarm(self) -> None:
         self.armed = False
-        self._hit = False
         self.target = math.nan
 
 

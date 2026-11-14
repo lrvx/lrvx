@@ -12620,7 +12620,7 @@ Exit rules (module `lrvx.exits`, pure Python with the arithmetic of
 `arm(...)`, `update(...) -> bool`, `armed`, `disarm()`; the level is `stop` (the
 take-profit's is `target`). The side is `"long"` or `"short"`. A hit does not
 disarm. `PercentStop` and `TakeProfit` take `arm(side, entry_price)` and
-`update(high, low)` and latch a hit until `disarm()` or the next `arm()`;
+`update(high, low)` and report whether that bar reached the level;
 `TimeStop` takes `arm()` and `update()` and is true from the `max_bars`-th
 update on. A `pct` that is not above 0, or fewer than one bar, raises
 `ValueError`. The levels are on the [exit rules page](../api/strategy/exits.md).

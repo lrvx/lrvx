@@ -56,7 +56,7 @@ void disarm();
 double pct() const;
 ```
 
-The stop is `entryPrice * (1 - pct / 100)` for a long and `entryPrice * (1 + pct / 100)` for a short, fixed at `arm`. A long is stopped when `low <= stop()`, a short when `high >= stop()`. A hit is latched: `update` keeps returning true until `disarm()` or the next `arm()`, whatever the later bars do. `PercentStop(2.5)` armed short at 100 gives exactly `100 * (1 + 2.5 / 100)`, which is `102.49999999999999`; every binding computes the same expression and gets the same bits.
+The stop is `entryPrice * (1 - pct / 100)` for a long and `entryPrice * (1 + pct / 100)` for a short, fixed at `arm`. A long is stopped when `low <= stop()`, a short when `high >= stop()`. As with the ATR rules, `update` reports whether this bar reached the stop; a hit leaves the rule armed and the stop where it was. `PercentStop(2.5)` armed short at 100 gives exactly `100 * (1 + 2.5 / 100)`, which is `102.49999999999999`; every binding computes the same expression and gets the same bits.
 
 ## TakeProfit
 
@@ -70,7 +70,7 @@ void disarm();
 double pct() const;
 ```
 
-The target is `entryPrice * (1 + pct / 100)` for a long, reached when `high >= target()`, and `entryPrice * (1 - pct / 100)` for a short, reached when `low <= target()`. Latched like `PercentStop`. `target()` is NaN while disarmed.
+The target is `entryPrice * (1 + pct / 100)` for a long, reached when `high >= target()`, and `entryPrice * (1 - pct / 100)` for a short, reached when `low <= target()`. Reported per bar like `PercentStop`. `target()` is NaN while disarmed.
 
 ## TimeStop
 

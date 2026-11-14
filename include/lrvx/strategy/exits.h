@@ -32,9 +32,10 @@
 // again until it does.
 //
 // PercentStop and TakeProfit take no ATR: arm(side, entryPrice) and
-// update(high, low), with the level at entryPrice * (1 -/+ pct / 100); a
-// hit is latched and reported until disarm() or the next arm(). TimeStop takes no prices at all: arm() and update(), true from the
-// maxBars-th update on.
+// update(high, low), with the level at entryPrice * (1 -/+ pct / 100).
+// Like the ATR rules, update() reports whether this bar reached the level;
+// a hit leaves the rule armed and the level where it was. TimeStop takes no
+// prices at all: arm() and update(), true from the maxBars-th update on.
 //
 // The python package carries the same classes in lrvx.exits with the same
 // arithmetic; tests on both sides pin one scenario to the same levels.
@@ -270,19 +271,12 @@ class PercentStop
     _stop = side == Side::BUY ? entryPrice * (1.0 - _pct / 100.0)
                               : entryPrice * (1.0 + _pct / 100.0);
     _armed = true;
-    _hit = false;
   }
 
-  // Once the stop is reached the hit is latched: every update reports it
-  // until disarm() or the next arm().
-  bool update(double high, double low) noexcept
+  // Whether this bar's range reached the stop.
+  bool update(double high, double low) const noexcept
   {
-    if (!_armed)
-    {
-      return false;
-    }
-    _hit = _hit || detail::reached(_side, high, low, _stop);
-    return _hit;
+    return _armed && detail::reached(_side, high, low, _stop);
   }
 
   double stop() const noexcept { return _stop; }
@@ -290,7 +284,6 @@ class PercentStop
   void disarm() noexcept
   {
     _armed = false;
-    _hit = false;
     _stop = std::numeric_limits<double>::quiet_NaN();
   }
   double pct() const noexcept { return _pct; }
@@ -300,7 +293,6 @@ class PercentStop
   Side _side{Side::BUY};
   double _stop{std::numeric_limits<double>::quiet_NaN()};
   bool _armed{false};
-  bool _hit{false};
 };
 
 // A profit target `pct` percent from the entry: entry * (1 + pct / 100) for a
@@ -317,18 +309,16 @@ class TakeProfit
     _target = side == Side::BUY ? entryPrice * (1.0 + _pct / 100.0)
                                 : entryPrice * (1.0 - _pct / 100.0);
     _armed = true;
-    _hit = false;
   }
 
-  // Latched like PercentStop: reported until disarm() or the next arm().
-  bool update(double high, double low) noexcept
+  // Whether this bar's range reached the target.
+  bool update(double high, double low) const noexcept
   {
     if (!_armed)
     {
       return false;
     }
-    _hit = _hit || (_side == Side::BUY ? high >= _target : low <= _target);
-    return _hit;
+    return _side == Side::BUY ? high >= _target : low <= _target;
   }
 
   double target() const noexcept { return _target; }
@@ -336,7 +326,6 @@ class TakeProfit
   void disarm() noexcept
   {
     _armed = false;
-    _hit = false;
     _target = std::numeric_limits<double>::quiet_NaN();
   }
   double pct() const noexcept { return _pct; }
@@ -346,7 +335,6 @@ class TakeProfit
   Side _side{Side::BUY};
   double _target{std::numeric_limits<double>::quiet_NaN()};
   bool _armed{false};
-  bool _hit{false};
 };
 
 // Exit after a number of bars: update() counts the bars since arm() and is
