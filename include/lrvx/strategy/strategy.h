@@ -248,7 +248,7 @@ class Strategy : public IStrategy
     c.lastTradePrice = ev.bar.close;
     c.lastUpdateNs = ev.bar.endTime.time_since_epoch().count();
     refreshPosition(c, sym);
-    countBarInPosition(c, sym);
+    countBarInPosition(c);
 
     // Push into the per-(symbol, timeframe) ring so multi-TF strategies
     // can recall the last N closed bars without bookkeeping by hand.
@@ -682,10 +682,6 @@ class Strategy : public IStrategy
   struct PositionFacts
   {
     int64_t positionRaw{0};
-    // Bumped each time a position opens from flat or flips.
-    uint64_t opened{0};
-    // The value of `opened` the bar count belongs to.
-    uint64_t counted{0};
   };
 
   // Moves the entry price by the change in position since the last refresh.
@@ -713,7 +709,6 @@ class Strategy : public IStrategy
     const bool opened = prev == 0 || (prev > 0) != (now > 0);
     if (opened)
     {
-      ++f.opened;
       c.barsInPosition = 0;
       c.entryPrice = fillPrice ? std::optional<Price>(*fillPrice) : snap.avgEntryPrice;
       return;
@@ -743,21 +738,12 @@ class Strategy : public IStrategy
   }
 
   // Caller holds the symbol lock and has refreshed the position for a bar.
-  void countBarInPosition(SymbolContext& c, SymbolId sym) noexcept
+  static void countBarInPosition(SymbolContext& c) noexcept
   {
-    PositionFacts& f = _positionFacts[sym];
-    if (c.position.isZero())
+    if (!c.position.isZero())
     {
-      c.barsInPosition = 0;
-      return;
+      ++c.barsInPosition;
     }
-    if (f.counted != f.opened)
-    {
-      f.counted = f.opened;
-      c.barsInPosition = 1;
-      return;
-    }
-    ++c.barsInPosition;
   }
 
   // Caller holds the symbol lock and has just applied a depth frame: the
