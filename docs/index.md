@@ -135,7 +135,7 @@ Pick the row for your binding. The C++ engine itself only matters if you build f
 
 | If you use | You need |
 |---|---|
-| **Python** | Python 3.10+. `pip install lrvx` for prebuilt wheels (Linux / macOS). |
+| **Python** | Python 3.10+. `pip install lrvx` for prebuilt wheels (CPython 3.10 to 3.15; Linux, macOS, Windows). |
 | **Node.js** | Node 20+. `npm install @lrvx/lrvx`. |
 | **Codon** | Codon compiler + `lrvx` built with `-DLRVX_BUILD_CAPI=ON`. |
 | **C++** | C++23 compiler (GCC 14+ / Clang 18+; MSVC or clang-cl on Windows), CMake 3.22+. |

@@ -238,6 +238,42 @@ void BacktestRunner::resetRunState()
   _poolStateCount = 0;
   _lastEventType.reset();
   _signalEmitted = false;
+  _hasLastPrice.fill(false);
+  _lastPricesOverflow.clear();
+}
+
+void BacktestRunner::noteLastPrice(SymbolId symbol, Price price)
+{
+  if (symbol < kFlatMarks) [[likely]]
+  {
+    _lastPrices[symbol] = price;
+    _hasLastPrice[symbol] = true;
+    return;
+  }
+  for (auto& [id, p] : _lastPricesOverflow)
+  {
+    if (id == symbol)
+    {
+      p = price;
+      return;
+    }
+  }
+  _lastPricesOverflow.emplace_back(symbol, price);
+}
+
+void BacktestRunner::applyMarks(BacktestResult& res) const
+{
+  for (size_t sym = 0; sym < kFlatMarks; ++sym)
+  {
+    if (_hasLastPrice[sym])
+    {
+      res.markPrice(static_cast<SymbolId>(sym), _lastPrices[sym]);
+    }
+  }
+  for (const auto& [id, price] : _lastPricesOverflow)
+  {
+    res.markPrice(id, price);
+  }
 }
 
 BacktestResult BacktestRunner::run(replay::IMultiSegmentReader& reader)
@@ -330,6 +366,7 @@ void BacktestRunner::stepBar(const BarEvent& ev)
   // intrabar high/low, not just the close. The open leads: it is where the
   // orders held back from the previous bar's callback are matched.
   sim().onBar(ev.symbol, ev.bar.open, ev.bar.high, ev.bar.low, ev.bar.close);
+  noteLastPrice(ev.symbol, ev.bar.close);
 
   // The strategy is shown a bar the simulator has already walked, so every
   // price it can react to is in the market state. Anything it submits from
@@ -726,6 +763,7 @@ void BacktestRunner::processEvent(const replay::ReplayEvent& event, bool dispatc
 
     sim().onTrade(trade_ev.trade.symbol, trade_ev.trade.price, trade_ev.trade.quantity,
                   trade_ev.trade.isBuy);
+    noteLastPrice(trade_ev.trade.symbol, trade_ev.trade.price);
 
     if (dispatchMarketData)
     {
@@ -996,6 +1034,7 @@ BacktestResult BacktestRunner::result() const
   {
     res.recordFill(fill);
   }
+  applyMarks(res);
   return res;
 }
 
@@ -1008,6 +1047,7 @@ BacktestResult BacktestRunner::extractResult()
   {
     res.recordFill(fill);
   }
+  applyMarks(res);
   return res;
 }
 

@@ -106,6 +106,81 @@ def _build_spot_gz(dest: Path, *, rpi: bool = False) -> Path:
     return _write_gz(dest, buf.getvalue())
 
 
+class BybitParserTests(unittest.TestCase):
+    """The derivatives timestamp and trade id parsers, and how the stats
+    of a range's days are added up."""
+
+    _S = 1_700_000_001
+    _NS = 1_000_000_000
+
+    def test_timestamp_without_a_fraction_is_whole_seconds(self) -> None:
+        self.assertEqual(bybit._parse_ts_ns("1700000001"), self._S * self._NS)
+        self.assertEqual(bybit._parse_ts_ns(" 1700000001 "), self._S * self._NS)
+
+    def test_short_fraction_is_padded_on_the_right(self) -> None:
+        self.assertEqual(bybit._parse_ts_ns("1700000001.25"),
+                         self._S * self._NS + 250_000_000)
+        self.assertEqual(bybit._parse_ts_ns("1700000001.5"),
+                         self._S * self._NS + 500_000_000)
+
+    def test_leading_zeros_of_the_fraction_are_kept(self) -> None:
+        self.assertEqual(bybit._parse_ts_ns("1700000001.000123"),
+                         self._S * self._NS + 123_000)
+        self.assertEqual(bybit._parse_ts_ns("1700000001.000000001"),
+                         self._S * self._NS + 1)
+        self.assertEqual(bybit._parse_ts_ns("1700000001.05"),
+                         self._S * self._NS + 50_000_000)
+
+    def test_fraction_longer_than_nanoseconds_keeps_its_first_nine_digits(self) -> None:
+        self.assertEqual(bybit._parse_ts_ns("1700000001.1234567891"),
+                         self._S * self._NS + 123_456_789)
+        self.assertEqual(bybit._parse_ts_ns("1700000001.00000000099"),
+                         self._S * self._NS)
+
+    def test_numeric_trade_ids_are_kept_as_numbers(self) -> None:
+        for token, expected in (("1", 1), ("1234567", 1234567),
+                                ("123456789012", 123456789012)):
+            with self.subTest(token=token):
+                self.assertEqual(bybit._hash_trade_id(token), expected)
+
+    def test_uuid_trade_ids_fold_to_the_first_eight_md5_bytes(self) -> None:
+        import hashlib
+
+        token = "9d1f3e6b-4c2a-5e8f-a1b2-c3d4e5f60718"
+        expected = int.from_bytes(hashlib.md5(token.encode("ascii")).digest()[:8],
+                                  "big", signed=False)
+        self.assertEqual(bybit._hash_trade_id(token), expected)
+        self.assertNotEqual(bybit._hash_trade_id(token),
+                            bybit._hash_trade_id(token.replace("9d1f", "9d1e")))
+        self.assertLess(bybit._hash_trade_id(token), 1 << 64)
+
+    def test_added_stats_take_the_earliest_first_and_latest_last_timestamp(self) -> None:
+        early = bybit.ConvertStats(trades_written=2, rows_read=2, files_processed=1,
+                                   first_ts_ns=100, last_ts_ns=150, last_trade_id=7)
+        late = bybit.ConvertStats(trades_written=3, rows_read=4, rows_skipped=1,
+                                  files_processed=1, first_ts_ns=200, last_ts_ns=250,
+                                  last_trade_id=5)
+        for order in ((early, late), (late, early)):
+            with self.subTest(first=order[0].first_ts_ns):
+                agg = bybit.ConvertStats()
+                for s in order:
+                    bybit._add_stats(agg, s)
+                self.assertEqual(agg.first_ts_ns, 100)
+                self.assertEqual(agg.last_ts_ns, 250)
+                self.assertEqual(agg.last_trade_id, 7)
+                self.assertEqual(agg.trades_written, 5)
+                self.assertEqual(agg.rows_read, 6)
+                self.assertEqual(agg.rows_skipped, 1)
+                self.assertEqual(agg.files_processed, 2)
+
+    def test_a_day_that_wrote_nothing_does_not_reset_the_first_timestamp(self) -> None:
+        agg = bybit.ConvertStats()
+        bybit._add_stats(agg, bybit.ConvertStats(files_processed=1, first_ts_ns=300,
+                                                 last_ts_ns=400))
+        bybit._add_stats(agg, bybit.ConvertStats(files_processed=1))
+        self.assertEqual((agg.first_ts_ns, agg.last_ts_ns), (300, 400))
+
+
 class BybitConvertTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="bybit-"))

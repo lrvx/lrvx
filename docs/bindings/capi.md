@@ -166,6 +166,11 @@ exports the pair it compared (`CAPI_ABI_VERSION` / `capi_abi_version()`,
 The shared library also carries a real `SOVERSION` now, so the platform
 loader refuses a mismatched major/minor before any of this runs.
 
+`lrvx_version()` is a different number: the release the library was built
+from (for example `"1.2.3"`), the string Python reports as `lrvx.__version__` and Node,
+Codon (`lrvx.abi.version()`) and QuickJS as `version()`. It moves with every
+release; `LRVX_CAPI_ABI_VERSION` moves only when this boundary changes shape.
+
 ### Threads
 
 Handles are not synchronised. Two threads may use two different handles

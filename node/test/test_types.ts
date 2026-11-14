@@ -696,6 +696,20 @@ void targets.future_linear_slope(arr, 5);
   checkAcceptsBigint(() => recorder.onTrade(1, 100, 1, T), "BarDispatchRecorder.onTrade accepts bigint tsNs");
 }
 
+// ── FoldStats carries the open position's valuation ─────────────────
+// A walk-forward fold's and a grid-search result's stats are FoldStats; both
+// carry unrealizedPnl and finalEquity like RunnerStats.
+{
+  const valuation = (s: lrvx.FoldStats): [number, number] => [s.unrealizedPnl, s.finalEquity];
+  const gs = new lrvx.GridSearch();
+  gs.addAxis([1, 2]);
+  gs.setFactory((p) => ({ unrealizedPnl: 3 * p[0], finalEquity: 1000 + 3 * p[0] }) as unknown as lrvx.RunnerStats);
+  const rows: lrvx.GridSearchResult[] = gs.run();
+  const [u, e] = valuation(rows[1].stats);
+  check(u === 6, `GridSearchResult.stats.unrealizedPnl is a number read through (${u})`);
+  check(e === 1006, `GridSearchResult.stats.finalEquity is a number read through (${e})`);
+}
+
 // ── Constants exist ──────────────────────────────────────────────────
 void SLIPPAGE_NONE;
 void SLIPPAGE_FIXED_BPS;

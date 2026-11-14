@@ -46,8 +46,9 @@ they replay for the first symbol registered.
 | `addJourneyTracer(tracer)` | `void` | Attach an `OrderJourneyTracer`; it records every order event of the runs that follow. Its rows carry `tsNs` and the per-stage timestamps as `bigint` |
 | `equityCurve()` | `EquityCurve` | Equity curve from the most recent run |
 | `trades()` | `BacktestTrades` | Closed trades from the most recent run |
+| `openPositions()` | `OpenPositions` | Positions the most recent run left open: `symbol` (`Uint32Array`), `side` (`Uint8Array`, 0 long / 1 short), `quantity`, `entryPrice`, `markPrice`, `unrealizedPnl` (`Float64Array`), aligned by row, ascending symbol id |
 
-`equityCurve()` and `trades()` throw `LrvxError(E_RUN_002)` if no run has completed.
+`equityCurve()`, `trades()` and `openPositions()` throw `LrvxError(E_RUN_002)` if no run has completed.
 
 Every run's stats object carries `skippedOptionQuotes` and `skippedPoolStates`: the option-quote
 and pool-state records a tape run (`runTape`, `runTapes`, `runTapeBarsOnTicks`) read and delivered
@@ -90,6 +91,29 @@ search result's `stats` -- also carries:
 | `timeWeightedReturn` | `number` | Time-weighted return |
 | `startTimeNs` | `bigint` | Timestamp of the run's first fill; `0n` when nothing filled |
 | `endTimeNs` | `bigint` | Timestamp of the run's last fill |
+
+A `BacktestRunner` run, `BacktestResult.stats()`, `Engine.run()`, a walk-forward fold's
+`trainStats` / `testStats` and a grid search result's `stats` also value the position still open
+when the data ended:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `unrealizedPnl` | `number` | Sum over symbols of `(mark - entry) * qty` for a long and `(entry - mark) * qty` for a short, `entry` the average entry, no exit fee. 0 when the run ends flat |
+| `finalEquity` | `number` | `initialCapital + netPnl + unrealizedPnl` |
+
+`netPnl`, `finalCapital`, `returnPct`, `trades()` and `equityCurve()` leave the open position out
+(its entry fee is in `totalFees`). The mark is the last price the run saw for the symbol: the last
+bar's close on bar replay (`runBars`, `runTapeBars`; a bar still open when a tape ends is never
+replayed), the last trade on tick replay (`runTape`, `runTapes`, `runOhlcv`, `runCsv`,
+`runTapeBarsOnTicks`); book records do not move it. A symbol never priced is valued at its last
+fill. `openPositions()` lists the rows.
+
+A `WalkForwardRunner` fold values each leg on its own: `trainStats` the position open at the end
+of the train window, `testStats` the one open at the end of the test window, each marked at its
+window's last close (`runCsv` replays closes as trades). A `GridSearch` result's `stats` carry the
+`unrealizedPnl` and `finalEquity` its factory returned, so a `BacktestRunner` stats object returned
+as is keeps them; a factory that leaves them out reads 0, like every other key, and a value that is
+not a number is a `TypeError` naming the key.
 
 ---
 
@@ -167,6 +191,8 @@ const stats = result.stats();
 | `recordFill(orderId, symbol, side, price, qty, timestampNs)` | `void` | Record a single fill |
 | `ingestExecutor(exec)` | `void` | Drain all fills from a `SimulatedExecutor` |
 | `stats()` | stats object | Same fields as `BacktestRunner` stats |
+| `markPrice(symbol, price)` | `void` | The price an open position in `symbol` is valued at in `stats()` and `openPositions()`; the last call wins. A symbol never marked is valued at its last fill |
+| `openPositions()` | `OpenPositions` | Positions still open, same shape as `BacktestRunner.openPositions()` |
 
 ---
 

@@ -47,6 +47,11 @@ export const CAPI_ABI_VERSION: number;
 /** C ABI version the loaded lrvx library reports. */
 export function capiAbiVersion(): number;
 
+/** The release the addon was built from (`lrvx_version()`), equal to this
+ *  package's `version`. A separate thing from {@link capiAbiVersion}, which
+ *  moves only when the C boundary changes shape. */
+export function version(): string;
+
 /** Why the last call that reports failure through its return value failed:
  *  `FundingSchedule.loadTape` returning `false`, `recompress` returning
  *  `false`, `extractSymbols` / `extractTimeRange` returning `0`. Each of them
@@ -548,6 +553,14 @@ export interface BacktestStats {
   /** Timestamps of the run's first and last fill; `0n` when nothing filled. */
   startTimeNs: bigint;
   endTimeNs: bigint;
+  /** The positions still open when the data ended, valued at the last
+   *  price the run saw for each symbol (a bar's close on bar replay, the
+   *  last trade on tick replay): (mark - entry) * qty for a long,
+   *  (entry - mark) * qty for a short, no exit fee. `netPnl`,
+   *  `finalCapital` and `returnPct` leave it out. */
+  unrealizedPnl: number;
+  /** `initialCapital + netPnl + unrealizedPnl`. */
+  finalEquity: number;
 }
 
 /** Stats returned by every `BacktestRunner.run*` method. `BacktestStats`
@@ -585,6 +598,14 @@ export interface RunnerStats {
   skippedOptionQuotes: number;
   /** Pool-state records a tape run read and delivered to nobody. */
   skippedPoolStates: number;
+  /** The positions still open when the data ended, valued at the last
+   *  price the run saw for each symbol (a bar's close on bar replay, the
+   *  last trade on tick replay): (mark - entry) * qty for a long,
+   *  (entry - mark) * qty for a short, no exit fee. `netPnl`,
+   *  `finalCapital` and `returnPct` leave it out. */
+  unrealizedPnl: number;
+  /** `initialCapital + netPnl + unrealizedPnl`. */
+  finalEquity: number;
 }
 
 /** Stats attached to a `WalkForwardFold` and to a `GridSearchResult`.
@@ -616,6 +637,15 @@ export interface FoldStats {
   /** Timestamps of the run's first and last fill; `0n` when nothing filled. */
   startTimeNs: bigint;
   endTimeNs: bigint;
+  /** The position still open at the end of the window, marked at the
+   *  window's last close: (mark - entry) * qty for a long, (entry - mark) *
+   *  qty for a short, no exit fee. A grid search result carries the value
+   *  its factory returned. `netPnl`, `finalCapital` and `returnPct` leave it
+   *  out. */
+  unrealizedPnl: number;
+  /** `initialCapital + netPnl + unrealizedPnl`; a grid search result
+   *  carries the value its factory returned. */
+  finalEquity: number;
 }
 
 // ── Symbol & registry ─────────────────────────────────────────────────
@@ -920,6 +950,18 @@ export interface BacktestTrades {
   exitTimeNs: BigInt64Array;
 }
 
+/** Positions still open at the end of a run, aligned by row, ascending
+ *  symbol id. `side` is 0 for a long, 1 for a short; `quantity` is absolute
+ *  and `entryPrice` the average entry. */
+export interface OpenPositions {
+  symbol: Uint32Array;
+  side: Uint8Array;
+  quantity: Float64Array;
+  entryPrice: Float64Array;
+  markPrice: Float64Array;
+  unrealizedPnl: Float64Array;
+}
+
 /** Walk-forward fold metadata + train/test stats. */
 export interface WalkForwardFold {
   foldIndex: number;
@@ -1087,6 +1129,10 @@ export class BacktestRunner {
   /** Closed trades from the most recent run. Throws LrvxError(E_RUN_002)
    *  if no run has completed. */
   trades(): BacktestTrades;
+  /** Positions the most recent run left open, marked at the last price it
+   *  replayed per symbol; their sum is the stats' `unrealizedPnl`. Throws
+   *  LrvxError(E_RUN_002) if no run has completed. */
+  openPositions(): OpenPositions;
 }
 
 export class LatencyDistribution {
@@ -1582,6 +1628,12 @@ export class BacktestResult {
   ): void;
   ingestExecutor(executor: SimulatedExecutor): void;
   stats(): BacktestStats;
+  /** The price an open position in `symbol` is valued at in `stats()` and
+   *  `openPositions()`; the last call wins. A symbol never marked is valued
+   *  at its last fill. */
+  markPrice(symbol: number, price: number): void;
+  /** Positions still open, ascending symbol id. */
+  openPositions(): OpenPositions;
 }
 
 // ── Streaming indicators ──────────────────────────────────────────────

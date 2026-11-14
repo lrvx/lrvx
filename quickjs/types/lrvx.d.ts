@@ -974,6 +974,8 @@ declare const lrvx: {
     /** Why the last call that reports failure through its return value
      *  failed; `''` when it did not. */
     lastError(): string;
+    /** The release the library was built from (`lrvx_version()`). */
+    version(): string;
     /** Read an OHLCV CSV. A ts column in s / ms / us / ns is scaled to ns. */
     loadCsv(path: string): Bar[];
 
@@ -1081,6 +1083,24 @@ declare interface BacktestStats {
     returnPct: number;
     startTimeNs: bigint;
     endTimeNs: bigint;
+    /** The positions still open, valued at their mark (see
+     *  `BacktestResult.markPrice`): (mark - entry) * qty for a long,
+     *  (entry - mark) * qty for a short, no exit fee. `netPnl`,
+     *  `finalCapital` and `returnPct` leave it out. */
+    unrealizedPnl: number;
+    /** `initialCapital + netPnl + unrealizedPnl`. */
+    finalEquity: number;
+}
+
+/** A position still open: `side` 0 long / 1 short, `quantity` absolute,
+ *  `entryPrice` the average entry. */
+declare interface OpenPosition {
+    symbol: number;
+    side: number;
+    quantity: number;
+    entryPrice: number;
+    markPrice: number;
+    unrealizedPnl: number;
 }
 
 declare interface EquityPoint {
@@ -1097,6 +1117,12 @@ declare class BacktestResult {
                quantity: number, timestampNs: bigint | number): void;
     ingestExecutor(executor: SimulatedExecutor): void;
     stats(): BacktestStats;
+    /** The price an open position in `symbol` is valued at in `stats()` and
+     *  `openPositions()`; the last call wins. A symbol never marked is
+     *  valued at its last fill. */
+    markPrice(symbol: number, price: number): void;
+    /** Positions still open, ascending symbol id. */
+    openPositions(): OpenPosition[];
     equityCurve(): EquityPoint[];
     writeEquityCurveCsv(path: string): boolean;
 }

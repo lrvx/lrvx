@@ -22,7 +22,9 @@ the file is not already in time order.
 """
 from __future__ import annotations
 
+import os
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, Optional
 
@@ -120,9 +122,16 @@ class TradeFile:
     time. It can be iterated more than once and yields the same rows
     each time.
 
-    Use as a context manager; leaving it deletes the temporary file."""
+    Use as a context manager; leaving it deletes the temporary file.
 
-    def __init__(self, rows: Iterable[tuple], dtype, *, sort: bool) -> None:
+    With ``spill_dir`` the rows are kept in a file of that directory
+    instead of a private temporary one, and the object pickles: a worker
+    process parses a file into it and hands it to the process that
+    writes the tape, which closes it (deleting the file) when done. The
+    directory's owner removes whatever is left there."""
+
+    def __init__(self, rows: Iterable[tuple], dtype, *, sort: bool,
+                 spill_dir: Optional[Path] = None) -> None:
         import numpy as np
 
         self.dtype = np.dtype(dtype)
@@ -137,8 +146,14 @@ class TradeFile:
         self._in_order = True
         self._last_ts: Optional[int] = None
         self._runs = []
-        self._dir = tempfile.TemporaryDirectory(prefix="lrvx-archive-import-")
-        self._path = Path(self._dir.name) / "rows.bin"
+        if spill_dir is None:
+            self._dir = tempfile.TemporaryDirectory(prefix="lrvx-archive-import-")
+            self._path = Path(self._dir.name) / "rows.bin"
+        else:
+            fd, name = tempfile.mkstemp(dir=spill_dir, prefix="rows-", suffix=".bin")
+            os.close(fd)
+            self._dir = None
+            self._path = Path(name)
         try:
             with open(self._path, "wb") as out:
                 pending = []
@@ -174,7 +189,18 @@ class TradeFile:
         self.rows_read += len(run)
 
     def close(self) -> None:
-        self._dir.cleanup()
+        if self._dir is not None:
+            self._dir.cleanup()
+        else:
+            try:
+                self._path.unlink()
+            except FileNotFoundError:
+                pass
+
+    def __getstate__(self) -> dict:
+        if self._dir is not None:
+            raise TypeError("a TradeFile pickles only when built with spill_dir")
+        return dict(self.__dict__)
 
     def __enter__(self) -> "TradeFile":
         return self
@@ -277,6 +303,19 @@ class TradeFile:
                         held[r] = rows[take:]
                 out = parts[0] if len(parts) == 1 else np.concatenate(parts)
                 yield out[np.argsort(out["ts"], kind="stable")]
+
+
+@dataclass
+class ParsedTrades:
+    """One archive file parsed and not yet written: its rows, how many
+    data rows failed to parse, and what else the importer noted
+    (``extra``). Built where the file is parsed, in a worker process or
+    in the caller; ``rows`` is closed by whoever writes it."""
+
+    path: Path
+    rows: TradeFile
+    rows_invalid: int = 0
+    extra: dict = field(default_factory=dict)
 
 
 class WrittenTrades:

@@ -321,16 +321,42 @@ def _symbol_from_file(path: Path) -> str:
     return stem[:idx] if idx > 0 else stem
 
 
-def _convert_file(csv_path: Path, out_tape: Path, *, symbol_id: int,
-                  symbol_name: str, market: str, exchange_id: int,
-                  exchange_name: str, append: bool, max_segment_mb: int,
-                  compression: str, write_metadata: bool,
-                  qty_multiplier: float) -> ConvertStats:
+def _parse_file(csv_path: Path, symbol_name: str, qty_multiplier: float,
+                spill_dir: Optional[Path] = None) -> _dedup.ParsedTrades:
+    """Parse one archive file, nothing written yet. ``extra`` holds the
+    rows of other instruments (``other_rows``) and up to five of their
+    names (``other_names``)."""
     src = _layout.CsvFile(csv_path, _LAYOUTS, source="OKX trade")
     other = _Other()
-    with _dedup.TradeFile(_iter_rows(src, symbol_name, qty_multiplier, other),
-                          _dedup.trade_dtype(), sort=True) as rows:
+    rows = _dedup.TradeFile(_iter_rows(src, symbol_name, qty_multiplier, other),
+                            _dedup.trade_dtype(), sort=True, spill_dir=spill_dir)
+    try:
         src.check(rows.rows_read)
+    except BaseException:
+        rows.close()
+        raise
+    return _dedup.ParsedTrades(csv_path, rows, src.counts.invalid,
+                               {"other_rows": other.rows,
+                                "other_names": list(other.names)})
+
+
+def _parse_range_file(job: Tuple[Path, str, float, Path]) -> _dedup.ParsedTrades:
+    """One file of a range, parsed in a worker of ``_range.convert_days``.
+    A cached file that does not open is evicted from the cache."""
+    path, symbol_name, qty_multiplier, spill_dir = job
+    with evict_if_corrupt(path):
+        return _parse_file(path, symbol_name, qty_multiplier, spill_dir)
+
+
+def _write_file(parsed: _dedup.ParsedTrades, out_tape: Path, *, symbol_id: int,
+                symbol_name: str, append: bool, exchange_id: int,
+                max_segment_mb: int, compression: str) -> ConvertStats:
+    """Write a parsed file's rows that are not on the tape yet. Raises
+    ``InstrumentNotInFileError`` for a chain file holding no trade of
+    ``symbol_name``."""
+    rows = parsed.rows
+    other_rows = parsed.extra.get("other_rows", 0)
+    try:
         done = _dedup.write_trade_file(
             rows, out_tape, append=append, symbol_id=symbol_id,
             exchange_id=exchange_id, max_segment_mb=max_segment_mb,
@@ -339,18 +365,34 @@ def _convert_file(csv_path: Path, out_tape: Path, *, symbol_id: int,
             trades_written=done.count,
             rows_read=rows.rows_read,
             rows_skipped=rows.rows_skipped,
-            rows_invalid=src.counts.invalid,
-            rows_other_instruments=other.rows,
+            rows_invalid=parsed.rows_invalid,
+            rows_other_instruments=other_rows,
             files_processed=1,
             first_ts_ns=done.first_ts_ns,
             last_ts_ns=done.last_ts_ns,
             last_trade_id=done.last_id if done.count else rows.id_max,
         )
-    if other.rows and not stats.rows_read and not stats.rows_invalid:
+    finally:
+        rows.close()
+    if other_rows and not stats.rows_read and not stats.rows_invalid:
+        names = parsed.extra.get("other_names", [])
         raise InstrumentNotInFileError(
-            f"{csv_path}: no trade of '{symbol_name}' among {other.rows} rows; "
-            f"the file holds {', '.join(other.names)}"
-            + (", ..." if len(other.names) == 5 else ""))
+            f"{parsed.path}: no trade of '{symbol_name}' among {other_rows} rows; "
+            f"the file holds {', '.join(names)}"
+            + (", ..." if len(names) == 5 else ""))
+    return stats
+
+
+def _convert_file(csv_path: Path, out_tape: Path, *, symbol_id: int,
+                  symbol_name: str, market: str, exchange_id: int,
+                  exchange_name: str, append: bool, max_segment_mb: int,
+                  compression: str, write_metadata: bool,
+                  qty_multiplier: float) -> ConvertStats:
+    stats = _write_file(
+        _parse_file(csv_path, symbol_name, qty_multiplier), out_tape,
+        symbol_id=symbol_id, symbol_name=symbol_name, append=append,
+        exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+        compression=compression)
     if write_metadata and (stats.trades_written or stats.rows_read):
         _write_metadata(
             out_tape, exchange_name=exchange_name, market=market,
@@ -359,6 +401,21 @@ def _convert_file(csv_path: Path, out_tape: Path, *, symbol_id: int,
             trades_added=stats.trades_written, qty_multiplier=qty_multiplier,
         )
     return stats
+
+
+def _add_stats(agg: ConvertStats, s: ConvertStats) -> None:
+    agg.trades_written += s.trades_written
+    agg.rows_read += s.rows_read
+    agg.rows_skipped += s.rows_skipped
+    agg.rows_invalid += s.rows_invalid
+    agg.rows_other_instruments += s.rows_other_instruments
+    agg.files_processed += s.files_processed
+    if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
+        agg.first_ts_ns = s.first_ts_ns
+    if s.last_ts_ns > agg.last_ts_ns:
+        agg.last_ts_ns = s.last_ts_ns
+    if s.last_trade_id > agg.last_trade_id:
+        agg.last_trade_id = s.last_trade_id
 
 
 def trades_to_lrvx(
@@ -423,6 +480,7 @@ def range_to_lrvx(
     compression: str = "none",
     skip_missing: bool = False,
     qty_multiplier: float = 1.0,
+    workers: Optional[int] = None,
 ) -> ConvertStats:
     """Convert a range of OKX days (UTC+8 dates, inclusive) into lrvx:
     ``date_from="2024-01-15"`` starts at 2024-01-14T16:00Z.
@@ -431,14 +489,20 @@ def range_to_lrvx(
     ``<cache_root>/okx`` (``~/.lrvx/archive-cache/okx`` unless
     ``LRVX_ARCHIVE_CACHE`` says otherwise), or ``mirror`` when given,
     laid out as ``<market>/<instrument or family>/<file name as
-    published>``.
+    published>``. ``parallel`` downloads run at once.
 
-    The instrument id's shape is checked before any request. A range in
-    which no day is published raises ``NoFilesError``; a missing day
-    raises ``FileNotFoundError`` unless ``skip_missing``. For futures
-    and options, a day whose chain file holds no trade of ``symbol``
-    adds nothing; the range raises ``InstrumentNotInFileError`` only
-    when no day held one."""
+    ``workers`` processes parse the files (default: one per core, at
+    most one per file; ``1`` parses in this process); the tape is
+    written here, a day at a time in date order, so it is the same tape
+    whatever the count. An import that fails leaves the tape as it was.
+
+    The instrument id's shape and ``workers`` are checked before any
+    request. A range in which no day is published raises
+    ``NoFilesError``; a missing day raises ``FileNotFoundError`` unless
+    ``skip_missing``. For futures and options, a day whose chain file
+    holds no trade of ``symbol`` adds nothing; the range raises
+    ``InstrumentNotInFileError`` only when no day held one."""
+    _range.check_workers(workers)
     check_symbol(symbol, market)
     days = _range.days_between(date_from, date_to)
     if not days:
@@ -455,49 +519,40 @@ def range_to_lrvx(
                               skip_missing=skip_missing,
                               what=f"okx {market} trades {symbol}")
 
+    paths = [path for _, path in pairs if path is not None]
+    out_tape = Path(out_tape).expanduser()
     agg = ConvertStats()
     absent: List[str] = []
-    for day, path in pairs:
-        if path is None:
-            continue
+
+    def write(_: int, parsed: _dedup.ParsedTrades) -> None:
         try:
-            with evict_if_corrupt(path):
-                s = _convert_file(
-                    path, Path(out_tape).expanduser(),
-                    symbol_id=symbol_id, symbol_name=symbol, market=market,
-                    exchange_id=exchange_id, exchange_name=exchange_name,
-                    append=append, max_segment_mb=max_segment_mb,
-                    compression=compression, write_metadata=False,
-                    qty_multiplier=qty_multiplier,
-                )
+            s = _write_file(
+                parsed, out_tape, symbol_id=symbol_id, symbol_name=symbol,
+                append=append, exchange_id=exchange_id,
+                max_segment_mb=max_segment_mb, compression=compression)
         except InstrumentNotInFileError as e:
             absent.append(str(e))
             agg.files_processed += 1
-            continue
-        agg.trades_written += s.trades_written
-        agg.rows_read += s.rows_read
-        agg.rows_skipped += s.rows_skipped
-        agg.rows_invalid += s.rows_invalid
-        agg.rows_other_instruments += s.rows_other_instruments
-        agg.files_processed += s.files_processed
-        if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
-            agg.first_ts_ns = s.first_ts_ns
-        if s.last_ts_ns > agg.last_ts_ns:
-            agg.last_ts_ns = s.last_ts_ns
-        if s.last_trade_id > agg.last_trade_id:
-            agg.last_trade_id = s.last_trade_id
+            return
+        _add_stats(agg, s)
 
-    if absent and not agg.rows_read:
-        raise InstrumentNotInFileError(
-            f"no day in the range holds a trade of '{symbol}': " + absent[0])
+    with _range.spill_dir() as spill, _range.all_or_nothing(out_tape):
+        _range.convert_days(
+            [(path, symbol, qty_multiplier, spill) for path in paths],
+            _parse_range_file,
+            workers=_range.resolve_workers(workers, len(paths)), then=write)
 
-    _write_metadata(
-        Path(out_tape).expanduser(),
-        exchange_name=exchange_name, market=market,
-        symbol_id=symbol_id, symbol_name=symbol,
-        first_ts_ns=agg.first_ts_ns, last_ts_ns=agg.last_ts_ns,
-        trades_added=agg.trades_written, qty_multiplier=qty_multiplier,
-    )
+        if absent and not agg.rows_read:
+            raise InstrumentNotInFileError(
+                f"no day in the range holds a trade of '{symbol}': " + absent[0])
+
+        _write_metadata(
+            out_tape,
+            exchange_name=exchange_name, market=market,
+            symbol_id=symbol_id, symbol_name=symbol,
+            first_ts_ns=agg.first_ts_ns, last_ts_ns=agg.last_ts_ns,
+            trades_added=agg.trades_written, qty_multiplier=qty_multiplier,
+        )
 
     return agg
 

@@ -99,6 +99,9 @@ struct BacktestStats
 
   UnixNanos startTimeNs;
   UnixNanos endTimeNs;
+
+  double unrealizedPnl;  // open positions at their mark, no exit fee
+  double finalEquity;    // initialCapital + netPnl + unrealizedPnl
 };
 ```
 
@@ -136,8 +139,8 @@ The per-trade fee split is carried at full width. The per-side fee in quote curr
 realized PnL. `totalFees` is the fee of every recorded fill, including the
 entry fill (or the part of it not yet closed) of a position still open after
 the last fill. `netPnl = totalPnl - totalFees`, `finalCapital = initialCapital
-+ netPnl` and `returnPct` therefore include that entry fee, and nothing values
-the open position, so its unrealized PnL appears nowhere:
++ netPnl` and `returnPct` therefore include that entry fee and leave out the
+open position's unrealized PnL:
 
 ```
 netPnl = sum over trades() of (pnl - fee) - entry fee of the open position
@@ -145,15 +148,33 @@ netPnl = sum over trades() of (pnl - fee) - entry fee of the open position
 
 The last `EquityPoint.equity` is `initialCapital` plus the closed trades' net,
 without that fee. For 0.01 BTC entered at 78,000 at 4 bp the two differ by
-0.312. When no trade has closed, `computeStats()` returns zero for every
+0.312. When no trade has closed, `computeStats()` returns zero for every trade
 statistic, `totalFees` and `netPnl` included, and `finalCapital` equals
 `initialCapital`.
 
-There is no flag for an open position. `fills()` shows it: per symbol, the sum
-of `quantity` with `+` for `BUY` and `-` for `SELL` is non-zero while a
-position is open. A strategy driven by `BacktestRunner` can read its own
-position at the end of the run (`ctx.position`, or `position()` in the Python
-`on_stop()`).
+The open position is valued separately. `unrealizedPnl` is the sum over symbols
+of `(mark - entry) * qty` for a long and `(entry - mark) * qty` for a short,
+with `entry` the average entry price and no exit fee; `finalEquity` is
+`initialCapital + netPnl + unrealizedPnl`, also when no trade has closed.
+`markPrice(symbol, price)` sets the mark (the last call wins); a symbol never
+marked is valued at its last fill. `BacktestRunner` marks its result at the
+last price each run replayed: a bar's close on bar replay (`runBars`,
+`runTapeBars`), the last trade on tick replay (`run`, `runTape`, `runTapes`,
+`runTapeBarsOnTicks`). Book records do not move the mark.
+
+`openPositions()` lists every open position, ascending symbol id:
+
+```cpp
+struct OpenPosition
+{
+  SymbolId symbol;
+  Side side;           // BUY for a long, SELL for a short
+  Quantity quantity;   // absolute
+  Price entryPrice;    // average entry
+  Price markPrice;
+  Volume unrealizedPnl;
+};
+```
 
 ## EquityPoint
 
@@ -183,6 +204,9 @@ public:
   const std::vector<TradeRecord>& trades() const;
   const std::vector<EquityPoint>& equityCurve() const;
   double totalPnl() const;
+
+  void markPrice(SymbolId symbol, Price price);
+  std::vector<OpenPosition> openPositions() const;
 
   bool writeEquityCurveCsv(const std::string& path) const;
 };

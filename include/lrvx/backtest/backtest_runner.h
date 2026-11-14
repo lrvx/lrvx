@@ -25,6 +25,7 @@
 #include "lrvx/strategy/strategy.h"
 #include "lrvx/validation/abstract_order_validator.h"
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -397,6 +398,12 @@ class BacktestRunner : public ISignalHandler
   // Hands the venue's fee ladder (when there is one) to a result before it
   // replays the fills, so the fills are priced at the venue's tier.
   void attachFeeSchedule(BacktestResult& res) const;
+  // The last price this run replayed for `symbol`: a trade's price, or a
+  // bar's close on bar replay. Book records do not move it.
+  void noteLastPrice(SymbolId symbol, Price price);
+  // Marks every open position in `res` at the last price the run saw for
+  // its symbol.
+  void applyMarks(BacktestResult& res) const;
 
   BacktestConfig _config;
   SimulatedClock _clock;
@@ -453,6 +460,13 @@ class BacktestRunner : public ISignalHandler
   uint64_t _optionQuoteCount{0};  // read, delivered to no consumer (see BacktestState)
   uint64_t _poolStateCount{0};    // read, delivered to no consumer (see BacktestState)
   std::optional<replay::EventType> _lastEventType;
+
+  // noteLastPrice's table: symbol ids below kFlatMarks by index, the rest
+  // in a short list.
+  static constexpr size_t kFlatMarks = BacktestResult::kMaxSymbols;
+  std::array<Price, kFlatMarks> _lastPrices{};
+  std::array<bool, kFlatMarks> _hasLastPrice{};
+  std::vector<std::pair<SymbolId, Price>> _lastPricesOverflow;
 
   // Breakpoints
   std::vector<Breakpoint> _breakpoints;

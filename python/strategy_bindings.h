@@ -2704,6 +2704,8 @@ class PyBacktestRunner
     d["sortino_ratio"] = stats.sortinoRatio;
     d["calmar_ratio"] = stats.calmarRatio;
     d["return_pct"] = stats.returnPct;
+    d["unrealized_pnl"] = stats.unrealizedPnl;
+    d["final_equity"] = stats.finalEquity;
     _lastResult = std::move(result);
     return d;
   }
@@ -2820,6 +2822,8 @@ class PyBacktestRunner
     d["sortino_ratio"] = stats.sortinoRatio;
     d["calmar_ratio"] = stats.calmarRatio;
     d["return_pct"] = stats.returnPct;
+    d["unrealized_pnl"] = stats.unrealizedPnl;
+    d["final_equity"] = stats.finalEquity;
     _lastResult = std::move(result);
     return d;
   }
@@ -2901,6 +2905,44 @@ class PyBacktestRunner
     d["fee"] = fee;
     d["entry_time_ns"] = ets;
     d["exit_time_ns"] = xts;
+    return d;
+  }
+
+  py::object open_positions()
+  {
+    if (!_lastResult.has_value())
+    {
+      throw lrvx::LrvxError(
+          "E_RUN_002",
+          "BacktestRunner.open_positions() called before any run_* completed.");
+    }
+    const auto open = _lastResult->openPositions();
+    const size_t n = open.size();
+    py::array_t<uint32_t> sym(n);
+    py::array_t<uint8_t> side(n);
+    py::array_t<double> qty(n), entry(n), mark(n), upnl(n);
+    auto a_sym = sym.mutable_unchecked<1>();
+    auto a_side = side.mutable_unchecked<1>();
+    auto a_qty = qty.mutable_unchecked<1>();
+    auto a_entry = entry.mutable_unchecked<1>();
+    auto a_mark = mark.mutable_unchecked<1>();
+    auto a_upnl = upnl.mutable_unchecked<1>();
+    for (size_t i = 0; i < n; ++i)
+    {
+      a_sym(i) = static_cast<uint32_t>(open[i].symbol);
+      a_side(i) = static_cast<uint8_t>(open[i].side);
+      a_qty(i) = open[i].quantity.toDouble();
+      a_entry(i) = open[i].entryPrice.toDouble();
+      a_mark(i) = open[i].markPrice.toDouble();
+      a_upnl(i) = open[i].unrealizedPnl.toDouble();
+    }
+    py::dict d;
+    d["symbol"] = sym;
+    d["side"] = side;
+    d["quantity"] = qty;
+    d["entry_price"] = entry;
+    d["mark_price"] = mark;
+    d["unrealized_pnl"] = upnl;
     return d;
   }
 
@@ -3221,6 +3263,8 @@ class PyBacktestRunner
     d["sortino_ratio"] = stats.sortinoRatio;
     d["calmar_ratio"] = stats.calmarRatio;
     d["return_pct"] = stats.returnPct;
+    d["unrealized_pnl"] = stats.unrealizedPnl;
+    d["final_equity"] = stats.finalEquity;
     _lastResult = std::move(result);
     return d;
   }
@@ -4103,5 +4147,12 @@ inline void bindStrategy(py::module_& m)
       .def("trades", &PyBacktestRunner::trades,
            "Return closed trades from the most recent run as a dict of numpy "
            "arrays (symbol, side, entry_price, exit_price, quantity, pnl, "
-           "fee, entry_time_ns, exit_time_ns).");
+           "fee, entry_time_ns, exit_time_ns).")
+      .def("open_positions", &PyBacktestRunner::open_positions,
+           "Positions the most recent run had not closed when it ended, as a\n"
+           "dict of numpy arrays aligned by row (symbol, side 0 long / 1 short,\n"
+           "quantity, entry_price (average), mark_price, unrealized_pnl),\n"
+           "ascending symbol id. The mark is the last price the run replayed\n"
+           "for the symbol: a bar's close on bar replay, the last trade on tick\n"
+           "replay. Their sum is the stats' unrealized_pnl.");
 }

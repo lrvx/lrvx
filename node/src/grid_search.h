@@ -19,16 +19,19 @@ struct GridSearchCallContext
 {
   Napi::Env env;
   Napi::FunctionReference factory_fn;
-  std::vector<std::vector<double>> per_call_params;
+  // The grid the run is on: each combination's valuation is recorded on it.
+  LrvxGridSearchHandle gs{nullptr};
   // What the factory threw, or what was wrong with the stats it returned.
   // The run unwinds through the C API, which keeps only a message, so run
   // rethrows this one to keep its class.
   Napi::ObjectReference error;
 };
 
-// The stats the factory returned, read into the C struct. A key left out
-// reads 0; a key of the wrong type used to read 0 as well.
-inline void gridSearchReadStats(const Napi::Value& result, LrvxBacktestStats* out_stats)
+// The stats the factory returned, read into the C struct, and their
+// unrealizedPnl and finalEquity recorded on `gs` for combination `index`. A
+// key left out reads 0; a key of the wrong type used to read 0 as well.
+inline void gridSearchReadStats(const Napi::Value& result, LrvxBacktestStats* out_stats,
+                                LrvxGridSearchHandle gs, uint64_t index)
 {
   auto obj = argObject(result, "setFactory: the stats the factory returns");
   auto getNum = [&](const char* key) -> double
@@ -65,6 +68,10 @@ inline void gridSearchReadStats(const Napi::Value& result, LrvxBacktestStats* ou
   };
   out_stats->startTimeNs = getNs("startTimeNs");
   out_stats->endTimeNs = getNs("endTimeNs");
+  // LrvxBacktestStats has no field for the open position at the end.
+  const double unrealizedPnl = getNum("unrealizedPnl");
+  const double finalEquity = getNum("finalEquity");
+  lrvx_grid_search_record_valuation(gs, index, unrealizedPnl, finalEquity);
 }
 
 inline int gridSearchFactoryThunk(void* user_data, uint64_t param_index,
@@ -80,7 +87,7 @@ inline int gridSearchFactoryThunk(void* user_data, uint64_t param_index,
     {
       arr[i] = Napi::Number::New(ctx->env, params[i]);
     }
-    gridSearchReadStats(ctx->factory_fn.Call({arr}), out_stats);
+    gridSearchReadStats(ctx->factory_fn.Call({arr}), out_stats, ctx->gs, param_index);
   }
   catch (const Napi::Error& e)
   {
@@ -90,7 +97,6 @@ inline int gridSearchFactoryThunk(void* user_data, uint64_t param_index,
     }
     throw;
   }
-  (void)param_index;
   return 1;
 }
 
@@ -187,7 +193,7 @@ class GridSearchNode : public Napi::ObjectWrap<GridSearchNode>
             "E_RUN_002",
             "GridSearch.run called with no axes / empty axis.");
       }
-      GridSearchCallContext ctx{env, Napi::FunctionReference(), {}, {}};
+      GridSearchCallContext ctx{env, Napi::FunctionReference(), _handle, {}};
       ctx.factory_fn = Napi::Persistent(_factory.Value());
       std::vector<LrvxBacktestStats> stats(total);
       lrvx_clear_last_error();
@@ -221,7 +227,8 @@ class GridSearchNode : public Napi::ObjectWrap<GridSearchNode>
         auto o = Napi::Object::New(env);
         o.Set("index", Napi::Number::New(env, static_cast<double>(i)));
         o.Set("params", pArr);
-        o.Set("stats", statsToJsObj(env, stats[i]));
+        o.Set("stats", statsToJsObj(env, stats[i], lrvx_grid_search_result_unrealized_pnl(_handle, i),
+                                    lrvx_grid_search_result_final_equity(_handle, i)));
         results[i] = o;
       }
       return results; });

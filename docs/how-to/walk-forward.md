@@ -8,7 +8,8 @@ folds, the backtest is overfit.
 
 `lrvx.WalkForwardRunner` ships in Python. The same primitive is in
 `lrvx.WalkForwardRunner` for Node and through the C ABI for Codon
-(`lrvx_walk_forward_run_csv`).
+(`lrvx_walk_forward_run_csv`, and `lrvx_walk_forward_run_csv_result` for
+the folds together with each leg's open position).
 
 ## Modes
 
@@ -120,10 +121,47 @@ the file was read and is too short for one fold.
 ```
 
 The two `*_stats` blocks are the same shape as `BacktestRunner.run_csv`
-returns. Compute aggregate statistics (mean / median / variance over
+returns. Each values the position still open at the end of its own window,
+marked at that window's last close: `unrealized_pnl` (`unrealizedPnl` in
+Node) is `(mark - entry) * qty` for a long and `(entry - mark) * qty` for a
+short, with no exit fee, and `final_equity` (`finalEquity`) is
+`initial_capital + net_pnl + unrealized_pnl`. `net_pnl` and `final_capital`
+stay the closed trades'. Compute aggregate statistics (mean / median / variance over
 folds) on the client side — the runner does not aggregate for you on
 purpose, since useful aggregates depend on what you are looking for
 (robustness vs. average performance vs. worst case).
+
+### C API
+
+`LrvxWalkForwardFold` has no field for the valuation, and its shape is
+fixed by the ABI. `lrvx_walk_forward_run_csv_result` runs the same folds as
+`lrvx_walk_forward_run_csv` and keeps them in an owned handle:
+
+```c
+LrvxWalkForwardResultHandle r = lrvx_walk_forward_run_csv_result(
+    registry, "data/btcusdt_sample.csv", "BTCUSDT", 0.0004, 10000.0, &cfg,
+    factory, user_data);
+if (r == NULL) { /* the reason is in lrvx_last_error_message() */ }
+
+uint32_t n = lrvx_walk_forward_result_folds(r, NULL, 0);  /* the count */
+LrvxWalkForwardFold* folds = malloc(n * sizeof *folds);
+lrvx_walk_forward_result_folds(r, folds, n);
+for (uint32_t i = 0; i < n; ++i)
+{
+  double open_at_test_end = lrvx_walk_forward_result_test_unrealized_pnl(r, i);
+  double equity_at_test_end = lrvx_walk_forward_result_test_final_equity(r, i);
+  /* _train_unrealized_pnl / _train_final_equity for the train leg */
+}
+free(folds);
+lrvx_walk_forward_result_destroy(r);
+```
+
+It fails where `lrvx_walk_forward_run_csv` does -- a CSV that cannot be
+opened or parsed, a symbol the registry does not hold, a NULL registry,
+path, config or factory -- with NULL and the reason in
+`lrvx_last_error_message()`. A file too short for one fold is a handle with
+zero folds and no error. A `fold_index` past the last fold reads 0 with no
+error.
 
 ## Full OHLCV path for `on_bar` strategies
 

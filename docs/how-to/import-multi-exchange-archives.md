@@ -63,6 +63,24 @@ The range forms share one download policy:
 - Without `--skip-missing`, a missing day stops the range with an error naming its URL. With `--skip-missing` the range steps over days the archive does not publish; a download that keeps failing for another reason still stops it.
 - A range in which no day is published fails, with or without `--skip-missing`, naming the symbol, market and dates and the first URL tried. The CLI exits with status 1.
 
+## Conversion in worker processes
+
+Parsing the CSVs is the slow part of an import, so the range forms parse the files of a range in worker processes: `workers` (`--workers N`) of them, by default one per CPU core and at most one per file (a Bitget part counts as one file). `--workers 1` parses in the importing process. `parallel` (`--parallel`) is the number of downloads in flight and does not change how many processes convert.
+
+The tape is written by the importing process alone, a file at a time in date order, with the dedup described below, so a range imported with any worker count gives the same tape: the same records in the same order, one segment per file, the same `metadata.json` and the same counters. A worker parses a file into a temporary file in the system temp directory (about 33 bytes per trade) and the workers run at most two files per worker ahead of the writer, so the temporary space stays at a few days' worth however long the range.
+
+An import that fails leaves the tape as it found it, whatever the worker count: the error is the one the file raised (`UnknownLayoutError`, `NothingParsedError`, `CorruptArchiveError`, ...) and names the file, the segments written for earlier files of the range are removed and `metadata.json` keeps its old content. A cached file that does not open is removed from the cache, so the next run downloads it again.
+
+The workers are started with the `spawn` method, on every platform. A script that calls a range importer from its top level needs the usual `if __name__ == "__main__":` guard; without it, pass `workers=1`.
+
+```bash
+lrvx archive bybit --symbol BTCUSDT --market linear \
+  --from 2026-08-01 --to 2026-10-31 --out ./tapes/bybit-linear-BTCUSDT \
+  --workers 8
+```
+
+On a 14-core Mac, the 92 Bybit BTCUSDT linear days from 2026-08-01 to 2026-10-31 (146 million trades, from a local mirror) import in 40 s with the default worker count and in 5 min 9 s with `--workers 1`, into the same tape.
+
 ## Append and dedup
 
 All four trade importers append by default and dedup the same way: a row is skipped when its trade id is already on the tape for the same symbol within the incoming file's time range. A trade keeps its exchange timestamp, so only that range can hold a copy of it, and the dedup read covers that range instead of the whole tape. Re-importing a day adds nothing, a new day lands in full, an overlapping range keeps each trade once, and days may be imported in any order (a later day first, or a day that fills a gap). `--no-append` turns the check off.
@@ -120,7 +138,7 @@ Linear and inverse files:
 timestamp,symbol,side,size,price,tickDirection,trdMatchID,grossValue,homeNotional,foreignNotional
 ```
 
-Recent files add a trailing `RPI` column. `timestamp` is Unix seconds with a decimal fraction. `side` is the taker side, `Buy` / `Sell`, mapped to lrvx's `Side::BUY` / `Side::SELL`. `trdMatchID` is a UUID string that the importer folds into the 64-bit lrvx `trade_id` (low 8 bytes of its MD5); the folded ids carry no order, which the membership dedup above does not need. `size` is in the base coin for linear and in USD contracts for inverse. Older files list trades newest first.
+Recent files add a trailing `RPI` column. `timestamp` is Unix seconds with a decimal fraction. `side` is the taker side, `Buy` / `Sell`, mapped to lrvx's `Side::BUY` / `Side::SELL`. `trdMatchID` is a UUID string that the importer folds into the 64-bit lrvx `trade_id` (the first 8 bytes of its MD5 digest, read big-endian); the folded ids carry no order, which the membership dedup above does not need. `size` is in the base coin for linear and in USD contracts for inverse. Older files list trades newest first.
 
 Spot files:
 
@@ -150,8 +168,9 @@ lrvx.archives.bybit.range_to_lrvx(
     date_to="2024-12-31",
     out_tape="/path/lrvx/BTCUSDT_bybit",
     mirror=None,        # default = ~/.lrvx/archive-cache/bybit
-    parallel=4,
+    parallel=4,         # downloads in flight
     skip_missing=False,
+    workers=None,       # processes parsing files; None = one per core
 )
 ```
 

@@ -136,8 +136,11 @@ def _digest(stats, trades, equity) -> str:
     return h.hexdigest()
 
 
-# Captured from the runner before it took slippage or latency keywords.
-BASELINE_DIGEST = "602c88f18cebfa7082efd12a55d26370e007d0c27074a39e707db6aab4dd13b5"
+# Captured from the runner before it took slippage or latency keywords, then
+# re-captured when stats gained unrealized_pnl and final_equity; without those
+# two keys the digest is still the original
+# 602c88f18cebfa7082efd12a55d26370e007d0c27074a39e707db6aab4dd13b5.
+BASELINE_DIGEST = "4bece33ba2d57c78cc5ae1411acd94071da892846c107ed131a6db18f4916ecd"
 
 
 def test_defaults_reproduce_the_baseline_bit_for_bit():

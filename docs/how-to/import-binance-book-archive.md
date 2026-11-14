@@ -34,11 +34,11 @@ binance.t1_to_lrvx(csv_path, out_tape, *, symbol_id=1, symbol_name="",
 
 binance.range_book_to_lrvx(
     symbol, market, book_type, date_from, date_to, out_tape, *,
-    mirror=None, parallel=2, ...,
+    mirror=None, parallel=2, workers=None, ...,
 ) -> BookConvertStats
 ```
 
-`book_type` is `"t1"`; `market` is `"um-futures"` or `"cm-futures"` (for coin-margined contracts the symbol is the contract name, e.g. `BTCUSD_PERP`). Anything else, or a symbol of the wrong shape for the market, raises `ValueError` before any download. Days are UTC days. The range form downloads missing zips from `data.binance.vision` into the shared archive cache, `~/.lrvx/archive-cache/binance/<market>/<symbol>/` (or `mirror` in place of `~/.lrvx/archive-cache/binance`), next to the aggTrades files of the same symbol, and runs the converter on the local files serially so the writer stays append-safe. Missing days, retries and the cache work as for aggTrades; see [Import multi-exchange archives](import-multi-exchange-archives.md#downloads).
+`book_type` is `"t1"`; `market` is `"um-futures"` or `"cm-futures"` (for coin-margined contracts the symbol is the contract name, e.g. `BTCUSD_PERP`). Anything else, or a symbol of the wrong shape for the market, raises `ValueError` before any download. Days are UTC days. The range form downloads missing zips from `data.binance.vision` into the shared archive cache, `~/.lrvx/archive-cache/binance/<market>/<symbol>/` (or `mirror` in place of `~/.lrvx/archive-cache/binance`), next to the aggTrades files of the same symbol. Its files are parsed in `workers` processes (`--workers`, default one per core) and written by the importing process in date order, so the tape is the same for any worker count; see [Conversion in worker processes](import-multi-exchange-archives.md#conversion-in-worker-processes). Missing days, retries and the cache work as for aggTrades; see [Import multi-exchange archives](import-multi-exchange-archives.md#downloads).
 
 ## Example
 

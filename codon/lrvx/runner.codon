@@ -107,6 +107,8 @@ from C import lrvx_backtest_runner_take_result(cobj) -> cobj
 from C import lrvx_backtest_result_destroy(cobj)
 from C import lrvx_backtest_result_equity_curve(cobj, cobj, u32) -> u32
 from C import lrvx_backtest_result_trades(cobj, cobj, u32) -> u32
+from C import lrvx_backtest_result_unrealized_pnl(cobj) -> float
+from C import lrvx_backtest_result_final_equity(cobj) -> float
 
 # Walk-forward + grid search C ABI.
 from C import lrvx_walk_forward_run_csv(cobj, cobj, cobj, float, float,
@@ -128,7 +130,7 @@ from C import lrvx_quantity_to_double(i64) -> float
 from C import lrvx_strategy_create(u32, Ptr[u32], u32, cobj, cobj) -> cobj
 
 from lrvx.types import SCALE, Price, Quantity
-from lrvx.backtest import BacktestStats
+from lrvx.backtest import BacktestStats, _open_positions_of
 from lrvx.dispatch import bind_callbacks, _as_class, _report_callback_error
 from lrvx.dispatch import _gc_register_thread
 from lrvx.layout import _EV_ORDER_ID, _EV_SYMBOL_ID, _EV_SIDE, _EV_ORDER_TYPE
@@ -610,6 +612,15 @@ class BacktestRunner:
 
     def _parse_stats(self, buf: List[i64]) -> BacktestStats:
         fp = Ptr[f64](buf.arr.ptr)
+        # The position the run left open is valued on its result, which
+        # LrvxBacktestStats does not carry.
+        unrealized = 0.0
+        final_equity = fp[6]
+        result = lrvx_backtest_runner_take_result(self._handle)
+        if result != cobj():
+            unrealized = float(lrvx_backtest_result_unrealized_pnl(result))
+            final_equity = float(lrvx_backtest_result_final_equity(result))
+            lrvx_backtest_result_destroy(result)
         return BacktestStats(
             total_trades=int(buf[0]),
             winning_trades=int(buf[1]),
@@ -641,7 +652,9 @@ class BacktestRunner:
             start_time_ns=int(buf[27]),
             end_time_ns=int(buf[28]),
             skipped_option_quotes=int(buf[29]),
-            skipped_pool_states=int(buf[30])
+            skipped_pool_states=int(buf[30]),
+            unrealized_pnl=unrealized,
+            final_equity=final_equity
         )
 
     def run_csv(self, path: str, symbol: str) -> BacktestStats:
@@ -866,3 +879,20 @@ class BacktestRunner:
                 fee_l.append(float(fp[i * 8 + 7]))
         lrvx_backtest_result_destroy(result)
         return (sym_l, side_l, ep_l, xp_l, qty_l, pnl_l, fee_l, ets_l, xts_l)
+
+    def open_positions(self) -> Tuple[List[int], List[int], List[float],
+                                      List[float], List[float], List[float]]:
+        """Positions the most recent run left open, marked at the last
+        price it replayed per symbol (a bar's close on bar replay, the last
+        trade on tick replay).
+
+        Returns ``(symbol, side, quantity, entry_price, mark_price,
+        unrealized_pnl)`` parallel lists, ascending symbol id; ``side`` is
+        0 for long, 1 for short. Raises if no run has completed.
+        """
+        result = lrvx_backtest_runner_take_result(self._handle)
+        if result == cobj():
+            raise ValueError("BacktestRunner.open_positions called before any run_*")
+        out = _open_positions_of(result)
+        lrvx_backtest_result_destroy(result)
+        return out

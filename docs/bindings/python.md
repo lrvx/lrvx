@@ -14,7 +14,8 @@ cmake -B build \
 cmake --build build
 ```
 
-Requires: Python 3.10+, pybind11 (`pip install pybind11`).
+Requires: Python 3.10+, pybind11 3.1 or newer (`pip install "pybind11>=3.1"`). The
+prebuilt wheels on PyPI cover CPython 3.10 to 3.15.
 
 The module builds at `build/python/lrvx.cpython-*.so`.
 
@@ -92,7 +93,7 @@ The constructor takes `(registry, fee_rate=0.0004, initial_capital=100000.0)` �
 
 `run_csv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used; each bar is replayed as one trade, so `on_trade` fires and `on_bar` does not. Timestamps below `1e12` are treated as seconds and scaled to nanoseconds, because a raw CSV column's unit is genuinely unknown. `run_ohlcv(ts, close, symbol)` and `run_bars(...)` (full OHLC, fires `on_bar`) are both different: `ts` and `start_time_ns` / `end_time_ns` are nanoseconds by contract — the same contract the C ABI, Node, and Codon bindings use for the same calls — so they are used exactly as given, with no unit guessing at all. Other entry points: `run_tape(path)` and `run_tapes(paths)` replay `.lrvx` tapes tick by tick (`on_trade`), `run_tape_bars(path, interval_seconds=..., symbol=...)` replays a tape as time bars (`on_bar`, `run_bars`' fill rules), and `run_tape_bars_on_ticks(path, interval_seconds=..., symbol=...)` shows the strategy the same bars while the executor fills on the tape's prints.
 
-Returns a plain dict. Keys: `total_trades`, `winning_trades`, `losing_trades`, `initial_capital`, `final_capital`, `total_pnl`, `total_fees`, `net_pnl`, `gross_profit`, `gross_loss`, `max_drawdown`, `max_drawdown_pct`, `win_rate`, `profit_factor`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `return_pct`.
+Returns a plain dict. Keys: `total_trades`, `winning_trades`, `losing_trades`, `initial_capital`, `final_capital`, `total_pnl`, `total_fees`, `net_pnl`, `gross_profit`, `gross_loss`, `max_drawdown`, `max_drawdown_pct`, `win_rate`, `profit_factor`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `return_pct`, `unrealized_pnl`, `final_equity`. A position still open when the data ends is valued at the last price the run replayed for its symbol (a bar's close on bar replay, the last trade on tick replay; book records do not move it): `unrealized_pnl` is that valuation, with no exit fee, and `final_equity` is `initial_capital + net_pnl + unrealized_pnl`. `net_pnl`, `final_capital` and `return_pct` count closed trades only, and `open_positions()` lists what was left open. `Engine.run` returns a `Stats` object carrying the same two fields.
 
 Hooks attach after construction: `set_executor(executor)` (a subclass of `lrvx.Executor`), `set_risk_manager`, `set_kill_switch`, `set_order_validator`, `set_pnl_tracker`, `add_execution_listener`.
 

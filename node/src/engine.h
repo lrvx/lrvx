@@ -231,6 +231,8 @@ inline Napi::Object statsObj(Napi::Env env, const BacktestStats& s)
   o.Set("returnPct", s.returnPct);
   setTradeTimeStats(env, o, s.avgTradeDurationNs, s.medianTradeDurationNs, s.maxTradeDurationNs,
                     s.timeWeightedReturn, s.startTimeNs.raw(), s.endTimeNs.raw());
+  o.Set("unrealizedPnl", s.unrealizedPnl);
+  o.Set("finalEquity", s.finalEquity);
   return o;
 }
 
@@ -479,11 +481,13 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
     SimulatedExecutor executor(clock);
     OrderId nextId = 1;
     size_t si = 0;
+    std::map<uint32_t, int64_t> lastClose;
 
     for (const auto& mb : merged)
     {
       clock.advanceTo(UnixNanos::fromRaw(mb.ts));
       executor.onBar(mb.sym, Price::fromRaw(mb.close));
+      lastClose[mb.sym] = mb.close;
       while (si < sigs.size() && sigs[sigOrder[si]].timestamp_ns <= mb.ts)
       {
         const auto& sg = sigs[sigOrder[si]];
@@ -497,6 +501,11 @@ class EngineWrap : public Napi::ObjectWrap<EngineWrap>
     for (const auto& fill : executor.fills())
     {
       result.recordFill(fill);
+    }
+    // An open position is valued at the last close the run replayed.
+    for (const auto& [sym, close] : lastClose)
+    {
+      result.markPrice(sym, Price::fromRaw(close));
     }
     return statsObj(info.Env(), result.computeStats());
   }

@@ -21,6 +21,7 @@
 #include <initializer_list>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace node_lrvx
 {
@@ -457,6 +458,50 @@ inline void setTradeTimeStats(Napi::Env env, Napi::Object& obj, const LrvxBackte
 {
   setTradeTimeStats(env, obj, s.avgTradeDurationNs, s.medianTradeDurationNs,
                     s.maxTradeDurationNs, s.timeWeightedReturn, s.startTimeNs, s.endTimeNs);
+}
+
+// The open position at the end of a run, from a result handle: stats gain
+// unrealizedPnl and finalEquity (initialCapital + netPnl + unrealizedPnl).
+inline void setOpenPositionStats(Napi::Env env, Napi::Object& obj, LrvxBacktestResultHandle res)
+{
+  obj.Set("unrealizedPnl", Napi::Number::New(env, lrvx_backtest_result_unrealized_pnl(res)));
+  obj.Set("finalEquity", Napi::Number::New(env, lrvx_backtest_result_final_equity(res)));
+}
+
+// { symbol: Uint32Array, side: Uint8Array (0 long / 1 short), quantity,
+//   entryPrice, markPrice, unrealizedPnl: Float64Array }, aligned by row,
+// ascending symbol id.
+inline Napi::Object openPositionsToJs(Napi::Env env, LrvxBacktestResultHandle res)
+{
+  const uint32_t total = lrvx_backtest_result_open_positions(res, nullptr, 0);
+  std::vector<LrvxBacktestOpenPosition> buf(total);
+  if (total > 0)
+  {
+    lrvx_backtest_result_open_positions(res, buf.data(), total);
+  }
+  auto symArr = Napi::Uint32Array::New(env, total);
+  auto sideArr = Napi::Uint8Array::New(env, total);
+  auto qtyArr = Napi::Float64Array::New(env, total);
+  auto entryArr = Napi::Float64Array::New(env, total);
+  auto markArr = Napi::Float64Array::New(env, total);
+  auto upnlArr = Napi::Float64Array::New(env, total);
+  for (uint32_t i = 0; i < total; ++i)
+  {
+    symArr.Data()[i] = buf[i].symbol;
+    sideArr.Data()[i] = buf[i].side;
+    qtyArr.Data()[i] = buf[i].quantity;
+    entryArr.Data()[i] = buf[i].entry_price;
+    markArr.Data()[i] = buf[i].mark_price;
+    upnlArr.Data()[i] = buf[i].unrealized_pnl;
+  }
+  auto obj = Napi::Object::New(env);
+  obj.Set("symbol", symArr);
+  obj.Set("side", sideArr);
+  obj.Set("quantity", qtyArr);
+  obj.Set("entryPrice", entryArr);
+  obj.Set("markPrice", markArr);
+  obj.Set("unrealizedPnl", upnlArr);
+  return obj;
 }
 
 inline bool requireSameLength(Napi::Env env, const char* fnName,

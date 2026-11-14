@@ -202,6 +202,10 @@ jobs:
       # lrvx-mcp shipped `mcp>=1.0` while this file installed `mcp>=1.0,<2`, so
       # CI was green on 1.x and users got the 2.0 SDK, which crashes on start.
       run: python3 scripts/check_dep_pins.py
+    - name: Wheel matrix covers every Python the package claims
+      # 0.12.0 claimed requires-python >=3.10 and built no cp314 wheel, so
+      # pip on Python 3.14 compiled the sdist instead.
+      run: python3 scripts/check_wheel_matrix.py
 
     - name: Verify the sanitizer transcript scan is wired into every job that needs it
       # `ctest --output-on-failure` prints the output of the tests it decided
@@ -224,7 +228,7 @@ jobs:
       # doesn't need.
       run: |
         scripts/ci-apt-install.sh --no-install-recommends cmake ninja-build g++-14
-        python3 -m pip install --break-system-packages "pybind11<3.1.0" numpy
+        python3 -m pip install --break-system-packages "pybind11>=3.1.0,<3.2" numpy
         cmake -B build -G Ninja \
               -DCMAKE_CXX_COMPILER=g++-14 \
               -DCMAKE_BUILD_TYPE=Release \
@@ -317,15 +321,18 @@ jobs:
       # pybind11-stubgen pinned below 3.0: 3.0.0 reorders the generated
       # stubs, so an unpinned install drifts against the committed .pyi the
       # moment a new release lands, with no change in the repository.
-      # pybind11 pinned below 3.1.0: 3.1.0 changed the signatures stubgen
-      # renders, so the committed .pyi (generated with 3.0.x) drifts against
-      # an unpinned install. Bump this pin together with a stub regeneration.
+      # pybind11 pinned to 3.1.x: the signatures stubgen renders change
+      # between minor releases (3.1.0 changed them against 3.0.x), so the
+      # committed .pyi (generated with 3.1.x) drifts against an unpinned
+      # install. The floor is pyproject's [build-system] pybind11, which
+      # the wheels build with. Bump this pin together with a stub
+      # regeneration.
       # scipy is the only workflow that installs it: LiveQueueCalibrator's
       # continuous-fit method is lazy-import-optional, and without scipy
       # here test_fit_scipy_matches_or_beats_grid_rmse always skips while
       # its mirror (missing-dependency error message) always passes, so the
       # suite summary reads clean either way.
-      run: python3 -m pip install --break-system-packages "pybind11<3.1.0" numpy scipy "pybind11-stubgen<3" mypy pyright pytest
+      run: python3 -m pip install --break-system-packages "pybind11>=3.1.0,<3.2" numpy scipy "pybind11-stubgen<3" mypy pyright pytest
 
     - name: Install Codon
       env:
@@ -583,6 +590,8 @@ jobs:
                    codon_trace_attach_smoke codon_modify_order_smoke \
                    codon_base_strategy_callbacks_smoke \
                    codon_backtest_runner_stats_smoke \
+                   codon_open_position_at_end_smoke codon_version_smoke \
+                   codon_engine_run_open_position_smoke \
                    codon_funding_schedule_smoke \
                    codon_runner_strategy_ids_smoke codon_last_error_smoke \
                    codon_runner_order_event_smoke \

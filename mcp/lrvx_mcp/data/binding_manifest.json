@@ -175,7 +175,22 @@
         {
           "group": "backtest_slippage",
           "kind": "function",
+          "name": "lrvx_backtest_result_final_equity"
+        },
+        {
+          "group": "backtest_slippage",
+          "kind": "function",
           "name": "lrvx_backtest_result_ingest_executor"
+        },
+        {
+          "group": "backtest_slippage",
+          "kind": "function",
+          "name": "lrvx_backtest_result_mark_price"
+        },
+        {
+          "group": "backtest_slippage",
+          "kind": "function",
+          "name": "lrvx_backtest_result_open_positions"
         },
         {
           "group": "backtest_slippage",
@@ -191,6 +206,11 @@
           "group": "backtest_slippage",
           "kind": "function",
           "name": "lrvx_backtest_result_trades"
+        },
+        {
+          "group": "backtest_slippage",
+          "kind": "function",
+          "name": "lrvx_backtest_result_unrealized_pnl"
         },
         {
           "group": "backtest_slippage",
@@ -1256,6 +1276,21 @@
           "group": "grid_search",
           "kind": "function",
           "name": "lrvx_grid_search_params_for_index"
+        },
+        {
+          "group": "grid_search",
+          "kind": "function",
+          "name": "lrvx_grid_search_record_valuation"
+        },
+        {
+          "group": "grid_search",
+          "kind": "function",
+          "name": "lrvx_grid_search_result_final_equity"
+        },
+        {
+          "group": "grid_search",
+          "kind": "function",
+          "name": "lrvx_grid_search_result_unrealized_pnl"
         },
         {
           "group": "grid_search",
@@ -3858,6 +3893,11 @@
           "name": "lrvx_venue_stack_venue_name"
         },
         {
+          "group": "capi_diagnostics",
+          "kind": "function",
+          "name": "lrvx_version"
+        },
+        {
           "group": "tape_aggregator",
           "kind": "function",
           "name": "lrvx_volume_bin_aggregator_create"
@@ -3920,11 +3960,50 @@
         {
           "group": "walk_forward",
           "kind": "function",
+          "name": "lrvx_walk_forward_result_destroy"
+        },
+        {
+          "group": "walk_forward",
+          "kind": "function",
+          "name": "lrvx_walk_forward_result_folds"
+        },
+        {
+          "group": "walk_forward",
+          "kind": "function",
+          "name": "lrvx_walk_forward_result_test_final_equity"
+        },
+        {
+          "group": "walk_forward",
+          "kind": "function",
+          "name": "lrvx_walk_forward_result_test_unrealized_pnl"
+        },
+        {
+          "group": "walk_forward",
+          "kind": "function",
+          "name": "lrvx_walk_forward_result_train_final_equity"
+        },
+        {
+          "group": "walk_forward",
+          "kind": "function",
+          "name": "lrvx_walk_forward_result_train_unrealized_pnl"
+        },
+        {
+          "group": "walk_forward",
+          "kind": "function",
           "name": "lrvx_walk_forward_run_csv"
+        },
+        {
+          "group": "walk_forward",
+          "kind": "function",
+          "name": "lrvx_walk_forward_run_csv_result"
         },
         {
           "kind": "struct",
           "name": "LrvxBBO"
+        },
+        {
+          "kind": "struct",
+          "name": "LrvxBacktestOpenPosition"
         },
         {
           "kind": "struct",
@@ -4405,6 +4484,10 @@
         {
           "kind": "handle",
           "name": "LrvxVolumeProfileHandle"
+        },
+        {
+          "kind": "handle",
+          "name": "LrvxWalkForwardResultHandle"
         }
       ]
     },
@@ -5228,6 +5311,10 @@
         },
         {
           "kind": "function",
+          "name": "version"
+        },
+        {
+          "kind": "function",
           "name": "vwap"
         },
         {
@@ -5465,6 +5552,16 @@
         },
         {
           "kind": "method",
+          "name": "mark_price",
+          "parent": "BacktestResult"
+        },
+        {
+          "kind": "method",
+          "name": "open_positions",
+          "parent": "BacktestResult"
+        },
+        {
+          "kind": "method",
           "name": "record_fill",
           "parent": "BacktestResult"
         },
@@ -5496,6 +5593,11 @@
         {
           "kind": "method",
           "name": "equity_curve",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "open_positions",
           "parent": "BacktestRunner"
         },
         {
@@ -9051,7 +9153,19 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_backtest_result_final_equity"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_backtest_result_ingest_executor"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_backtest_result_mark_price"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_backtest_result_open_positions"
         },
         {
           "kind": "c_import",
@@ -9064,6 +9178,10 @@
         {
           "kind": "c_import",
           "name": "lrvx_backtest_result_trades"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_backtest_result_unrealized_pnl"
         },
         {
           "kind": "c_import",
@@ -9916,6 +10034,18 @@
         {
           "kind": "c_import",
           "name": "lrvx_grid_search_params_for_index"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_grid_search_record_valuation"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_grid_search_result_final_equity"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_grid_search_result_unrealized_pnl"
         },
         {
           "kind": "c_import",
@@ -11999,6 +12129,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_version"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_volume_bin_aggregator_create"
         },
         {
@@ -12047,7 +12181,35 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_walk_forward_result_destroy"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_walk_forward_result_folds"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_walk_forward_result_test_final_equity"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_walk_forward_result_test_unrealized_pnl"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_walk_forward_result_train_final_equity"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_walk_forward_result_train_unrealized_pnl"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_walk_forward_run_csv"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_walk_forward_run_csv_result"
         }
       ]
     },
@@ -13452,6 +13614,11 @@
           "header": "include/lrvx/ml/onnx_inference.h",
           "kind": "type",
           "name": "OnnxSidecar"
+        },
+        {
+          "header": "include/lrvx/backtest/backtest_result.h",
+          "kind": "type",
+          "name": "OpenPosition"
         },
         {
           "header": "include/lrvx/backtest/backtest_optimizer.h",
@@ -15105,6 +15272,16 @@
         },
         {
           "kind": "method",
+          "name": "markPrice",
+          "parent": "BacktestResult"
+        },
+        {
+          "kind": "method",
+          "name": "openPositions",
+          "parent": "BacktestResult"
+        },
+        {
+          "kind": "method",
           "name": "recordFill",
           "parent": "BacktestResult"
         },
@@ -15130,12 +15307,22 @@
         },
         {
           "kind": "method",
+          "name": "unrealizedPnl",
+          "parent": "BacktestResult"
+        },
+        {
+          "kind": "method",
           "name": "updatePositionLong",
           "parent": "BacktestResult"
         },
         {
           "kind": "method",
           "name": "updatePositionShort",
+          "parent": "BacktestResult"
+        },
+        {
+          "kind": "method",
+          "name": "valueOpen",
           "parent": "BacktestResult"
         },
         {
@@ -15161,6 +15348,11 @@
         {
           "kind": "method",
           "name": "advanceClocks",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "applyMarks",
           "parent": "BacktestRunner"
         },
         {
@@ -15236,6 +15428,11 @@
         {
           "kind": "method",
           "name": "modifiedOrder",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "noteLastPrice",
           "parent": "BacktestRunner"
         },
         {
@@ -28293,6 +28490,10 @@
         },
         {
           "kind": "class",
+          "name": "OpenPositions"
+        },
+        {
+          "kind": "class",
           "name": "Order"
         },
         {
@@ -28957,6 +29158,10 @@
         },
         {
           "kind": "function",
+          "name": "version"
+        },
+        {
+          "kind": "function",
           "name": "vwap"
         },
         {
@@ -29169,6 +29374,16 @@
         },
         {
           "kind": "method",
+          "name": "markPrice",
+          "parent": "BacktestResult"
+        },
+        {
+          "kind": "method",
+          "name": "openPositions",
+          "parent": "BacktestResult"
+        },
+        {
+          "kind": "method",
           "name": "recordFill",
           "parent": "BacktestResult"
         },
@@ -29190,6 +29405,11 @@
         {
           "kind": "method",
           "name": "equityCurve",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "openPositions",
           "parent": "BacktestRunner"
         },
         {
@@ -29339,6 +29559,11 @@
         },
         {
           "kind": "method",
+          "name": "finalEquity",
+          "parent": "BacktestStats"
+        },
+        {
+          "kind": "method",
           "name": "grossLoss",
           "parent": "BacktestStats"
         },
@@ -29425,6 +29650,11 @@
         {
           "kind": "method",
           "name": "totalTrades",
+          "parent": "BacktestStats"
+        },
+        {
+          "kind": "method",
+          "name": "unrealizedPnl",
           "parent": "BacktestStats"
         },
         {
@@ -30954,6 +31184,11 @@
         },
         {
           "kind": "method",
+          "name": "finalEquity",
+          "parent": "FoldStats"
+        },
+        {
+          "kind": "method",
           "name": "initialCapital",
           "parent": "FoldStats"
         },
@@ -31025,6 +31260,11 @@
         {
           "kind": "method",
           "name": "totalTrades",
+          "parent": "FoldStats"
+        },
+        {
+          "kind": "method",
+          "name": "unrealizedPnl",
           "parent": "FoldStats"
         },
         {
@@ -32081,6 +32321,36 @@
           "kind": "method",
           "name": "symbolId",
           "parent": "OHLCBinRow"
+        },
+        {
+          "kind": "method",
+          "name": "entryPrice",
+          "parent": "OpenPositions"
+        },
+        {
+          "kind": "method",
+          "name": "markPrice",
+          "parent": "OpenPositions"
+        },
+        {
+          "kind": "method",
+          "name": "quantity",
+          "parent": "OpenPositions"
+        },
+        {
+          "kind": "method",
+          "name": "side",
+          "parent": "OpenPositions"
+        },
+        {
+          "kind": "method",
+          "name": "symbol",
+          "parent": "OpenPositions"
+        },
+        {
+          "kind": "method",
+          "name": "unrealizedPnl",
+          "parent": "OpenPositions"
         },
         {
           "kind": "method",
@@ -33414,6 +33684,11 @@
         },
         {
           "kind": "method",
+          "name": "finalEquity",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
           "name": "initialCapital",
           "parent": "RunnerStats"
         },
@@ -33495,6 +33770,11 @@
         {
           "kind": "method",
           "name": "totalTrades",
+          "parent": "RunnerStats"
+        },
+        {
+          "kind": "method",
+          "name": "unrealizedPnl",
           "parent": "RunnerStats"
         },
         {
@@ -36090,6 +36370,10 @@
         },
         {
           "kind": "function",
+          "name": "version"
+        },
+        {
+          "kind": "function",
           "name": "vol_cone"
         },
         {
@@ -36365,6 +36649,16 @@
         },
         {
           "kind": "method",
+          "name": "mark_price",
+          "parent": "BacktestResult"
+        },
+        {
+          "kind": "method",
+          "name": "open_positions",
+          "parent": "BacktestResult"
+        },
+        {
+          "kind": "method",
           "name": "record_fill",
           "parent": "BacktestResult"
         },
@@ -36401,6 +36695,11 @@
         {
           "kind": "method",
           "name": "equity_curve",
+          "parent": "BacktestRunner"
+        },
+        {
+          "kind": "method",
+          "name": "open_positions",
           "parent": "BacktestRunner"
         },
         {
@@ -39820,6 +40119,11 @@
         },
         {
           "kind": "method",
+          "name": "final_equity",
+          "parent": "Stats"
+        },
+        {
+          "kind": "method",
           "name": "gross_loss",
           "parent": "Stats"
         },
@@ -39891,6 +40195,11 @@
         {
           "kind": "method",
           "name": "total_trades",
+          "parent": "Stats"
+        },
+        {
+          "kind": "method",
+          "name": "unrealized_pnl",
           "parent": "Stats"
         },
         {
@@ -41051,6 +41360,10 @@
         },
         {
           "kind": "function",
+          "name": "version"
+        },
+        {
+          "kind": "function",
           "name": "volumeBars"
         },
         {
@@ -41176,6 +41489,14 @@
         {
           "kind": "global",
           "name": "__lrvx_backtest_result_ingest"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_backtest_result_mark_price"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_backtest_result_open_positions"
         },
         {
           "kind": "global",
@@ -43107,6 +43428,10 @@
         },
         {
           "kind": "global",
+          "name": "__lrvx_version"
+        },
+        {
+          "kind": "global",
           "name": "__lrvx_vprofile_add_trade"
         },
         {
@@ -43346,10 +43671,14 @@
         "lrvx_backtest_result_create",
         "lrvx_backtest_result_destroy",
         "lrvx_backtest_result_equity_curve",
+        "lrvx_backtest_result_final_equity",
         "lrvx_backtest_result_ingest_executor",
+        "lrvx_backtest_result_mark_price",
+        "lrvx_backtest_result_open_positions",
         "lrvx_backtest_result_record_fill",
         "lrvx_backtest_result_stats",
         "lrvx_backtest_result_trades",
+        "lrvx_backtest_result_unrealized_pnl",
         "lrvx_backtest_result_write_equity_curve_csv",
         "lrvx_latency_distribution_create",
         "lrvx_latency_distribution_destroy",
@@ -43413,6 +43742,8 @@
           "__lrvx_backtest_result_destroy",
           "__lrvx_backtest_result_equity_curve",
           "__lrvx_backtest_result_ingest",
+          "__lrvx_backtest_result_mark_price",
+          "__lrvx_backtest_result_open_positions",
           "__lrvx_backtest_result_record_fill",
           "__lrvx_backtest_result_stats",
           "__lrvx_backtest_result_write_csv",
@@ -43623,7 +43954,8 @@
         "lrvx_capi_abi_version",
         "lrvx_clear_last_error",
         "lrvx_last_error_code",
-        "lrvx_last_error_message"
+        "lrvx_last_error_message",
+        "lrvx_version"
       ],
       "codon": {
         "present": true,
@@ -43641,7 +43973,9 @@
       },
       "quickjs": {
         "classes": [],
-        "functions": [],
+        "functions": [
+          "__lrvx_version"
+        ],
         "status": "required"
       }
     },
@@ -44327,6 +44661,9 @@
         "lrvx_grid_search_create",
         "lrvx_grid_search_destroy",
         "lrvx_grid_search_params_for_index",
+        "lrvx_grid_search_record_valuation",
+        "lrvx_grid_search_result_final_equity",
+        "lrvx_grid_search_result_unrealized_pnl",
         "lrvx_grid_search_run",
         "lrvx_grid_search_total"
       ],
@@ -46514,7 +46851,14 @@
     },
     "walk_forward": {
       "capi_functions": [
-        "lrvx_walk_forward_run_csv"
+        "lrvx_walk_forward_result_destroy",
+        "lrvx_walk_forward_result_folds",
+        "lrvx_walk_forward_result_test_final_equity",
+        "lrvx_walk_forward_result_test_unrealized_pnl",
+        "lrvx_walk_forward_result_train_final_equity",
+        "lrvx_walk_forward_result_train_unrealized_pnl",
+        "lrvx_walk_forward_run_csv",
+        "lrvx_walk_forward_run_csv_result"
       ],
       "codon": {
         "present": true,

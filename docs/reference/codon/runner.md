@@ -128,6 +128,7 @@ replay for the first symbol registered.
 | `run_tapes(paths)` | `BacktestStats` | Replay N `.lrvx` tapes merged on read. Raises `ValueError` with the reason on bad paths or overlapping book streams |
 | `equity_curve()` | `Tuple[List[int], List[float], List[float]]` | `(timestamps_ns, equity, drawdown_pct)` from the most recent run, all the same length. Raises if no run has completed |
 | `trades()` | 9 parallel lists | `(symbol, side, entry_price, exit_price, quantity, pnl, fee, entry_time_ns, exit_time_ns)` for the closed trades of the most recent run. `side` is 0 for long, 1 for short |
+| `open_positions()` | 6 parallel lists | `(symbol, side, quantity, entry_price, mark_price, unrealized_pnl)` for the positions the most recent run left open, marked at the last price it replayed per symbol (the last bar's close on bar replay, the last trade on tick replay); ascending symbol id, `side` 0 long, 1 short. Their sum is the stats' `unrealized_pnl`. Raises if no run has completed |
 | `close()` | `None` | Free resources |
 
 See [Backtest](backtest.md) for the `BacktestStats` field reference.

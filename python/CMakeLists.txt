@@ -1,4 +1,9 @@
-find_package(pybind11 REQUIRED)
+# pybind11 3.x locates Python through CMake's FindPython (Python_EXECUTABLE,
+# Python_ROOT_DIR) rather than the FindPythonInterp / FindPythonLibs
+# modules CMake deprecates; scikit-build-core passes the Python_* hints
+# when it builds a wheel. 3.1.0 is the floor pyproject.toml builds with.
+set(PYBIND11_FINDPYTHON ON)
+find_package(pybind11 3.1.0 REQUIRED)
 
 # pybind11_add_module links pybind11::lto (-flto=auto on GCC) into the
 # module unless CMAKE_INTERPROCEDURAL_OPTIMIZATION is defined, whatever

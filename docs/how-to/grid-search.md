@@ -230,6 +230,12 @@ const results = gs.run();  // [{index, params, stats}, ...]
 
 A key the factory leaves out reads 0. A key of another type (a string where a number belongs), a return value that is not an object, or an error the factory throws stops the run, and `run()` throws that error.
 
+Each result's `stats` also carry `unrealizedPnl` and `finalEquity`, the position the combination's run left open at the end, as the factory returned them: a `BacktestRunner` stats object returned as is keeps its own, and a factory that leaves them out reads 0.
+
+### C API
+
+`LrvxBacktestStats` has no field for the open position at the end of a run, so a factory hands it over separately: `lrvx_grid_search_record_valuation(gs, index, unrealized_pnl, final_equity)` with the `index` it was called with, and after the run `lrvx_grid_search_result_unrealized_pnl(gs, index)` and `lrvx_grid_search_result_final_equity(gs, index)` read it back. Each `lrvx_grid_search_run` that is handed `stats_out` starts afresh. A combination whose factory recorded nothing reads `unrealized_pnl` 0 and `final_equity` `initialCapital + netPnl` of the stats it wrote. A record for an index the run does not produce is dropped, and a read past what the last run produced (or before any run) returns 0, neither with an error. The record store has its own lock, so a factory may record from whichever thread it runs a combination on.
+
 ### Pairs with walk-forward
 
 Compose with [walk-forward](walk-forward.md): run a `GridSearch` on each fold's train slice, pick the best params by your criterion, evaluate on test. The two primitives stay separate so the choice of "best" stays opinionated to the caller (sharpe vs. profit factor vs. drawdown-aware).

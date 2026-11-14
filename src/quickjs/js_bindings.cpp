@@ -3831,7 +3831,43 @@ static JSValue js_backtest_result_stats(JSContext* ctx, JSValueConst, int,
   JS_SetPropertyStr(ctx, obj, "returnPct", JS_NewFloat64(ctx, s.returnPct));
   JS_SetPropertyStr(ctx, obj, "startTimeNs", JS_NewBigInt64(ctx, s.startTimeNs));
   JS_SetPropertyStr(ctx, obj, "endTimeNs", JS_NewBigInt64(ctx, s.endTimeNs));
+  auto h = static_cast<LrvxBacktestResultHandle>(getHandle(ctx, argv[0]));
+  JS_SetPropertyStr(ctx, obj, "unrealizedPnl",
+                    JS_NewFloat64(ctx, lrvx_backtest_result_unrealized_pnl(h)));
+  JS_SetPropertyStr(ctx, obj, "finalEquity",
+                    JS_NewFloat64(ctx, lrvx_backtest_result_final_equity(h)));
   return obj;
+}
+static JSValue js_backtest_result_mark_price(JSContext* ctx, JSValueConst, int,
+                                             JSValueConst* argv)
+{
+  lrvx_backtest_result_mark_price(static_cast<LrvxBacktestResultHandle>(getHandle(ctx, argv[0])),
+                                  toUint32(ctx, argv[1]), toDouble(ctx, argv[2]));
+  return JS_UNDEFINED;
+}
+static JSValue js_backtest_result_open_positions(JSContext* ctx, JSValueConst, int,
+                                                 JSValueConst* argv)
+{
+  auto h = static_cast<LrvxBacktestResultHandle>(getHandle(ctx, argv[0]));
+  const uint32_t n = lrvx_backtest_result_open_positions(h, nullptr, 0);
+  std::vector<LrvxBacktestOpenPosition> rows(n);
+  if (n > 0)
+  {
+    lrvx_backtest_result_open_positions(h, rows.data(), n);
+  }
+  JSValue arr = JS_NewArray(ctx);
+  for (uint32_t i = 0; i < n; ++i)
+  {
+    JSValue row = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, row, "symbol", JS_NewUint32(ctx, rows[i].symbol));
+    JS_SetPropertyStr(ctx, row, "side", JS_NewUint32(ctx, rows[i].side));
+    JS_SetPropertyStr(ctx, row, "quantity", JS_NewFloat64(ctx, rows[i].quantity));
+    JS_SetPropertyStr(ctx, row, "entryPrice", JS_NewFloat64(ctx, rows[i].entry_price));
+    JS_SetPropertyStr(ctx, row, "markPrice", JS_NewFloat64(ctx, rows[i].mark_price));
+    JS_SetPropertyStr(ctx, row, "unrealizedPnl", JS_NewFloat64(ctx, rows[i].unrealized_pnl));
+    JS_SetPropertyUint32(ctx, arr, i, row);
+  }
+  return arr;
 }
 static JSValue js_backtest_result_equity_curve(JSContext* ctx, JSValueConst, int,
                                                JSValueConst* argv)
@@ -7473,6 +7509,11 @@ static JSValue js_capi_abi_version(JSContext* c, JSValueConst, int, JSValueConst
   return JS_NewUint32(c, lrvx_capi_abi_version());
 }
 
+static JSValue js_version(JSContext* c, JSValueConst, int, JSValueConst*)
+{
+  return JS_NewString(c, lrvx_version());
+}
+
 bool registerLrvxBindings(JSContext* ctx)
 {
   // Before anything else: an engine that loaded against the wrong
@@ -7919,6 +7960,9 @@ bool registerLrvxBindings(JSContext* ctx)
                 js_backtest_result_record_fill, 7);
   addGlobalFunc(ctx, "__lrvx_backtest_result_ingest", js_backtest_result_ingest, 2);
   addGlobalFunc(ctx, "__lrvx_backtest_result_stats", js_backtest_result_stats, 1);
+  addGlobalFunc(ctx, "__lrvx_backtest_result_mark_price", js_backtest_result_mark_price, 3);
+  addGlobalFunc(ctx, "__lrvx_backtest_result_open_positions", js_backtest_result_open_positions,
+                1);
   addGlobalFunc(ctx, "__lrvx_backtest_result_equity_curve",
                 js_backtest_result_equity_curve, 1);
   addGlobalFunc(ctx, "__lrvx_backtest_result_write_csv", js_backtest_result_write_csv, 2);
@@ -8371,6 +8415,7 @@ bool registerLrvxBindings(JSContext* ctx)
   // The ABI pair the handshake above compared, so a script can report
   // what the engine it is running inside was built against.
   addGlobalFunc(ctx, "__lrvx_capi_abi_version", js_capi_abi_version, 0);
+  addGlobalFunc(ctx, "__lrvx_version", js_version, 0);
   {
     JSValue g = JS_GetGlobalObject(ctx);
     JS_SetPropertyStr(ctx, g, "__LRVX_CAPI_ABI_VERSION",

@@ -4930,3 +4930,285 @@ TEST(JsIntegrationTest, AnUnknownPolicySideOrTypeNameThrows)
   EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "soldAfter"), -1.0)
       << "only the fill with a known side was applied";
 }
+
+// ============================================================
+// Version and the open position at the end of a backtest
+// ============================================================
+
+namespace
+{
+
+struct JsGlobals
+{
+  explicit JsGlobals(LrvxJsStrategy& s) : strat(s), ctx(s.engine().context()) {}
+
+  double num(const char* name) const
+  {
+    JSValue v = strat.engine().getGlobalProperty(name);
+    double d = 0;
+    JS_ToFloat64(ctx, &d, v);
+    JS_FreeValue(ctx, v);
+    return d;
+  }
+  std::string str(const char* name) const
+  {
+    JSValue v = strat.engine().getGlobalProperty(name);
+    const char* s = JS_ToCString(ctx, v);
+    std::string out = s ? s : "";
+    if (s)
+    {
+      JS_FreeCString(ctx, s);
+    }
+    JS_FreeValue(ctx, v);
+    return out;
+  }
+
+  LrvxJsStrategy& strat;
+  JSContext* ctx;
+};
+
+}  // namespace
+
+// lrvx.version() is lrvx_version(): the release this tree builds, the
+// `project(lrvx VERSION ...)` CMake passes in as LRVX_EXPECTED_VERSION.
+TEST(JsIntegrationTest, VersionIsTheLibraryRelease)
+{
+  TempJsFile script(R"(
+    var err = "";
+    var v = "";
+    try {
+      v = lrvx.version();
+    } catch (e) {
+      err = String(e);
+    }
+  )");
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  JsGlobals g(jsStrat);
+  EXPECT_EQ(g.str("err"), "");
+  EXPECT_EQ(g.str("v"), std::string(LRVX_EXPECTED_VERSION));
+  EXPECT_FALSE(g.str("v").empty());
+}
+
+// BacktestResult.markPrice(symbol, price) marks a symbol; stats() gains
+// unrealizedPnl (sum over symbols, (mark - entry) * qty long, (entry - mark)
+// * qty short, no exit fee) and finalEquity (initialCapital + netPnl +
+// unrealizedPnl); openPositions() returns one object per open symbol,
+// ascending symbol id: { symbol, side (0 long / 1 short), quantity,
+// entryPrice, markPrice, unrealizedPnl }. An unmarked symbol is valued at its
+// last fill. netPnl / totalPnl / totalFees do not change.
+TEST(JsIntegrationTest, BacktestResultValuesTheOpenPositionAtTheEnd)
+{
+  TempJsFile script(R"(
+    var err = "";
+    var unrealized = NaN, finalEquity = NaN, identity = NaN, totalPnl = NaN;
+    var openCount = -1, sym0 = -1, sym1 = -1, side0 = -1, side1 = -1;
+    var qty0 = NaN, qty1 = NaN, entry0 = NaN, entry1 = NaN;
+    var mark0 = NaN, mark1 = NaN, row0 = NaN, row1 = NaN;
+    var flatUnrealized = NaN, flatEquityGap = NaN, flatOpen = -1;
+    var unmarked = NaN;
+    try {
+      var r = new BacktestResult(10000.0, 0.0004);
+      r.recordFill(1, 1, "buy", 100.0, 1.0, 1000000000);
+      r.recordFill(2, 1, "sell", 110.0, 1.0, 2000000000);
+      r.recordFill(3, 1, "buy", 105.0, 2.0, 3000000000);
+      r.recordFill(4, 2, "sell", 50.0, 3.0, 4000000000);
+      r.markPrice(1, 108.5);
+      r.markPrice(2, 52.0);
+      var s = r.stats();
+      unrealized = s.unrealizedPnl;
+      finalEquity = s.finalEquity;
+      identity = s.initialCapital + s.netPnl + s.unrealizedPnl;
+      totalPnl = s.totalPnl;
+      var open = r.openPositions();
+      openCount = open.length;
+      sym0 = open[0].symbol; sym1 = open[1].symbol;
+      side0 = open[0].side; side1 = open[1].side;
+      qty0 = open[0].quantity; qty1 = open[1].quantity;
+      entry0 = open[0].entryPrice; entry1 = open[1].entryPrice;
+      mark0 = open[0].markPrice; mark1 = open[1].markPrice;
+      row0 = open[0].unrealizedPnl; row1 = open[1].unrealizedPnl;
+      r.destroy();
+
+      var f = new BacktestResult(10000.0, 0.0004);
+      f.recordFill(1, 1, "buy", 100.0, 1.0, 1000000000);
+      f.recordFill(2, 1, "sell", 110.0, 1.0, 2000000000);
+      f.markPrice(1, 150.0);
+      var fs = f.stats();
+      flatUnrealized = fs.unrealizedPnl;
+      flatEquityGap = fs.finalEquity - fs.finalCapital;
+      flatOpen = f.openPositions().length;
+      f.destroy();
+
+      var u = new BacktestResult(10000.0, 0.0);
+      u.recordFill(1, 1, "buy", 100.0, 2.0, 1000000000);
+      u.recordFill(2, 1, "sell", 104.0, 1.0, 2000000000);
+      unmarked = u.stats().unrealizedPnl;
+      u.destroy();
+    } catch (e) {
+      err = String(e);
+    }
+  )");
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  JsGlobals g(jsStrat);
+
+  EXPECT_EQ(g.str("err"), "");
+  // long 2 @ 105 marked 108.5: +7; short 3 @ 50 marked 52: -6.
+  EXPECT_NEAR(g.num("unrealized"), 1.0, 1e-9);
+  EXPECT_NEAR(g.num("finalEquity"), g.num("identity"), 1e-9);
+  EXPECT_NEAR(g.num("totalPnl"), 10.0, 1e-9) << "totalPnl stays the closed trades'";
+  EXPECT_EQ(g.num("openCount"), 2.0);
+  EXPECT_EQ(g.num("sym0"), 1.0);
+  EXPECT_EQ(g.num("sym1"), 2.0);
+  EXPECT_EQ(g.num("side0"), 0.0);
+  EXPECT_EQ(g.num("side1"), 1.0);
+  EXPECT_NEAR(g.num("qty0"), 2.0, 1e-9);
+  EXPECT_NEAR(g.num("qty1"), 3.0, 1e-9);
+  EXPECT_NEAR(g.num("entry0"), 105.0, 1e-9);
+  EXPECT_NEAR(g.num("entry1"), 50.0, 1e-9);
+  EXPECT_NEAR(g.num("mark0"), 108.5, 1e-9);
+  EXPECT_NEAR(g.num("mark1"), 52.0, 1e-9);
+  EXPECT_NEAR(g.num("row0"), 7.0, 1e-9);
+  EXPECT_NEAR(g.num("row1"), -6.0, 1e-9);
+  EXPECT_EQ(g.num("flatUnrealized"), 0.0);
+  EXPECT_NEAR(g.num("flatEquityGap"), 0.0, 1e-9);
+  EXPECT_EQ(g.num("flatOpen"), 0.0);
+  EXPECT_NEAR(g.num("unmarked"), 4.0, 1e-9);
+}
+
+// Engine.run replays every loaded symbol's bars merged in time order. A
+// position still open when the signals run out is valued at the last close
+// the run replayed for its symbol -- the latest bar in time, not the last
+// row loaded -- in unrealizedPnl, and finalEquity = initialCapital + netPnl
+// + unrealizedPnl. Mirrors the Engine.run block of
+// node/test/test_backtest_open_position_at_end.js.
+TEST(JsIntegrationTest, EngineRunValuesTheOpenPositionAtTheLastClose)
+{
+  const auto rows = [](const std::vector<std::pair<int64_t, double>>& bars)
+  {
+    // open, high and low differ from the close, so a mark taken from any of
+    // them shows.
+    std::string out = "timestamp,open,high,low,close,volume\n";
+    for (const auto& [ts, close] : bars)
+    {
+      out += std::to_string(ts) + "," + std::to_string(close - 0.5) + "," +
+             std::to_string(close + 1.0) + "," + std::to_string(close - 1.0) + "," +
+             std::to_string(close) + ",10.0\n";
+    }
+    return out;
+  };
+  constexpr int64_t T0 = 1767225600;
+  TempCsvFile single(rows({{T0, 100.0}, {T0 + 60, 102.0}, {T0 + 120, 104.0}, {T0 + 180, 107.0}, {T0 + 240, 110.0}}));
+  // A on the minute, B on the half minute; B's last bar comes after A's.
+  TempCsvFile symA(rows({{T0, 100.0}, {T0 + 60, 101.0}, {T0 + 120, 102.0}, {T0 + 180, 103.0}}));
+  // A's rows out of time order: the last row (close 102) is not its latest
+  // bar (close 103).
+  TempCsvFile symAShuffled(
+      rows({{T0, 100.0}, {T0 + 180, 103.0}, {T0 + 60, 101.0}, {T0 + 120, 102.0}}));
+  TempCsvFile symB(rows({{T0 + 30, 50.0}, {T0 + 90, 51.0}, {T0 + 150, 52.0}, {T0 + 210, 53.0}, {T0 + 270, 54.0}}));
+
+  TempJsFile script("var SINGLE = \"" + single.path() + "\";\n" +
+                    "var A_PATH = \"" + symA.path() + "\";\n" +
+                    "var A_SHUFFLED = \"" + symAShuffled.path() + "\";\n" +
+                    "var B_PATH = \"" + symB.path() + "\";\n" + R"(
+    var err = "";
+    function gap(s) { return s.finalEquity - (s.initialCapital + s.netPnl + s.unrealizedPnl); }
+    function runSingle(fee, first, firstQty, second, secondQty) {
+      var e = new Engine(10000.0, fee);
+      e.loadCsv(SINGLE);
+      var b = e._symbols["__default__"];
+      var sb = new SignalBuilder();
+      sb[first](b[0].ts, firstQty);
+      sb[second](b[2].ts, secondQty);
+      return e.run(sb);
+    }
+    function runPair(aPath, aSig, bSig) {
+      var e = new Engine(10000.0, 0.0);
+      e.loadCsv(aPath, "A");
+      e.loadCsv(B_PATH, "B");
+      var sb = new SignalBuilder();
+      sb[aSig](e._symbols["A"][0].ts, 1.0, "A");
+      sb[bSig[0]](e._symbols["B"][0].ts, bSig[1], "B");
+      return e.run(sb);
+    }
+    var longTrades = -1, longTotalPnl = NaN, longUnrealized = NaN, longGap = NaN,
+        longCapitalGap = NaN;
+    var shortTrades = -1, shortTotalPnl = NaN, shortUnrealized = NaN, shortGap = NaN;
+    var feeUnrealized = NaN, feeFees = NaN, feeGap = NaN;
+    var flatTrades = -1, flatUnrealized = NaN, flatEquityGap = NaN;
+    var pairTrades = -1, pairUnrealized = NaN, pairGap = NaN;
+    var shuffledUnrealized = NaN, shuffledGap = NaN;
+    try {
+      // Buys 2 on bar 0 (100), sells 1 on bar 2 (104), holds 1 to the last
+      // close, 110.
+      var l = runSingle(0.0, "buy", 2.0, "sell", 1.0);
+      longTrades = l.totalTrades; longTotalPnl = l.totalPnl;
+      longUnrealized = l.unrealizedPnl; longGap = gap(l);
+      longCapitalGap = l.finalCapital - (l.initialCapital + l.netPnl);
+
+      var s = runSingle(0.0, "sell", 2.0, "buy", 1.0);
+      shortTrades = s.totalTrades; shortTotalPnl = s.totalPnl;
+      shortUnrealized = s.unrealizedPnl; shortGap = gap(s);
+
+      var f = runSingle(0.001, "buy", 2.0, "sell", 1.0);
+      feeUnrealized = f.unrealizedPnl; feeFees = f.totalFees; feeGap = gap(f);
+
+      var e = new Engine(10000.0, 0.0);
+      e.loadCsv(SINGLE);
+      var b = e._symbols["__default__"];
+      var sb = new SignalBuilder();
+      sb.buy(b[0].ts, 1.0);
+      sb.sell(b[3].ts, 1.0);
+      var fl = e.run(sb);
+      flatTrades = fl.totalTrades; flatUnrealized = fl.unrealizedPnl;
+      flatEquityGap = fl.finalEquity - fl.finalCapital;
+
+      // Long 1 A @ 100, short 2 B @ 50.
+      var p = runPair(A_PATH, "buy", ["sell", 2.0]);
+      pairTrades = p.totalTrades; pairUnrealized = p.unrealizedPnl; pairGap = gap(p);
+
+      // Long 1 A @ 100, long 1 B @ 50.
+      var q = runPair(A_SHUFFLED, "buy", ["buy", 1.0]);
+      shuffledUnrealized = q.unrealizedPnl; shuffledGap = gap(q);
+    } catch (ex) {
+      err = String(ex);
+    }
+  )");
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  JsGlobals g(jsStrat);
+
+  EXPECT_EQ(g.str("err"), "");
+
+  EXPECT_EQ(g.num("longTrades"), 1.0);
+  EXPECT_NEAR(g.num("longTotalPnl"), 4.0, 1e-9) << "the closed unit, 104 - 100";
+  EXPECT_NEAR(g.num("longUnrealized"), 10.0, 1e-9)
+      << "the open unit marked at the last close, 110 - 100; 4 means it was valued at its "
+         "last fill";
+  EXPECT_NEAR(g.num("longGap"), 0.0, 1e-9);
+  EXPECT_NEAR(g.num("longCapitalGap"), 0.0, 1e-9) << "finalCapital leaves the open unit out";
+
+  EXPECT_EQ(g.num("shortTrades"), 1.0);
+  EXPECT_NEAR(g.num("shortTotalPnl"), -4.0, 1e-9);
+  EXPECT_NEAR(g.num("shortUnrealized"), -10.0, 1e-9) << "short 1 @ 100 marked at 110";
+  EXPECT_NEAR(g.num("shortGap"), 0.0, 1e-9);
+
+  EXPECT_NEAR(g.num("feeUnrealized"), 10.0, 1e-9) << "no exit fee taken from the open unit";
+  EXPECT_GT(g.num("feeFees"), 0.0);
+  EXPECT_NEAR(g.num("feeGap"), 0.0, 1e-9);
+
+  EXPECT_EQ(g.num("flatTrades"), 1.0);
+  EXPECT_EQ(g.num("flatUnrealized"), 0.0);
+  EXPECT_NEAR(g.num("flatEquityGap"), 0.0, 1e-9) << "flat: finalEquity == finalCapital";
+
+  EXPECT_EQ(g.num("pairTrades"), 0.0);
+  EXPECT_NEAR(g.num("pairUnrealized"), 3.0 - 8.0, 1e-9)
+      << "A at its last close 103 (+3), B at 54 (-8); marking both at the last bar "
+         "replayed (54) would give A -46";
+  EXPECT_NEAR(g.num("pairGap"), 0.0, 1e-9);
+
+  EXPECT_NEAR(g.num("shuffledUnrealized"), 3.0 + 4.0, 1e-9)
+      << "A at 103, its latest bar, not 102, its last row; B at 54";
+  EXPECT_NEAR(g.num("shuffledGap"), 0.0, 1e-9);
+}

@@ -265,6 +265,7 @@ if(LRVX_ENABLE_BACKTEST)
   add_lrvx_test(test_backtest_ctx_position)
   add_lrvx_test(test_backtest_run_tape)
   add_lrvx_test(test_backtest_run_tape_bars_on_ticks)
+  add_lrvx_test(test_backtest_open_position_at_end)
   # Needs the backtest runner's tape path alongside the replay writer/reader,
   # and reads docs/spec/lrvx.md to check the recorded side-convention
   # decision.
@@ -374,6 +375,11 @@ if(LRVX_BUILD_CAPI)
   target_link_libraries(test_capi_venue_stack PRIVATE lrvx_capi)
   add_lrvx_test(test_capi_diagnostics)
   target_link_libraries(test_capi_diagnostics PRIVATE lrvx_capi)
+  # Compares lrvx_version() with the version this tree declares.
+  add_lrvx_test(test_capi_version)
+  target_link_libraries(test_capi_version PRIVATE lrvx_capi)
+  target_compile_definitions(test_capi_version PRIVATE
+    LRVX_EXPECTED_VERSION="${PROJECT_VERSION}")
   add_lrvx_test(test_capi_signal_codes)
   target_link_libraries(test_capi_signal_codes PRIVATE lrvx_capi)
   add_lrvx_test(test_capi_streaming_indicator)
@@ -415,6 +421,10 @@ if(LRVX_BUILD_CAPI)
     target_link_libraries(test_capi_backtest PRIVATE lrvx_capi)
     add_lrvx_test(test_capi_backtest_timestamps)
     target_link_libraries(test_capi_backtest_timestamps PRIVATE lrvx_capi)
+    add_lrvx_test(test_capi_backtest_open_position)
+    target_link_libraries(test_capi_backtest_open_position PRIVATE lrvx_capi)
+    add_lrvx_test(test_capi_fold_valuation)
+    target_link_libraries(test_capi_fold_valuation PRIVATE lrvx_capi)
     add_lrvx_test(test_capi_run_tape_bars)
     target_link_libraries(test_capi_run_tape_bars PRIVATE lrvx_capi)
     add_lrvx_test(test_capi_runner_stats)
@@ -440,7 +450,8 @@ if(LRVX_BUILD_QUICKJS)
   # computes. The example loads its CSV by a path relative to the repo root,
   # so the test has to know where that is.
   target_compile_definitions(test_quickjs PRIVATE
-    LRVX_REPO_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/..")
+    LRVX_REPO_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/.."
+    LRVX_EXPECTED_VERSION="${PROJECT_VERSION}")
 endif()
 
 if(LRVX_ENABLE_CPU_AFFINITY)

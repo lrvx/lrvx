@@ -49,6 +49,24 @@ else:
                 f"{_NATIVE_IMPORT_ERROR} (while accessing lrvx.{name})"
             ) from None
 
+# The release this package was built from. The compiled library carries it
+# (lrvx_version(), from the version CMakeLists.txt declares), so a stale
+# extension next to newer Python sources cannot report the newer number. A
+# source-tree import without the extension falls back to the installed
+# distribution's metadata.
+if _NATIVE_AVAILABLE:
+    __version__: str = version()
+else:
+    def _installed_version() -> str:
+        try:
+            from importlib.metadata import version as _dist_version
+            return _dist_version("lrvx")
+        except Exception:  # noqa: BLE001 -- no distribution either
+            return "0+unknown"
+
+    __version__ = _installed_version()
+    del _installed_version
+
 del _NATIVE_AVAILABLE  # branch flag only; keep it out of the module surface
 
 # Pure-Python research surfaces that sit on top of the compiled bindings.

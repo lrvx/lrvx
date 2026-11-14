@@ -8,7 +8,7 @@ import numpy.typing
 import typing
 from . import _heatmap as _heatmap
 from . import targets
-__all__: list[str] = ['_heatmap', 'ALL_OR_NOTHING', 'ATR', 'Account', 'AdlRanking', 'AggregatorEventFilter', 'AmmCurve', 'AutoCorrelation', 'BEST_EFFORT', 'BacktestResult', 'BacktestRunner', 'BarData', 'BarDispatchRecorder', 'BinCountAggregator', 'Binance', 'BinaryLogRecorderHook', 'Bollinger', 'BookAnchored', 'BookOnly', 'BookSnapshotBinAggregator', 'Bybit', 'CANCELLED', 'CAPI_ABI_VERSION', 'CCI', 'CHOP', 'CompositeBookMatrix', 'ConstantLatency', 'Correlation', 'Cross', 'DEMA', 'DataReader', 'DataWriter', 'DeltaBookEncoder', 'DeltaBookReplayer', 'EMA', 'EmpiricalLatency', 'Engine', 'EventTypeStatsAggregator', 'ExchangeCapabilities', 'ExecutionListener', 'Executor', 'ExponentialLatency', 'FAILED', 'FILLED', 'FIRE_ON_ANY', 'FeeSchedule', 'FeeTier', 'FeedClockPolicy', 'FillLiquidity', 'FootprintBar', 'FundingPayment', 'FundingSchedule', 'FundingTapeEntry', 'GaussianLatency', 'GridSearch', 'ISSUE_BLOCK_DECOMPRESSION_FAILED', 'ISSUE_BLOCK_MAGIC_INVALID', 'ISSUE_BLOCK_SIZE_MISMATCH', 'ISSUE_EVENT_COUNT_MISMATCH', 'ISSUE_FILE_NOT_FOUND', 'ISSUE_FILE_READ_ERROR', 'ISSUE_FILE_TRUNCATED', 'ISSUE_FRAME_CRC_MISMATCH', 'ISSUE_FRAME_SIZE_TOO_LARGE', 'ISSUE_FRAME_TRUNCATED', 'ISSUE_FRAME_TYPE_UNKNOWN', 'ISSUE_HEADER_CORRUPTED', 'ISSUE_INDEX_CRC_MISMATCH', 'ISSUE_INDEX_MAGIC_INVALID', 'ISSUE_INDEX_NOT_SORTED', 'ISSUE_INDEX_OUT_OF_BOUNDS', 'ISSUE_INVALID_FLAGS', 'ISSUE_INVALID_MAGIC', 'ISSUE_INVALID_VERSION', 'ISSUE_SEGMENT_RANGE_OVERLAP', 'ISSUE_TIMESTAMP_JUMP_TOO_LARGE', 'ISSUE_TIMESTAMP_OUT_OF_ORDER', 'IndicatorGraph', 'Isolated', 'KAMA', 'KillSwitch', 'Kurtosis', 'L3Book', 'LEADER_FOLLOWER', 'LatencyDistribution', 'LatencyModel', 'LatencySample', 'LegState', 'LiquidationEngine', 'LiveQueuePositionEstimator', 'LrvxError', 'MACD', 'MarginMode', 'MarkImpactModel', 'MarketDataRecorderHook', 'MarketProfile', 'MergedTapeReader', 'MultiFeedClock', 'None_', 'OHLCBinAggregator', 'ONE_SIDED', 'ORDER_FLAG_IOC', 'ORDER_FLAG_POST_ONLY', 'ORDER_FLAG_REDUCE_ONLY', 'ORDER_TYPE_NAMES', 'OptionType', 'Order', 'OrderBook', 'OrderEventData', 'OrderEventKind', 'OrderGroup', 'OrderGroupPolicy', 'OrderGroupState', 'OrderJourneyTracer', 'OrderTracker', 'OrderValidator', 'PARTIALLY_FILLED', 'PENDING', 'PRICE_SCALE', 'ParkinsonVol', 'Partitioner', 'PeakAggregator', 'PnLTracker', 'PnlRatio', 'PoolReplay', 'PoolTape', 'PositionGroupTracker', 'PositionSize', 'PositionTracker', 'QUANTITY_SCALE', 'QUEUE_FULL', 'QUEUE_NONE', 'QUEUE_TOB', 'QuantileAggregator', 'REVERTING', 'RMA', 'RSI', 'RateLimitEndpointFamily', 'RateLimitPolicy', 'ReplayEvent', 'ReplaySource', 'RiskManager', 'RogersSatchellVol', 'RollingZScore', 'Runner', 'SIGNAL_FLAG_ENTER', 'SIGNAL_FLAG_EXIT', 'SIGNAL_FLAG_REBALANCE', 'SLIPPAGE_FIXED_BPS', 'SLIPPAGE_FIXED_TICKS', 'SLIPPAGE_NONE', 'SLIPPAGE_VOLUME_IMPACT', 'SMA', 'SUBMITTED', 'ShannonEntropy', 'Signal', 'SignalBuilder', 'SimulatedClock', 'SimulatedExecutor', 'Skewness', 'Slope', 'Stats', 'Stochastic', 'StorageSink', 'Strategy', 'StreamingIndicatorGraph', 'Symbol', 'SymbolContext', 'SymbolRegistry', 'TEMA', 'TapeRef', 'TraceReader', 'TraceRecorder', 'TradeData', 'VOLUME_SCALE', 'VenueAvailability', 'VenueExecutor', 'VenueStack', 'VolSurface', 'VolumeBinAggregator', 'VolumeProfile', 'WAIT_FOR_ALL', 'WalkForwardRunner', 'adf', 'adx', 'aggregate_heikin_ashi_bars', 'aggregate_range_bars', 'aggregate_renko_bars', 'aggregate_tick_bars', 'aggregate_time_bars', 'aggregate_volume_bars', 'atr', 'autocorrelation', 'bar_returns', 'baw_price', 'binomial_price', 'bollinger', 'bootstrap_ci', 'bs_price', 'bs_price_discrete_dividends', 'bs_vega', 'build_surface_as_of', 'calibrate_svi', 'capi_abi_version', 'cci', 'chop', 'correlation', 'cost_of_carry', 'cvd', 'deflated_sharpe', 'dema', 'ema', 'export_data', 'extract_symbols', 'extract_time_range', 'forward_price', 'greeks', 'grid_neighborhood', 'hurst_dfa', 'i256_roundtrip', 'implied_percentile_in_cone', 'implied_vol', 'inspect', 'kama', 'kurtosis', 'last_error', 'list_indicators', 'macd', 'merge', 'merge_dir', 'obv', 'order_type_code', 'order_type_name', 'parkinson_vol', 'pbo_cscv', 'permutation_test', 'prices_to_double', 'profit_factor', 'quantities_to_double', 'realized_vol', 'recompress', 'rma', 'rogers_satchell_vol', 'rolling_correlation', 'rolling_hurst', 'rolling_zscore', 'rsi', 'second_order_greeks', 'set_log_callback', 'shannon_entropy', 'skewness', 'slope', 'sma', 'split', 'stochastic', 'targets', 'tema', 'trade_pnl', 'u256_from_hex', 'u256_roundtrip', 'validate', 'validate_dataset', 'vol_cone', 'volumes_to_double', 'vwap', 'whites_reality_check', 'win_rate']
+__all__: list[str] = ['_heatmap', 'ALL_OR_NOTHING', 'ATR', 'Account', 'AdlRanking', 'AggregatorEventFilter', 'AmmCurve', 'AutoCorrelation', 'BEST_EFFORT', 'BacktestResult', 'BacktestRunner', 'BarData', 'BarDispatchRecorder', 'BinCountAggregator', 'Binance', 'BinaryLogRecorderHook', 'Bollinger', 'BookAnchored', 'BookOnly', 'BookSnapshotBinAggregator', 'Bybit', 'CANCELLED', 'CAPI_ABI_VERSION', 'CCI', 'CHOP', 'CompositeBookMatrix', 'ConstantLatency', 'Correlation', 'Cross', 'DEMA', 'DataReader', 'DataWriter', 'DeltaBookEncoder', 'DeltaBookReplayer', 'EMA', 'EmpiricalLatency', 'Engine', 'EventTypeStatsAggregator', 'ExchangeCapabilities', 'ExecutionListener', 'Executor', 'ExponentialLatency', 'FAILED', 'FILLED', 'FIRE_ON_ANY', 'FeeSchedule', 'FeeTier', 'FeedClockPolicy', 'FillLiquidity', 'FootprintBar', 'FundingPayment', 'FundingSchedule', 'FundingTapeEntry', 'GaussianLatency', 'GridSearch', 'ISSUE_BLOCK_DECOMPRESSION_FAILED', 'ISSUE_BLOCK_MAGIC_INVALID', 'ISSUE_BLOCK_SIZE_MISMATCH', 'ISSUE_EVENT_COUNT_MISMATCH', 'ISSUE_FILE_NOT_FOUND', 'ISSUE_FILE_READ_ERROR', 'ISSUE_FILE_TRUNCATED', 'ISSUE_FRAME_CRC_MISMATCH', 'ISSUE_FRAME_SIZE_TOO_LARGE', 'ISSUE_FRAME_TRUNCATED', 'ISSUE_FRAME_TYPE_UNKNOWN', 'ISSUE_HEADER_CORRUPTED', 'ISSUE_INDEX_CRC_MISMATCH', 'ISSUE_INDEX_MAGIC_INVALID', 'ISSUE_INDEX_NOT_SORTED', 'ISSUE_INDEX_OUT_OF_BOUNDS', 'ISSUE_INVALID_FLAGS', 'ISSUE_INVALID_MAGIC', 'ISSUE_INVALID_VERSION', 'ISSUE_SEGMENT_RANGE_OVERLAP', 'ISSUE_TIMESTAMP_JUMP_TOO_LARGE', 'ISSUE_TIMESTAMP_OUT_OF_ORDER', 'IndicatorGraph', 'Isolated', 'KAMA', 'KillSwitch', 'Kurtosis', 'L3Book', 'LEADER_FOLLOWER', 'LatencyDistribution', 'LatencyModel', 'LatencySample', 'LegState', 'LiquidationEngine', 'LiveQueuePositionEstimator', 'LrvxError', 'MACD', 'MarginMode', 'MarkImpactModel', 'MarketDataRecorderHook', 'MarketProfile', 'MergedTapeReader', 'MultiFeedClock', 'None_', 'OHLCBinAggregator', 'ONE_SIDED', 'ORDER_FLAG_IOC', 'ORDER_FLAG_POST_ONLY', 'ORDER_FLAG_REDUCE_ONLY', 'ORDER_TYPE_NAMES', 'OptionType', 'Order', 'OrderBook', 'OrderEventData', 'OrderEventKind', 'OrderGroup', 'OrderGroupPolicy', 'OrderGroupState', 'OrderJourneyTracer', 'OrderTracker', 'OrderValidator', 'PARTIALLY_FILLED', 'PENDING', 'PRICE_SCALE', 'ParkinsonVol', 'Partitioner', 'PeakAggregator', 'PnLTracker', 'PnlRatio', 'PoolReplay', 'PoolTape', 'PositionGroupTracker', 'PositionSize', 'PositionTracker', 'QUANTITY_SCALE', 'QUEUE_FULL', 'QUEUE_NONE', 'QUEUE_TOB', 'QuantileAggregator', 'REVERTING', 'RMA', 'RSI', 'RateLimitEndpointFamily', 'RateLimitPolicy', 'ReplayEvent', 'ReplaySource', 'RiskManager', 'RogersSatchellVol', 'RollingZScore', 'Runner', 'SIGNAL_FLAG_ENTER', 'SIGNAL_FLAG_EXIT', 'SIGNAL_FLAG_REBALANCE', 'SLIPPAGE_FIXED_BPS', 'SLIPPAGE_FIXED_TICKS', 'SLIPPAGE_NONE', 'SLIPPAGE_VOLUME_IMPACT', 'SMA', 'SUBMITTED', 'ShannonEntropy', 'Signal', 'SignalBuilder', 'SimulatedClock', 'SimulatedExecutor', 'Skewness', 'Slope', 'Stats', 'Stochastic', 'StorageSink', 'Strategy', 'StreamingIndicatorGraph', 'Symbol', 'SymbolContext', 'SymbolRegistry', 'TEMA', 'TapeRef', 'TraceReader', 'TraceRecorder', 'TradeData', 'VOLUME_SCALE', 'VenueAvailability', 'VenueExecutor', 'VenueStack', 'VolSurface', 'VolumeBinAggregator', 'VolumeProfile', 'WAIT_FOR_ALL', 'WalkForwardRunner', 'adf', 'adx', 'aggregate_heikin_ashi_bars', 'aggregate_range_bars', 'aggregate_renko_bars', 'aggregate_tick_bars', 'aggregate_time_bars', 'aggregate_volume_bars', 'atr', 'autocorrelation', 'bar_returns', 'baw_price', 'binomial_price', 'bollinger', 'bootstrap_ci', 'bs_price', 'bs_price_discrete_dividends', 'bs_vega', 'build_surface_as_of', 'calibrate_svi', 'capi_abi_version', 'cci', 'chop', 'correlation', 'cost_of_carry', 'cvd', 'deflated_sharpe', 'dema', 'ema', 'export_data', 'extract_symbols', 'extract_time_range', 'forward_price', 'greeks', 'grid_neighborhood', 'hurst_dfa', 'i256_roundtrip', 'implied_percentile_in_cone', 'implied_vol', 'inspect', 'kama', 'kurtosis', 'last_error', 'list_indicators', 'macd', 'merge', 'merge_dir', 'obv', 'order_type_code', 'order_type_name', 'parkinson_vol', 'pbo_cscv', 'permutation_test', 'prices_to_double', 'profit_factor', 'quantities_to_double', 'realized_vol', 'recompress', 'rma', 'rogers_satchell_vol', 'rolling_correlation', 'rolling_hurst', 'rolling_zscore', 'rsi', 'second_order_greeks', 'set_log_callback', 'shannon_entropy', 'skewness', 'slope', 'sma', 'split', 'stochastic', 'targets', 'tema', 'trade_pnl', 'u256_from_hex', 'u256_roundtrip', 'validate', 'validate_dataset', 'version', 'vol_cone', 'volumes_to_double', 'vwap', 'whites_reality_check', 'win_rate']
 class ATR:
     def __init__(self, period: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
@@ -97,6 +97,10 @@ class AdlRanking:
     PnlRatio: typing.ClassVar[AdlRanking]  # value = <AdlRanking.PnlRatio: 0>
     PositionSize: typing.ClassVar[AdlRanking]  # value = <AdlRanking.PositionSize: 3>
     __members__: typing.ClassVar[dict[str, AdlRanking]]  # value = {'PnlRatio': <AdlRanking.PnlRatio: 0>, 'Binance': <AdlRanking.Binance: 1>, 'Bybit': <AdlRanking.Bybit: 2>, 'PositionSize': <AdlRanking.PositionSize: 3>}
+    @typing.overload
+    def __eq__(self, other: AdlRanking) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -109,6 +113,10 @@ class AdlRanking:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: AdlRanking) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -139,6 +147,10 @@ class AggregatorEventFilter:
     Both: typing.ClassVar[AggregatorEventFilter]  # value = <AggregatorEventFilter.Both: 3>
     Trades: typing.ClassVar[AggregatorEventFilter]  # value = <AggregatorEventFilter.Trades: 1>
     __members__: typing.ClassVar[dict[str, AggregatorEventFilter]]  # value = {'Trades': <AggregatorEventFilter.Trades: 1>, 'BooksOnly': <AggregatorEventFilter.BooksOnly: 2>, 'Both': <AggregatorEventFilter.Both: 3>}
+    @typing.overload
+    def __eq__(self, other: AggregatorEventFilter) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -151,6 +163,10 @@ class AggregatorEventFilter:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: AggregatorEventFilter) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -223,6 +239,18 @@ class BacktestResult:
         """
         Drain executor fills into this result in FIFO order
         """
+    def mark_price(self, symbol: typing.SupportsInt | typing.SupportsIndex, price: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        """
+        The price an open position in `symbol` is valued at in stats()
+        (unrealized_pnl, final_equity) and open_positions(); the last call
+        wins. A symbol never marked is valued at its last fill.
+        """
+    def open_positions(self) -> numpy.ndarray[typing.Any, numpy.dtype[numpy.void]]:
+        """
+        Positions still open, as a numpy structured array (symbol, side
+        0 long / 1 short, quantity, entry_price (average), mark_price,
+        unrealized_pnl), ascending symbol id.
+        """
     def record_fill(self, order_id: typing.SupportsInt | typing.SupportsIndex, symbol: typing.SupportsInt | typing.SupportsIndex, side: str, price: typing.SupportsFloat | typing.SupportsIndex, quantity: typing.SupportsFloat | typing.SupportsIndex, timestamp_ns: typing.SupportsInt | typing.SupportsIndex, is_maker: bool = False) -> None:
         ...
     def stats(self) -> dict:
@@ -255,6 +283,15 @@ class BacktestRunner:
     def equity_curve(self) -> typing.Any:
         """
         Return the equity curve from the most recent run as a dict of numpy arrays (timestamp_ns, equity, drawdown_pct).
+        """
+    def open_positions(self) -> typing.Any:
+        """
+        Positions the most recent run had not closed when it ended, as a
+        dict of numpy arrays aligned by row (symbol, side 0 long / 1 short,
+        quantity, entry_price (average), mark_price, unrealized_pnl),
+        ascending symbol id. The mark is the last price the run replayed
+        for the symbol: a bar's close on bar replay, the last trade on tick
+        replay. Their sum is the stats' unrealized_pnl.
         """
     def run_bars(self, start_time_ns: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], end_time_ns: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], open: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], high: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], low: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], volume: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol: str = '', bar_type: typing.SupportsInt | typing.SupportsIndex = 0, bar_type_param: typing.SupportsInt | typing.SupportsIndex = 0) -> typing.Any:
         ...
@@ -959,6 +996,10 @@ class FeedClockPolicy:
     LEADER_FOLLOWER: typing.ClassVar[FeedClockPolicy]  # value = <FeedClockPolicy.LEADER_FOLLOWER: 2>
     WAIT_FOR_ALL: typing.ClassVar[FeedClockPolicy]  # value = <FeedClockPolicy.WAIT_FOR_ALL: 0>
     __members__: typing.ClassVar[dict[str, FeedClockPolicy]]  # value = {'WAIT_FOR_ALL': <FeedClockPolicy.WAIT_FOR_ALL: 0>, 'FIRE_ON_ANY': <FeedClockPolicy.FIRE_ON_ANY: 1>, 'LEADER_FOLLOWER': <FeedClockPolicy.LEADER_FOLLOWER: 2>}
+    @typing.overload
+    def __eq__(self, other: FeedClockPolicy) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -971,6 +1012,10 @@ class FeedClockPolicy:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: FeedClockPolicy) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -999,6 +1044,10 @@ class FillLiquidity:
     TAKER: typing.ClassVar[FillLiquidity]  # value = <FillLiquidity.TAKER: 2>
     UNKNOWN: typing.ClassVar[FillLiquidity]  # value = <FillLiquidity.UNKNOWN: 0>
     __members__: typing.ClassVar[dict[str, FillLiquidity]]  # value = {'UNKNOWN': <FillLiquidity.UNKNOWN: 0>, 'MAKER': <FillLiquidity.MAKER: 1>, 'TAKER': <FillLiquidity.TAKER: 2>}
+    @typing.overload
+    def __eq__(self, other: FillLiquidity) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -1011,6 +1060,10 @@ class FillLiquidity:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: FillLiquidity) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -1357,6 +1410,10 @@ class LegState:
     PENDING: typing.ClassVar[LegState]  # value = <LegState.PENDING: 0>
     SUBMITTED: typing.ClassVar[LegState]  # value = <LegState.SUBMITTED: 1>
     __members__: typing.ClassVar[dict[str, LegState]]  # value = {'PENDING': <LegState.PENDING: 0>, 'SUBMITTED': <LegState.SUBMITTED: 1>, 'PARTIALLY_FILLED': <LegState.PARTIALLY_FILLED: 2>, 'FILLED': <LegState.FILLED: 3>, 'CANCELLED': <LegState.CANCELLED: 4>, 'FAILED': <LegState.FAILED: 5>}
+    @typing.overload
+    def __eq__(self, other: LegState) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -1369,6 +1426,10 @@ class LegState:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: LegState) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -1532,6 +1593,10 @@ class MarginMode:
     Cross: typing.ClassVar[MarginMode]  # value = <MarginMode.Cross: 0>
     Isolated: typing.ClassVar[MarginMode]  # value = <MarginMode.Isolated: 1>
     __members__: typing.ClassVar[dict[str, MarginMode]]  # value = {'Cross': <MarginMode.Cross: 0>, 'Isolated': <MarginMode.Isolated: 1>}
+    @typing.overload
+    def __eq__(self, other: MarginMode) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -1544,6 +1609,10 @@ class MarginMode:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: MarginMode) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -1572,6 +1641,10 @@ class MarkImpactModel:
     BookOnly: typing.ClassVar[MarkImpactModel]  # value = <MarkImpactModel.BookOnly: 2>
     None_: typing.ClassVar[MarkImpactModel]  # value = <MarkImpactModel.None_: 0>
     __members__: typing.ClassVar[dict[str, MarkImpactModel]]  # value = {'None_': <MarkImpactModel.None_: 0>, 'BookAnchored': <MarkImpactModel.BookAnchored: 1>, 'BookOnly': <MarkImpactModel.BookOnly: 2>}
+    @typing.overload
+    def __eq__(self, other: MarkImpactModel) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -1584,6 +1657,10 @@ class MarkImpactModel:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: MarkImpactModel) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -1716,6 +1793,10 @@ class OptionType:
     CALL: typing.ClassVar[OptionType]  # value = <OptionType.CALL: 0>
     PUT: typing.ClassVar[OptionType]  # value = <OptionType.PUT: 1>
     __members__: typing.ClassVar[dict[str, OptionType]]  # value = {'CALL': <OptionType.CALL: 0>, 'PUT': <OptionType.PUT: 1>}
+    @typing.overload
+    def __eq__(self, other: OptionType) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -1728,6 +1809,10 @@ class OptionType:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: OptionType) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -2009,6 +2094,10 @@ class OrderEventKind:
     REJECT: typing.ClassVar[OrderEventKind]  # value = <OrderEventKind.REJECT: 5>
     SUBMIT: typing.ClassVar[OrderEventKind]  # value = <OrderEventKind.SUBMIT: 1>
     __members__: typing.ClassVar[dict[str, OrderEventKind]]  # value = {'SUBMIT': <OrderEventKind.SUBMIT: 1>, 'CANCEL': <OrderEventKind.CANCEL: 2>, 'MODIFY': <OrderEventKind.MODIFY: 3>, 'ACK': <OrderEventKind.ACK: 4>, 'REJECT': <OrderEventKind.REJECT: 5>, 'EXPIRE': <OrderEventKind.EXPIRE: 6>}
+    @typing.overload
+    def __eq__(self, other: OrderEventKind) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -2021,6 +2110,10 @@ class OrderEventKind:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: OrderEventKind) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -2098,6 +2191,10 @@ class OrderGroupPolicy:
     BEST_EFFORT: typing.ClassVar[OrderGroupPolicy]  # value = <OrderGroupPolicy.BEST_EFFORT: 0>
     ONE_SIDED: typing.ClassVar[OrderGroupPolicy]  # value = <OrderGroupPolicy.ONE_SIDED: 2>
     __members__: typing.ClassVar[dict[str, OrderGroupPolicy]]  # value = {'BEST_EFFORT': <OrderGroupPolicy.BEST_EFFORT: 0>, 'ALL_OR_NOTHING': <OrderGroupPolicy.ALL_OR_NOTHING: 1>, 'ONE_SIDED': <OrderGroupPolicy.ONE_SIDED: 2>}
+    @typing.overload
+    def __eq__(self, other: OrderGroupPolicy) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -2110,6 +2207,10 @@ class OrderGroupPolicy:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: OrderGroupPolicy) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -2150,6 +2251,10 @@ class OrderGroupState:
     REVERTING: typing.ClassVar[OrderGroupState]  # value = <OrderGroupState.REVERTING: 5>
     SUBMITTED: typing.ClassVar[OrderGroupState]  # value = <OrderGroupState.SUBMITTED: 1>
     __members__: typing.ClassVar[dict[str, OrderGroupState]]  # value = {'PENDING': <OrderGroupState.PENDING: 0>, 'SUBMITTED': <OrderGroupState.SUBMITTED: 1>, 'PARTIALLY_FILLED': <OrderGroupState.PARTIALLY_FILLED: 2>, 'FILLED': <OrderGroupState.FILLED: 3>, 'CANCELLED': <OrderGroupState.CANCELLED: 4>, 'REVERTING': <OrderGroupState.REVERTING: 5>, 'FAILED': <OrderGroupState.FAILED: 6>}
+    @typing.overload
+    def __eq__(self, other: OrderGroupState) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -2162,6 +2267,10 @@ class OrderGroupState:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: OrderGroupState) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -2463,6 +2572,10 @@ class RateLimitEndpointFamily:
     MarketData: typing.ClassVar[RateLimitEndpointFamily]  # value = <RateLimitEndpointFamily.MarketData: 1>
     Trading: typing.ClassVar[RateLimitEndpointFamily]  # value = <RateLimitEndpointFamily.Trading: 0>
     __members__: typing.ClassVar[dict[str, RateLimitEndpointFamily]]  # value = {'Trading': <RateLimitEndpointFamily.Trading: 0>, 'MarketData': <RateLimitEndpointFamily.MarketData: 1>, 'Account': <RateLimitEndpointFamily.Account: 2>}
+    @typing.overload
+    def __eq__(self, other: RateLimitEndpointFamily) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -2475,6 +2588,10 @@ class RateLimitEndpointFamily:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: RateLimitEndpointFamily) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -3082,6 +3199,9 @@ class Stats:
     def final_capital(self) -> float:
         ...
     @property
+    def final_equity(self) -> float:
+        ...
+    @property
     def gross_loss(self) -> float:
         ...
     @property
@@ -3122,6 +3242,9 @@ class Stats:
         ...
     @property
     def total_trades(self) -> int:
+        ...
+    @property
+    def unrealized_pnl(self) -> float:
         ...
     @property
     def win_rate(self) -> float:
@@ -3711,6 +3834,10 @@ class _ExecOrderType:
     Limit: typing.ClassVar[_ExecOrderType]  # value = <_ExecOrderType.Limit: 1>
     Market: typing.ClassVar[_ExecOrderType]  # value = <_ExecOrderType.Market: 0>
     __members__: typing.ClassVar[dict[str, _ExecOrderType]]  # value = {'Market': <_ExecOrderType.Market: 0>, 'Limit': <_ExecOrderType.Limit: 1>}
+    @typing.overload
+    def __eq__(self, other: _ExecOrderType) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -3723,6 +3850,10 @@ class _ExecOrderType:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: _ExecOrderType) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -3748,6 +3879,10 @@ class _ExecSide:
     Buy: typing.ClassVar[_ExecSide]  # value = <_ExecSide.Buy: 0>
     Sell: typing.ClassVar[_ExecSide]  # value = <_ExecSide.Sell: 1>
     __members__: typing.ClassVar[dict[str, _ExecSide]]  # value = {'Buy': <_ExecSide.Buy: 0>, 'Sell': <_ExecSide.Sell: 1>}
+    @typing.overload
+    def __eq__(self, other: _ExecSide) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -3760,6 +3895,10 @@ class _ExecSide:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: _ExecSide) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -4105,6 +4244,11 @@ def validate(segment_path: str, verify_crc: bool = True, verify_timestamps: bool
     ...
 def validate_dataset(data_dir: str) -> dict:
     ...
+def version() -> str:
+    """
+    The release the compiled library was built from (lrvx_version()),
+    the same string as lrvx.__version__.
+    """
 def vol_cone(prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], horizons: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], periods_per_year: typing.SupportsFloat | typing.SupportsIndex) -> list:
     """
     Realized-vol cone from a price series: for each horizon (in return periods) slide a window, annualize realized vol, and report a dict(horizon, min, p25, p50, p75, max, samples). periods_per_year is 252 (equity) or 365 (crypto).

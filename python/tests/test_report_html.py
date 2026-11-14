@@ -115,5 +115,54 @@ class ReportHtmlTests(unittest.TestCase):
         self.assertIn("A &amp; B", html)
 
 
+def _card(label: str, value: str) -> str:
+    return (f'<div class="label">{label}</div>'
+            f'<div class="val">{value}</div>')
+
+
+class ReportOpenPositionCardsTests(unittest.TestCase):
+    """Stats that value a position still open at the end carry
+    ``unrealized_pnl`` and ``final_equity``; the report shows each as a
+    card. Stats without them (an older dict, a grid-search factory's own
+    dict) get no such card, not a card reading 0 or a dash."""
+
+    def test_cards_shown_when_the_stats_carry_them(self):
+        stats = dict(_STATS, unrealized_pnl=12.34, final_equity=9891.34)
+        html = render_html(stats)
+        self.assertIn(_card("Unrealized PnL", "12.3400"), html)
+        self.assertIn(_card("Final equity", "9891.3400"), html)
+        self.assertIn(_card("Final capital", "9879.0000"), html,
+                      "final_capital keeps its own card beside final_equity")
+
+    def test_a_zero_valuation_is_still_shown(self):
+        stats = dict(_STATS, unrealized_pnl=0.0, final_equity=9879.0)
+        html = render_html(stats)
+        self.assertIn(_card("Unrealized PnL", "0.0000"), html)
+        self.assertIn(_card("Final equity", "9879.0000"), html)
+
+    def test_cards_omitted_when_the_stats_do_not_carry_them(self):
+        html = render_html(_STATS)
+        self.assertNotIn("Unrealized PnL", html)
+        self.assertNotIn("Final equity", html)
+        self.assertIn("Final capital", html)
+
+    def test_engine_run_stats_render_both_cards(self):
+        import lrvx  # noqa: PLC0415
+        import numpy as np  # noqa: PLC0415
+
+        eng = lrvx.Engine(10_000.0, 0.0)
+        closes = np.array([100.0, 102.0, 104.0, 107.0, 110.0])
+        ts = np.array([1_767_225_600 + 60 * i for i in range(5)], dtype=np.int64)
+        eng.load_ohlcv({"ts": ts, "open": closes, "high": closes, "low": closes,
+                        "close": closes, "volume": np.ones(5)}, "BTCUSDT")
+        sig = lrvx.SignalBuilder()
+        sig.buy(int(ts[0]), 2.0)
+        sig.sell(int(ts[2]), 1.0)
+        stats = eng.run(sig).to_dict()
+        html = render_html(stats)
+        self.assertIn(_card("Unrealized PnL", "10.0000"), html)
+        self.assertIn(_card("Final equity", "10014.0000"), html)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

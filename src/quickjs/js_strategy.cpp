@@ -332,6 +332,11 @@ void LrvxJsStrategy::loadStdlib()
         __lrvx_backtest_result_ingest(this._h, executor.handle);
       }
       stats() { return __lrvx_backtest_result_stats(this._h); }
+      // The price an open position in `symbol` is valued at in stats()
+      // (unrealizedPnl, finalEquity) and openPositions(); the last call
+      // wins. A symbol never marked is valued at its last fill.
+      markPrice(symbol, price) { __lrvx_backtest_result_mark_price(this._h, symbol, price); }
+      openPositions() { return __lrvx_backtest_result_open_positions(this._h); }
       equityCurve() { return __lrvx_backtest_result_equity_curve(this._h); }
       writeEquityCurveCsv(path) { return __lrvx_backtest_result_write_csv(this._h, path); }
     }
@@ -693,10 +698,12 @@ void LrvxJsStrategy::loadStdlib()
         var sorted = signals.sorted();
         var sigIdx = 0;
         var orderId = 1;
+        var lastClose = {};
 
         for (var mi = 0; mi < merged.length; mi++) {
           var ref = merged[mi];
           var sid = getSid(ref.key);
+          lastClose[sid] = ref.bar.close;
           // Advance clock (ns) and fill pending orders at this bar's close.
           // Signals are submitted AFTER onBar to match Python Engine semantics.
           executor.advanceClock(ref.tsNs);
@@ -722,6 +729,8 @@ void LrvxJsStrategy::loadStdlib()
           sigIdx++;
         }
         result.ingestExecutor(executor);
+        // An open position is valued at the last close the run replayed.
+        for (var ms in lastClose) { result.markPrice(Number(ms), lastClose[ms]); }
         var stats = result.stats();
         result.destroy();
         executor.destroy();
@@ -803,6 +812,9 @@ void LrvxJsStrategy::loadStdlib()
       // __lrvx_funding_schedule_load_tape that returned false or 0 did so;
       // '' when it did not fail.
       lastError: function() { return __lrvx_last_error(); },
+
+      // The release the library was built from (lrvx_version()).
+      version: function() { return __lrvx_version(); },
 
       loadCsv: function(path) { return __lrvx_load_csv(path); },
 

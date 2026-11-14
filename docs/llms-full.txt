@@ -150,7 +150,7 @@ Pick the row for your binding. The C++ engine itself only matters if you build f
 
 | If you use | You need |
 |---|---|
-| **Python** | Python 3.10+. `pip install lrvx` for prebuilt wheels (Linux / macOS). |
+| **Python** | Python 3.10+. `pip install lrvx` for prebuilt wheels (CPython 3.10 to 3.15; Linux, macOS, Windows). |
 | **Node.js** | Node 20+. `npm install @lrvx/lrvx`. |
 | **Codon** | Codon compiler + `lrvx` built with `-DLRVX_BUILD_CAPI=ON`. |
 | **C++** | C++23 compiler (GCC 14+ / Clang 18+; MSVC or clang-cl on Windows), CMake 3.22+. |
@@ -257,7 +257,8 @@ cmake -B build \
 cmake --build build
 ```
 
-Requires: Python 3.10+, pybind11 (`pip install pybind11`).
+Requires: Python 3.10+, pybind11 3.1 or newer (`pip install "pybind11>=3.1"`). The
+prebuilt wheels on PyPI cover CPython 3.10 to 3.15.
 
 The module builds at `build/python/lrvx.cpython-*.so`.
 
@@ -335,7 +336,7 @@ The constructor takes `(registry, fee_rate=0.0004, initial_capital=100000.0)` �
 
 `run_csv` reads OHLCV **bars**: one header line, then `timestamp,open,high,low,close,volume`. Only the timestamp and close columns are used; each bar is replayed as one trade, so `on_trade` fires and `on_bar` does not. Timestamps below `1e12` are treated as seconds and scaled to nanoseconds, because a raw CSV column's unit is genuinely unknown. `run_ohlcv(ts, close, symbol)` and `run_bars(...)` (full OHLC, fires `on_bar`) are both different: `ts` and `start_time_ns` / `end_time_ns` are nanoseconds by contract — the same contract the C ABI, Node, and Codon bindings use for the same calls — so they are used exactly as given, with no unit guessing at all. Other entry points: `run_tape(path)` and `run_tapes(paths)` replay `.lrvx` tapes tick by tick (`on_trade`), `run_tape_bars(path, interval_seconds=..., symbol=...)` replays a tape as time bars (`on_bar`, `run_bars`' fill rules), and `run_tape_bars_on_ticks(path, interval_seconds=..., symbol=...)` shows the strategy the same bars while the executor fills on the tape's prints.
 
-Returns a plain dict. Keys: `total_trades`, `winning_trades`, `losing_trades`, `initial_capital`, `final_capital`, `total_pnl`, `total_fees`, `net_pnl`, `gross_profit`, `gross_loss`, `max_drawdown`, `max_drawdown_pct`, `win_rate`, `profit_factor`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `return_pct`.
+Returns a plain dict. Keys: `total_trades`, `winning_trades`, `losing_trades`, `initial_capital`, `final_capital`, `total_pnl`, `total_fees`, `net_pnl`, `gross_profit`, `gross_loss`, `max_drawdown`, `max_drawdown_pct`, `win_rate`, `profit_factor`, `sharpe_ratio`, `sortino_ratio`, `calmar_ratio`, `return_pct`, `unrealized_pnl`, `final_equity`. A position still open when the data ends is valued at the last price the run replayed for its symbol (a bar's close on bar replay, the last trade on tick replay; book records do not move it): `unrealized_pnl` is that valuation, with no exit fee, and `final_equity` is `initial_capital + net_pnl + unrealized_pnl`. `net_pnl`, `final_capital` and `return_pct` count closed trades only, and `open_positions()` lists what was left open. `Engine.run` returns a `Stats` object carrying the same two fields.
 
 Hooks attach after construction: `set_executor(executor)` (a subclass of `lrvx.Executor`), `set_risk_manager`, `set_kill_switch`, `set_order_validator`, `set_pnl_tracker`, `add_execution_listener`.
 
@@ -1507,6 +1508,11 @@ exports the pair it compared (`CAPI_ABI_VERSION` / `capi_abi_version()`,
 
 The shared library also carries a real `SOVERSION` now, so the platform
 loader refuses a mismatched major/minor before any of this runs.
+
+`lrvx_version()` is a different number: the release the library was built
+from (for example `"1.2.3"`), the string Python reports as `lrvx.__version__` and Node,
+Codon (`lrvx.abi.version()`) and QuickJS as `version()`. It moves with every
+release; `LRVX_CAPI_ABI_VERSION` moves only when this boundary changes shape.
 
 ### Threads
 
@@ -5453,6 +5459,12 @@ const results = gs.run();  // [{index, params, stats}, ...]
 ```
 
 A key the factory leaves out reads 0. A key of another type (a string where a number belongs), a return value that is not an object, or an error the factory throws stops the run, and `run()` throws that error.
+
+Each result's `stats` also carry `unrealizedPnl` and `finalEquity`, the position the combination's run left open at the end, as the factory returned them: a `BacktestRunner` stats object returned as is keeps its own, and a factory that leaves them out reads 0.
+
+### C API
+
+`LrvxBacktestStats` has no field for the open position at the end of a run, so a factory hands it over separately: `lrvx_grid_search_record_valuation(gs, index, unrealized_pnl, final_equity)` with the `index` it was called with, and after the run `lrvx_grid_search_result_unrealized_pnl(gs, index)` and `lrvx_grid_search_result_final_equity(gs, index)` read it back. Each `lrvx_grid_search_run` that is handed `stats_out` starts afresh. A combination whose factory recorded nothing reads `unrealized_pnl` 0 and `final_equity` `initialCapital + netPnl` of the stats it wrote. A record for an index the run does not produce is dropped, and a read past what the last run produced (or before any run) returns 0, neither with an error. The record store has its own lock, so a factory may record from whichever thread it runs a combination on.
 
 ### Pairs with walk-forward
 
@@ -9711,7 +9723,7 @@ Generated by `scripts/gen_api_index.py` from
 
 Module: `lrvx`
 
-Surface: 119 classes, 83 functions, 63 constants.
+Surface: 119 classes, 84 functions, 63 constants.
 
 ### Constants
 
@@ -9859,6 +9871,7 @@ Surface: 119 classes, 83 functions, 63 constants.
 - `u256_roundtrip(value: int) -> int`
 - `validate(segment_path: str, verify_crc: bool = True, verify_timestamps: bool = True) -> dict`
 - `validate_dataset(data_dir: str) -> dict`
+- `version() -> str` — The release the compiled library was built from (lrvx_version()),
 - `vol_cone(prices: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], horizons: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], periods_per_year: typing.SupportsFloat | typing.SupportsIndex) -> list` — Realized-vol cone from a price series: for each horizon (in return periods) slide a window, annualize realized vol, and report a dict(horizon, min, p25, p50, p75, max, samples). periods_per_year is 252 (equity) or 365 (crypto).
 - `volumes_to_double(raw: typing.Annotated[numpy.typing.ArrayLike, numpy.int64]) -> numpy.typing.NDArray[numpy.float64]` — Convert raw int64 volume array to float64 array (divides by VOLUME_SCALE).
 - `vwap(close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], volume: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], window: typing.SupportsInt | typing.SupportsIndex = 96) -> numpy.typing.NDArray[numpy.float64]`
@@ -9989,6 +10002,8 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 
 - `equity_curve(self) -> numpy.ndarray[typing.Any, numpy.dtype[numpy.void]]`
 - `ingest_executor(self, executor: SimulatedExecutor) -> None`
+- `mark_price(self, symbol: typing.SupportsInt | typing.SupportsIndex, price: typing.SupportsFloat | typing.SupportsIndex) -> None`
+- `open_positions(self) -> numpy.ndarray[typing.Any, numpy.dtype[numpy.void]]`
 - `record_fill(self, order_id: typing.SupportsInt | typing.SupportsIndex, symbol: typing.SupportsInt | typing.SupportsIndex, side: str, price: typing.SupportsFloat | typing.SupportsIndex, quantity: typing.SupportsFloat | typing.SupportsIndex, timestamp_ns: typing.SupportsInt | typing.SupportsIndex, is_maker: bool = False) -> None`
 - `stats(self) -> dict`
 - `trades(self) -> numpy.ndarray[typing.Any, numpy.dtype[numpy.void]]`
@@ -10006,6 +10021,7 @@ Which event kinds an aggregator counts. Trades = TradeRecord only, BooksOnly = b
 - `begin_session(self, on_signal: typing.Any = None) -> None`
 - `end_session(self) -> typing.Any`
 - `equity_curve(self) -> typing.Any`
+- `open_positions(self) -> typing.Any`
 - `run_bars(self, start_time_ns: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], end_time_ns: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], open: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], high: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], low: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], volume: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol: str = '', bar_type: typing.SupportsInt | typing.SupportsIndex = 0, bar_type_param: typing.SupportsInt | typing.SupportsIndex = 0) -> typing.Any`
 - `run_csv(self, path: str, symbol: str = '') -> typing.Any`
 - `run_ohlcv(self, ts: typing.Annotated[numpy.typing.ArrayLike, numpy.int64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], symbol: str = '') -> typing.Any`
@@ -11690,6 +11706,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - *property* `avg_win: float`
 - *property* `calmar_ratio: float`
 - *property* `final_capital: float`
+- *property* `final_equity: float`
 - *property* `gross_loss: float`
 - *property* `gross_profit: float`
 - *property* `initial_capital: float`
@@ -11704,6 +11721,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - *property* `total_fees: float`
 - *property* `total_pnl: float`
 - *property* `total_trades: int`
+- *property* `unrealized_pnl: float`
 - *property* `win_rate: float`
 - *property* `winning_trades: int`
 
@@ -12766,6 +12784,7 @@ name.
 | `run_tapes(paths)` | Run against N `.lrvx` tapes merged on read. Symbols are rekeyed by `(metadata.exchange, name)`, so two captures of the same venue/symbol collapse and two venues stay distinct. `run_tapes([t])` equals `run_tape(t)`, skipped-record counts included |
 | `equity_curve()` | Equity curve from the most recent run, as a dict of numpy arrays (`timestamp_ns`, `equity`, `drawdown_pct`). One point per closed trade; a position still open at the end adds none (see [A position open at the end](#a-position-open-at-the-end)) |
 | `trades()` | Closed trades from the most recent run, as a dict of numpy arrays (`symbol`, `side`, `entry_price`, `exit_price`, `quantity`, `pnl`, `fee`, `entry_time_ns`, `exit_time_ns`). A position still open at the end is not a trade and is not listed. On bar replay (`run_bars`, `run_tape_bars`) `entry_time_ns` / `exit_time_ns` are the end of the bar in which the fill happened, wherever in the bar it matched: a fill inside a daily bar carries the next day's 00:00. On tick replay, and with `run_tape_bars_on_ticks`, they are the timestamp of the filling event |
+| `open_positions()` | Positions the most recent run left open, as a dict of numpy arrays (`symbol`, `side`, `quantity`, `entry_price`, `mark_price`, `unrealized_pnl`), marked at the last price the run saw per symbol (see [A position open at the end](#a-position-open-at-the-end)) |
 
 An empty `symbol` resolves to `"default"`.
 
@@ -12793,6 +12812,8 @@ in [Reading why a signal went nowhere](#reading-why-a-signal-went-nowhere), next
 | `total_fees` | Fees of every fill, including the entry fill of a position still open at the end |
 | `net_pnl` | `total_pnl - total_fees`. Carries the entry fee of a position still open at the end, but not its unrealized P&L |
 | `final_capital` | `initial_capital + net_pnl` |
+| `unrealized_pnl` | P&L of the positions still open at the end, marked at the last price the run saw for each symbol; 0 when the run ends flat. See [A position open at the end](#a-position-open-at-the-end) |
+| `final_equity` | `initial_capital + net_pnl + unrealized_pnl`: what the account is worth with the open position valued |
 | `total_trades` | Round-trip trade count |
 | `win_rate` | Winning trade fraction |
 | `sharpe_ratio` | Sharpe ratio over the returns between closed trades, scaled by sqrt(252); one period is one closed trade, not one day, so it is not annualized by time |
@@ -12805,10 +12826,10 @@ The dict carries the other `BacktestResult.stats()` keys too (`winning_trades`,
 ### A position open at the end
 
 A run can end with a position still open: the data ran out before the exit.
-`trades()` and `equity_curve()` hold closed trades only, and nothing values the
-open position, so its unrealized P&L is in none of the numbers. Its entry fee
-is: `total_fees` counts every fill, so `net_pnl`, `final_capital` and
-`return_pct` include it, while the closed trades do not.
+`trades()` and `equity_curve()` hold closed trades only, and `total_pnl`,
+`net_pnl`, `final_capital` and `return_pct` keep that meaning. The entry fee of
+the open position is in them: `total_fees` counts every fill, so `net_pnl`,
+`final_capital` and `return_pct` include it, while the closed trades do not.
 
 ```
 net_pnl = sum(trades()["pnl"] - trades()["fee"]) - fee of the open entry
@@ -12816,15 +12837,39 @@ net_pnl = sum(trades()["pnl"] - trades()["fee"]) - fee of the open entry
 
 For 0.01 BTC entered at 78,000 with a 4 bp fee that is 0.312 below the closed
 trades' net, and below the last `equity_curve()` point minus `initial_capital`.
-When no trade has closed at all, the statistics are all zero, `total_fees` and
-`net_pnl` included, even though an entry was filled and charged.
+When no trade has closed at all, the trade statistics are all zero, `total_fees`
+and `net_pnl` included, even though an entry was filled and charged.
 
-To tell that a run ended with a position open, read `position()` in the
-strategy's `on_stop()`, which the runner calls at the end of the run, or call
-`strategy.position(symbol)` after the run while the runner that ran it is
-still alive. A non-zero value is the open quantity. To value it, mark it at the
-last price yourself, or close it from the strategy before the data ends so it
-becomes a trade.
+The open position itself is valued in two more keys:
+
+- `unrealized_pnl` is the sum over symbols of `(mark - entry) * quantity` for a
+  long and `(entry - mark) * quantity` for a short, with `entry` the average
+  entry price and no exit fee.
+- `final_equity` is `initial_capital + net_pnl + unrealized_pnl`, also when no
+  trade has closed.
+
+The mark is the last price the run saw for the symbol. On bar replay
+(`run_bars`, `run_tape_bars`) that is the close of the last bar replayed: a bar
+still open when a tape ends is never replayed, so its trades do not move the
+mark. On tick replay (`run_tape`, `run_tapes`, `run_ohlcv`, `run_csv`, and
+`run_tape_bars_on_ticks`, which decides on bars but fills on ticks) it is the
+last trade; book records do not move it. A symbol the run never priced is valued
+at its last fill.
+
+`open_positions()` lists what is open after the most recent run, as a dict of
+numpy arrays aligned by row like `trades()`: `symbol`, `side` (0 long,
+1 short), `quantity`, `entry_price`, `mark_price` and `unrealized_pnl`,
+ascending symbol id. Its `unrealized_pnl` column sums to the stats key. Inside
+the strategy, `position()` in `on_stop()` still reads the open quantity.
+
+```python
+stats = runner.run_tape_bars("tape/", interval_seconds=60, symbol="BTCUSDT")
+print(stats["net_pnl"], stats["unrealized_pnl"], stats["final_equity"])
+open_ = runner.open_positions()
+for sym, qty, entry, mark in zip(open_["symbol"], open_["quantity"],
+                                 open_["entry_price"], open_["mark_price"]):
+    print(sym, qty, entry, mark)
+```
 
 ## Example
 
@@ -15280,6 +15325,8 @@ lrvx.BacktestResult(
 | `trades()` | `ndarray` | Closed trades as a `PyTradeRecord` structured array. A position still open after the last fill is not listed |
 | `equity_curve()` | `ndarray` | Equity curve as a `PyEquityPoint` structured array, one point per closed trade |
 | `write_equity_curve_csv(path)` | `bool` | Write equity curve to CSV (`timestamp_ns,equity,drawdown_pct` header) |
+| `mark_price(symbol, price)` | `None` | The price an open position in `symbol` is valued at; the last call wins. A symbol never marked is valued at its last fill |
+| `open_positions()` | `ndarray` | Positions still open as a `PyOpenPosition` structured array, ascending symbol id |
 
 ### `stats()` keys
 
@@ -15316,13 +15363,15 @@ The [`Stats`](engine.md#stats) object returned by `Engine.run()` is a different,
 | `return_pct` | `float` | Net return percentage |
 | `start_time_ns` | `int` | First fill timestamp |
 | `end_time_ns` | `int` | Last fill timestamp |
+| `unrealized_pnl` | `float` | P&L of the positions still open, at their mark; no exit fee |
+| `final_equity` | `float` | `initial_capital + net_pnl + unrealized_pnl` |
 
 #### A position open after the last fill
 
-`trades()` and `equity_curve()` hold closed trades only, and the result never
-values an open position, so the unrealized PnL of a position still open after
-the last fill is in none of the numbers. Its entry fee is: `total_fees` counts
-every fill, so `net_pnl`, `final_capital` and `return_pct` include it.
+`trades()` and `equity_curve()` hold closed trades only, and `total_pnl`,
+`net_pnl`, `final_capital` and `return_pct` keep that meaning. The entry fee of
+a position still open after the last fill is in them: `total_fees` counts every
+fill, so `net_pnl`, `final_capital` and `return_pct` include it.
 
 ```
 net_pnl = sum(trades()["pnl"] - trades()["fee"]) - fee of the open entry
@@ -15330,12 +15379,16 @@ net_pnl = sum(trades()["pnl"] - trades()["fee"]) - fee of the open entry
 
 For 0.01 BTC entered at 78,000 with a 4 bp fee, `net_pnl` is 0.312 below the
 closed trades' net and below the last equity point minus `initial_capital`.
-When no trade has closed, every statistic is zero, `total_fees` included.
+When no trade has closed, every trade statistic is zero, `total_fees` included.
 
-A position is open when the signed fill quantities for a symbol do not sum to
-zero: sum `quantity` over `executor.fills_list()` with `+` for `"buy"` and
-`-` for `"sell"`, over the same fills you ingested. Under `BacktestRunner`, use
-the strategy's `position()` instead (see
+The open position is valued in `unrealized_pnl`: `(mark - entry) * quantity`
+for a long and `(entry - mark) * quantity` for a short, summed over symbols,
+with `entry` the average entry price and no exit fee. `final_equity` is
+`initial_capital + net_pnl + unrealized_pnl`. A `BacktestResult` built by hand
+has no market data, so give it the mark with `mark_price(symbol, price)`; a
+symbol never marked is valued at its last fill. `open_positions()` lists each
+open position. Under `BacktestRunner` the result is marked at the last price
+the run replayed (see
 [strategy.md](strategy.md#a-position-open-at-the-end)).
 
 ---
@@ -15374,6 +15427,17 @@ the strategy's `position()` instead (see
 | `timestamp_ns` | `int64` | Sample timestamp (ns) |
 | `equity` | `float64` | Account equity |
 | `drawdown_pct` | `float64` | Drawdown from peak (percentage) |
+
+### PyOpenPosition
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `symbol` | `uint32` | Symbol ID |
+| `side` | `uint8` | 0 = long, 1 = short |
+| `quantity` | `float64` | Open quantity (absolute) |
+| `entry_price` | `float64` | Average entry price |
+| `mark_price` | `float64` | Price the position is valued at |
+| `unrealized_pnl` | `float64` | `(mark - entry) * quantity` long, `(entry - mark) * quantity` short |
 
 ---
 
@@ -16027,8 +16091,9 @@ they replay for the first symbol registered.
 | `addJourneyTracer(tracer)` | `void` | Attach an `OrderJourneyTracer`; it records every order event of the runs that follow. Its rows carry `tsNs` and the per-stage timestamps as `bigint` |
 | `equityCurve()` | `EquityCurve` | Equity curve from the most recent run |
 | `trades()` | `BacktestTrades` | Closed trades from the most recent run |
+| `openPositions()` | `OpenPositions` | Positions the most recent run left open: `symbol` (`Uint32Array`), `side` (`Uint8Array`, 0 long / 1 short), `quantity`, `entryPrice`, `markPrice`, `unrealizedPnl` (`Float64Array`), aligned by row, ascending symbol id |
 
-`equityCurve()` and `trades()` throw `LrvxError(E_RUN_002)` if no run has completed.
+`equityCurve()`, `trades()` and `openPositions()` throw `LrvxError(E_RUN_002)` if no run has completed.
 
 Every run's stats object carries `skippedOptionQuotes` and `skippedPoolStates`: the option-quote
 and pool-state records a tape run (`runTape`, `runTapes`, `runTapeBarsOnTicks`) read and delivered
@@ -16071,6 +16136,29 @@ search result's `stats` -- also carries:
 | `timeWeightedReturn` | `number` | Time-weighted return |
 | `startTimeNs` | `bigint` | Timestamp of the run's first fill; `0n` when nothing filled |
 | `endTimeNs` | `bigint` | Timestamp of the run's last fill |
+
+A `BacktestRunner` run, `BacktestResult.stats()`, `Engine.run()`, a walk-forward fold's
+`trainStats` / `testStats` and a grid search result's `stats` also value the position still open
+when the data ended:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `unrealizedPnl` | `number` | Sum over symbols of `(mark - entry) * qty` for a long and `(entry - mark) * qty` for a short, `entry` the average entry, no exit fee. 0 when the run ends flat |
+| `finalEquity` | `number` | `initialCapital + netPnl + unrealizedPnl` |
+
+`netPnl`, `finalCapital`, `returnPct`, `trades()` and `equityCurve()` leave the open position out
+(its entry fee is in `totalFees`). The mark is the last price the run saw for the symbol: the last
+bar's close on bar replay (`runBars`, `runTapeBars`; a bar still open when a tape ends is never
+replayed), the last trade on tick replay (`runTape`, `runTapes`, `runOhlcv`, `runCsv`,
+`runTapeBarsOnTicks`); book records do not move it. A symbol never priced is valued at its last
+fill. `openPositions()` lists the rows.
+
+A `WalkForwardRunner` fold values each leg on its own: `trainStats` the position open at the end
+of the train window, `testStats` the one open at the end of the test window, each marked at its
+window's last close (`runCsv` replays closes as trades). A `GridSearch` result's `stats` carry the
+`unrealizedPnl` and `finalEquity` its factory returned, so a `BacktestRunner` stats object returned
+as is keeps them; a factory that leaves them out reads 0, like every other key, and a value that is
+not a number is a `TypeError` naming the key.
 
 ---
 
@@ -16148,6 +16236,8 @@ const stats = result.stats();
 | `recordFill(orderId, symbol, side, price, qty, timestampNs)` | `void` | Record a single fill |
 | `ingestExecutor(exec)` | `void` | Drain all fills from a `SimulatedExecutor` |
 | `stats()` | stats object | Same fields as `BacktestRunner` stats |
+| `markPrice(symbol, price)` | `void` | The price an open position in `symbol` is valued at in `stats()` and `openPositions()`; the last call wins. A symbol never marked is valued at its last fill |
+| `openPositions()` | `OpenPositions` | Positions still open, same shape as `BacktestRunner.openPositions()` |
 
 ---
 
@@ -17925,6 +18015,7 @@ replay for the first symbol registered.
 | `run_tapes(paths)` | `BacktestStats` | Replay N `.lrvx` tapes merged on read. Raises `ValueError` with the reason on bad paths or overlapping book streams |
 | `equity_curve()` | `Tuple[List[int], List[float], List[float]]` | `(timestamps_ns, equity, drawdown_pct)` from the most recent run, all the same length. Raises if no run has completed |
 | `trades()` | 9 parallel lists | `(symbol, side, entry_price, exit_price, quantity, pnl, fee, entry_time_ns, exit_time_ns)` for the closed trades of the most recent run. `side` is 0 for long, 1 for short |
+| `open_positions()` | 6 parallel lists | `(symbol, side, quantity, entry_price, mark_price, unrealized_pnl)` for the positions the most recent run left open, marked at the last price it replayed per symbol (the last bar's close on bar replay, the last trade on tick replay); ascending symbol id, `side` 0 long, 1 short. Their sum is the stats' `unrealized_pnl`. Raises if no run has completed |
 | `close()` | `None` | Free resources |
 
 See [Backtest](backtest.md) for the `BacktestStats` field reference.
@@ -17982,6 +18073,8 @@ Returned by `BacktestRunner.run_csv()` / `run_ohlcv()` and `BacktestResult.stats
 | `end_time_ns` | `int` | Backtest end timestamp (ns) |
 | `skipped_option_quotes` | `int` | Option-quote records a tape run read and delivered to nobody (`run_tape`, `run_tapes`, `run_tape_bars_on_ticks`); 0 otherwise |
 | `skipped_pool_states` | `int` | Pool-state records a tape run read and delivered to nobody, as `skipped_option_quotes` |
+| `unrealized_pnl` | `float` | The positions still open at the end, at the last price the run saw per symbol (a bar's close on bar replay, the last trade on tick replay): `(mark - entry) * qty` long, `(entry - mark) * qty` short, no exit fee. `net_pnl`, `final_capital` and `return_pct` leave it out. 0 on walk-forward fold stats, which carry no result |
+| `final_equity` | `float` | `initial_capital + net_pnl + unrealized_pnl` (0 on walk-forward fold stats) |
 
 ---
 
@@ -18106,6 +18199,8 @@ BacktestResult(
 | `record_fill(order_id, symbol, side, price, qty, timestamp_ns)` | `None` | Record a single fill |
 | `ingest_executor(executor)` | `None` | Drain all fills from a `SimulatedExecutor` |
 | `stats()` | `BacktestStats` | Compute and return statistics |
+| `mark_price(symbol, price)` | `None` | The price an open position in `symbol` is valued at in `stats()` and `open_positions()`; the last call wins. A symbol never marked is valued at its last fill |
+| `open_positions()` | 6 parallel lists | `(symbol, side, quantity, entry_price, mark_price, unrealized_pnl)` for the positions still open, ascending symbol id; `side` 0 long, 1 short |
 | `equity_curve_size()` | `int` | Number of equity curve points |
 | `write_equity_curve_csv(path)` | `bool` | Write equity curve to CSV |
 | `close()` | `None` | Free resources |
@@ -19144,6 +19239,7 @@ Extended operations:
 | `lrvx.extractSymbols(inputPath, outputDir, symbols)` | Extract selected symbols |
 | `lrvx.extractTimeRange(inputPath, outputPath, fromNs, toNs)` | Extract a time window |
 | `lrvx.lastError()` | Why the last `recompressSegment` returned `false` or the last `extractSymbols` / `extractTimeRange` returned `0`: a string that opens with the C function's name and names the file that could not be read or written. Each of the three clears it on entry, so `''` means the call did not fail; an extract that matched nothing returns `0` with `''`. `validateSegment` and `mergeSegments` clear it too: `validateSegment` returns `false` for a segment that fails its checks (`''`) and for a file that could not be read (the reason), and `mergeSegments` returns `true` only when every input was merged and at least one event was written, as `mergeDir`'s `success` does: it returns `false` with the reason when no segment was merged, and `false` with `merged N segment(s); skipped: Cannot open: <path>; ...` when some inputs could not be opened (the output is still written from the ones that opened; this case used to return `true`) |
+| `lrvx.version()` | The release the library was built from (`lrvx_version()`), the string Python reports as `lrvx.__version__` |
 
 ---
 
@@ -19362,6 +19458,7 @@ typedef void* LrvxLiveEngineHandle;
 typedef void* LrvxRunnerHandle;
 typedef void* LrvxBacktestRunnerHandle;
 typedef void* LrvxGridSearchHandle;
+typedef void* LrvxWalkForwardResultHandle;
 typedef void* LrvxLatencyModelHandle;
 typedef void* LrvxTapeDiffHandle;
 typedef void* LrvxPortfolioRiskHandle;

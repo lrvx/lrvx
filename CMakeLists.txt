@@ -225,6 +225,17 @@ if(LRVX_ENABLE_BACKTEST)
   message(STATUS "Backtest module enabled")
 endif()
 
+# The release string the bindings report (lrvx_version(), lrvx.__version__,
+# version() in Node, Codon and QuickJS). It is compiled into the core archive
+# from project() above, so every binding that links the archive reports the
+# version this tree builds and none carries a copy of the number. The lite
+# profile has no binding, so it leaves the file out.
+if(NOT LRVX_VENUE_LITE)
+  list(APPEND SRC_FILES src/version.cpp)
+  set_source_files_properties(src/version.cpp PROPERTIES
+    COMPILE_DEFINITIONS "LRVX_PROJECT_VERSION=\"${PROJECT_VERSION}\"")
+endif()
+
 set(LRVX ${PROJECT_NAME})
 
 add_library(${LRVX} STATIC ${SRC_FILES})
