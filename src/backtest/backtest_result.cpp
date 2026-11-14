@@ -37,6 +37,7 @@ void BacktestResult::recordFill(const Fill& fill)
   _totalFees = Volume::fromRaw(_totalFees.raw() + fee.raw());
 
   Position& pos = getPosition(fill.symbol);
+  pos.lastFillPrice = fill.price;
 
   // Pro-rate this fill's fee between a close portion and a new-open portion
   // by quantity, so a flipping fill (close + open) attributes fees correctly
@@ -130,10 +131,12 @@ BacktestStats BacktestResult::computeStats() const
   BacktestStats stats;
   stats.totalTrades = _trades.size();
   stats.initialCapital = _config.initialCapital;
+  stats.unrealizedPnl = unrealizedPnl().toDouble();
 
   if (stats.totalTrades == 0)
   {
     stats.finalCapital = _config.initialCapital;
+    stats.finalEquity = _config.initialCapital + stats.unrealizedPnl;
     return stats;
   }
 
@@ -188,6 +191,7 @@ BacktestStats BacktestResult::computeStats() const
   stats.grossLoss = Volume::fromRaw(grossLossRaw).toDouble();
 
   stats.finalCapital = _config.initialCapital + stats.netPnl;
+  stats.finalEquity = stats.finalCapital + stats.unrealizedPnl;
   stats.returnPct = (stats.netPnl / _config.initialCapital) * 100.0;
 
   stats.winRate =
@@ -258,6 +262,61 @@ BacktestStats BacktestResult::computeStats() const
 double BacktestResult::totalPnl() const
 {
   return _totalPnl.toDouble();
+}
+
+void BacktestResult::markPrice(SymbolId symbol, Price price)
+{
+  Position& pos = getPosition(symbol);
+  pos.mark = price;
+  pos.marked = true;
+}
+
+OpenPosition BacktestResult::valueOpen(SymbolId symbol, const Position& pos)
+{
+  const bool isLong = pos.quantity.raw() > 0;
+  const Quantity absQty = Quantity::fromRaw(isLong ? pos.quantity.raw() : -pos.quantity.raw());
+  OpenPosition out;
+  out.symbol = symbol;
+  out.side = isLong ? Side::BUY : Side::SELL;
+  out.quantity = absQty;
+  out.entryPrice = pos.avgPrice;
+  out.markPrice = pos.marked ? pos.mark : pos.lastFillPrice;
+  out.unrealizedPnl = computePnl(pos.avgPrice, out.markPrice, absQty, isLong);
+  return out;
+}
+
+std::vector<OpenPosition> BacktestResult::openPositions() const
+{
+  std::vector<OpenPosition> out;
+  for (size_t sym = 0; sym < kMaxSymbols; ++sym)
+  {
+    if (_positionsFlat[sym].quantity.raw() != 0)
+    {
+      out.push_back(valueOpen(static_cast<SymbolId>(sym), _positionsFlat[sym]));
+    }
+  }
+  const size_t flatCount = out.size();
+  for (const auto& [id, pos] : _positionsOverflow)
+  {
+    if (pos.quantity.raw() != 0)
+    {
+      out.push_back(valueOpen(id, pos));
+    }
+  }
+  std::sort(out.begin() + static_cast<std::ptrdiff_t>(flatCount), out.end(),
+            [](const OpenPosition& a, const OpenPosition& b)
+            { return a.symbol < b.symbol; });
+  return out;
+}
+
+Volume BacktestResult::unrealizedPnl() const
+{
+  int64_t raw = 0;
+  for (const auto& p : openPositions())
+  {
+    raw += p.unrealizedPnl.raw();
+  }
+  return Volume::fromRaw(raw);
 }
 
 bool BacktestResult::writeEquityCurveCsv(const std::string& path) const

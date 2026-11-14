@@ -1196,6 +1196,7 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
             InstanceMethod("addJourneyTracer", &BacktestRunnerNode::addJourneyTracer),
             InstanceMethod("equityCurve", &BacktestRunnerNode::equityCurve),
             InstanceMethod("trades", &BacktestRunnerNode::trades),
+            InstanceMethod("openPositions", &BacktestRunnerNode::openPositions),
         });
   }
 
@@ -1683,7 +1684,39 @@ class BacktestRunnerNode : public Napi::ObjectWrap<BacktestRunnerNode>
       return obj; });
   }
 
-  static Napi::Object statsToJs(Napi::Env env, const LrvxBacktestStats& s)
+  // runner.openPositions() → { symbol: Uint32Array, side: Uint8Array,
+  //                            quantity/entryPrice/markPrice/unrealizedPnl:
+  //                            Float64Array }, marked at the run's last price
+  //                            per symbol
+  Napi::Value openPositions(const Napi::CallbackInfo& info)
+  {
+    return tryLrvx(info.Env(), [&]() -> Napi::Value
+                   {
+      LrvxBacktestResultHandle res = lrvx_backtest_runner_take_result(_handle);
+      if (!res) {
+        throw lrvx::LrvxError(
+            "E_RUN_002",
+            "BacktestRunner.openPositions() called before any run* completed.");
+      }
+      auto obj = openPositionsToJs(info.Env(), res);
+      lrvx_backtest_result_destroy(res);
+      return obj; });
+  }
+
+  // The stats of the run that just finished, with the position it left open
+  // valued (unrealizedPnl, finalEquity) from the runner's result.
+  Napi::Object statsToJs(Napi::Env env, const LrvxBacktestStats& s)
+  {
+    auto obj = baseStatsToJs(env, s);
+    if (LrvxBacktestResultHandle res = lrvx_backtest_runner_take_result(_handle))
+    {
+      setOpenPositionStats(env, obj, res);
+      lrvx_backtest_result_destroy(res);
+    }
+    return obj;
+  }
+
+  static Napi::Object baseStatsToJs(Napi::Env env, const LrvxBacktestStats& s)
   {
     auto obj = Napi::Object::New(env);
     obj.Set("totalTrades", Napi::Number::New(env, static_cast<double>(s.totalTrades)));

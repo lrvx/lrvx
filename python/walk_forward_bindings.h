@@ -106,6 +106,8 @@ inline py::dict statsToDict(const lrvx::BacktestStats& s)
   d["sortino_ratio"] = s.sortinoRatio;
   d["calmar_ratio"] = s.calmarRatio;
   d["return_pct"] = s.returnPct;
+  d["unrealized_pnl"] = s.unrealizedPnl;
+  d["final_equity"] = s.finalEquity;
   return d;
 }
 

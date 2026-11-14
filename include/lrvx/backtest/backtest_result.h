@@ -81,6 +81,25 @@ struct BacktestStats
 
   UnixNanos startTimeNs{0};
   UnixNanos endTimeNs{0};
+
+  // The positions still open when the run ended, each valued at its mark
+  // (see BacktestResult::markPrice): (mark - entry) * qty for a long,
+  // (entry - mark) * qty for a short, no exit fee. Nothing above includes
+  // it -- netPnl, finalCapital and returnPct stay the closed trades' figures.
+  double unrealizedPnl{0.0};
+  // initialCapital + netPnl + unrealizedPnl.
+  double finalEquity{0.0};
+};
+
+// A position the run had not closed when it ended.
+struct OpenPosition
+{
+  SymbolId symbol{};
+  Side side{};          // BUY for a long, SELL for a short
+  Quantity quantity{};  // absolute
+  Price entryPrice{};   // average entry
+  Price markPrice{};
+  Volume unrealizedPnl{};
 };
 
 class BacktestResult
@@ -113,6 +132,15 @@ class BacktestResult
   const std::vector<EquityPoint>& equityCurve() const { return _equityCurve; }
   double totalPnl() const;
 
+  // The price an open position in `symbol` is valued at; the last call wins.
+  // A symbol never marked is valued at its last fill. The backtest runners
+  // mark every price they replay, so their results are marked at the run's
+  // last price per symbol.
+  void markPrice(SymbolId symbol, Price price);
+  void markPrice(SymbolId symbol, double price) { markPrice(symbol, Price::fromDouble(price)); }
+  // Every symbol with a position open, ascending symbol id.
+  std::vector<OpenPosition> openPositions() const;
+
   // Writes timestamp_ns,equity,drawdown_pct CSV. Returns true on success.
   bool writeEquityCurveCsv(const std::string& path) const;
 
@@ -123,9 +151,14 @@ class BacktestResult
     Price avgPrice{};
     UnixNanos entryTimeNs{0};  // set when position opens from flat
     Volume entryFeeAcc{};      // fees accumulated on opens/adds since position opened
+    Price lastFillPrice{};
+    Price mark{};
+    bool marked{false};
   };
 
   Position& getPosition(SymbolId symbol);
+  static OpenPosition valueOpen(SymbolId symbol, const Position& pos);
+  Volume unrealizedPnl() const;
 
   static Volume computePnl(Price entryPrice, Price exitPrice, Quantity qty, bool isLong);
 

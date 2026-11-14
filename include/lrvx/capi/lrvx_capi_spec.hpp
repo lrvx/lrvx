@@ -2058,6 +2058,46 @@ extern "C"
                                        LrvxBacktestTrade* trades_out,
                                        uint32_t max_trades);
 
+  // A position still open at the end of the run. side: 0 = long, 1 = short,
+  // as LrvxBacktestTrade. quantity is absolute, entry_price the average
+  // entry; unrealized_pnl is (mark - entry) * quantity for a long and
+  // (entry - mark) * quantity for a short, with no exit fee.
+  typedef struct
+  {
+    uint32_t symbol;
+    uint8_t side;
+    double quantity;
+    double entry_price;
+    double mark_price;
+    double unrealized_pnl;
+  } LrvxBacktestOpenPosition;
+
+  // The price an open position in `symbol` is valued at; the last call wins.
+  // A symbol never marked is valued at its last fill. A runner's result
+  // (lrvx_backtest_runner_take_result, and the stats a run_* returns) is
+  // already marked at the last price the run replayed per symbol: a bar's
+  // close on bar replay, the last trade on tick replay.
+  LRVX_EXPORT(group = "backtest_slippage")
+  void lrvx_backtest_result_mark_price(LrvxBacktestResultHandle result, uint32_t symbol,
+                                       double price);
+
+  // Sum of the open positions' unrealized_pnl. LrvxBacktestStats leaves it
+  // out: net_pnl, final_capital and return_pct stay the closed trades'.
+  LRVX_EXPORT(group = "backtest_slippage")
+  double lrvx_backtest_result_unrealized_pnl(LrvxBacktestResultHandle result);
+
+  // initial_capital + net_pnl + lrvx_backtest_result_unrealized_pnl.
+  LRVX_EXPORT(group = "backtest_slippage")
+  double lrvx_backtest_result_final_equity(LrvxBacktestResultHandle result);
+
+  // Returns the number of open positions. If positions_out is non-NULL,
+  // writes up to max_positions entries, ascending symbol id, and returns the
+  // number written.
+  LRVX_EXPORT(group = "backtest_slippage")
+  uint32_t lrvx_backtest_result_open_positions(LrvxBacktestResultHandle result,
+                                               LrvxBacktestOpenPosition* positions_out,
+                                               uint32_t max_positions);
+
   // ============================================================
   // Segment operations (full API)
   // ============================================================
@@ -5560,6 +5600,14 @@ extern "C"
   // shows up as wrong numbers rather than a failed load.
   LRVX_EXPORT(group = "capi_diagnostics")
   uint32_t lrvx_capi_abi_version(void);
+
+  // The release the library was built from, e.g. "1.2.3": the
+  // `project(lrvx VERSION ...)` of the tree, the same string as Python's
+  // lrvx.__version__. Separate from lrvx_capi_abi_version(), which moves
+  // only when this boundary changes shape. Static storage; the same pointer
+  // on every call.
+  LRVX_EXPORT(group = "capi_diagnostics")
+  const char* lrvx_version(void);
 
   // The last failure on the calling thread, set by a call that returned its
   // failure value. 0 = no error recorded, 1 = a NULL handle was passed,

@@ -310,6 +310,8 @@ lrvx.BacktestResult(
 | `trades()` | `ndarray` | Closed trades as a `PyTradeRecord` structured array. A position still open after the last fill is not listed |
 | `equity_curve()` | `ndarray` | Equity curve as a `PyEquityPoint` structured array, one point per closed trade |
 | `write_equity_curve_csv(path)` | `bool` | Write equity curve to CSV (`timestamp_ns,equity,drawdown_pct` header) |
+| `mark_price(symbol, price)` | `None` | The price an open position in `symbol` is valued at; the last call wins. A symbol never marked is valued at its last fill |
+| `open_positions()` | `ndarray` | Positions still open as a `PyOpenPosition` structured array, ascending symbol id |
 
 ### `stats()` keys
 
@@ -346,13 +348,15 @@ The [`Stats`](engine.md#stats) object returned by `Engine.run()` is a different,
 | `return_pct` | `float` | Net return percentage |
 | `start_time_ns` | `int` | First fill timestamp |
 | `end_time_ns` | `int` | Last fill timestamp |
+| `unrealized_pnl` | `float` | P&L of the positions still open, at their mark; no exit fee |
+| `final_equity` | `float` | `initial_capital + net_pnl + unrealized_pnl` |
 
 #### A position open after the last fill
 
-`trades()` and `equity_curve()` hold closed trades only, and the result never
-values an open position, so the unrealized PnL of a position still open after
-the last fill is in none of the numbers. Its entry fee is: `total_fees` counts
-every fill, so `net_pnl`, `final_capital` and `return_pct` include it.
+`trades()` and `equity_curve()` hold closed trades only, and `total_pnl`,
+`net_pnl`, `final_capital` and `return_pct` keep that meaning. The entry fee of
+a position still open after the last fill is in them: `total_fees` counts every
+fill, so `net_pnl`, `final_capital` and `return_pct` include it.
 
 ```
 net_pnl = sum(trades()["pnl"] - trades()["fee"]) - fee of the open entry
@@ -360,12 +364,16 @@ net_pnl = sum(trades()["pnl"] - trades()["fee"]) - fee of the open entry
 
 For 0.01 BTC entered at 78,000 with a 4 bp fee, `net_pnl` is 0.312 below the
 closed trades' net and below the last equity point minus `initial_capital`.
-When no trade has closed, every statistic is zero, `total_fees` included.
+When no trade has closed, every trade statistic is zero, `total_fees` included.
 
-A position is open when the signed fill quantities for a symbol do not sum to
-zero: sum `quantity` over `executor.fills_list()` with `+` for `"buy"` and
-`-` for `"sell"`, over the same fills you ingested. Under `BacktestRunner`, use
-the strategy's `position()` instead (see
+The open position is valued in `unrealized_pnl`: `(mark - entry) * quantity`
+for a long and `(entry - mark) * quantity` for a short, summed over symbols,
+with `entry` the average entry price and no exit fee. `final_equity` is
+`initial_capital + net_pnl + unrealized_pnl`. A `BacktestResult` built by hand
+has no market data, so give it the mark with `mark_price(symbol, price)`; a
+symbol never marked is valued at its last fill. `open_positions()` lists each
+open position. Under `BacktestRunner` the result is marked at the last price
+the run replayed (see
 [strategy.md](strategy.md#a-position-open-at-the-end)).
 
 ---
@@ -404,6 +412,17 @@ the strategy's `position()` instead (see
 | `timestamp_ns` | `int64` | Sample timestamp (ns) |
 | `equity` | `float64` | Account equity |
 | `drawdown_pct` | `float64` | Drawdown from peak (percentage) |
+
+### PyOpenPosition
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `symbol` | `uint32` | Symbol ID |
+| `side` | `uint8` | 0 = long, 1 = short |
+| `quantity` | `float64` | Open quantity (absolute) |
+| `entry_price` | `float64` | Average entry price |
+| `mark_price` | `float64` | Price the position is valued at |
+| `unrealized_pnl` | `float64` | `(mark - entry) * quantity` long, `(entry - mark) * quantity` short |
 
 ---
 

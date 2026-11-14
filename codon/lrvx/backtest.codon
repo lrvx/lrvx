@@ -159,6 +159,10 @@ from C import lrvx_backtest_result_ingest_executor(cobj, cobj)
 from C import lrvx_backtest_result_stats(cobj, Ptr[i64])
 from C import lrvx_backtest_result_equity_curve(cobj, cobj, u32) -> u32
 from C import lrvx_backtest_result_write_equity_curve_csv(cobj, str) -> u8
+from C import lrvx_backtest_result_mark_price(cobj, u32, float)
+from C import lrvx_backtest_result_unrealized_pnl(cobj) -> float
+from C import lrvx_backtest_result_final_equity(cobj) -> float
+from C import lrvx_backtest_result_open_positions(cobj, cobj, u32) -> u32
 
 
 @dataclass
@@ -198,6 +202,15 @@ class BacktestStats:
     # nobody; 0 for a run that read no tape.
     skipped_option_quotes: int = 0
     skipped_pool_states: int = 0
+    # The positions still open when the data ended, valued at the last price
+    # the run saw per symbol (a bar's close on bar replay, the last trade on
+    # tick replay): (mark - entry) * qty long, (entry - mark) * qty short,
+    # no exit fee. net_pnl, final_capital and return_pct leave it out.
+    # final_equity = initial_capital + net_pnl + unrealized_pnl. Filled by
+    # BacktestResult.stats() and every BacktestRunner.run_*; stats built
+    # from a bare LrvxBacktestStats (walk-forward folds) leave both 0.
+    unrealized_pnl: float = 0.0
+    final_equity: float = 0.0
 
     def __repr__(self) -> str:
         return (f"BacktestStats(trades={self.total_trades}, "
@@ -918,6 +931,37 @@ class VenueStack:
         return lrvx_venue_stack_venue(self._h)
 
 
+def _open_positions_of(result: cobj) -> Tuple[List[int], List[int], List[float],
+                                              List[float], List[float], List[float]]:
+    """(symbol, side, quantity, entry_price, mark_price, unrealized_pnl)
+    parallel lists for the positions a result holds open, ascending symbol
+    id; side 0 long, 1 short."""
+    n = int(lrvx_backtest_result_open_positions(result, cobj(), u32(0)))
+    sym_l: List[int] = []
+    side_l: List[int] = []
+    qty_l: List[float] = []
+    entry_l: List[float] = []
+    mark_l: List[float] = []
+    upnl_l: List[float] = []
+    if n > 0:
+        # LrvxBacktestOpenPosition in i64 slots: [0] uint32 symbol | uint8
+        # side | padding, [1] quantity, [2] entry_price, [3] mark_price,
+        # [4] unrealized_pnl -- 40 bytes.
+        buf = [i64(0)] * (n * 5)
+        lrvx_backtest_result_open_positions(result, cobj(buf.arr.ptr), u32(n))
+        fp = Ptr[f64](buf.arr.ptr)
+        u32p = Ptr[u32](buf.arr.ptr)
+        u8p = Ptr[u8](buf.arr.ptr)
+        for i in range(n):
+            sym_l.append(int(u32p[i * 10]))
+            side_l.append(int(u8p[i * 40 + 4]))
+            qty_l.append(float(fp[i * 5 + 1]))
+            entry_l.append(float(fp[i * 5 + 2]))
+            mark_l.append(float(fp[i * 5 + 3]))
+            upnl_l.append(float(fp[i * 5 + 4]))
+    return (sym_l, side_l, qty_l, entry_l, mark_l, upnl_l)
+
+
 class BacktestResult:
     """Aggregates simulated fills into trades, stats, and an equity curve."""
 
@@ -992,8 +1036,23 @@ class BacktestResult:
             start_time_ns=int(buf[27]),
             end_time_ns=int(buf[28]),
             skipped_option_quotes=int(buf[29]),
-            skipped_pool_states=int(buf[30])
+            skipped_pool_states=int(buf[30]),
+            unrealized_pnl=float(lrvx_backtest_result_unrealized_pnl(self._handle)),
+            final_equity=float(lrvx_backtest_result_final_equity(self._handle))
         )
+
+    def mark_price(self, symbol: int, price: float):
+        """The price an open position in `symbol` is valued at in stats()
+        and open_positions(); the last call wins. A symbol never marked is
+        valued at its last fill."""
+        lrvx_backtest_result_mark_price(self._handle, u32(symbol), price)
+
+    def open_positions(self) -> Tuple[List[int], List[int], List[float],
+                                      List[float], List[float], List[float]]:
+        """Positions still open: (symbol, side, quantity, entry_price,
+        mark_price, unrealized_pnl) parallel lists, ascending symbol id;
+        side 0 long, 1 short."""
+        return _open_positions_of(self._handle)
 
 
 # Module-level factories for VenueStack. Codon does not have

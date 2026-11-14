@@ -65,6 +65,20 @@ struct PyTradeRecord
 static_assert(sizeof(PyTradeRecord) == 64);
 
 #pragma pack(push, 1)
+struct PyOpenPosition
+{
+  uint32_t symbol;
+  uint8_t side;
+  uint8_t _pad[3];
+  double quantity;
+  double entry_price;
+  double mark_price;
+  double unrealized_pnl;
+};
+#pragma pack(pop)
+static_assert(sizeof(PyOpenPosition) == 40);
+
+#pragma pack(push, 1)
 struct PyEquityPoint
 {
   int64_t timestamp_ns;
@@ -98,6 +112,17 @@ inline PyTradeRecord tradeRecToPy(const TradeRecord& t)
           .exit_time_ns = t.exitTimeNs.raw(),
           .pnl_raw = t.pnl.raw(),
           .fee_raw = t.fee.raw()};
+}
+
+inline PyOpenPosition openPositionToPy(const OpenPosition& p)
+{
+  return {.symbol = p.symbol,
+          .side = static_cast<uint8_t>(p.side == Side::BUY ? 0 : 1),
+          ._pad = {},
+          .quantity = p.quantity.toDouble(),
+          .entry_price = p.entryPrice.toDouble(),
+          .mark_price = p.markPrice.toDouble(),
+          .unrealized_pnl = p.unrealizedPnl.toDouble()};
 }
 
 inline PyEquityPoint equityToPy(const EquityPoint& p)
@@ -661,7 +686,26 @@ class PyBacktestResult
     d["return_pct"] = s.returnPct;
     d["start_time_ns"] = s.startTimeNs.raw();
     d["end_time_ns"] = s.endTimeNs.raw();
+    d["unrealized_pnl"] = s.unrealizedPnl;
+    d["final_equity"] = s.finalEquity;
     return d;
+  }
+
+  void markPrice(uint32_t symbol, double price)
+  {
+    _result->markPrice(symbol, Price::fromDouble(price));
+  }
+
+  py::array_t<PyOpenPosition> openPositions() const
+  {
+    const auto open = _result->openPositions();
+    py::array_t<PyOpenPosition> arr(open.size());
+    auto* out = arr.mutable_data();
+    for (size_t i = 0; i < open.size(); ++i)
+    {
+      out[i] = openPositionToPy(open[i]);
+    }
+    return arr;
   }
 
   py::array_t<PyTradeRecord> trades() const
@@ -723,6 +767,8 @@ inline void bindBacktest(py::module_& m)
   PYBIND11_NUMPY_DTYPE(PyTradeRecord, symbol, side, entry_price_raw, exit_price_raw,
                        quantity_raw, entry_time_ns, exit_time_ns, pnl_raw, fee_raw);
   PYBIND11_NUMPY_DTYPE(PyEquityPoint, timestamp_ns, equity, drawdown_pct);
+  PYBIND11_NUMPY_DTYPE(PyOpenPosition, symbol, side, quantity, entry_price, mark_price,
+                       unrealized_pnl);
 
   py::class_<PySimulatedExecutor>(m, "SimulatedExecutor")
       .def(py::init<>())
@@ -963,6 +1009,14 @@ inline void bindBacktest(py::module_& m)
            "Compute stats as a dict (includes new metrics: streaks, durations, TWR)")
       .def("trades", &PyBacktestResult::trades,
            "Return trade records as numpy structured array")
+      .def("mark_price", &PyBacktestResult::markPrice, py::arg("symbol"), py::arg("price"),
+           "The price an open position in `symbol` is valued at in stats()\n"
+           "(unrealized_pnl, final_equity) and open_positions(); the last call\n"
+           "wins. A symbol never marked is valued at its last fill.")
+      .def("open_positions", &PyBacktestResult::openPositions,
+           "Positions still open, as a numpy structured array (symbol, side\n"
+           "0 long / 1 short, quantity, entry_price (average), mark_price,\n"
+           "unrealized_pnl), ascending symbol id.")
       .def("equity_curve", &PyBacktestResult::equityCurve,
            "Return equity curve as numpy structured array")
       .def("write_equity_curve_csv", &PyBacktestResult::writeEquityCurveCsv, py::arg("path"),

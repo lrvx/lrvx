@@ -736,6 +736,10 @@ PYBIND11_MODULE(_lrvx, m)
         "C ABI version the loaded lrvx library reports. Equal to\n"
         "CAPI_ABI_VERSION, which the extension was compiled against --\n"
         "the import fails outright when they disagree.");
+  m.def("version", []()
+        { return std::string(lrvx_version()); },
+        "The release the compiled library was built from (lrvx_version()),\n"
+        "the same string as lrvx.__version__.");
   m.def(
       "last_error", []()
       { return std::string(lrvx_last_error_message()); },

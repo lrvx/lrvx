@@ -148,6 +148,7 @@ Extended operations:
 | `lrvx.extractSymbols(inputPath, outputDir, symbols)` | Extract selected symbols |
 | `lrvx.extractTimeRange(inputPath, outputPath, fromNs, toNs)` | Extract a time window |
 | `lrvx.lastError()` | Why the last `recompressSegment` returned `false` or the last `extractSymbols` / `extractTimeRange` returned `0`: a string that opens with the C function's name and names the file that could not be read or written. Each of the three clears it on entry, so `''` means the call did not fail; an extract that matched nothing returns `0` with `''`. `validateSegment` and `mergeSegments` clear it too: `validateSegment` returns `false` for a segment that fails its checks (`''`) and for a file that could not be read (the reason), and `mergeSegments` returns `true` only when every input was merged and at least one event was written, as `mergeDir`'s `success` does: it returns `false` with the reason when no segment was merged, and `false` with `merged N segment(s); skipped: Cannot open: <path>; ...` when some inputs could not be opened (the output is still written from the ones that opened; this case used to return `true`) |
+| `lrvx.version()` | The release the library was built from (`lrvx_version()`), the string Python reports as `lrvx.__version__` |
 
 ---
 

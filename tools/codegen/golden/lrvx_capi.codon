@@ -121,6 +121,10 @@ from C import lrvx_backtest_result_stats(cobj, cobj)
 from C import lrvx_backtest_result_equity_curve(cobj, cobj, u32) -> u32
 from C import lrvx_backtest_result_write_equity_curve_csv(cobj, cobj) -> u8
 from C import lrvx_backtest_result_trades(cobj, cobj, u32) -> u32
+from C import lrvx_backtest_result_mark_price(cobj, u32, float)
+from C import lrvx_backtest_result_unrealized_pnl(cobj) -> float
+from C import lrvx_backtest_result_final_equity(cobj) -> float
+from C import lrvx_backtest_result_open_positions(cobj, cobj, u32) -> u32
 
 # ── backtestrunner_replay ──
 from C import lrvx_backtest_runner_create(cobj, float, float) -> cobj
@@ -167,6 +171,7 @@ from C import lrvx_binary_log_recorder_hook_stats(cobj) -> cobj
 
 # ── capi_diagnostics ──
 from C import lrvx_capi_abi_version() -> u32
+from C import lrvx_version() -> cobj
 from C import lrvx_last_error_code() -> int
 from C import lrvx_last_error_message() -> cobj
 from C import lrvx_clear_last_error()

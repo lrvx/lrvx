@@ -641,7 +641,9 @@ class BacktestResultWrap : public Napi::ObjectWrap<BacktestResultWrap>
     return DefineClass(env, "BacktestResult",
                        {InstanceMethod("recordFill", &BacktestResultWrap::RecordFill),
                         InstanceMethod("ingestExecutor", &BacktestResultWrap::IngestExecutor),
-                        InstanceMethod("stats", &BacktestResultWrap::Stats)});
+                        InstanceMethod("stats", &BacktestResultWrap::Stats),
+                        InstanceMethod("markPrice", &BacktestResultWrap::MarkPrice),
+                        InstanceMethod("openPositions", &BacktestResultWrap::OpenPositions)});
   }
   BacktestResultWrap(const Napi::CallbackInfo& info) : Napi::ObjectWrap<BacktestResultWrap>(info)
   {
@@ -699,7 +701,20 @@ class BacktestResultWrap : public Napi::ObjectWrap<BacktestResultWrap>
     o.Set("calmarRatio", s.calmarRatio);
     o.Set("returnPct", s.returnPct);
     setTradeTimeStats(info.Env(), o, s);
+    setOpenPositionStats(info.Env(), o, _h);
     return o;
+  }
+  // markPrice(symbol, price): the price an open position in `symbol` is
+  // valued at; the last call wins. A symbol never marked is valued at its
+  // last fill.
+  void MarkPrice(const Napi::CallbackInfo& info)
+  {
+    lrvx_backtest_result_mark_price(_h, argUint32(info[0], "markPrice: symbol"),
+                                    argNumber(info[1], "markPrice: price"));
+  }
+  Napi::Value OpenPositions(const Napi::CallbackInfo& info)
+  {
+    return openPositionsToJs(info.Env(), _h);
   }
   LrvxBacktestResultHandle _h;
 };

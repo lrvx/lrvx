@@ -339,6 +339,16 @@ extern "C"
 
   typedef struct
   {
+    uint32_t symbol;
+    uint8_t side;
+    double quantity;
+    double entry_price;
+    double mark_price;
+    double unrealized_pnl;
+  } LrvxBacktestOpenPosition;
+
+  typedef struct
+  {
     uint8_t success;
     uint64_t segments_merged;
     uint64_t events_written;
@@ -1065,6 +1075,13 @@ extern "C"
                                                       const char* path);
   uint32_t lrvx_backtest_result_trades(LrvxBacktestResultHandle result,
                                        LrvxBacktestTrade* trades_out, uint32_t max_trades);
+  void lrvx_backtest_result_mark_price(LrvxBacktestResultHandle result, uint32_t symbol,
+                                       double price);
+  double lrvx_backtest_result_unrealized_pnl(LrvxBacktestResultHandle result);
+  double lrvx_backtest_result_final_equity(LrvxBacktestResultHandle result);
+  uint32_t lrvx_backtest_result_open_positions(LrvxBacktestResultHandle result,
+                                               LrvxBacktestOpenPosition* positions_out,
+                                               uint32_t max_positions);
 
   // ============================================================
   // Backtestrunner Replay
@@ -1181,6 +1198,7 @@ extern "C"
   // ============================================================
 
   uint32_t lrvx_capi_abi_version(void);
+  const char* lrvx_version(void);
   int lrvx_last_error_code(void);
   const char* lrvx_last_error_message(void);
   void lrvx_clear_last_error(void);

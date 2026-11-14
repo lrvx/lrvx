@@ -104,6 +104,8 @@ groups:
         lrvx_backtest_result_equity_curve: __lrvx_backtest_result_equity_curve
         lrvx_backtest_result_ingest_executor: __lrvx_backtest_result_ingest
         lrvx_backtest_result_record_fill: __lrvx_backtest_result_record_fill
+        lrvx_backtest_result_mark_price: __lrvx_backtest_result_mark_price
+        lrvx_backtest_result_open_positions: __lrvx_backtest_result_open_positions
         lrvx_backtest_result_stats: __lrvx_backtest_result_stats
         lrvx_backtest_result_write_equity_curve_csv: __lrvx_backtest_result_write_csv
         lrvx_latency_distribution_create: __lrvx_latency_distribution_create
@@ -1300,6 +1302,8 @@ groups:
     codon: { status: required }
     quickjs:
       status: required
+      functions:
+        lrvx_version: __lrvx_version
 
 
 ## ── Per-function allowlist ───────────────────────────────────────────
@@ -1372,10 +1376,14 @@ allowlist_functions:
     lrvx_backtest_result_create: *cpp_direct
     lrvx_backtest_result_destroy: *cpp_direct
     lrvx_backtest_result_equity_curve: *cpp_direct
+    lrvx_backtest_result_final_equity: *cpp_direct
     lrvx_backtest_result_ingest_executor: *cpp_direct
+    lrvx_backtest_result_mark_price: *cpp_direct
+    lrvx_backtest_result_open_positions: *cpp_direct
     lrvx_backtest_result_record_fill: *cpp_direct
     lrvx_backtest_result_stats: *cpp_direct
     lrvx_backtest_result_trades: *cpp_direct
+    lrvx_backtest_result_unrealized_pnl: *cpp_direct
     lrvx_backtest_result_write_equity_curve_csv: *cpp_direct
     lrvx_backtest_runner_add_execution_listener: *cpp_direct
     lrvx_backtest_runner_add_journey_tracer: *cpp_direct
@@ -2410,7 +2418,9 @@ allowlist_functions:
     lrvx_streaming_indicator_output_count: "the indicator classes know their own inputs and outputs, so the handle's arity queries are not called"
   quickjs:
     lrvx_aggregator_destroy: *no_quickjs_global
+    lrvx_backtest_result_final_equity: *quickjs_helper_only
     lrvx_backtest_result_trades: *no_quickjs_global
+    lrvx_backtest_result_unrealized_pnl: *quickjs_helper_only
     lrvx_backtest_runner_add_execution_listener: *no_quickjs_global
     lrvx_backtest_runner_add_journey_tracer: *no_quickjs_global
     lrvx_backtest_runner_create: *no_quickjs_global

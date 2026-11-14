@@ -56,6 +56,7 @@
 #include "lrvx/stats/grid_neighborhood.h"
 #include "lrvx/stats/pbo_cscv.h"
 #include "lrvx/stats/whites_reality_check.h"
+#include "lrvx/version.h"
 
 #include "lrvx/indicator/adf.h"
 #include "lrvx/indicator/adx.h"
@@ -5451,6 +5452,53 @@ uint32_t lrvx_backtest_result_trades(LrvxBacktestResultHandle h, LrvxBacktestTra
     out[i].exit_time_ns = t.exitTimeNs.raw();
     out[i].pnl = t.pnl.toDouble();
     out[i].fee = t.fee.toDouble();
+  }
+  return n;
+  LRVX_CAPI_LEAVE;
+}
+
+void lrvx_backtest_result_mark_price(LrvxBacktestResultHandle h, uint32_t symbol, double price)
+{
+  LRVX_CAPI_ENTER_VOID(h);
+  static_cast<LrvxBacktestResultImpl*>(h)->result->markPrice(symbol, Price::fromDouble(price));
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+double lrvx_backtest_result_unrealized_pnl(LrvxBacktestResultHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return static_cast<LrvxBacktestResultImpl*>(h)->result->computeStats().unrealizedPnl;
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_backtest_result_final_equity(LrvxBacktestResultHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return static_cast<LrvxBacktestResultImpl*>(h)->result->computeStats().finalEquity;
+  LRVX_CAPI_LEAVE;
+}
+
+uint32_t lrvx_backtest_result_open_positions(LrvxBacktestResultHandle h,
+                                             LrvxBacktestOpenPosition* out,
+                                             uint32_t max_positions)
+{
+  LRVX_CAPI_ENTER(h);
+  const auto open = static_cast<LrvxBacktestResultImpl*>(h)->result->openPositions();
+  const uint32_t total = static_cast<uint32_t>(open.size());
+  if (!out)
+  {
+    return total;
+  }
+  const uint32_t n = (total < max_positions) ? total : max_positions;
+  for (uint32_t i = 0; i < n; ++i)
+  {
+    const auto& p = open[i];
+    out[i].symbol = static_cast<uint32_t>(p.symbol);
+    out[i].side = static_cast<uint8_t>(p.side);
+    out[i].quantity = p.quantity.toDouble();
+    out[i].entry_price = p.entryPrice.toDouble();
+    out[i].mark_price = p.markPrice.toDouble();
+    out[i].unrealized_pnl = p.unrealizedPnl.toDouble();
   }
   return n;
   LRVX_CAPI_LEAVE;
@@ -14621,6 +14669,13 @@ extern "C" uint32_t lrvx_capi_abi_version(void)
 {
   LRVX_CAPI_ENTER_NOHANDLE;
   return LRVX_CAPI_ABI_VERSION;
+  LRVX_CAPI_LEAVE;
+}
+
+extern "C" const char* lrvx_version(void)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  return lrvx::projectVersion();
   LRVX_CAPI_LEAVE;
 }
 

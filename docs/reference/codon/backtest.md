@@ -46,6 +46,8 @@ Returned by `BacktestRunner.run_csv()` / `run_ohlcv()` and `BacktestResult.stats
 | `end_time_ns` | `int` | Backtest end timestamp (ns) |
 | `skipped_option_quotes` | `int` | Option-quote records a tape run read and delivered to nobody (`run_tape`, `run_tapes`, `run_tape_bars_on_ticks`); 0 otherwise |
 | `skipped_pool_states` | `int` | Pool-state records a tape run read and delivered to nobody, as `skipped_option_quotes` |
+| `unrealized_pnl` | `float` | The positions still open at the end, at the last price the run saw per symbol (a bar's close on bar replay, the last trade on tick replay): `(mark - entry) * qty` long, `(entry - mark) * qty` short, no exit fee. `net_pnl`, `final_capital` and `return_pct` leave it out. 0 on walk-forward fold stats, which carry no result |
+| `final_equity` | `float` | `initial_capital + net_pnl + unrealized_pnl` (0 on walk-forward fold stats) |
 
 ---
 
@@ -170,6 +172,8 @@ BacktestResult(
 | `record_fill(order_id, symbol, side, price, qty, timestamp_ns)` | `None` | Record a single fill |
 | `ingest_executor(executor)` | `None` | Drain all fills from a `SimulatedExecutor` |
 | `stats()` | `BacktestStats` | Compute and return statistics |
+| `mark_price(symbol, price)` | `None` | The price an open position in `symbol` is valued at in `stats()` and `open_positions()`; the last call wins. A symbol never marked is valued at its last fill |
+| `open_positions()` | 6 parallel lists | `(symbol, side, quantity, entry_price, mark_price, unrealized_pnl)` for the positions still open, ascending symbol id; `side` 0 long, 1 short |
 | `equity_curve_size()` | `int` | Number of equity curve points |
 | `write_equity_curve_csv(path)` | `bool` | Write equity curve to CSV |
 | `close()` | `None` | Free resources |

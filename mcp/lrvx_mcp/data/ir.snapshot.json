@@ -1487,6 +1487,17 @@
     },
     {
       "group": "backtest_slippage",
+      "name": "lrvx_backtest_result_final_equity",
+      "params": [
+        {
+          "name": "result",
+          "type": "LrvxBacktestResultHandle"
+        }
+      ],
+      "return_type": "double"
+    },
+    {
+      "group": "backtest_slippage",
       "name": "lrvx_backtest_result_ingest_executor",
       "params": [
         {
@@ -1499,6 +1510,44 @@
         }
       ],
       "return_type": "void"
+    },
+    {
+      "group": "backtest_slippage",
+      "name": "lrvx_backtest_result_mark_price",
+      "params": [
+        {
+          "name": "result",
+          "type": "LrvxBacktestResultHandle"
+        },
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        },
+        {
+          "name": "price",
+          "type": "double"
+        }
+      ],
+      "return_type": "void"
+    },
+    {
+      "group": "backtest_slippage",
+      "name": "lrvx_backtest_result_open_positions",
+      "params": [
+        {
+          "name": "result",
+          "type": "LrvxBacktestResultHandle"
+        },
+        {
+          "name": "positions_out",
+          "type": "LrvxBacktestOpenPosition *"
+        },
+        {
+          "name": "max_positions",
+          "type": "uint32_t"
+        }
+      ],
+      "return_type": "uint32_t"
     },
     {
       "group": "backtest_slippage",
@@ -1568,6 +1617,17 @@
         }
       ],
       "return_type": "uint32_t"
+    },
+    {
+      "group": "backtest_slippage",
+      "name": "lrvx_backtest_result_unrealized_pnl",
+      "params": [
+        {
+          "name": "result",
+          "type": "LrvxBacktestResultHandle"
+        }
+      ],
+      "return_type": "double"
     },
     {
       "group": "backtest_slippage",
@@ -15374,6 +15434,12 @@
       "return_type": "const char *"
     },
     {
+      "group": "capi_diagnostics",
+      "name": "lrvx_version",
+      "params": [],
+      "return_type": "const char *"
+    },
+    {
       "group": "tape_aggregator",
       "name": "lrvx_volume_bin_aggregator_create",
       "params": [
@@ -15721,6 +15787,35 @@
         }
       ],
       "name": "LrvxBBO"
+    },
+    {
+      "fields": [
+        {
+          "name": "symbol",
+          "type": "uint32_t"
+        },
+        {
+          "name": "side",
+          "type": "uint8_t"
+        },
+        {
+          "name": "quantity",
+          "type": "double"
+        },
+        {
+          "name": "entry_price",
+          "type": "double"
+        },
+        {
+          "name": "mark_price",
+          "type": "double"
+        },
+        {
+          "name": "unrealized_pnl",
+          "type": "double"
+        }
+      ],
+      "name": "LrvxBacktestOpenPosition"
     },
     {
       "fields": [
