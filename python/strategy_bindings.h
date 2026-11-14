@@ -3689,14 +3689,18 @@ inline void bindStrategy(py::module_& m)
            "bar_type: 0=Time, 1=Tick, 2=Volume, 3=Renko, 4=Range, "
            "5=HeikinAshi, 6=BpsRange. param: time bar interval in "
            "nanoseconds, or the tick / volume / range threshold the "
-           "aggregator was configured with.")
+           "aggregator was configured with. A bar_type from 7 to 255 has "
+           "no ring and reads None; one outside 0..255 raises TypeError.")
       .def("last_n_closed_bars", &PyStrategyBase::last_n_closed_bars,
            py::arg("symbol_id"), py::arg("bar_type"), py::arg("param"), py::arg("n"),
            "Return the most recent up to n closed bars for the given "
            "(symbol, timeframe), oldest first. Returns an empty list "
            "until the aggregator has emitted at least one bar.")
       .def("bar_ring_capacity", &PyStrategyBase::bar_ring_capacity)
-      .def("set_bar_ring_capacity", &PyStrategyBase::set_bar_ring_capacity, py::arg("n"))
+      .def("set_bar_ring_capacity", &PyStrategyBase::set_bar_ring_capacity, py::arg("n"),
+           "Set how many closed bars each (symbol, timeframe) ring keeps; "
+           "0 is taken as 1. Lowering it trims every ring to its newest "
+           "bars at once; raising it keeps the bars held.")
       .def_property_readonly("symbol_names", &PyStrategyBase::symbol_names)
       .def_property_readonly("primary_symbol_name", &PyStrategyBase::primary_symbol_name);
 

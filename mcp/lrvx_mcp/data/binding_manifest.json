@@ -8624,6 +8624,11 @@
         },
         {
           "kind": "method",
+          "name": "_check_bar_type",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "_create_handle",
           "parent": "Strategy"
         },

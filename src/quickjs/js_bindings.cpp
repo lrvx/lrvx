@@ -771,11 +771,36 @@ static JSValue jsBarFromLrvx(JSContext* ctx, const LrvxBar& b)
   return obj;
 }
 
+// An integer Number from 0 (Time) to 6 (BpsRange); anything else would be
+// truncated to uint8_t and could read another bar type's ring.
+static bool toBarTypeOrThrow(JSContext* ctx, JSValueConst val, uint32_t& out, const char* what)
+{
+  if (JS_IsNumber(val))
+  {
+    double d = 0;
+    if (JS_ToFloat64(ctx, &d, val) < 0)
+    {
+      return false;
+    }
+    if (d >= 0.0 && d <= 6.0 && d == std::floor(d))
+    {
+      out = static_cast<uint32_t>(d);
+      return true;
+    }
+  }
+  JS_ThrowTypeError(ctx, "%s must be an integer from 0 to 6", what);
+  return false;
+}
+
 static JSValue js_strategy_last_closed_bar(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
   GET_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
-  uint32_t bt = toUint32(ctx, argv[2]);
+  uint32_t bt = 0;
+  if (!toBarTypeOrThrow(ctx, argv[2], bt, "lastClosedBar: barType"))
+  {
+    return JS_EXCEPTION;
+  }
   uint64_t param = static_cast<uint64_t>(toInt64(ctx, argv[3]));
   LrvxBar bar{};
   uint8_t ok = lrvx_strategy_last_closed_bar(h, sym, static_cast<uint8_t>(bt), param, &bar);
@@ -791,7 +816,11 @@ static JSValue js_strategy_last_n_closed_bars(JSContext* ctx, JSValueConst, int,
 {
   GET_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
-  uint32_t bt = toUint32(ctx, argv[2]);
+  uint32_t bt = 0;
+  if (!toBarTypeOrThrow(ctx, argv[2], bt, "lastNClosedBars: barType"))
+  {
+    return JS_EXCEPTION;
+  }
   uint64_t param = static_cast<uint64_t>(toInt64(ctx, argv[3]));
   uint32_t n = toUint32(ctx, argv[4]);
   // `n` comes straight from JS and used to size this vector with no
@@ -825,7 +854,11 @@ static JSValue js_strategy_set_bar_ring_capacity(JSContext* ctx, JSValueConst, i
                                                  JSValueConst* argv)
 {
   GET_HANDLE_OR_THROW(ctx, argv);
-  uint32_t cap = toUint32(ctx, argv[1]);
+  uint32_t cap = 0;
+  if (!toUint32OrThrow(ctx, argv[1], cap, "setBarRingCapacity: capacity"))
+  {
+    return JS_EXCEPTION;
+  }
   lrvx_strategy_set_bar_ring_capacity(h, cap);
   return JS_UNDEFINED;
 }

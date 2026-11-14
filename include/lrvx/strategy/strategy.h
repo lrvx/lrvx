@@ -377,14 +377,30 @@ class Strategy : public IStrategy
   // that it returns `std::nullopt`. The ring stores up to
   // `barRingCapacity()` bars per (symbol, tf) and evicts the oldest
   // when full. `lastNClosedBars` returns the most recent `n` in
-  // chronological order (oldest first).
+  // chronological order (oldest first). Lowering the capacity trims every
+  // ring to its newest bars at once; raising it keeps the bars held. 0 is
+  // taken as 1.
   size_t barRingCapacity() const noexcept
   {
     return _barRingCapacity.load(std::memory_order_relaxed);
   }
-  void setBarRingCapacity(size_t n) noexcept
+  void setBarRingCapacity(size_t n)
   {
-    _barRingCapacity.store(std::max<size_t>(n, 1), std::memory_order_relaxed);
+    const size_t capacity = std::max<size_t>(n, 1);
+    // Under the ring lock, so no push in onBar sees the new capacity before
+    // the rings are trimmed to it, and no read sees a ring longer than it.
+    std::lock_guard<std::mutex> rings(_barRingMutex);
+    _barRingCapacity.store(capacity, std::memory_order_relaxed);
+    for (auto& [sym, byTf] : _barRings)
+    {
+      for (auto& [key, ring] : byTf)
+      {
+        while (ring.size() > capacity)
+        {
+          ring.pop_front();
+        }
+      }
+    }
   }
 
   std::optional<Bar> lastClosedBar(SymbolId sym, BarType type, uint64_t param) const

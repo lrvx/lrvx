@@ -186,7 +186,9 @@ declare class Strategy {
     /** Most recent closed bar of `(symbol, barType, param)`, or null until
      *  one has closed. `barType` is 0=Time, 1=Tick, 2=Volume, 3=Renko,
      *  4=Range, 5=Heikin-Ashi, 6=Bps-range; `param` is the interval in ns for
-     *  Time bars, a count for Tick bars, the raw threshold for Volume bars. */
+     *  Time bars, a count for Tick bars, the raw threshold for Volume bars.
+     *  A `barType` that is not an integer Number from 0 to 6 throws a
+     *  `TypeError`. */
     lastClosedBar(symbol: string | number | undefined, barType: number,
                   param: number | bigint): ClosedBar | null;
     /** At most `n` most recent closed bars of `(symbol, barType, param)`,
@@ -195,7 +197,10 @@ declare class Strategy {
                     param: number | bigint, n: number): ClosedBar[];
     /** Bars kept per (symbol, barType, param) ring; 64 by default. */
     readonly barRingCapacity: number;
-    /** Set the ring depth; clamped to at least 1. */
+    /** Set the ring depth; clamped to at least 1. Lowering it trims every
+     *  ring to its newest bars at once; raising it keeps the bars held. A
+     *  value that is not an integer Number from 0 to 4294967295 throws a
+     *  `TypeError` and leaves the depth unchanged. */
     setBarRingCapacity(n: number): void;
 
     readonly primarySymbol: string;

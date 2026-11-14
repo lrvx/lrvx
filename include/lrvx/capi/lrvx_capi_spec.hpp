@@ -1094,6 +1094,9 @@ extern "C"
   // it dispatches BarEvents to the strategy. `bar_type` matches
   // LrvxBarData (0=Time, 1=Tick, ...); `param` is interval-ns for
   // time bars, count for tick bars, threshold for volume bars.
+  // A `bar_type` above 6 has no ring: the reads return 0.
+  // `set_bar_ring_capacity` takes 0 as 1; lowering it trims every
+  // ring to its newest bars at once, raising it keeps the bars held.
 
   LRVX_EXPORT(group = "multi_tf_helpers")
   uint8_t lrvx_strategy_last_closed_bar(LrvxStrategyHandle s, uint32_t symbol,

@@ -668,7 +668,17 @@ struct NodeStrategyHost : TsfnHost
     // ring of the most recent closed bars without bookkeeping in
     // user code. `lastClosedBar(symbolId, barType, param)` returns
     // the most recent or `null`; `lastNClosedBars(...)` returns up
-    // to `n` bars oldest first.
+    // to `n` bars oldest first. A barType outside 0 (Time) .. 6 (BpsRange)
+    // throws rather than being truncated to uint8_t, where 256 read Time.
+    auto barTypeArg = [](const Napi::Value& v, const char* what)
+    {
+      const uint32_t bt = argUint32(v, what);
+      if (bt > 6)
+      {
+        throw Napi::TypeError::New(v.Env(), std::string(what) + " must be an integer from 0 to 6");
+      }
+      return static_cast<BarType>(bt);
+    };
     auto buildBar = [](Napi::Env env, const Bar& b)
     {
       auto o = Napi::Object::New(env);
@@ -683,24 +693,24 @@ struct NodeStrategyHost : TsfnHost
             Napi::BigInt::New(env, static_cast<int64_t>(b.endTime.time_since_epoch().count())));
       return o;
     };
-    em.Set("lastClosedBar", Napi::Function::New(env_, [buildBar](const Napi::CallbackInfo& i) -> Napi::Value
+    em.Set("lastClosedBar", Napi::Function::New(env_, [buildBar, barTypeArg](const Napi::CallbackInfo& i) -> Napi::Value
                                                 {
         auto* h = static_cast<NodeStrategyHost*>(i.Data());
         uint32_t sym = symId(i[0]);
-        uint8_t bt = static_cast<uint8_t>(argUint32(i[1], "lastClosedBar: barType"));
+        BarType bt = barTypeArg(i[1], "lastClosedBar: barType");
         uint64_t param = argUint64(i[2], "lastClosedBar: barTypeParam");
-        auto bar = h->bridge->lastClosedBar(sym, static_cast<BarType>(bt), param);
+        auto bar = h->bridge->lastClosedBar(sym, bt, param);
         if (!bar){ return i.Env().Null();
 }
         return buildBar(i.Env(), *bar); }, "lastClosedBar", this));
-    em.Set("lastNClosedBars", Napi::Function::New(env_, [buildBar](const Napi::CallbackInfo& i) -> Napi::Value
+    em.Set("lastNClosedBars", Napi::Function::New(env_, [buildBar, barTypeArg](const Napi::CallbackInfo& i) -> Napi::Value
                                                   {
         auto* h = static_cast<NodeStrategyHost*>(i.Data());
         uint32_t sym = symId(i[0]);
-        uint8_t bt = static_cast<uint8_t>(argUint32(i[1], "lastNClosedBars: barType"));
+        BarType bt = barTypeArg(i[1], "lastNClosedBars: barType");
         uint64_t param = argUint64(i[2], "lastNClosedBars: barTypeParam");
         size_t n = argUint32(i[3], "lastNClosedBars: n");
-        auto bars = h->bridge->lastNClosedBars(sym, static_cast<BarType>(bt), param, n);
+        auto bars = h->bridge->lastNClosedBars(sym, bt, param, n);
         Napi::Array out = Napi::Array::New(i.Env(), bars.size());
         for (size_t k = 0; k < bars.size(); ++k){ out.Set(static_cast<uint32_t>(k), buildBar(i.Env(), bars[k]));
 }
