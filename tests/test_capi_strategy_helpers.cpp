@@ -8,9 +8,9 @@
  */
 
 // The C API side of the strategy helpers:
-//  - the entry price and bars-in-position on LrvxSymbolContext and through
-//    lrvx_entry_price_raw_opt / lrvx_bars_in_position, in a backtest and on
-//    the synchronous runner fed with venue fills;
+//  - the entry price and bars-in-position through lrvx_entry_price_raw_opt
+//    and lrvx_bars_in_position (LrvxSymbolContext keeps its ABI 6 layout),
+//    in a backtest and on the synchronous runner fed with venue fills;
 //  - exit rule handles (lrvx_exit_*), pinned to the levels of
 //    tests/test_exits.cpp and tests/test_exits_percent_time.cpp;
 //  - History handles and lrvx_crossed_above / lrvx_crossed_below;
@@ -35,14 +35,10 @@ constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
 constexpr int64_t kOne = 100'000'000;
 constexpr int64_t kMinuteNs = 60'000'000'000LL;
 
-// ---- LrvxSymbolContext layout ------------------------------------------
-
-static_assert(offsetof(LrvxSymbolContext, has_entry_price) == 5,
-              "has_entry_price sits in the padding after has_avg_entry_price");
-static_assert(offsetof(LrvxSymbolContext, last_touch_ns) == 96, "existing fields do not move");
-static_assert(offsetof(LrvxSymbolContext, entry_price_raw) == 104);
-static_assert(offsetof(LrvxSymbolContext, bars_in_position) == 112);
-static_assert(sizeof(LrvxSymbolContext) == 120);
+// The position facts are read through accessors; the callback struct keeps
+// its layout, so a binding built against ABI 6 reads it unchanged.
+static_assert(sizeof(LrvxSymbolContext) == 104);
+static_assert(offsetof(LrvxSymbolContext, last_touch_ns) == 96);
 
 // ---- Position facts ------------------------------------------------------
 
@@ -51,18 +47,20 @@ struct Seen
   std::optional<double> entry;
   uint32_t bars;
   double position;
-  // The same facts asked through the accessors.
+  // The same facts asked a second time in the same callback.
   std::optional<double> askedEntry;
   uint32_t askedBars;
 };
 
-std::optional<double> entryOf(const LrvxSymbolContext* ctx)
+// The entry price and bar count of `symbol` as the strategy reads them now.
+std::optional<double> entryOf(LrvxStrategyHandle strategy, uint32_t symbol)
 {
-  if (!ctx->has_entry_price)
+  int64_t raw = 0;
+  if (!lrvx_entry_price_raw_opt(strategy, symbol, &raw))
   {
     return std::nullopt;
   }
-  return lrvx_price_to_double(ctx->entry_price_raw);
+  return lrvx_price_to_double(raw);
 }
 
 struct Scenario
@@ -77,14 +75,11 @@ struct Scenario
 void onBar(void* ud, const LrvxSymbolContext* ctx, const LrvxBarData*)
 {
   auto* s = static_cast<Scenario*>(ud);
-  Seen seen{entryOf(ctx), ctx->bars_in_position, lrvx_quantity_to_double(ctx->position_raw),
-            std::nullopt, 0};
-  int64_t raw = 0;
-  if (lrvx_entry_price_raw_opt(s->strategy, s->symbol, &raw))
-  {
-    seen.askedEntry = lrvx_price_to_double(raw);
-  }
-  seen.askedBars = lrvx_bars_in_position(s->strategy, s->symbol);
+  // Asked twice: the second answer must not differ from the first (an
+  // accessor that counts the bar it is asked on would).
+  Seen seen{entryOf(s->strategy, s->symbol), lrvx_bars_in_position(s->strategy, s->symbol),
+            lrvx_quantity_to_double(ctx->position_raw), entryOf(s->strategy, s->symbol),
+            lrvx_bars_in_position(s->strategy, s->symbol)};
   s->seen.push_back(seen);
   switch (s->bar++)
   {
@@ -240,7 +235,8 @@ struct Live
 void onLiveBar(void* ud, const LrvxSymbolContext* ctx, const LrvxBarData* bar)
 {
   auto* s = static_cast<Live*>(ud);
-  s->seen.emplace_back(bar->symbol, Seen{entryOf(ctx), ctx->bars_in_position,
+  s->seen.emplace_back(bar->symbol, Seen{entryOf(s->strategy, bar->symbol),
+                                         lrvx_bars_in_position(s->strategy, bar->symbol),
                                          lrvx_quantity_to_double(ctx->position_raw), std::nullopt,
                                          0});
 }
