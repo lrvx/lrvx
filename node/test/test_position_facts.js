@@ -205,5 +205,144 @@ console.log('=== live Runner: fills via onOrderEvent, bars via onBar, per symbol
         `B short at 500, its own first bar (${JSON.stringify(lb[2])})`);
 }
 
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
+// Scenario B: an add after a partial close, then a short added to, partly
+// closed and added to again. Twenty bars, the same prices.
+//   bar 1  buy 1  -> 120  long 1, entry 120
+//   bar 3  buy 1  -> 140  long 2, entry 130
+//   bar 5  sell 1 -> 160  long 1, entry 130 (the manager's FIFO basis: 140)
+//   bar 7  buy 1  -> 180  long 2, entry (130 + 180) / 2 = 155 (FIFO: 160)
+//   bar 9  sell 4 -> 200  short 2, entry 200, count restarts
+//   bar 11 sell 2 -> 220  short 4, entry 210
+//   bar 13 buy 1  -> 240  short 3, entry 210 (FIFO: 213.33)
+//   bar 15 sell 1 -> 260  short 4, entry 222.5 (FIFO: 225)
+//   bar 17 buy 4  -> 280  flat
+console.log('=== add after a partial close, add to and partly close a short ===');
+{
+  const reg = new lrvx.SymbolRegistry();
+  const sym = reg.addSymbol('sim', 'BTCUSDT', 0.01);
+  const bt = new lrvx.BacktestRunner(reg, 0, 1e6);
+  const actions = {1: ['buy', 1], 3: ['buy', 1], 5: ['sell', 1], 7: ['buy', 1], 9: ['sell', 4],
+                   11: ['sell', 2], 13: ['buy', 1], 15: ['sell', 1], 17: ['buy', 4]};
+  const log = [];
+  const fills = [];
+  const strat = scripted(sym, log, actions);
+  strat.onFill = (ctx, ev) => {
+    fills.push([ev.fillPrice, ctx.position, ctx.entryPrice, ctx.barsInPosition]);
+  };
+  bt.setStrategy(strat);
+  bt.runBars(...bars(20), 'BTCUSDT');
+  const want = [
+    [null, 0], [null, 0], [120, 1], [120, 2], [130, 3], [130, 4], [130, 5], [130, 6],
+    [155, 7], [155, 8], [200, 1], [200, 2], [210, 3], [210, 4], [210, 5], [210, 6],
+    [222.5, 7], [222.5, 8], [null, 0], [null, 0],
+  ];
+  const positions = [0, 0, 1, 1, 2, 2, 1, 1, 2, 2, -2, -2, -4, -4, -3, -3, -4, -4, 0, 0];
+  check(log.map((r) => r[2]).join() === positions.join(),
+        `premise: positions ${log.map((r) => r[2])}`);
+  want.forEach(([entry, held], i) => {
+    const got = log[i] || [];
+    const entryOk = entry === null ? got[0] === null : near(got[0], entry);
+    check(entryOk, `scenario B bar ${i} entryPrice ${got[0]}, want ${entry}`);
+    check(got[1] === held, `scenario B bar ${i} barsInPosition ${got[1]}, want ${held}`);
+  });
+  // An opening or flipping fill reads 0 bars; the flattening fill reads no
+  // entry and 0 bars.
+  const wantFills = [
+    [120, 1, 120, 0], [140, 2, 130, 2], [160, 1, 130, 4], [180, 2, 155, 6], [200, -2, 200, 0],
+    [220, -4, 210, 2], [240, -3, 210, 4], [260, -4, 222.5, 6], [280, 0, null, 0],
+  ];
+  check(fills.length === wantFills.length, `nine fills (${fills.length})`);
+  wantFills.forEach(([price, pos, entry, held], i) => {
+    const got = fills[i] || [];
+    check(got[0] === price && got[1] === pos, `premise: fill ${i} ${got[1]} @ ${got[0]}`);
+    const entryOk = entry === null ? got[2] === null : near(got[2], entry);
+    check(entryOk, `onFill ${i}: entryPrice ${got[2]}, want ${entry}`);
+    check(got[3] === held, `onFill ${i}: barsInPosition ${got[3]}, want ${held}`);
+  });
+}
+
+// A threaded Runner calls the strategy later, on the JS thread, than the
+// engine thread delivered the event. ctx carries the facts as they were at
+// delivery: here every event is delivered before the first callback after
+// bar 0 runs, by which time the position is flat again.
+async function threadedRunnerSection() {
+  console.log('=== threaded Runner: ctx facts are those at delivery ===');
+  const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  const waitFor = async (cond, ms) => {
+    const until = Date.now() + ms;
+    while (!cond() && Date.now() < until) { await new Promise((r) => setTimeout(r, 10)); }
+    return cond();
+  };
+  const reg = new lrvx.SymbolRegistry();
+  const a = reg.addSymbol('test', 'AAA', 0.01);
+  const runner = new lrvx.Runner(reg, () => {}, true);
+  const log = [];
+  const fills = [];
+  let idBuy = 0;
+  let idSell = 0;
+  runner.addStrategy({
+    symbols: [a],
+    onBar(ctx, _bar, emit) {
+      log.push([ctx.entryPrice, ctx.barsInPosition, ctx.position]);
+      if (!idBuy) {
+        idBuy = emit.limitBuy(50, 4, a);
+        idSell = emit.limitSell(90, 4, a);
+      }
+    },
+    onFill(ctx, ev) {
+      fills.push([ev.fillPrice, ctx.entryPrice, ctx.barsInPosition, ctx.position]);
+    },
+  });
+  runner.start();
+  const bar = (i) => {
+    const open = 100 + 10 * i;
+    runner.onBar(a, {open, high: open + 3, low: open - 2, close: open + 1, volume: 10,
+                     startTimeNs: BigInt(i) * MIN, endTimeNs: BigInt(i + 1) * MIN});
+  };
+  const fill = (orderId, side, fillQty, fillPrice) => runner.onOrderEvent(
+      {orderId, symbol: a, side, status: 'FILLED', fillQty, fillPrice});
+  try {
+    bar(0);
+    check(await waitFor(() => idBuy !== 0, 5000), 'premise: the first bar reached the strategy');
+    // A reported order event is only queued behind the market data published
+    // before it, so a bar published right after it may be delivered first.
+    // The JS thread is held after each publish until the engine has
+    // delivered it: every event arrives in this order, and no callback runs
+    // until all of them have.
+    const steps = [
+      () => fill(idBuy, 'buy', 1, 50),
+      () => bar(1),   // long 1 @ 50, bar 1
+      () => fill(idBuy, 'buy', 3, 70),
+      () => bar(2),   // long 4 @ 65, bar 2
+      () => fill(idSell, 'sell', 4, 80),
+      () => bar(3),   // flat
+    ];
+    for (const step of steps) {
+      step();
+      sleepSync(100);
+    }
+    check(await waitFor(() => log.length === 4 && fills.length === 3, 5000),
+          `premise: four bars and three fills reached the strategy (${log.length}, ${fills.length})`);
+  } finally {
+    runner.stop();
+  }
+  const show = (r) => JSON.stringify(r);
+  check(log[0] && log[0][0] === null && log[0][1] === 0, `bar 0 flat (${show(log[0])})`);
+  check(log[1] && log[1][2] === 1 && near(log[1][0], 50) && log[1][1] === 1,
+        `bar 1 long 1 @ 50, 1 bar (${show(log[1])})`);
+  check(log[2] && log[2][2] === 4 && near(log[2][0], 65) && log[2][1] === 2,
+        `bar 2 long 4 @ 65, 2 bars (${show(log[2])})`);
+  check(log[3] && log[3][2] === 0 && log[3][0] === null && log[3][1] === 0,
+        `bar 3 flat (${show(log[3])})`);
+  check(fills[0] && near(fills[0][1], 50) && fills[0][2] === 0, `fill 0 (${show(fills[0])})`);
+  check(fills[1] && near(fills[1][1], 65) && fills[1][2] === 1, `fill 1 (${show(fills[1])})`);
+  check(fills[2] && fills[2][3] === 0 && fills[2][1] === null && fills[2][2] === 0,
+        `the flattening fill reads no entry and 0 bars (${show(fills[2])})`);
+}
+
+threadedRunnerSection()
+  .catch((e) => check(false, `threaded Runner section threw ${e && e.stack}`))
+  .then(() => {
+    console.log(`\n${passed} passed, ${failed} failed`);
+    process.exit(failed > 0 ? 1 : 0);
+  });

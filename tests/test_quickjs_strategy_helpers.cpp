@@ -69,9 +69,12 @@ function section(name, fn) {
 }
 function throws(fn) { try { fn(); return false; } catch (e) { return true; } }
 function isNum(v) { return typeof v === 'number'; }
-function absent(v) { return v === null || (typeof v === 'number' && isNaN(v)); }
+// A missing exit level reads null (lrvx.d.ts: number | null), never NaN.
+function absent(v) { return v === null; }
+// For indicator outputs, where the stream reads null and compute() NaN.
+function blank(v) { return v === null || (typeof v === 'number' && isNaN(v)); }
 function same(a, b) {
-  if (absent(a) || absent(b)) return absent(a) && absent(b);
+  if (blank(a) || blank(b)) return blank(a) && blank(b);
   return a === b;
 }
 function show(v) { return v === null ? 'null' : String(v); }
@@ -676,4 +679,101 @@ TEST(JsPositionFacts, TickOnlyRunHasAnEntryButNoBars)
   // the next trade on there is an entry price, and with no bar seen
   // barsInPosition stays 0.
   EXPECT_EQ(log, s + "0:null/0 " + s + "1:100/0 " + s + "2:100/0 " + s + "3:100/0");
+}
+
+namespace
+{
+
+// Scenario B: an add after a partial close, then a short added to, partly
+// closed and added to again; every bar and every fill logged as
+// position/entry/bars.
+//
+//   bar 1  buy 1   -> 120   long 1, entry 120
+//   bar 3  buy 1   -> 140   long 2, entry 130
+//   bar 5  sell 1  -> 160   long 1, entry 130 (the manager's FIFO basis: 140)
+//   bar 7  buy 1   -> 180   long 2, entry 155 (FIFO: 160)
+//   bar 9  sell 4  -> 200   short 2, entry 200
+//   bar 11 sell 2  -> 220   short 4, entry 210
+//   bar 13 buy 1   -> 240   short 3, entry 210
+//   bar 15 sell 1  -> 260   short 4, entry 222.5 (FIFO: 225)
+//   bar 17 buy 4   -> 280   flat
+const char* const kScenarioBScript = R"(
+var bars = [];
+var fills = [];
+var PLAN = {1: 1, 3: 1, 5: -1, 7: 1, 9: -4, 11: -2, 13: 1, 15: -1, 17: 4};
+function facts(ctx) {
+  return ctx.position + '/' + (ctx.entryPrice === null ? 'null' : String(ctx.entryPrice))
+       + '/' + ctx.barsInPosition;
+}
+class PlanStrat extends Strategy {
+  constructor() { super({ exchange: "Test", symbols: ['BTCUSDT'] }); this.i = 0; }
+  onBar(ctx, bar) {
+    bars.push(facts(ctx));
+    var q = PLAN[this.i++];
+    if (q > 0) this.marketBuy({ symbol: 'BTCUSDT', qty: q });
+    else if (q < 0) this.marketSell({ symbol: 'BTCUSDT', qty: -q });
+  }
+  onFill(ctx, ev) { fills.push(ev.fillPrice + ':' + facts(ctx)); }
+}
+lrvx.register(new PlanStrat());
+)";
+
+}  // namespace
+
+TEST(JsPositionFacts, AddsAfterAPartialCloseAndOnAShortAreWeightedByTheirFills)
+{
+  ScriptFile script(kScenarioBScript);
+  SymbolRegistry registry;
+  LrvxJsStrategy js(script.path(), registry);
+  const auto ids = js.symbolIds();
+  BridgeStrategy bridge(1, std::vector<SymbolId>(ids.begin(), ids.end()), registry,
+                        js.getCallbacks());
+  js.injectHandle(static_cast<LrvxStrategyHandle>(&bridge));
+
+  std::vector<BarEvent> bars;
+  for (int i = 0; i < 20; ++i)
+  {
+    bars.push_back(scenarioBar(ids[0], i, 100.0));
+  }
+  BacktestRunner runner;
+  runner.setSymbolRegistry(&registry);
+  runner.setStrategy(&bridge);
+  runner.runBars(bars);
+
+  EXPECT_EQ(readString(js, "bars.join(' ')"),
+            "0/null/0 0/null/0 1/120/1 1/120/2 2/130/3 2/130/4 1/130/5 1/130/6 "
+            "2/155/7 2/155/8 -2/200/1 -2/200/2 -4/210/3 -4/210/4 -3/210/5 -3/210/6 "
+            "-4/222.5/7 -4/222.5/8 0/null/0 0/null/0");
+  // An opening or flipping fill reads 0 bars; the flattening fill reads no
+  // entry and 0 bars.
+  EXPECT_EQ(readString(js, "fills.join(' ')"),
+            "120:1/120/0 140:2/130/2 160:1/130/4 180:2/155/6 200:-2/200/0 220:-4/210/2 "
+            "240:-3/210/4 260:-4/222.5/6 280:0/null/0");
+}
+
+TEST(JsHighestLowest, ResetForgetsTheOldValues)
+{
+  runUnitScript(R"(
+function feed(ind, xs) { return xs.map(function (x) { return ind.update(x); }); }
+function showArr(a) { return '[' + a.map(show).join(',') + ']'; }
+section('Highest', function () {
+  var h = new Highest(3);
+  feed(h, [50, 90, 70, 80, NaN]);
+  h.reset();
+  var got = feed(h, [1, 3, 2, 1, 0.5, 0.25]);
+  check(showArr(got) === '[null,null,3,3,2,1]', 'Highest after reset ' + showArr(got));
+  check(h.count === 6 && h.ready === true, 'Highest after reset: count ' + h.count);
+  if (typeof h.destroy === 'function') h.destroy();
+});
+section('Lowest', function () {
+  var l = new Lowest(3);
+  feed(l, [-50, -90, -70, -80, NaN]);
+  l.reset();
+  var got = feed(l, [10, 8, 9, 10, 11, 12]);
+  check(showArr(got) === '[null,null,8,8,9,10]', 'Lowest after reset ' + showArr(got));
+  check(l.count === 6 && l.ready === true, 'Lowest after reset: count ' + l.count);
+  if (typeof l.destroy === 'function') l.destroy();
+});
+)",
+                4);
 }

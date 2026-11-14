@@ -77,6 +77,21 @@ check(lo.count == 0 and math.isnan(lo.value), "Lowest: reset")
 ln = Lowest(3)
 check(same_list([ln.update(x) for x in nx], [nan, nan, nan, nan, 2.0, 3.0]), "Lowest NaN window")
 
+# reset() forgets the old extremes, warm-up and NaN: high values (low, for
+# Lowest) first, then a reset, then a stream the old values would dominate.
+hr = Highest(3)
+for x in [50.0, 90.0, 70.0, 80.0, nan]:
+    hr.update(x)
+hr.reset()
+hrg = [hr.update(x) for x in [1.0, 3.0, 2.0, 1.0, 0.5, 0.25]]
+check(same_list(hrg, [nan, nan, 3.0, 3.0, 2.0, 1.0]), f"Highest after reset: {hrg}")
+lr = Lowest(3)
+for x in [-50.0, -90.0, -70.0, -80.0, nan]:
+    lr.update(x)
+lr.reset()
+lrg = [lr.update(x) for x in [10.0, 8.0, 9.0, 10.0, 11.0, 12.0]]
+check(same_list(lrg, [nan, nan, 8.0, 8.0, 9.0, 10.0]), f"Lowest after reset: {lrg}")
+
 for name in ("Highest", "Lowest"):
     refused = False
     try:

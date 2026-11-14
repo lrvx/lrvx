@@ -192,5 +192,41 @@ section('TimeStop: hit on the maxBars-th update', () => {
   check(one.update() === true, 'maxBars 1: the first update hits');
 });
 
+section('every property reads back what it was built with', () => {
+  // Distinct values, so a property that reads another parameter shows.
+  const a = new lrvx.AtrStop(2.5);
+  check(a.atrMultiple === 2.5, `AtrStop.atrMultiple ${a.atrMultiple}`);
+  check(a.armed === false, `AtrStop.armed ${a.armed}`);
+  check(Number.isNaN(a.stop), `AtrStop.stop before arm ${a.stop}`);
+  a.arm('long', 100.0, 2.0);
+  check(a.stop === 95.0, `AtrStop.stop after arm ${a.stop}`);
+  check(a.atrMultiple === 2.5, `AtrStop.atrMultiple after arm ${a.atrMultiple}`);
+
+  const c = new lrvx.ChandelierExit(4, 3.5);
+  check(c.lookback === 4, `ChandelierExit.lookback ${c.lookback}`);
+  check(c.atrMultiple === 3.5, `ChandelierExit.atrMultiple ${c.atrMultiple}`);
+  check(c.armed === false, `ChandelierExit.armed ${c.armed}`);
+  check(Number.isNaN(c.stop), `ChandelierExit.stop before arm ${c.stop}`);
+  c.arm('long', 100.0, 2.0);
+  check(c.stop === 93.0, `ChandelierExit.stop after arm ${c.stop}`);
+
+  const b = new lrvx.BreakEvenTrail(2.0, 3.0, 1.5);
+  check(b.armed === false && b.atBreakEven === false, 'BreakEvenTrail before arm');
+  check(Number.isNaN(b.stop), `BreakEvenTrail.stop before arm ${b.stop}`);
+  b.arm('long', 100.0, 2.0);
+  check(b.stop === 96.0 && b.armed === true && b.atBreakEven === false,
+        `BreakEvenTrail after arm: stop ${b.stop}`);
+
+  const p = new lrvx.PercentStop(4);
+  check(p.pct === 4, `PercentStop.pct ${p.pct}`);
+  check(p.armed === false && Number.isNaN(p.stop), `PercentStop before arm: ${p.stop}`);
+  const t = new lrvx.TakeProfit(30);
+  check(t.pct === 30, `TakeProfit.pct ${t.pct}`);
+  check(t.armed === false && Number.isNaN(t.target), `TakeProfit before arm: ${t.target}`);
+  const ts = new lrvx.TimeStop(7);
+  check(ts.maxBars === 7, `TimeStop.maxBars ${ts.maxBars}`);
+  check(ts.armed === false && ts.bars === 0, `TimeStop before arm: bars ${ts.bars}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

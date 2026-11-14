@@ -232,3 +232,70 @@ TEST(HighestLowest, AreRegistryRowsWithAFloorOfOne)
   EXPECT_TRUE(highest) << "registry.def has a SingleInput row named highest";
   EXPECT_TRUE(lowest) << "registry.def has a SingleInput row named lowest";
 }
+
+namespace
+{
+
+// High values first, then a reset, then lower ones (for Lowest: low values,
+// then higher ones). Whatever the first stream held must not reach the
+// second: its values, its warm-up and its NaN.
+template <typename T>
+void expectResetForgetsTheOldWindow(const std::vector<double>& before,
+                                    const std::vector<double>& after,
+                                    const std::vector<double>& want, const char* name)
+{
+  T ind(3);
+  for (double v : before)
+  {
+    ind.update(v);
+  }
+  ASSERT_TRUE(std::isnan(ind.value())) << name << ": premise, a NaN is in the old window";
+  ind.reset();
+  for (size_t i = 0; i < after.size(); ++i)
+  {
+    ind.update(after[i]);
+    EXPECT_TRUE(same(ind.value(), want[i]))
+        << name << " after reset, step " << i << ": got " << ind.value() << ", want " << want[i];
+    EXPECT_EQ(ind.ready(), !std::isnan(want[i])) << name << " after reset, step " << i;
+    EXPECT_EQ(ind.count(), i + 1) << name << " after reset, step " << i;
+  }
+}
+
+}  // namespace
+
+TEST(Highest, ResetForgetsTheOldValues)
+{
+  expectResetForgetsTheOldWindow<Highest>({50, 90, 70, 80, kNaN}, {1, 3, 2, 1, 0.5, 0.25},
+                                          {kNaN, kNaN, 3, 3, 2, 1}, "Highest");
+}
+
+TEST(Lowest, ResetForgetsTheOldValues)
+{
+  expectResetForgetsTheOldWindow<Lowest>({-50, -90, -70, -80, kNaN}, {10, 8, 9, 10, 11, 12},
+                                         {kNaN, kNaN, 8, 8, 9, 10}, "Lowest");
+}
+
+// The header promises a zero period never produces a value. The bindings
+// refuse a period of 0; the C++ class takes it and stays empty.
+TEST(HighestLowest, PeriodZeroNeverHasAValue)
+{
+  Highest h(0);
+  Lowest l(0);
+  for (double v : {3.0, 1.0, 2.0, 5.0})
+  {
+    h.update(v);
+    l.update(v);
+    EXPECT_TRUE(std::isnan(h.value())) << "Highest(0) after " << v;
+    EXPECT_TRUE(std::isnan(l.value())) << "Lowest(0) after " << v;
+    EXPECT_FALSE(h.ready());
+    EXPECT_FALSE(l.ready());
+  }
+  for (double v : h.compute(std::vector<double>{3.0, 1.0, 2.0}))
+  {
+    EXPECT_TRUE(std::isnan(v)) << "Highest(0).compute";
+  }
+  for (double v : l.compute(std::vector<double>{3.0, 1.0, 2.0}))
+  {
+    EXPECT_TRUE(std::isnan(v)) << "Lowest(0).compute";
+  }
+}

@@ -82,3 +82,19 @@ def test_period_zero_is_rejected_like_sma(name) -> None:
 def test_listed_as_indicators() -> None:
     names = lrvx.list_indicators()
     assert "Highest" in names and "Lowest" in names
+
+
+@pytest.mark.parametrize("name,before,after,want", [
+    ("Highest", [50, 90, 70, 80, NAN], [1, 3, 2, 1, 0.5, 0.25], [None, None, 3, 3, 2, 1]),
+    ("Lowest", [-50, -90, -70, -80, NAN], [10, 8, 9, 10, 11, 12], [None, None, 8, 8, 9, 10]),
+])
+def test_reset_forgets_the_old_values(name, before, after, want) -> None:
+    """The extremes, the warm-up and the NaN of the stream before reset() do
+    not reach the stream after it."""
+    ind = getattr(lrvx, name)(3)
+    for x in before:
+        ind.update(float(x))
+    ind.reset()
+    got = [ind.update(float(x)) for x in after]
+    assert got == want
+    assert ind.count == len(after) and ind.ready

@@ -263,3 +263,86 @@ def test_live_runner_fills_the_same_context():
         else:
             assert entry == pytest.approx(exp[1], abs=1e-9), f"callback {i}: {entry!r}"
         assert bars == exp[2], f"callback {i}: bars_in_position {bars}"
+
+
+# Scenario B: an add after a partial close, then a short added to, partly
+# closed and added to again. Twenty bars, the same prices.
+#
+#     bar 1  buy 1   -> 120   long 1, entry 120
+#     bar 3  buy 1   -> 140   long 2, entry 130
+#     bar 5  sell 1  -> 160   long 1, entry 130 (the manager's FIFO basis: 140)
+#     bar 7  buy 1   -> 180   long 2, entry (130 + 180) / 2 = 155 (FIFO: 160)
+#     bar 9  sell 4  -> 200   short 2, entry 200, count restarts
+#     bar 11 sell 2  -> 220   short 4, entry 210
+#     bar 13 buy 1   -> 240   short 3, entry 210 (FIFO: 213.33)
+#     bar 15 sell 1  -> 260   short 4, entry 222.5 (FIFO: 225)
+#     bar 17 buy 4   -> 280   flat
+PLAN_B = {1: 1.0, 3: 1.0, 5: -1.0, 7: 1.0, 9: -4.0, 11: -2.0, 13: 1.0, 15: -1.0, 17: 4.0}
+EXPECTED_B = [
+    (None, 0), (None, 0), (120.0, 1), (120.0, 2), (130.0, 3), (130.0, 4), (130.0, 5),
+    (130.0, 6), (155.0, 7), (155.0, 8), (200.0, 1), (200.0, 2), (210.0, 3), (210.0, 4),
+    (210.0, 5), (210.0, 6), (222.5, 7), (222.5, 8), (None, 0), (None, 0),
+]
+POSITIONS_B = [0, 0, 1, 1, 2, 2, 1, 1, 2, 2, -2, -2, -4, -4, -3, -3, -4, -4, 0, 0]
+# (fill price, position, entry, bars) in on_fill: an opening or flipping
+# fill reads 0 bars; the flattening fill reads no entry and 0 bars.
+FILLS_B = [
+    (120.0, 1, 120.0, 0), (140.0, 2, 130.0, 2), (160.0, 1, 130.0, 4), (180.0, 2, 155.0, 6),
+    (200.0, -2, 200.0, 0), (220.0, -4, 210.0, 2), (240.0, -3, 210.0, 4),
+    (260.0, -4, 222.5, 6), (280.0, 0, None, 0),
+]
+
+
+class ScenarioWithFills(Scenario):
+    """Records each bar and fill as the callback's ctx and as self.ctx()
+    read them."""
+
+    def __init__(self, symbols, plan):
+        super().__init__(symbols, plan)
+        self.own_seen = []
+        self.fills = []
+        self.own_fills = []
+
+    def on_bar(self, ctx, bar):
+        own = self.ctx()
+        self.own_seen.append((own.entry_price, own.bars_in_position, own.position))
+        super().on_bar(ctx, bar)
+
+    def on_fill(self, ctx, ev):
+        self.fills.append((ev.fill_price, ctx.position, ctx.entry_price, ctx.bars_in_position))
+        own = self.ctx()
+        self.own_fills.append((ev.fill_price, own.position, own.entry_price,
+                               own.bars_in_position))
+
+
+def _check_fills(fills, label):
+    assert [(p, pos) for p, pos, _, _ in fills] == [(p, pos) for p, pos, _, _ in FILLS_B], (
+        f"{label}: premise, the fills land as planned")
+    for i, ((_, _, entry, bars), (_, _, want_entry, want_bars)) in enumerate(zip(fills, FILLS_B)):
+        if want_entry is None:
+            assert entry is None, f"{label} fill {i}: entry_price {entry!r}, want None"
+        else:
+            assert entry == pytest.approx(want_entry, abs=1e-9), (
+                f"{label} fill {i}: entry_price {entry!r}, want {want_entry}")
+        assert bars == want_bars, f"{label} fill {i}: bars_in_position {bars}, want {want_bars}"
+
+
+def test_adds_after_a_partial_close_and_on_a_short_are_weighted_by_their_fills():
+    sym, runner = _runner()
+    strat = ScenarioWithFills([sym], PLAN_B)
+    runner.set_strategy(strat)
+    runner.run_bars(*_bars(20), symbol="BTCUSDT")
+    _check(strat.seen, "on_bar ctx", EXPECTED_B, POSITIONS_B)
+    _check_fills(strat.fills, "on_fill ctx")
+
+
+def test_the_ctx_method_reads_the_same_facts_as_the_callback_ctx():
+    """Strategy.ctx() outside the callback argument: the weighted entry (not
+    the manager's FIFO basis, which reads 160 at bar 8 and 225 at bar 16) and
+    the bar count."""
+    sym, runner = _runner()
+    strat = ScenarioWithFills([sym], PLAN_B)
+    runner.set_strategy(strat)
+    runner.run_bars(*_bars(20), symbol="BTCUSDT")
+    _check(strat.own_seen, "self.ctx() in on_bar", EXPECTED_B, POSITIONS_B)
+    _check_fills(strat.own_fills, "self.ctx() in on_fill")

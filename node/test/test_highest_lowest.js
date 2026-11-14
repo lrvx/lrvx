@@ -92,5 +92,33 @@ section('period 0 is rejected as SMA rejects it', () => {
   }
 });
 
+section('batch highest() and lowest() functions', () => {
+  const input = new Float64Array(SERIES);
+  for (const [fn, want, label] of [[lrvx.highest, WANT_HIGH, 'highest'],
+                                   [lrvx.lowest, WANT_LOW, 'lowest']]) {
+    const out = fn(input, 3);
+    check(out instanceof Float64Array && out.length === SERIES.length,
+          `${label}(): a Float64Array of the input length`);
+    want.forEach((w, i) => {
+      check(same(out[i], w === null ? NaN : w), `${label}()[${i}] ${out[i]}, want ${w}`);
+    });
+  }
+});
+
+section('reset forgets the old values', () => {
+  const cases = [[lrvx.Highest, [50, 90, 70, 80, NaN], [1, 3, 2, 1, 0.5, 0.25],
+                  [null, null, 3, 3, 2, 1], 'Highest'],
+                 [lrvx.Lowest, [-50, -90, -70, -80, NaN], [10, 8, 9, 10, 11, 12],
+                  [null, null, 8, 8, 9, 10], 'Lowest']];
+  for (const [Cls, before, after, want, label] of cases) {
+    const ind = new Cls(3);
+    before.forEach((x) => ind.update(x));
+    ind.reset();
+    const got = after.map((x) => ind.update(x));
+    check(got.join() === want.join(), `${label} after reset: ${got}, want ${want}`);
+    check(ind.count === after.length && ind.ready === true, `${label} after reset: count ${ind.count}`);
+  }
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

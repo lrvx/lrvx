@@ -336,6 +336,214 @@ TEST(CapiPositionFacts, LiveRunnerFillsTheSameContext)
   lrvx_registry_destroy(registry);
 }
 
+TEST(CapiPositionFacts, EntryAccessorLeavesTheOutputAloneWhenFlat)
+{
+  LrvxRegistryHandle registry = lrvx_registry_create();
+  const uint32_t sym = lrvx_registry_add_symbol(registry, "sim", "BTCUSDT", 0.01);
+  LrvxStrategyCallbacks cb{};
+  uint32_t syms[] = {sym};
+  LrvxStrategyHandle strategy = lrvx_strategy_create(1, syms, 1, registry, cb);
+
+  int64_t raw = -777;
+  lrvx_clear_last_error();
+  EXPECT_EQ(lrvx_entry_price_raw_opt(strategy, sym, &raw), 0) << "flat: no entry";
+  EXPECT_EQ(raw, -777) << "flat: price_out is not written";
+  EXPECT_EQ(lrvx_last_error_code(), 0) << "flat is an answer, not an error";
+  EXPECT_EQ(lrvx_entry_price_raw_opt(strategy, sym, nullptr), 0) << "a NULL price_out is allowed";
+
+  lrvx_strategy_destroy(strategy);
+  lrvx_registry_destroy(registry);
+}
+
+namespace
+{
+
+// Scenario B: an add after a partial close, then a short added to, partly
+// closed and added to again. Bars open at 100 + 10 i; an order from bar i
+// fills at bar i + 1's open.
+//
+//   bar 1  buy 1   -> 120   long 1, entry 120
+//   bar 3  buy 1   -> 140   long 2, entry 130
+//   bar 5  sell 1  -> 160   long 1, entry 130 (the manager's FIFO basis: 140)
+//   bar 7  buy 1   -> 180   long 2, entry 155 (FIFO: 160)
+//   bar 9  sell 4  -> 200   short 2, entry 200
+//   bar 11 sell 2  -> 220   short 4, entry 210
+//   bar 13 buy 1   -> 240   short 3, entry 210
+//   bar 15 sell 1  -> 260   short 4, entry 222.5 (FIFO: 225)
+//   bar 17 buy 4   -> 280   flat
+struct ScenarioB
+{
+  LrvxStrategyHandle strategy{nullptr};
+  uint32_t symbol{0};
+  size_t bar{0};
+  std::vector<Seen> seen;
+  std::vector<double> managerAvg;
+  // (fill price, what the fill callback reads)
+  std::vector<std::pair<double, Seen>> fills;
+};
+
+void onBarB(void* ud, const LrvxSymbolContext* ctx, const LrvxBarData*)
+{
+  auto* s = static_cast<ScenarioB*>(ud);
+  s->seen.push_back(Seen{entryOf(s->strategy, s->symbol),
+                         lrvx_bars_in_position(s->strategy, s->symbol),
+                         lrvx_quantity_to_double(ctx->position_raw), std::nullopt, 0});
+  s->managerAvg.push_back(lrvx_price_to_double(ctx->avg_entry_price_raw));
+  int64_t qty = 0;
+  switch (s->bar++)
+  {
+    case 1:
+    case 3:
+    case 7:
+    case 13:
+      qty = 1;
+      break;
+    case 5:
+    case 15:
+      qty = -1;
+      break;
+    case 9:
+      qty = -4;
+      break;
+    case 11:
+      qty = -2;
+      break;
+    case 17:
+      qty = 4;
+      break;
+    default:
+      break;
+  }
+  if (qty > 0)
+  {
+    lrvx_emit_market_buy(s->strategy, s->symbol, qty * kOne);
+  }
+  else if (qty < 0)
+  {
+    lrvx_emit_market_sell(s->strategy, s->symbol, -qty * kOne);
+  }
+}
+
+void onFillB(void* ud, const LrvxSymbolContext* ctx, const LrvxOrderEventData* ev)
+{
+  auto* s = static_cast<ScenarioB*>(ud);
+  s->fills.emplace_back(lrvx_price_to_double(ev->fill_price_raw),
+                        Seen{entryOf(s->strategy, s->symbol),
+                             lrvx_bars_in_position(s->strategy, s->symbol),
+                             lrvx_quantity_to_double(ctx->position_raw), std::nullopt, 0});
+}
+
+}  // namespace
+
+TEST(CapiPositionFacts, AddsAfterAPartialCloseAndOnAShortAreWeightedByTheirFills)
+{
+  LrvxRegistryHandle registry = lrvx_registry_create();
+  ScenarioB s;
+  s.symbol = lrvx_registry_add_symbol(registry, "sim", "BTCUSDT", 0.01);
+  LrvxStrategyCallbacks cb{};
+  cb.on_bar = onBarB;
+  cb.on_fill = onFillB;
+  cb.user_data = &s;
+  uint32_t syms[] = {s.symbol};
+  s.strategy = lrvx_strategy_create(1, syms, 1, registry, cb);
+  LrvxBacktestRunnerHandle runner = lrvx_backtest_runner_create(registry, 0.0, 1'000'000.0);
+  lrvx_backtest_runner_set_strategy(runner, s.strategy);
+
+  Bars b;
+  for (int i = 0; i < 20; ++i)
+  {
+    const double o = 100.0 + 10.0 * i;
+    b.start.push_back(i * kMinuteNs);
+    b.end.push_back((i + 1) * kMinuteNs);
+    b.open.push_back(o);
+    b.high.push_back(o + 3.0);
+    b.low.push_back(o - 2.0);
+    b.close.push_back(o + 1.0);
+    b.volume.push_back(100.0);
+  }
+  LrvxBacktestStats stats{};
+  ASSERT_EQ(lrvx_backtest_runner_run_bars(runner, b.start.data(), b.end.data(), b.open.data(),
+                                          b.high.data(), b.low.data(), b.close.data(),
+                                          b.volume.data(), 20, "BTCUSDT", 0, 0, &stats),
+            1);
+
+  const double positions[] = {0, 0, 1, 1, 2, 2, 1, 1, 2, 2, -2, -2, -4, -4, -3, -3, -4, -4, 0, 0};
+  const std::vector<Expect> want = {
+      {std::nullopt, 0},
+      {std::nullopt, 0},
+      {120.0, 1},
+      {120.0, 2},
+      {130.0, 3},
+      {130.0, 4},
+      {130.0, 5},
+      {130.0, 6},
+      {155.0, 7},
+      {155.0, 8},
+      {200.0, 1},
+      {200.0, 2},
+      {210.0, 3},
+      {210.0, 4},
+      {210.0, 5},
+      {210.0, 6},
+      {222.5, 7},
+      {222.5, 8},
+      {std::nullopt, 0},
+      {std::nullopt, 0},
+  };
+  ASSERT_EQ(s.seen.size(), want.size());
+  // The premise: after the partial closes the manager's cost basis on the
+  // context (avg_entry_price_raw) is a FIFO figure, not the weighted entry.
+  EXPECT_NEAR(s.managerAvg[8], 160.0, 1e-9) << "premise";
+  EXPECT_NEAR(s.managerAvg[16], 225.0, 1e-9) << "premise";
+  for (size_t i = 0; i < want.size(); ++i)
+  {
+    ASSERT_DOUBLE_EQ(s.seen[i].position, positions[i]) << "bar " << i << " (premise)";
+    EXPECT_EQ(s.seen[i].entry.has_value(), want[i].entry.has_value()) << "bar " << i;
+    if (s.seen[i].entry && want[i].entry)
+    {
+      EXPECT_NEAR(*s.seen[i].entry, *want[i].entry, 1e-9) << "bar " << i;
+    }
+    EXPECT_EQ(s.seen[i].bars, want[i].bars) << "bar " << i;
+  }
+
+  // The fill callbacks: an opening or flipping fill reads 0 bars, the
+  // flattening fill reads no entry and 0 bars.
+  struct WantFill
+  {
+    double price, position;
+    std::optional<double> entry;
+    uint32_t bars;
+  };
+  const std::vector<WantFill> wantFills = {
+      {120, 1, 120.0, 0},
+      {140, 2, 130.0, 2},
+      {160, 1, 130.0, 4},
+      {180, 2, 155.0, 6},
+      {200, -2, 200.0, 0},
+      {220, -4, 210.0, 2},
+      {240, -3, 210.0, 4},
+      {260, -4, 222.5, 6},
+      {280, 0, std::nullopt, 0},
+  };
+  ASSERT_EQ(s.fills.size(), wantFills.size());
+  for (size_t i = 0; i < wantFills.size(); ++i)
+  {
+    const auto& [price, got] = s.fills[i];
+    ASSERT_DOUBLE_EQ(price, wantFills[i].price) << "fill " << i << " (premise)";
+    ASSERT_DOUBLE_EQ(got.position, wantFills[i].position) << "fill " << i << " (premise)";
+    EXPECT_EQ(got.entry.has_value(), wantFills[i].entry.has_value()) << "fill " << i;
+    if (got.entry && wantFills[i].entry)
+    {
+      EXPECT_NEAR(*got.entry, *wantFills[i].entry, 1e-9) << "fill " << i;
+    }
+    EXPECT_EQ(got.bars, wantFills[i].bars) << "fill " << i;
+  }
+
+  lrvx_backtest_runner_destroy(runner);
+  lrvx_strategy_destroy(s.strategy);
+  lrvx_registry_destroy(registry);
+}
+
 // ---- Exit rules ------------------------------------------------------------
 
 namespace

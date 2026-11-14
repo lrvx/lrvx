@@ -27,6 +27,7 @@
 #include "lrvx/backtest/backtest_runner.h"
 #include "lrvx/book/events/trade_event.h"
 #include "lrvx/engine/symbol_registry.h"
+#include "lrvx/position/abstract_position_manager.h"
 #include "lrvx/replay/binary_format_v1.h"
 #include "lrvx/replay/writers/binary_log_writer.h"
 #include "lrvx/strategy/strategy.h"
@@ -414,4 +415,291 @@ TEST(StrategyPositionFacts, TickReplaySetsTheEntryButCountsNoBars)
       EXPECT_NEAR(*s.entry, p1, 1e-9) << "one fill: the entry is its price";
     }
   }
+}
+
+// Scenario B: an add after a partial close, then a short that is added to,
+// partly closed and added to again. Twenty bars, same prices as scenario A.
+//
+//   bar 1  buy 1   -> 120 at bar 2   long 1, entry 120
+//   bar 3  buy 1   -> 140 at bar 4   long 2, entry 130
+//   bar 5  sell 1  -> 160 at bar 6   long 1, entry 130 (the manager's FIFO basis: 140)
+//   bar 7  buy 1   -> 180 at bar 8   long 2, entry (130 + 180) / 2 = 155 (FIFO: 160)
+//   bar 9  sell 4  -> 200 at bar 10  short 2, entry 200, count restarts
+//   bar 11 sell 2  -> 220 at bar 12  short 4, entry 210
+//   bar 13 buy 1   -> 240 at bar 14  short 3, entry 210 (FIFO: 213.33)
+//   bar 15 sell 1  -> 260 at bar 16  short 4, entry (3 * 210 + 260) / 4 = 222.5 (FIFO: 225)
+//   bar 17 buy 4   -> 280 at bar 18  flat
+namespace
+{
+
+const std::vector<std::pair<size_t, double>> kPlanB = {
+    {1, 1.0}, {3, 1.0}, {5, -1.0}, {7, 1.0}, {9, -4.0}, {11, -2.0}, {13, 1.0}, {15, -1.0}, {17, 4.0}};
+
+const std::vector<Expect> kExpectedB = {
+    {std::nullopt, 0},
+    {std::nullopt, 0},
+    {120.0, 1},
+    {120.0, 2},
+    {130.0, 3},
+    {130.0, 4},
+    {130.0, 5},
+    {130.0, 6},
+    {155.0, 7},
+    {155.0, 8},
+    {200.0, 1},
+    {200.0, 2},
+    {210.0, 3},
+    {210.0, 4},
+    {210.0, 5},
+    {210.0, 6},
+    {222.5, 7},
+    {222.5, 8},
+    {std::nullopt, 0},
+    {std::nullopt, 0},
+};
+
+const double kPositionsB[] = {0, 0, 1, 1, 2, 2, 1, 1, 2, 2, -2, -2, -4, -4, -3, -3, -4, -4, 0, 0};
+
+struct FillSeen
+{
+  double fillPrice;
+  Seen ctx;
+  std::optional<double> managerAvg;
+};
+
+// Scenario strategy that also records what each fill callback reads.
+class FillRecordingStrategy : public ScenarioStrategy
+{
+ public:
+  using ScenarioStrategy::ScenarioStrategy;
+
+  std::vector<FillSeen> fills;
+  std::vector<std::optional<double>> managerAvgOnBar;
+
+ protected:
+  void onSymbolBar(SymbolContext& ctx, const BarEvent& ev) override
+  {
+    managerAvgOnBar.push_back(ctx.avgEntryPrice ? std::optional<double>(ctx.avgEntryPrice->toDouble())
+                                                : std::nullopt);
+    ScenarioStrategy::onSymbolBar(ctx, ev);
+  }
+
+  void onSymbolFill(SymbolContext& ctx, const OrderEvent& ev) override
+  {
+    fills.push_back(FillSeen{ev.fillPrice.toDouble(),
+                             Seen{entryOf(ctx), ctx.barsInPosition, ctx.position.toDouble()},
+                             ctx.avgEntryPrice ? std::optional<double>(ctx.avgEntryPrice->toDouble())
+                                               : std::nullopt});
+  }
+};
+
+}  // namespace
+
+TEST(StrategyPositionFacts, AddsAfterAPartialCloseAndOnAShortAreWeightedByTheirFills)
+{
+  SymbolRegistry reg;
+  const SymbolId sym = addSymbol(reg, "BTCUSDT");
+  FillRecordingStrategy strat({sym}, reg);
+  strat.plan = {kPlanB};
+
+  BacktestConfig cfg;
+  cfg.feeRate = 0.0;
+  BacktestRunner runner(cfg);
+  runner.setStrategy(&strat);
+  runner.runBars(scenarioBars(sym, 20));
+
+  ASSERT_EQ(strat.seen[0].size(), kExpectedB.size());
+  for (size_t i = 0; i < kExpectedB.size(); ++i)
+  {
+    ASSERT_DOUBLE_EQ(strat.seen[0][i].position, kPositionsB[i]) << "bar " << i << " (premise)";
+  }
+  // The premise that makes this scenario worth running: after the partial
+  // closes the position manager's cost basis is a FIFO figure, different
+  // from the weighted entry, so an entry taken from it would show.
+  ASSERT_TRUE(strat.managerAvgOnBar[8].has_value());
+  ASSERT_NEAR(*strat.managerAvgOnBar[8], 160.0, 1e-9) << "premise: FIFO basis after the re-add";
+  ASSERT_TRUE(strat.managerAvgOnBar[16].has_value());
+  ASSERT_NEAR(*strat.managerAvgOnBar[16], 225.0, 1e-9) << "premise: FIFO basis after the short re-add";
+
+  for (size_t i = 0; i < kExpectedB.size(); ++i)
+  {
+    const auto& want = kExpectedB[i];
+    const auto& got = strat.seen[0][i];
+    EXPECT_EQ(got.entry.has_value(), want.entry.has_value()) << "bar " << i;
+    if (got.entry && want.entry)
+    {
+      EXPECT_NEAR(*got.entry, *want.entry, 1e-9) << "bar " << i;
+    }
+    EXPECT_EQ(got.bars, want.bars) << "bar " << i << ": barsInPosition";
+  }
+}
+
+TEST(StrategyPositionFacts, FillCallbacksReadTheFactsTheFillLeaves)
+{
+  SymbolRegistry reg;
+  const SymbolId sym = addSymbol(reg, "BTCUSDT");
+  FillRecordingStrategy strat({sym}, reg);
+  strat.plan = {kPlanB};
+
+  BacktestConfig cfg;
+  cfg.feeRate = 0.0;
+  BacktestRunner runner(cfg);
+  runner.setStrategy(&strat);
+  runner.runBars(scenarioBars(sym, 20));
+
+  // (fill price, position, entry, bars). The fill that opens or flips a
+  // position reads 0 bars: no bar has been seen holding it yet. The fill
+  // that flattens reads no entry and 0 bars, not the count of the position
+  // it closed.
+  struct Want
+  {
+    double price;
+    double position;
+    std::optional<double> entry;
+    uint32_t bars;
+  };
+  const std::vector<Want> want = {
+      {120, 1, 120.0, 0},
+      {140, 2, 130.0, 2},
+      {160, 1, 130.0, 4},
+      {180, 2, 155.0, 6},
+      {200, -2, 200.0, 0},
+      {220, -4, 210.0, 2},
+      {240, -3, 210.0, 4},
+      {260, -4, 222.5, 6},
+      {280, 0, std::nullopt, 0},
+  };
+  ASSERT_EQ(strat.fills.size(), want.size());
+  for (size_t i = 0; i < want.size(); ++i)
+  {
+    const FillSeen& got = strat.fills[i];
+    ASSERT_DOUBLE_EQ(got.fillPrice, want[i].price) << "fill " << i << " (premise)";
+    ASSERT_DOUBLE_EQ(got.ctx.position, want[i].position) << "fill " << i << " (premise)";
+    EXPECT_EQ(got.ctx.entry.has_value(), want[i].entry.has_value()) << "fill " << i;
+    if (got.ctx.entry && want[i].entry)
+    {
+      EXPECT_NEAR(*got.ctx.entry, *want[i].entry, 1e-9) << "fill " << i;
+    }
+    EXPECT_EQ(got.ctx.bars, want[i].bars) << "fill " << i << ": barsInPosition";
+  }
+}
+
+namespace
+{
+
+// A position manager fed from outside the strategy: it can report a
+// position before it knows what was paid for it, as one synced from a venue
+// whose cost basis arrives later does.
+class ExternalPositions : public IPositionManager
+{
+ public:
+  using IPositionManager::IPositionManager;
+  Quantity position{};
+  std::optional<Price> avg;
+  Quantity getPosition(SymbolId) const override { return position; }
+  std::optional<Price> getAverageEntryPrice(SymbolId) const override { return avg; }
+  PositionSnapshot positionSnapshot(SymbolId) const override { return {position, avg}; }
+};
+
+class TradeReader : public Strategy
+{
+ public:
+  TradeReader(SymbolId sym, SymbolRegistry& reg) : Strategy(1, std::vector<SymbolId>{sym}, reg) {}
+  std::vector<Seen> seen;
+
+ protected:
+  void onSymbolTrade(SymbolContext& ctx, const TradeEvent&) override
+  {
+    seen.push_back(Seen{entryOf(ctx), ctx.barsInPosition, ctx.position.toDouble()});
+  }
+};
+
+TradeEvent tradeOf(SymbolId sym, double price, int64_t ns)
+{
+  TradeEvent ev{};
+  ev.trade.symbol = sym;
+  ev.trade.price = Price::fromDouble(price);
+  ev.trade.quantity = Quantity::fromDouble(1.0);
+  ev.trade.isBuy = true;
+  ev.trade.exchangeTsNs = UnixNanos{ns};
+  return ev;
+}
+
+}  // namespace
+
+TEST(StrategyPositionFacts, EntryAppearsWhenTheManagerLearnsTheCostBasisLate)
+{
+  SymbolRegistry reg;
+  const SymbolId sym = addSymbol(reg, "BTCUSDT");
+  ExternalPositions positions{2};
+  TradeReader strat(sym, reg);
+  strat.setPositionManager(&positions);
+
+  strat.onTrade(tradeOf(sym, 100.0, 1));
+  positions.position = Quantity::fromDouble(2.0);
+  strat.onTrade(tradeOf(sym, 101.0, 2));
+  // The basis becomes known while the position stays the same.
+  positions.avg = Price::fromDouble(150.0);
+  strat.onTrade(tradeOf(sym, 102.0, 3));
+  strat.onTrade(tradeOf(sym, 103.0, 4));
+
+  ASSERT_EQ(strat.seen.size(), 4u);
+  EXPECT_FALSE(strat.seen[0].entry.has_value()) << "flat";
+  ASSERT_DOUBLE_EQ(strat.seen[1].position, 2.0) << "premise";
+  EXPECT_FALSE(strat.seen[1].entry.has_value()) << "long 2, but nothing says at what price yet";
+  for (size_t i : {2u, 3u})
+  {
+    ASSERT_DOUBLE_EQ(strat.seen[i].position, 2.0) << "premise";
+    ASSERT_TRUE(strat.seen[i].entry.has_value()) << "trade " << i << ": the basis is known now";
+    EXPECT_NEAR(*strat.seen[i].entry, 150.0, 1e-9) << "trade " << i;
+  }
+}
+
+namespace
+{
+
+OrderEvent fillOf(SymbolId sym, double price, double qty)
+{
+  OrderEvent ev{};
+  ev.status = OrderEventStatus::FILLED;
+  ev.order.symbol = sym;
+  ev.fillPrice = Price::fromDouble(price);
+  ev.fillQty = Quantity::fromDouble(qty);
+  return ev;
+}
+
+}  // namespace
+
+TEST(StrategyPositionFacts, AnAddToAPositionOfUnknownCostHasNoEntryToWeight)
+{
+  SymbolRegistry reg;
+  const SymbolId sym = addSymbol(reg, "BTCUSDT");
+  // A manager that keeps no cost basis at all.
+  ExternalPositions positions{2};
+  TradeReader strat(sym, reg);
+  strat.setPositionManager(&positions);
+
+  // Long 2 that the strategy did not fill itself: nothing says at what price.
+  positions.position = Quantity::fromDouble(2.0);
+  strat.onTrade(tradeOf(sym, 100.0, 1));
+  // A buy of 1 at 130 fills on top of it.
+  positions.position = Quantity::fromDouble(3.0);
+  strat.onOrderEvent(fillOf(sym, 130.0, 1.0));
+  strat.onTrade(tradeOf(sym, 131.0, 2));
+  // Flat, then a buy of 1 at 140 from flat.
+  positions.position = Quantity{};
+  strat.onOrderEvent(fillOf(sym, 120.0, 3.0));
+  positions.position = Quantity::fromDouble(1.0);
+  strat.onOrderEvent(fillOf(sym, 140.0, 1.0));
+  strat.onTrade(tradeOf(sym, 141.0, 3));
+
+  ASSERT_EQ(strat.seen.size(), 3u);
+  ASSERT_DOUBLE_EQ(strat.seen[0].position, 2.0) << "premise";
+  EXPECT_FALSE(strat.seen[0].entry.has_value()) << "long 2 at an unknown price";
+  ASSERT_DOUBLE_EQ(strat.seen[1].position, 3.0) << "premise";
+  EXPECT_FALSE(strat.seen[1].entry.has_value())
+      << "two lots at an unknown price and one at 130 have no known average";
+  ASSERT_DOUBLE_EQ(strat.seen[2].position, 1.0) << "premise";
+  ASSERT_TRUE(strat.seen[2].entry.has_value()) << "a position opened by a fill has its price";
+  EXPECT_NEAR(*strat.seen[2].entry, 140.0, 1e-9);
 }
