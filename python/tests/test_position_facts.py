@@ -346,3 +346,109 @@ def test_the_ctx_method_reads_the_same_facts_as_the_callback_ctx():
     runner.run_bars(*_bars(20), symbol="BTCUSDT")
     _check(strat.own_seen, "self.ctx() in on_bar", EXPECTED_B, POSITIONS_B)
     _check_fills(strat.own_fills, "self.ctx() in on_fill")
+
+
+# The per-symbol method form, next to Strategy.position(symbol) and
+# last_price(symbol): Strategy.entry_price(symbol) and
+# Strategy.bars_in_position(symbol). Two symbols are traded by the strategy;
+# only ETHUSDT gets bars (scenario B), BTCUSDT stays flat. Each callback
+# records what the methods say about ETHUSDT by name, about BTCUSDT by name,
+# and about the primary symbol with no argument, next to the callback's ctx.
+
+_MISSING = "missing"
+
+
+def _read(strat, name, *args):
+    fn = getattr(strat, name, None)
+    if fn is None:
+        return f"{_MISSING} Strategy.{name}"
+    return fn(*args)
+
+
+def _facts(strat, *args):
+    return (_read(strat, "entry_price", *args), _read(strat, "bars_in_position", *args))
+
+
+class PerSymbolMethods(lrvx.Strategy):
+    def __init__(self, symbols, plan):
+        super().__init__(symbols)
+        self.plan = plan
+        self.i = 0
+        self.bars = []    # (ctx facts, ETHUSDT by name, BTCUSDT by name, no argument)
+        self.fills = []   # (fill price, ctx facts, ETHUSDT by name, BTCUSDT by name, no argument)
+        self.unknown = []
+
+    def _row(self, ctx):
+        return ((ctx.entry_price, ctx.bars_in_position), _facts(self, "ETHUSDT"),
+                _facts(self, "BTCUSDT"), _facts(self))
+
+    def on_bar(self, ctx, bar):
+        self.bars.append(self._row(ctx))
+        if self.i == 0:
+            for name in ("entry_price", "bars_in_position"):
+                fn = getattr(self, name, None)
+                try:
+                    if fn is None:
+                        self.unknown.append(f"{name}: {_MISSING}")
+                        continue
+                    got = fn("XRPUSDT")
+                    self.unknown.append(f"{name}: returned {got!r}")
+                except lrvx.LrvxError as e:
+                    self.unknown.append(f"{name}: {e.code}")
+        qty = self.plan.get(self.i)
+        if qty is not None:
+            if qty > 0:
+                self.market_buy(qty, symbol="ETHUSDT")
+            else:
+                self.market_sell(-qty, symbol="ETHUSDT")
+        self.i += 1
+
+    def on_fill(self, ctx, ev):
+        self.fills.append((ev.fill_price,) + self._row(ctx))
+
+
+def _same(got, want):
+    entry, bars = got
+    want_entry, want_bars = want
+    if want_entry is None:
+        ok = entry is None
+    else:
+        ok = isinstance(entry, float) and entry == pytest.approx(want_entry, abs=1e-9)
+    return ok and isinstance(bars, int) and not isinstance(bars, bool) and bars == want_bars
+
+
+@pytest.mark.parametrize("primary", ["BTCUSDT", "ETHUSDT"])
+def test_entry_price_and_bars_in_position_methods_follow_scenario_b_per_symbol(primary):
+    reg = lrvx.SymbolRegistry()
+    btc = reg.add_symbol("backtest", "BTCUSDT", tick_size=0.01)
+    eth = reg.add_symbol("backtest", "ETHUSDT", tick_size=0.01)
+    runner = lrvx.BacktestRunner(reg, fee_rate=0.0, initial_capital=1_000_000.0)
+    order = [btc, eth] if primary == "BTCUSDT" else [eth, btc]
+    strat = PerSymbolMethods(order, PLAN_B)
+    runner.set_strategy(strat)
+    runner.run_bars(*_bars(20), symbol="ETHUSDT")
+
+    flat = (None, 0)
+    assert len(strat.bars) == 20, "premise: ETHUSDT gets 20 bars"
+    for i, (ctx, by_eth, by_btc, default) in enumerate(strat.bars):
+        want = EXPECTED_B[i]
+        assert _same(ctx, want), f"premise, bar {i}: ctx reads {ctx}, want {want}"
+        assert _same(by_eth, want), f"bar {i}: entry_price/bars_in_position('ETHUSDT') {by_eth}, want {want}"
+        assert _same(by_btc, flat), f"bar {i}: ('BTCUSDT') {by_btc}, want the flat {flat}"
+        want_default = flat if primary == "BTCUSDT" else want
+        assert _same(default, want_default), (
+            f"bar {i}: no argument, primary {primary}: {default}, want {want_default}")
+
+    assert [f[0] for f in strat.fills] == [f[0] for f in FILLS_B], "premise: the fills land as planned"
+    for i, (price, ctx, by_eth, by_btc, default) in enumerate(strat.fills):
+        want = FILLS_B[i][2:]
+        assert _same(ctx, want), f"premise, fill {i} at {price}: ctx reads {ctx}, want {want}"
+        assert _same(by_eth, want), (
+            f"fill {i} at {price}: entry_price/bars_in_position('ETHUSDT') {by_eth}, want {want}")
+        assert _same(by_btc, flat), f"fill {i} at {price}: ('BTCUSDT') {by_btc}, want {flat}"
+        want_default = flat if primary == "BTCUSDT" else want
+        assert _same(default, want_default), (
+            f"fill {i} at {price}: no argument, primary {primary}: {default}, want {want_default}")
+
+    # A name the strategy does not trade is refused, as last_price(name) refuses it.
+    assert strat.unknown == ["entry_price: E_SYM_001", "bars_in_position: E_SYM_001"]

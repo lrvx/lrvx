@@ -751,6 +751,148 @@ TEST(JsPositionFacts, AddsAfterAPartialCloseAndOnAShortAreWeightedByTheirFills)
             "240:-3/210/4 260:-4/222.5/6 280:0/null/0");
 }
 
+namespace
+{
+
+// The per-symbol method form of the position facts: Strategy.entryPrice(symbol)
+// and Strategy.barsInPosition(symbol), next to position(symbol). Two symbols:
+// ETHUSDT runs scenario B (bars from 100), the primary BTCUSDT (bars from
+// 1000) buys 2 on its bar 2 (fills at 1030) and sells them on its bar 14
+// (fills at 1150). Each callback logs what the methods say, and checks that
+// the methods, asked by name and by id, agree with the callback's ctx, and
+// that asked about the other symbol they agree with the last ctx seen for it.
+const char* const kMethodScript = R"(
+var SYMBOLS = ['BTCUSDT', 'ETHUSDT'];
+var BTC_ID = -1;
+var ETH_ID = -1;
+var start = [];
+var ethBars = [];
+var ethFills = [];
+var btcBars = [];
+var btcFills = [];
+var lastCtx = {};
+var PLAN = { ETHUSDT: {1: 1, 3: 1, 5: -1, 7: 1, 9: -4, 11: -2, 13: 1, 15: -1, 17: 4},
+             BTCUSDT: {2: 2, 14: -2} };
+function call(self, name, sym) {
+  if (typeof self[name] !== 'function') return 'missing ' + name + '()';
+  return sym === undefined ? self[name]() : self[name](sym);
+}
+// position/entry/bars as the methods read them; no argument is the primary.
+function viaMethods(self, sym) {
+  return self.position(sym) + '/' + show(call(self, 'entryPrice', sym)) + '/'
+       + show(call(self, 'barsInPosition', sym));
+}
+function viaCtx(ctx) {
+  return ctx.position + '/' + show(ctx.entryPrice) + '/' + show(ctx.barsInPosition);
+}
+function nameOf(id) { return id === BTC_ID ? 'BTCUSDT' : 'ETHUSDT'; }
+function agree(self, ctx, where) {
+  var own = nameOf(ctx.symbolId);
+  var want = viaCtx(ctx);
+  lastCtx[own] = want;
+  [own, ctx.symbolId].forEach(function (s) {
+    var got = viaMethods(self, s);
+    check(got === want, where + ': methods(' + JSON.stringify(s) + ') read ' + got
+          + ', ctx reads ' + want);
+  });
+  var other = own === 'BTCUSDT' ? 'ETHUSDT' : 'BTCUSDT';
+  if (lastCtx[other] !== undefined) {
+    var g = viaMethods(self, other);
+    check(g === lastCtx[other], where + ': methods(' + other + ') read ' + g
+          + ', its last ctx read ' + lastCtx[other]);
+  }
+  var d = viaMethods(self);
+  var dWant = own === 'BTCUSDT' ? want : lastCtx.BTCUSDT;
+  if (dWant !== undefined) {
+    check(d === dWant, where + ': methods() read ' + d + ', the primary BTCUSDT reads ' + dWant);
+  }
+}
+class MethodStrat extends Strategy {
+  constructor() { super({ exchange: "Test", symbols: SYMBOLS }); this.n = {}; }
+  onStart() {
+    start.push(viaMethods(this), viaMethods(this, 'ETHUSDT'));
+  }
+  onBar(ctx, bar) {
+    var self = this;
+    var s = ctx.symbolId;
+    var name = nameOf(s);
+    var i = this.n[s] === undefined ? 0 : this.n[s];
+    this.n[s] = i + 1;
+    agree(this, ctx, name + ' bar ' + i);
+    if (name === 'ETHUSDT') ethBars.push(viaMethods(this, 'ETHUSDT'));
+    else btcBars.push(viaMethods(this));
+    if (name === 'BTCUSDT' && i === 0) {
+      check(typeof this.entryPrice === 'function'
+            && throws(function () { self.entryPrice('XRPUSDT'); }),
+            'entryPrice of a name the strategy does not trade throws');
+      check(typeof this.barsInPosition === 'function'
+            && throws(function () { self.barsInPosition('XRPUSDT'); }),
+            'barsInPosition of a name the strategy does not trade throws');
+    }
+    var q = PLAN[name][i];
+    if (q > 0) this.marketBuy({ symbol: name, qty: q });
+    else if (q < 0) this.marketSell({ symbol: name, qty: -q });
+  }
+  onFill(ctx, ev) {
+    var name = nameOf(ctx.symbolId);
+    agree(this, ctx, name + ' fill at ' + ev.fillPrice);
+    if (name === 'ETHUSDT') ethFills.push(ev.fillPrice + ':' + viaMethods(this, 'ETHUSDT'));
+    else btcFills.push(ev.fillPrice + ':' + viaMethods(this));
+  }
+}
+lrvx.register(new MethodStrat());
+)";
+
+}  // namespace
+
+TEST(JsPositionFacts, EntryPriceAndBarsInPositionMethodsFollowScenarioBPerSymbol)
+{
+  ScriptFile script(std::string(kPrelude) + kMethodScript);
+  SymbolRegistry registry;
+  LrvxJsStrategy js(script.path(), registry);
+  const auto ids = js.symbolIds();
+  ASSERT_EQ(ids.size(), 2u);
+  js.engine().eval(("BTC_ID = " + std::to_string(ids[0]) + "; ETH_ID = " +
+                    std::to_string(ids[1]) + ";")
+                       .c_str());
+  BridgeStrategy bridge(1, std::vector<SymbolId>(ids.begin(), ids.end()), registry,
+                        js.getCallbacks());
+  js.injectHandle(static_cast<LrvxStrategyHandle>(&bridge));
+
+  std::vector<BarEvent> bars;
+  for (int i = 0; i < 20; ++i)
+  {
+    bars.push_back(scenarioBar(ids[0], i, 1000.0));
+    bars.push_back(scenarioBar(ids[1], i, 100.0));
+  }
+  BacktestRunner runner;
+  runner.setSymbolRegistry(&registry);
+  runner.setStrategy(&bridge);
+  runner.runBars(bars);
+
+  // Flat before any fill, on both symbols.
+  EXPECT_EQ(readString(js, "start.join(' ')"), "0/null/0 0/null/0");
+  // ETHUSDT asked by name: scenario B on every bar and every fill. An
+  // opening or flipping fill reads 0 bars; the flattening fill reads no
+  // entry and 0 bars.
+  EXPECT_EQ(readString(js, "ethBars.join(' ')"),
+            "0/null/0 0/null/0 1/120/1 1/120/2 2/130/3 2/130/4 1/130/5 1/130/6 "
+            "2/155/7 2/155/8 -2/200/1 -2/200/2 -4/210/3 -4/210/4 -3/210/5 -3/210/6 "
+            "-4/222.5/7 -4/222.5/8 0/null/0 0/null/0");
+  EXPECT_EQ(readString(js, "ethFills.join(' ')"),
+            "120:1/120/0 140:2/130/2 160:1/130/4 180:2/155/6 200:-2/200/0 220:-4/210/2 "
+            "240:-3/210/4 260:-4/222.5/6 280:0/null/0");
+  // BTCUSDT through the no-argument form: the primary symbol, untouched by
+  // ETHUSDT's trading.
+  EXPECT_EQ(readString(js, "btcBars.join(' ')"),
+            "0/null/0 0/null/0 0/null/0 2/1030/1 2/1030/2 2/1030/3 2/1030/4 2/1030/5 "
+            "2/1030/6 2/1030/7 2/1030/8 2/1030/9 2/1030/10 2/1030/11 2/1030/12 "
+            "0/null/0 0/null/0 0/null/0 0/null/0 0/null/0");
+  EXPECT_EQ(readString(js, "btcFills.join(' ')"), "1030:2/1030/0 1150:0/null/0");
+  // 40 bars + 11 fills, each with at least the by-name and by-id checks.
+  expectNoFails(js, 2 * (40 + 11) + 2);
+}
+
 TEST(JsHighestLowest, ResetForgetsTheOldValues)
 {
   runUnitScript(R"(

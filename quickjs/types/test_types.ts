@@ -125,3 +125,20 @@ void Cancels;
 new lrvx.TWAPExecutor({ targetQty: 1, side: 'short', durationNs: 1, sliceCount: 1, startTimeNs: 0 });
 // @ts-expect-error not a member of lrvx
 lrvx.noSuchMember;
+
+class PositionFacts extends Strategy {
+    onBar(ctx: SymbolContext): void {
+        const entry: number | null = this.entryPrice('BTCUSDT');
+        const bars: number = this.barsInPosition('BTCUSDT');
+        const primaryEntry: number | null = this.entryPrice();
+        const primaryBars: number = this.barsInPosition();
+        const fromCtx: boolean = this.entryPrice(ctx.symbol) === ctx.entryPrice
+            && this.barsInPosition(ctx.symbol) === ctx.barsInPosition;
+        // @ts-expect-error flat reads null, so the entry is not always a number
+        const always: number = this.entryPrice();
+        // @ts-expect-error the bar count is never null
+        const noBars: null = this.barsInPosition();
+        void [entry, bars, primaryEntry, primaryBars, fromCtx, always, noBars];
+    }
+}
+void PositionFacts;

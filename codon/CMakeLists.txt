@@ -239,6 +239,9 @@ add_codon_executable(codon_version_smoke
 add_codon_executable(codon_position_facts_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/position_facts_smoke.codon)
 
+add_codon_executable(codon_position_facts_methods_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/position_facts_methods_smoke.codon)
+
 add_codon_executable(codon_exit_rules_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/exit_rules_smoke.codon)
 
