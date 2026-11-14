@@ -45,26 +45,26 @@ interface BookData {
 }
 
 interface MarketOrderOpts {
-    symbol?: string;
+    symbol?: string | number;
     qty: number;
 }
 
 interface LimitOrderOpts {
-    symbol?: string;
+    symbol?: string | number;
     price: number;
     qty: number;
     tif?: "GTC" | "IOC" | "FOK" | "POST_ONLY";
 }
 
 interface StopMarketOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     trigger: number;
     qty: number;
 }
 
 interface StopLimitOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     trigger: number;
     price: number;
@@ -72,14 +72,14 @@ interface StopLimitOpts {
 }
 
 interface TakeProfitMarketOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     trigger: number;
     qty: number;
 }
 
 interface TakeProfitLimitOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     trigger: number;
     price: number;
@@ -87,14 +87,14 @@ interface TakeProfitLimitOpts {
 }
 
 interface TrailingStopOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     offset: number;
     qty: number;
 }
 
 interface TrailingStopPercentOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     callbackBps: number;
     qty: number;
@@ -151,17 +151,17 @@ declare class Strategy {
     /** `orderId` is a non-negative integer Number or a BigInt; anything else
      *  is a TypeError and nothing is emitted. */
     cancel(orderId: number | bigint): void;
-    cancelAll(symbol?: string): void;
+    cancelAll(symbol?: string | number): void;
     modify(orderId: number | bigint, opts: ModifyOpts): void;
-    closePosition(symbol?: string): number;
+    closePosition(symbol?: string | number): number;
 
-    position(symbol?: string): number;
-    lastPrice(symbol?: string): number;
+    position(symbol?: string | number): number;
+    lastPrice(symbol?: string | number): number;
     /** null when the side is empty; a price below zero, and a price of
      *  exactly 0, are quotes like any other. */
-    bestBid(symbol?: string): number | null;
-    bestAsk(symbol?: string): number | null;
-    midPrice(symbol?: string): number | null;
+    bestBid(symbol?: string | number): number | null;
+    bestAsk(symbol?: string | number): number | null;
+    midPrice(symbol?: string | number): number | null;
     /** Quantity-weighted average entry of the symbol's open position, as
      *  `ctx.entryPrice` reads it; null when flat. */
     entryPrice(symbol?: string | number): number | null;
