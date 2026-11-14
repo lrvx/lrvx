@@ -162,6 +162,12 @@ declare class Strategy {
     bestBid(symbol?: string): number | null;
     bestAsk(symbol?: string): number | null;
     midPrice(symbol?: string): number | null;
+    /** Quantity-weighted average entry of the symbol's open position, as
+     *  `ctx.entryPrice` reads it; null when flat. */
+    entryPrice(symbol?: string | number): number | null;
+    /** Bar callbacks received while holding the symbol's current position,
+     *  as `ctx.barsInPosition` reads it; 0 when flat. */
+    barsInPosition(symbol?: string | number): number;
     orderStatus(orderId: number): OrderStatus | -1;
 
     readonly primarySymbol: string;

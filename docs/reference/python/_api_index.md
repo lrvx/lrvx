@@ -2103,6 +2103,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 **Members**
 
 - `bar_ring_capacity(self) -> int`
+- `bars_in_position(self, symbol: str | None = None) -> int`
 - `best_ask(self, symbol: str | None = None) -> float | None`
 - `best_bid(self, symbol: str | None = None) -> float | None`
 - `cancel_all_orders(self, symbol: str | None = None) -> None`
@@ -2127,6 +2128,7 @@ Simulated time source shared by a VenueStack. Monotonic: advance_to()
 - `emit_trailing_stop(self, symbol: typing.SupportsInt | typing.SupportsIndex, side: str, offset: typing.SupportsFloat | typing.SupportsIndex, quantity: typing.SupportsFloat | typing.SupportsIndex) -> int`
 - `emit_trailing_stop_percent(self, symbol: typing.SupportsInt | typing.SupportsIndex, side: str, callback_bps: typing.SupportsInt | typing.SupportsIndex, quantity: typing.SupportsFloat | typing.SupportsIndex) -> int`
 - `emit_withdraw_liquidity(self, pool: typing.SupportsInt | typing.SupportsIndex, liquidity: typing.SupportsFloat | typing.SupportsIndex) -> int`
+- `entry_price(self, symbol: str | None = None) -> float | None`
 - `get_order_status(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> int`
 - `last_closed_bar(self, symbol_id: typing.SupportsInt | typing.SupportsIndex, bar_type: typing.SupportsInt | typing.SupportsIndex = 0, param: typing.SupportsInt | typing.SupportsIndex = 0) -> dict | None`
 - `last_n_closed_bars(self, symbol_id: typing.SupportsInt | typing.SupportsIndex, bar_type: typing.SupportsInt | typing.SupportsIndex, param: typing.SupportsInt | typing.SupportsIndex, n: typing.SupportsInt | typing.SupportsIndex) -> list`

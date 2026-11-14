@@ -602,6 +602,25 @@ class PyStrategyBase
     return mid ? std::optional<double>(mid->toDouble()) : std::nullopt;
   }
 
+  std::optional<double> entry_price(std::optional<std::string> symbol = std::nullopt) const
+  {
+    if (!_bridge)
+    {
+      return std::nullopt;
+    }
+    const auto& entry = _bridge->ctx(_resolve(symbol)).entryPrice;
+    return entry ? std::optional<double>(entry->toDouble()) : std::nullopt;
+  }
+
+  uint32_t bars_in_position(std::optional<std::string> symbol = std::nullopt) const
+  {
+    if (!_bridge)
+    {
+      return 0;
+    }
+    return _bridge->ctx(_resolve(symbol)).barsInPosition;
+  }
+
   int32_t order_status(uint64_t order_id) const { return get_order_status(order_id); }
 
   std::string primary_symbol_name() const
@@ -3655,6 +3674,13 @@ inline void bindStrategy(py::module_& m)
       .def("best_bid", &PyStrategyBase::best_bid, py::arg("symbol") = py::none())
       .def("best_ask", &PyStrategyBase::best_ask, py::arg("symbol") = py::none())
       .def("mid_price", &PyStrategyBase::mid_price, py::arg("symbol") = py::none())
+      .def("entry_price", &PyStrategyBase::entry_price, py::arg("symbol") = py::none(),
+           "Quantity-weighted average entry of the symbol's open position, as "
+           "ctx.entry_price reads it; None when flat.")
+      .def("bars_in_position", &PyStrategyBase::bars_in_position,
+           py::arg("symbol") = py::none(),
+           "Bar callbacks received while holding the symbol's current position, as "
+           "ctx.bars_in_position reads it; 0 when flat.")
       .def("order_status", &PyStrategyBase::order_status, py::arg("order_id"))
       .def("last_closed_bar", &PyStrategyBase::last_closed_bar,
            py::arg("symbol_id"), py::arg("bar_type") = uint8_t{0}, py::arg("param") = uint64_t{0},

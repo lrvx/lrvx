@@ -545,6 +545,14 @@ class Strategy:
         """Mid price, or None unless both sides have a level. Defaults to primary symbol."""
         return self.ctx(self._resolve(symbol)).mid_price()
 
+    def entry_price(self, symbol: Optional[str] = None) -> Optional[float]:
+        """Average entry of the open position, or None when flat. Defaults to primary symbol."""
+        return self.ctx(self._resolve(symbol)).entry_price()
+
+    def bars_in_position(self, symbol: Optional[str] = None) -> int:
+        """Bar callbacks received while holding the current position; 0 when flat. Defaults to primary symbol."""
+        return self.ctx(self._resolve(symbol)).bars_in_position()
+
     def order_status(self, order_id: int) -> int:
         """Get order status. Returns -1 if not found."""
         return self.get_order_status(order_id)

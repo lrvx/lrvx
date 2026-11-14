@@ -3346,6 +3346,10 @@ class Strategy:
         ...
     def bar_ring_capacity(self) -> int:
         ...
+    def bars_in_position(self, symbol: str | None = None) -> int:
+        """
+        Bar callbacks received while holding the symbol's current position, as ctx.bars_in_position reads it; 0 when flat.
+        """
     def best_ask(self, symbol: str | None = None) -> float | None:
         ...
     def best_bid(self, symbol: str | None = None) -> float | None:
@@ -3394,6 +3398,10 @@ class Strategy:
         ...
     def emit_withdraw_liquidity(self, pool: typing.SupportsInt | typing.SupportsIndex, liquidity: typing.SupportsFloat | typing.SupportsIndex) -> int:
         ...
+    def entry_price(self, symbol: str | None = None) -> float | None:
+        """
+        Quantity-weighted average entry of the symbol's open position, as ctx.entry_price reads it; None when flat.
+        """
     def get_order_status(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> int:
         ...
     def last_closed_bar(self, symbol_id: typing.SupportsInt | typing.SupportsIndex, bar_type: typing.SupportsInt | typing.SupportsIndex = 0, param: typing.SupportsInt | typing.SupportsIndex = 0) -> dict | None:

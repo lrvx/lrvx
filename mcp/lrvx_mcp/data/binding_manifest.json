@@ -8664,6 +8664,11 @@
         },
         {
           "kind": "method",
+          "name": "bars_in_position",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "best_ask",
           "parent": "Strategy"
         },
@@ -8770,6 +8775,11 @@
         {
           "kind": "method",
           "name": "emit_trailing_stop_percent",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
+          "name": "entry_price",
           "parent": "Strategy"
         },
         {
@@ -41514,6 +41524,11 @@
         },
         {
           "kind": "method",
+          "name": "bars_in_position",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "best_ask",
           "parent": "Strategy"
         },
@@ -41630,6 +41645,11 @@
         {
           "kind": "method",
           "name": "emit_withdraw_liquidity",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
+          "name": "entry_price",
           "parent": "Strategy"
         },
         {
