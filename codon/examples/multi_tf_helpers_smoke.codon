@@ -8,7 +8,19 @@
 # without surprise (a no-op handle returns 0 from
 # lrvx_strategy_get_bar_ring_capacity rather than crashing).
 
-from lrvx.strategy import _LRVXBAR_SIZE, _lrvxbar_to_bardata
+from C import lrvx_registry_create() -> cobj
+from C import lrvx_registry_destroy(cobj)
+from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+from C import lrvx_runner_create(cobj, cobj, cobj) -> cobj
+from C import lrvx_runner_destroy(cobj)
+from C import lrvx_runner_add_strategy(cobj, cobj)
+from C import lrvx_runner_start(cobj)
+from C import lrvx_runner_stop(cobj)
+from C import lrvx_runner_on_bar(cobj, u32, u8, u64,
+                                  f64, f64, f64, f64, f64, f64,
+                                  i64, i64, u8)
+
+from lrvx.strategy import Strategy, _LRVXBAR_SIZE, _lrvxbar_to_bardata
 
 
 def check(label: str, ok: bool):
@@ -30,6 +42,87 @@ def write_lrvxbar(buf: Ptr[byte], start_ns: int, end_ns: int,
     Ptr[i64](buf + 48)[0] = i64(v)
     Ptr[i64](buf + 56)[0] = i64(bv)
     Ptr[u32](buf + 64)[0] = u32(trade_count)
+
+
+# What a call did: "ValueError" when it raised a ValueError whose message
+# contains every word in `needles`, otherwise what happened instead.
+def outcome(f, needles: List[str]) -> str:
+    try:
+        f()
+    except ValueError as e:
+        for w in needles:
+            if w not in e.message:
+                return "ValueError not naming '" + w + "': " + e.message
+        return "ValueError"
+    except Exception as e:
+        return "other exception: " + e.message
+    return "no raise"
+
+
+# Bad ring arguments raise ValueError, as the other codon/lrvx methods do
+# for bad input, instead of passing through u32() / u8() and wrapping:
+#  - set_bar_ring_capacity(n) for n < 0 or n > 4294967295, leaving the
+#    capacity as it was; 0 is still taken and clamped to 1;
+#  - last_closed_bar / last_n_closed_bars for a bar_type outside 0..6
+#    (Time .. BpsRange), naming the method and "bar_type".
+# Every case is checked and printed before the smoke fails.
+def bad_ring_arguments() -> int:
+    failures = 0
+    registry = lrvx_registry_create()
+    exch = "test"
+    name = "RING"
+    sym_id = int(lrvx_registry_add_symbol(registry, exch.c_str(), name.c_str(), 0.01))
+    strat = Strategy(symbols=[sym_id], strategy_id=1, registry=registry)
+    runner = lrvx_runner_create(registry, cobj(), cobj())
+    lrvx_runner_add_strategy(runner, strat._handle)
+    lrvx_runner_start(runner)
+    M1_NS = 60 * 1_000_000_000
+    lrvx_runner_on_bar(runner, u32(sym_id), u8(0), u64(M1_NS),
+                        2999.5, 3001.0, 2999.0, 3000.0, 1.0, 0.5,
+                        i64(0), i64(M1_NS), u8(0))
+
+    for n in [-1, 4294967296]:
+        got = outcome(lambda: strat.set_bar_ring_capacity(n),
+                      ["set_bar_ring_capacity"])
+        cap = strat.bar_ring_capacity
+        ok = got == "ValueError" and cap == 64
+        if not ok:
+            failures += 1
+        print(("ok: " if ok else "FAIL: ") + "set_bar_ring_capacity(" + str(n)
+              + ") raises and keeps the capacity at 64 (" + got
+              + ", capacity now " + str(cap) + ")")
+        strat.set_bar_ring_capacity(64)
+
+    for bt in [-1, 7, 255, 256]:
+        got = outcome(lambda: strat.last_closed_bar(sym_id, bt, M1_NS),
+                      ["last_closed_bar", "bar_type"])
+        if got != "ValueError":
+            failures += 1
+        print(("ok: " if got == "ValueError" else "FAIL: ")
+              + "last_closed_bar refuses bar_type " + str(bt) + " (" + got + ")")
+        got = outcome(lambda: strat.last_n_closed_bars(sym_id, bt, M1_NS, 5),
+                      ["last_n_closed_bars", "bar_type"])
+        if got != "ValueError":
+            failures += 1
+        print(("ok: " if got == "ValueError" else "FAIL: ")
+              + "last_n_closed_bars refuses bar_type " + str(bt) + " (" + got + ")")
+
+    last = strat.last_closed_bar(sym_id, 0, M1_NS)
+    ok = last is not None and abs(last.close - 3000.0) < 1e-9 and \
+        strat.last_closed_bar(sym_id, 6, M1_NS) is None
+    if not ok:
+        failures += 1
+    print(("ok: " if ok else "FAIL: ") + "bar_type 0 and 6 are still read")
+    strat.set_bar_ring_capacity(0)
+    ok = strat.bar_ring_capacity == 1
+    if not ok:
+        failures += 1
+    print(("ok: " if ok else "FAIL: ") + "set_bar_ring_capacity(0) is clamped to 1")
+
+    lrvx_runner_stop(runner)
+    lrvx_runner_destroy(runner)
+    lrvx_registry_destroy(registry)
+    return failures
 
 
 def run():
@@ -69,6 +162,9 @@ def run():
     # `lrvx_strategy_create_p` (pointer variant for the callbacks
     # struct), so a separate codon smoke (codon_strategy_e2e_smoke)
     # exercises the full path.
+
+    failures = bad_ring_arguments()
+    check("bad ring arguments raise (" + str(failures) + " failed)", failures == 0)
 
     print("codon multi-tf helpers smoke ok")
 
