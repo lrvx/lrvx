@@ -848,6 +848,7 @@ def cmd_archive_binance(args: argparse.Namespace) -> int:
             max_segment_mb=args.max_segment_mb,
             compression=args.compression,
             skip_missing=args.skip_missing,
+            workers=args.workers,
             qty_multiplier=args.qty_multiplier,
         )
 
@@ -907,6 +908,7 @@ def _cmd_archive_binance_book(args: argparse.Namespace, archives) -> int:
             max_segment_mb=args.max_segment_mb,
             compression=args.compression,
             skip_missing=args.skip_missing,
+            workers=args.workers,
         )
 
     print(_archive_summary(
@@ -956,6 +958,7 @@ def cmd_archive_bybit(args: argparse.Namespace) -> int:
             max_segment_mb=args.max_segment_mb,
             compression=args.compression,
             skip_missing=args.skip_missing,
+            workers=args.workers,
         )
 
     print(_archive_summary(
@@ -1006,6 +1009,7 @@ def cmd_archive_okx(args: argparse.Namespace) -> int:
             max_segment_mb=args.max_segment_mb,
             compression=args.compression,
             skip_missing=args.skip_missing,
+            workers=args.workers,
             qty_multiplier=args.qty_multiplier,
         )
 
@@ -1057,6 +1061,7 @@ def cmd_archive_bitget(args: argparse.Namespace) -> int:
             max_segment_mb=args.max_segment_mb,
             compression=args.compression,
             skip_missing=args.skip_missing,
+            workers=args.workers,
         )
 
     print(_archive_summary(
@@ -1069,6 +1074,13 @@ def cmd_archive_bitget(args: argparse.Namespace) -> int:
 
 
 # ── Argparse setup ─────────────────────────────────────────────────────
+
+
+_WORKERS_HELP = (
+    "Processes that convert the downloaded files (parse the CSVs) at once "
+    "(default: one per CPU core, at most one per file; 1 converts in this "
+    "process). The tape is written by this process in date order, so it "
+    "is the same whatever the count.")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -1356,7 +1368,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_binance.add_argument(
         "--parallel", type=int, default=4,
-        help="Concurrent downloads (default: 4). Conversion stays serial.",
+        help="Concurrent downloads (default: 4). How many processes "
+             "convert the files is --workers.",
+    )
+    p_binance.add_argument(
+        "--workers", type=int, default=None,
+        help=_WORKERS_HELP,
     )
     p_binance.add_argument("--symbol-id", dest="symbol_id", type=int, default=1,
                            help="Symbol ID to stamp on every trade (default: 1).")
@@ -1436,8 +1453,10 @@ def _build_parser() -> argparse.ArgumentParser:
                               "temporary name and renamed once complete; "
                               "delete the directory to clear it.")
     p_bybit.add_argument("--parallel", type=int, default=4,
-                         help="Concurrent downloads (default: 4). "
-                              "Conversion stays serial.")
+                         help="Concurrent downloads (default: 4). How many "
+                              "processes convert the files is --workers.")
+    p_bybit.add_argument("--workers", type=int, default=None,
+                         help=_WORKERS_HELP)
     p_bybit.add_argument("--symbol-id", dest="symbol_id", type=int, default=1,
                          help="Symbol ID stamped on every trade.")
     p_bybit.add_argument("--exchange-id", dest="exchange_id", type=int, default=0,
@@ -1498,8 +1517,10 @@ def _build_parser() -> argparse.ArgumentParser:
                             "written under a temporary name and renamed once "
                             "complete; delete the directory to clear it.")
     p_okx.add_argument("--parallel", type=int, default=4,
-                       help="Concurrent downloads (default: 4). "
-                            "Conversion stays serial.")
+                       help="Concurrent downloads (default: 4). How many "
+                            "processes convert the files is --workers.")
+    p_okx.add_argument("--workers", type=int, default=None,
+                       help=_WORKERS_HELP)
     p_okx.add_argument("--symbol-id", dest="symbol_id", type=int, default=1,
                        help="Symbol ID stamped on every trade.")
     p_okx.add_argument("--exchange-id", dest="exchange_id", type=int, default=0,
@@ -1568,7 +1589,10 @@ def _build_parser() -> argparse.ArgumentParser:
                                "once complete; delete the directory to clear "
                                "it.")
     p_bitget.add_argument("--parallel", type=int, default=4,
-                          help="Concurrent downloads (default: 4).")
+                          help="Concurrent downloads (default: 4). How many "
+                               "processes convert the parts is --workers.")
+    p_bitget.add_argument("--workers", type=int, default=None,
+                          help=_WORKERS_HELP)
     p_bitget.add_argument("--symbol-id", dest="symbol_id", type=int, default=1,
                           help="Symbol ID stamped on every trade.")
     p_bitget.add_argument("--exchange-id", dest="exchange_id", type=int, default=0,

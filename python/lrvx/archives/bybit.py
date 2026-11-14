@@ -50,9 +50,10 @@ ties in file order.
 """
 from __future__ import annotations
 
-import hashlib
+import itertools
 import json
 import re
+from hashlib import md5 as _md5
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -171,11 +172,14 @@ def _hash_trade_id(token: str) -> int:
     within a single symbol's daily volume; one would only matter when
     a new trade collides with a trade already on the tape in the same
     time window, which skips the new trade."""
-    try:
-        return int(token)
-    except (ValueError, TypeError):
-        pass
-    h = hashlib.md5(token.encode("ascii", errors="ignore")).digest()
+    # A UUID has '-' at index 8 and no leading whitespace, which int()
+    # can never parse; skip the failing attempt for it.
+    if not (len(token) > 8 and token[8] == "-" and not token[0].isspace()):
+        try:
+            return int(token)
+        except (ValueError, TypeError):
+            pass
+    h = _md5(token.encode("ascii", errors="ignore")).digest()
     return int.from_bytes(h[:8], "big", signed=False)
 
 
@@ -183,37 +187,63 @@ def _parse_ts_ns(token: str) -> int:
     """Parse a Bybit timestamp string (Unix seconds, dot-decimal) into
     nanoseconds without losing precision to float round-off. Accepts
     ``1700000001.25`` as well as ``1700000001.250000000``."""
-    s = token.strip()
-    if "." in s:
-        secs_str, frac_str = s.split(".", 1)
+    secs_str, dot, frac_str = token.strip().partition(".")
+    if dot:
         # Pad / truncate the fractional part to 9 digits (ns).
         if len(frac_str) > 9:
             frac_str = frac_str[:9]
         else:
             frac_str = frac_str.ljust(9, "0")
         return int(secs_str) * 1_000_000_000 + int(frac_str)
-    return int(s) * 1_000_000_000
+    return int(secs_str) * 1_000_000_000
+
+
+# The side tokens as the archive spells them; anything else goes through
+# _layout.side_of.
+_SIDES = {"Buy": 0, "Sell": 1, "buy": 0, "sell": 1}
 
 
 def _iter_rows(src: _layout.CsvFile) -> Iterator[Tuple[int, float, float, int, int]]:
     """Yield ``(trade_id, price, qty, ts_ns, side)`` rows from a Bybit
     archive CSV, spot or derivatives, by its detected layout."""
-    for row in src.rows():
+    rows = src.rows()
+    for first in rows:
+        # The layout is known once the first data row is read.
+        spot = src.layout.columns[0] == "id"
+        yield from (_iter_spot if spot else _iter_trading)(
+            src, itertools.chain((first,), rows))
+        return
+
+
+def _iter_spot(src: _layout.CsvFile, rows) -> Iterator[Tuple[int, float, float, int, int]]:
+    sides, side_of, bad = _SIDES, _layout.side_of, src.counts.bad
+    for row in rows:
         try:
-            if src.layout.columns[0] == "id":
-                side = _layout.side_of(row[4])
+            side = sides.get(row[4])
+            if side is None:
+                side = side_of(row[4])
                 if side is None:
                     raise ValueError(row[4])
-                yield (int(row[0]), float(row[2]), float(row[3]),
-                       int(row[1]) * 1_000_000, side)
-            else:
-                side = _layout.side_of(row[2])
-                if side is None or not row[6]:
-                    raise ValueError(row[2])
-                yield (_hash_trade_id(row[6]), float(row[4]), float(row[3]),
-                       _parse_ts_ns(row[0]), side)
+            yield (int(row[0]), float(row[2]), float(row[3]),
+                   int(row[1]) * 1_000_000, side)
         except (ValueError, IndexError):
-            src.counts.bad(row)
+            bad(row)
+
+
+def _iter_trading(src: _layout.CsvFile, rows) -> Iterator[Tuple[int, float, float, int, int]]:
+    sides, side_of, bad = _SIDES, _layout.side_of, src.counts.bad
+    trade_id, ts_ns = _hash_trade_id, _parse_ts_ns
+    for row in rows:
+        try:
+            side = sides.get(row[2])
+            if side is None:
+                side = side_of(row[2])
+            if side is None or not row[6]:
+                raise ValueError(row[2])
+            yield (trade_id(row[6]), float(row[4]), float(row[3]),
+                   ts_ns(row[0]), side)
+        except (ValueError, IndexError):
+            bad(row)
 
 
 def _ns_to_iso(ns: int) -> str:
@@ -305,6 +335,70 @@ def _write_metadata(out_tape: Path, *,
     meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True))
 
 
+def _parse_file(csv_path: Path, market: str,
+                spill_dir: Optional[Path] = None) -> _dedup.ParsedTrades:
+    """Parse one archive file, nothing written yet. Raises
+    ``UnknownLayoutError`` / ``NothingParsedError`` as ``trades_to_lrvx``
+    documents."""
+    seg = _market_path(market)
+    src = _layout.CsvFile(csv_path, _LAYOUTS["spot" if seg == "spot" else "trading"],
+                          source=f"Bybit {market} trade")
+    rows = _dedup.TradeFile(_iter_rows(src), _dedup.trade_dtype(), sort=True,
+                            spill_dir=spill_dir)
+    try:
+        src.check(rows.rows_read)
+    except BaseException:
+        rows.close()
+        raise
+    return _dedup.ParsedTrades(csv_path, rows, src.counts.invalid)
+
+
+def _parse_range_file(job: Tuple[Path, str, Path]) -> _dedup.ParsedTrades:
+    """One file of a range, parsed in a worker of ``_range.convert_days``.
+    A cached file that does not open is evicted from the cache."""
+    path, market, spill_dir = job
+    with evict_if_corrupt(path):
+        return _parse_file(path, market, spill_dir)
+
+
+def _write_file(parsed: _dedup.ParsedTrades, out_tape: Path, *, append: bool,
+                symbol_id: int, exchange_id: int, max_segment_mb: int,
+                compression: str) -> ConvertStats:
+    """Write a parsed file's rows that are not on the tape yet."""
+    rows = parsed.rows
+    try:
+        done = _dedup.write_trade_file(
+            rows, out_tape, append=append, symbol_id=symbol_id,
+            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+            compression=compression)
+        return ConvertStats(
+            trades_written=done.count,
+            rows_read=rows.rows_read,
+            rows_skipped=rows.rows_skipped,
+            rows_invalid=parsed.rows_invalid,
+            files_processed=1,
+            first_ts_ns=done.first_ts_ns,
+            last_ts_ns=done.last_ts_ns,
+            last_trade_id=done.last_id,
+        )
+    finally:
+        rows.close()
+
+
+def _add_stats(agg: ConvertStats, s: ConvertStats) -> None:
+    agg.trades_written += s.trades_written
+    agg.rows_read += s.rows_read
+    agg.rows_skipped += s.rows_skipped
+    agg.rows_invalid += s.rows_invalid
+    agg.files_processed += s.files_processed
+    if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
+        agg.first_ts_ns = s.first_ts_ns
+    if s.last_ts_ns > agg.last_ts_ns:
+        agg.last_ts_ns = s.last_ts_ns
+    if s.last_trade_id > agg.last_trade_id:
+        agg.last_trade_id = s.last_trade_id
+
+
 def trades_to_lrvx(
     csv_path: Union[str, Path],
     out_tape: Union[str, Path],
@@ -341,25 +435,10 @@ def trades_to_lrvx(
             stem = stem[: -len(".csv")]
         symbol_name = re.sub(r"_?\d{4}-\d{2}-\d{2}$", "", stem)
 
-    src = _layout.CsvFile(csv_path, _LAYOUTS["spot" if seg == "spot" else "trading"],
-                          source=f"Bybit {market} trade")
-    with _dedup.TradeFile(_iter_rows(src), _dedup.trade_dtype(),
-                          sort=True) as rows:
-        src.check(rows.rows_read)
-        done = _dedup.write_trade_file(
-            rows, out_tape, append=append, symbol_id=symbol_id,
-            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
-            compression=compression)
-        stats = ConvertStats(
-            trades_written=done.count,
-            rows_read=rows.rows_read,
-            rows_skipped=rows.rows_skipped,
-            rows_invalid=src.counts.invalid,
-            files_processed=1,
-            first_ts_ns=done.first_ts_ns,
-            last_ts_ns=done.last_ts_ns,
-            last_trade_id=done.last_id,
-        )
+    stats = _write_file(
+        _parse_file(csv_path, market), out_tape, append=append,
+        symbol_id=symbol_id, exchange_id=exchange_id,
+        max_segment_mb=max_segment_mb, compression=compression)
 
     if write_metadata and (stats.trades_written or stats.rows_read):
         _write_metadata(
@@ -387,6 +466,7 @@ def range_to_lrvx(
     max_segment_mb: int = 256,
     compression: str = "none",
     skip_missing: bool = False,
+    workers: Optional[int] = None,
 ) -> ConvertStats:
     """Convert a range of UTC days (inclusive) into lrvx.
 
@@ -394,10 +474,17 @@ def range_to_lrvx(
     ``<cache_root>/bybit`` (``~/.lrvx/archive-cache/bybit`` unless
     ``LRVX_ARCHIVE_CACHE`` says otherwise), or ``mirror`` when given,
     laid out as ``<market>/<symbol>/<file name as published>``.
+    ``parallel`` downloads run at once.
 
-    The symbol's shape is checked before any request. A range in which
-    no day is published raises ``NoFilesError``; a missing day raises
-    ``FileNotFoundError`` unless ``skip_missing``."""
+    ``workers`` processes parse the files (default: one per core, at
+    most one per file; ``1`` parses in this process); the tape is
+    written here, a day at a time in date order, so it is the same tape
+    whatever the count. An import that fails leaves the tape as it was.
+
+    The symbol's shape and ``workers`` are checked before any request. A
+    range in which no day is published raises ``NoFilesError``; a
+    missing day raises ``FileNotFoundError`` unless ``skip_missing``."""
+    _range.check_workers(workers)
     check_symbol(symbol, market)
     days = _range.days_between(date_from, date_to)
     if not days:
@@ -414,37 +501,28 @@ def range_to_lrvx(
                               skip_missing=skip_missing,
                               what=f"bybit {market} trades {symbol}")
 
+    paths = [path for _, path in pairs if path is not None]
+    out_tape = Path(out_tape).expanduser()
     agg = ConvertStats()
-    for day, path in pairs:
-        if path is None:
-            continue
-        with evict_if_corrupt(path):
-            s = trades_to_lrvx(
-                path, out_tape,
-                symbol_id=symbol_id, symbol_name=symbol, market=market,
-                exchange_id=exchange_id, exchange_name=exchange_name,
-                append=append, max_segment_mb=max_segment_mb,
-                compression=compression, write_metadata=False,
-            )
-        agg.trades_written += s.trades_written
-        agg.rows_read += s.rows_read
-        agg.rows_skipped += s.rows_skipped
-        agg.rows_invalid += s.rows_invalid
-        agg.files_processed += s.files_processed
-        if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
-            agg.first_ts_ns = s.first_ts_ns
-        if s.last_ts_ns > agg.last_ts_ns:
-            agg.last_ts_ns = s.last_ts_ns
-        if s.last_trade_id > agg.last_trade_id:
-            agg.last_trade_id = s.last_trade_id
 
-    _write_metadata(
-        Path(out_tape),
-        exchange_name=exchange_name, market=market,
-        symbol_id=symbol_id, symbol_name=symbol,
-        first_ts_ns=agg.first_ts_ns, last_ts_ns=agg.last_ts_ns,
-        trades_added=agg.trades_written,
-    )
+    def write(_: int, parsed: _dedup.ParsedTrades) -> None:
+        _add_stats(agg, _write_file(
+            parsed, out_tape, append=append, symbol_id=symbol_id,
+            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+            compression=compression))
+
+    with _range.spill_dir() as spill, _range.all_or_nothing(out_tape):
+        _range.convert_days([(path, market, spill) for path in paths],
+                            _parse_range_file,
+                            workers=_range.resolve_workers(workers, len(paths)),
+                            then=write)
+        _write_metadata(
+            out_tape,
+            exchange_name=exchange_name, market=market,
+            symbol_id=symbol_id, symbol_name=symbol,
+            first_ts_ns=agg.first_ts_ns, last_ts_ns=agg.last_ts_ns,
+            trades_added=agg.trades_written,
+        )
 
     return agg
 

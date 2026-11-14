@@ -333,6 +333,66 @@ def _symbol_from_file(path: Path) -> str:
     return "" if head.isdigit() else head
 
 
+def _parse_file(csv_path: Path,
+                spill_dir: Optional[Path] = None) -> _dedup.ParsedTrades:
+    """Parse one archive part, nothing written yet."""
+    src = _layout.CsvFile(csv_path, _LAYOUTS, source="Bitget trade")
+    rows = _dedup.TradeFile(_iter_rows(src), _dedup.trade_dtype(), sort=True,
+                            spill_dir=spill_dir)
+    try:
+        src.check(rows.rows_read)
+    except BaseException:
+        rows.close()
+        raise
+    return _dedup.ParsedTrades(csv_path, rows, src.counts.invalid)
+
+
+def _parse_range_file(job: Tuple[Path, Path]) -> _dedup.ParsedTrades:
+    """One part of a range, parsed in a worker of ``_range.convert_days``.
+    A cached part that does not open is evicted from the cache."""
+    path, spill_dir = job
+    with evict_if_corrupt(path):
+        return _parse_file(path, spill_dir)
+
+
+def _write_file(parsed: _dedup.ParsedTrades, out_tape: Path, *, append: bool,
+                symbol_id: int, exchange_id: int, max_segment_mb: int,
+                compression: str) -> ConvertStats:
+    """Write a parsed part's rows that are not on the tape yet."""
+    rows = parsed.rows
+    try:
+        done = _dedup.write_trade_file(
+            rows, out_tape, append=append, symbol_id=symbol_id,
+            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+            compression=compression, ts_ns_per_unit=1_000_000)
+        return ConvertStats(
+            trades_written=done.count,
+            rows_read=rows.rows_read,
+            rows_skipped=rows.rows_skipped,
+            rows_invalid=parsed.rows_invalid,
+            files_processed=1,
+            first_ts_ns=done.first_ts_ns,
+            last_ts_ns=done.last_ts_ns,
+            last_trade_id=done.last_id if done.count else rows.id_max,
+        )
+    finally:
+        rows.close()
+
+
+def _add_stats(agg: ConvertStats, s: ConvertStats) -> None:
+    agg.trades_written += s.trades_written
+    agg.rows_read += s.rows_read
+    agg.rows_skipped += s.rows_skipped
+    agg.rows_invalid += s.rows_invalid
+    agg.files_processed += s.files_processed
+    if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
+        agg.first_ts_ns = s.first_ts_ns
+    if s.last_ts_ns > agg.last_ts_ns:
+        agg.last_ts_ns = s.last_ts_ns
+    if s.last_trade_id > agg.last_trade_id:
+        agg.last_trade_id = s.last_trade_id
+
+
 def trades_to_lrvx(
     csv_path: Union[str, Path],
     out_tape: Union[str, Path],
@@ -367,24 +427,10 @@ def trades_to_lrvx(
             raise ValueError(
                 f"{csv_path.name} does not name its symbol; pass symbol_name")
 
-    src = _layout.CsvFile(csv_path, _LAYOUTS, source="Bitget trade")
-    with _dedup.TradeFile(_iter_rows(src), _dedup.trade_dtype(),
-                          sort=True) as rows:
-        src.check(rows.rows_read)
-        done = _dedup.write_trade_file(
-            rows, out_tape, append=append, symbol_id=symbol_id,
-            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
-            compression=compression, ts_ns_per_unit=1_000_000)
-        stats = ConvertStats(
-            trades_written=done.count,
-            rows_read=rows.rows_read,
-            rows_skipped=rows.rows_skipped,
-            rows_invalid=src.counts.invalid,
-            files_processed=1,
-            first_ts_ns=done.first_ts_ns,
-            last_ts_ns=done.last_ts_ns,
-            last_trade_id=done.last_id if done.count else rows.id_max,
-        )
+    stats = _write_file(
+        _parse_file(csv_path), out_tape, append=append, symbol_id=symbol_id,
+        exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+        compression=compression)
 
     if write_metadata and (stats.trades_written or stats.rows_read):
         _write_metadata(
@@ -412,6 +458,7 @@ def range_to_lrvx(
     max_segment_mb: int = 256,
     compression: str = "none",
     skip_missing: bool = False,
+    workers: Optional[int] = None,
 ) -> ConvertStats:
     """Convert a range of Bitget days (UTC+8 dates, inclusive), every
     part of each, into lrvx: ``date_from="2024-01-15"`` starts at
@@ -420,11 +467,19 @@ def range_to_lrvx(
     Parts are taken from, and missing ones downloaded into, the cache:
     ``<cache_root>/bitget`` (``~/.lrvx/archive-cache/bitget`` unless
     ``LRVX_ARCHIVE_CACHE`` says otherwise), or ``mirror`` when given,
-    laid out as ``<market>/<symbol>/<part name>``.
+    laid out as ``<market>/<symbol>/<part name>``. ``parallel`` days
+    download at once.
 
-    The symbol's shape is checked before any request. A range in which
-    no day is published raises ``NoFilesError``; a missing day raises
-    ``FileNotFoundError`` unless ``skip_missing``."""
+    ``workers`` processes parse the parts (default: one per core, at
+    most one per part; ``1`` parses in this process); the tape is
+    written here, a part at a time in date order, so it is the same
+    tape whatever the count. An import that fails leaves the tape as it
+    was.
+
+    The symbol's shape and ``workers`` are checked before any request. A
+    range in which no day is published raises ``NoFilesError``; a
+    missing day raises ``FileNotFoundError`` unless ``skip_missing``."""
+    _range.check_workers(workers)
     check_symbol(symbol, market)
     days = _range.days_between(date_from, date_to)
     if not days:
@@ -436,36 +491,28 @@ def range_to_lrvx(
         parallel=parallel, skip_missing=skip_missing,
         what=f"bitget {market} trades {symbol}")
 
+    parts = [path for _, paths in pairs for path in paths or ()]
+    out_tape = Path(out_tape).expanduser()
     agg = ConvertStats()
-    for day, paths in pairs:
-        for path in paths or ():
-            with evict_if_corrupt(path):
-                s = trades_to_lrvx(
-                    path, out_tape,
-                    symbol_id=symbol_id, symbol_name=symbol, market=market,
-                    exchange_id=exchange_id, exchange_name=exchange_name,
-                    append=append, max_segment_mb=max_segment_mb,
-                    compression=compression, write_metadata=False,
-                )
-            agg.trades_written += s.trades_written
-            agg.rows_read += s.rows_read
-            agg.rows_skipped += s.rows_skipped
-            agg.rows_invalid += s.rows_invalid
-            agg.files_processed += s.files_processed
-            if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
-                agg.first_ts_ns = s.first_ts_ns
-            if s.last_ts_ns > agg.last_ts_ns:
-                agg.last_ts_ns = s.last_ts_ns
-            if s.last_trade_id > agg.last_trade_id:
-                agg.last_trade_id = s.last_trade_id
 
-    _write_metadata(
-        Path(out_tape).expanduser(),
-        exchange_name=exchange_name, market=market,
-        symbol_id=symbol_id, symbol_name=symbol,
-        first_ts_ns=agg.first_ts_ns, last_ts_ns=agg.last_ts_ns,
-        trades_added=agg.trades_written,
-    )
+    def write(_: int, parsed: _dedup.ParsedTrades) -> None:
+        _add_stats(agg, _write_file(
+            parsed, out_tape, append=append, symbol_id=symbol_id,
+            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+            compression=compression))
+
+    with _range.spill_dir() as spill, _range.all_or_nothing(out_tape):
+        _range.convert_days([(path, spill) for path in parts],
+                            _parse_range_file,
+                            workers=_range.resolve_workers(workers, len(parts)),
+                            then=write)
+        _write_metadata(
+            out_tape,
+            exchange_name=exchange_name, market=market,
+            symbol_id=symbol_id, symbol_name=symbol,
+            first_ts_ns=agg.first_ts_ns, last_ts_ns=agg.last_ts_ns,
+            trades_added=agg.trades_written,
+        )
 
     return agg
 

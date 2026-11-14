@@ -58,12 +58,15 @@ binance.range_to_lrvx(
     out_tape:  str | Path,
     *,
     mirror:    str | Path | None = None,   # default ~/.lrvx/archive-cache/binance
-    parallel:  int = 4,
+    parallel:  int = 4,              # downloads in flight
     symbol_id: int = 1,
     skip_missing: bool = False,
+    workers:   int | None = None,    # processes parsing files; None = one per core
     ...
 ) -> ConvertStats
 ```
+
+Downloads run `parallel` at a time and the files are parsed in `workers` processes; the tape is written in date order by the calling process, so it is the same for any worker count. See [Conversion in worker processes](import-multi-exchange-archives.md#conversion-in-worker-processes).
 
 The symbol is checked against the form the archive uses for the market before anything is downloaded: `BTCUSDT` for spot, `BTCUSDT` or `BTCUSDT_240329` for um-futures, and for cm-futures the contract name, `BTCUSD_PERP` or `BTCUSD_240329`. A symbol of another shape (`BTCUSDT` on cm-futures, `btcusdt`, `BTC-USDT`) fails at once with an example of the expected form.
 

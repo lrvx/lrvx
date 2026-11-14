@@ -58,6 +58,7 @@ tapes — exchange = "binance", instrument_type derived from ``market``.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -326,6 +327,72 @@ def _write_metadata(
 # ── Single-day conversion ───────────────────────────────────────────
 
 
+def _parse_file(csv_path: Path, qty_multiplier: float,
+                spill_dir: Optional[Path] = None) -> _dedup.ParsedTrades:
+    """Parse one aggTrades file, nothing written yet. Rows keep file
+    order; the side is resolved from is_buyer_maker as they are
+    parsed."""
+    src = _layout.CsvFile(csv_path, _AGG_LAYOUTS, source="Binance aggTrades")
+    parsed = ((agg_id, price, qty, ts_ns, _SIDE_SELL if maker else _SIDE_BUY)
+              for agg_id, price, qty, ts_ns, maker
+              in _iter_rows(src, qty_multiplier))
+    rows = _dedup.TradeFile(parsed, _dedup.trade_dtype("i8"), sort=False,
+                            spill_dir=spill_dir)
+    try:
+        src.check(rows.rows_read)
+    except BaseException:
+        rows.close()
+        raise
+    return _dedup.ParsedTrades(csv_path, rows, src.counts.invalid)
+
+
+def _parse_range_file(job: Tuple[Path, float, Path]) -> _dedup.ParsedTrades:
+    """One file of a range, parsed in a worker of ``_range.convert_days``.
+    A cached file that does not open is evicted from the cache."""
+    path, qty_multiplier, spill_dir = job
+    with evict_if_corrupt(path):
+        return _parse_file(path, qty_multiplier, spill_dir)
+
+
+def _write_file(parsed: _dedup.ParsedTrades, out_tape: Path, *, append: bool,
+                symbol_id: int, exchange_id: int, max_segment_mb: int,
+                compression: str) -> ConvertStats:
+    """Write a parsed file's rows that are not on the tape yet."""
+    rows = parsed.rows
+    try:
+        done = _dedup.write_trade_file(
+            rows, out_tape, append=append, symbol_id=symbol_id,
+            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+            compression=compression)
+        return ConvertStats(
+            trades_written=done.count,
+            rows_read=rows.rows_read,
+            rows_skipped=rows.rows_skipped,
+            rows_invalid=parsed.rows_invalid,
+            files_processed=1,
+            first_ts_ns=done.first_ts_ns,
+            last_ts_ns=done.last_ts_ns,
+            last_trade_id=done.last_id if done.count else rows.id_max,
+        )
+    finally:
+        rows.close()
+
+
+def _add_stats(agg: ConvertStats, s: ConvertStats) -> None:
+    agg.trades_written += s.trades_written
+    agg.rows_read += s.rows_read
+    agg.rows_skipped += s.rows_skipped
+    agg.rows_invalid += s.rows_invalid
+    agg.files_processed += s.files_processed
+    if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
+        agg.first_ts_ns = s.first_ts_ns
+    if s.last_ts_ns > agg.last_ts_ns:
+        agg.last_ts_ns = s.last_ts_ns
+    if s.last_trade_id > agg.last_trade_id:
+        agg.last_trade_id = s.last_trade_id
+
+
+
 def aggtrades_to_lrvx(
     csv_path: Union[str, Path],
     out_tape: Union[str, Path],
@@ -364,28 +431,10 @@ def aggtrades_to_lrvx(
         # "BTCUSDT-aggTrades-2024-01-15.zip" → "BTCUSDT"
         symbol_name = csv_path.stem.split("-", 1)[0]
 
-    # Rows keep file order; the side is resolved from is_buyer_maker as
-    # they are parsed.
-    src = _layout.CsvFile(csv_path, _AGG_LAYOUTS, source="Binance aggTrades")
-    parsed = ((agg_id, price, qty, ts_ns, _SIDE_SELL if maker else _SIDE_BUY)
-              for agg_id, price, qty, ts_ns, maker
-              in _iter_rows(src, qty_multiplier))
-    with _dedup.TradeFile(parsed, _dedup.trade_dtype("i8"), sort=False) as rows:
-        src.check(rows.rows_read)
-        done = _dedup.write_trade_file(
-            rows, out_tape, append=append, symbol_id=symbol_id,
-            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
-            compression=compression)
-        stats = ConvertStats(
-            trades_written=done.count,
-            rows_read=rows.rows_read,
-            rows_skipped=rows.rows_skipped,
-            rows_invalid=src.counts.invalid,
-            files_processed=1,
-            first_ts_ns=done.first_ts_ns,
-            last_ts_ns=done.last_ts_ns,
-            last_trade_id=done.last_id if done.count else rows.id_max,
-        )
+    stats = _write_file(
+        _parse_file(csv_path, qty_multiplier), out_tape, append=append,
+        symbol_id=symbol_id, exchange_id=exchange_id,
+        max_segment_mb=max_segment_mb, compression=compression)
 
     if write_metadata and (stats.trades_written or stats.rows_read):
         _write_metadata(
@@ -422,6 +471,7 @@ def range_to_lrvx(
     compression: str = "none",
     skip_missing: bool = False,
     qty_multiplier: float = 1.0,
+    workers: Optional[int] = None,
 ) -> ConvertStats:
     """Convert a range of UTC days (inclusive) into lrvx.
 
@@ -430,12 +480,16 @@ def range_to_lrvx(
     ``LRVX_ARCHIVE_CACHE`` says otherwise), or ``mirror`` when given,
     laid out as ``<market>/<symbol>/<symbol>-aggTrades-<YYYY-MM-DD>.zip``.
 
-    The symbol's shape is checked before any request. A range in which
-    no day is published raises ``NoFilesError``; a missing day raises
-    ``FileNotFoundError`` unless ``skip_missing``. Downloads run up to
-    ``parallel`` connections in flight; the write step is serial so
-    the writer stays append-safe.
+    The symbol's shape and ``workers`` are checked before any request. A
+    range in which no day is published raises ``NoFilesError``; a
+    missing day raises ``FileNotFoundError`` unless ``skip_missing``.
+    Downloads run up to ``parallel`` connections in flight. ``workers``
+    processes parse the files (default: one per core, at most one per
+    file; ``1`` parses in this process); the tape is written here, a day
+    at a time in date order, so it is the same tape whatever the count.
+    An import that fails leaves the tape as it was.
     """
+    _range.check_workers(workers)
     check_symbol(symbol, market)
     days = _range.days_between(date_from, date_to)
     if not days:
@@ -452,42 +506,34 @@ def range_to_lrvx(
                               skip_missing=skip_missing,
                               what=f"binance {market} aggTrades {symbol}")
 
+    paths = [path for _, path in pairs if path is not None]
+    out_tape = Path(out_tape).expanduser()
     agg = ConvertStats()
-    for day, path in pairs:
-        if path is None:
-            continue
-        with evict_if_corrupt(path):
-            # Per-day metadata is skipped; one write at the end records
-            # the whole range and total count.
-            s = aggtrades_to_lrvx(
-                path, out_tape, symbol_id=symbol_id, symbol_name=symbol,
-                market=market, exchange_id=exchange_id,
-                exchange_name=exchange_name, append=append,
-                max_segment_mb=max_segment_mb, compression=compression,
-                write_metadata=False, qty_multiplier=qty_multiplier)
-        agg.trades_written += s.trades_written
-        agg.rows_read += s.rows_read
-        agg.rows_skipped += s.rows_skipped
-        agg.rows_invalid += s.rows_invalid
-        agg.files_processed += s.files_processed
-        if s.first_ts_ns and (agg.first_ts_ns == 0 or s.first_ts_ns < agg.first_ts_ns):
-            agg.first_ts_ns = s.first_ts_ns
-        if s.last_ts_ns > agg.last_ts_ns:
-            agg.last_ts_ns = s.last_ts_ns
-        if s.last_trade_id > agg.last_trade_id:
-            agg.last_trade_id = s.last_trade_id
 
-    _write_metadata(
-        Path(out_tape),
-        exchange_name=exchange_name,
-        market=market,
-        symbol_id=symbol_id,
-        symbol_name=symbol,
-        first_ts_ns=agg.first_ts_ns,
-        last_ts_ns=agg.last_ts_ns,
-        trades_added=agg.trades_written,
-        qty_multiplier=qty_multiplier,
-    )
+    def write(_: int, parsed: _dedup.ParsedTrades) -> None:
+        _add_stats(agg, _write_file(
+            parsed, out_tape, append=append, symbol_id=symbol_id,
+            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+            compression=compression))
+
+    with _range.spill_dir() as spill, _range.all_or_nothing(out_tape):
+        _range.convert_days([(path, qty_multiplier, spill) for path in paths],
+                            _parse_range_file,
+                            workers=_range.resolve_workers(workers, len(paths)),
+                            then=write)
+        # Per-day metadata is skipped; one write records the whole range
+        # and total count.
+        _write_metadata(
+            out_tape,
+            exchange_name=exchange_name,
+            market=market,
+            symbol_id=symbol_id,
+            symbol_name=symbol,
+            first_ts_ns=agg.first_ts_ns,
+            last_ts_ns=agg.last_ts_ns,
+            trades_added=agg.trades_written,
+            qty_multiplier=qty_multiplier,
+        )
 
     return agg
 
@@ -587,23 +633,6 @@ def _book_mirror_path(mirror: Path, symbol: str, market: str,
     return mirror / market / symbol / f"{symbol}-{product}-{day.isoformat()}.zip"
 
 
-def _file_ts_range_ms(path: Path, *, ts_col: int) -> Optional[Tuple[int, int]]:
-    """Smallest and largest timestamp (ms) in column ``ts_col`` of a
-    book archive file, or None when no row parses."""
-    lo: Optional[int] = None
-    hi: Optional[int] = None
-    for row in _open_csv_lines(path):
-        try:
-            ts = int(row[ts_col])
-        except (ValueError, IndexError):
-            continue
-        if lo is None or ts < lo:
-            lo = ts
-        if hi is None or ts > hi:
-            hi = ts
-    return None if lo is None else (lo, hi)
-
-
 class _BookSink:
     """Writes one file's book records, leaving out those already on the
     tape.
@@ -697,24 +726,6 @@ class _BookSink:
                 self._writer = None
 
 
-def _open_book_sink(csv_path: Path, out_tape: Path, *, ts_col: int,
-                    append: bool, symbol_id: int,
-                    exchange_id: int, max_segment_mb: int,
-                    compression: str) -> _BookSink:
-    import numpy as np
-
-    on_tape = np.empty(0, dtype=np.uint64)
-    if append:
-        span = _file_ts_range_ms(csv_path, ts_col=ts_col)
-        if span is not None:
-            on_tape = _dedup.existing_book_seqs(
-                out_tape, symbol_id,
-                span[0] * 1_000_000, span[1] * 1_000_000)
-    return _BookSink(out_tape, symbol_id=symbol_id, exchange_id=exchange_id,
-                     max_segment_mb=max_segment_mb, compression=compression,
-                     on_tape=on_tape)
-
-
 def _levels_array(items: List[Tuple[int, int]]):
     """Build a PyLevel structured numpy array from (price_raw, qty_raw)
     tuples. The DataWriter ignores the trailing side byte on write."""
@@ -766,13 +777,6 @@ def _book_csv(path: Path) -> _layout.CsvFile:
     return _layout.CsvFile(path, _BOOK_LAYOUTS, source="Binance bookTicker")
 
 
-def _open_csv_lines(path: Path) -> Iterator[List[str]]:
-    """Iterate the data rows of a bookTicker file (zipped or extracted),
-    its header row recognised and left out. Raises UnknownLayoutError
-    for a first row that is not the bookTicker header."""
-    return _book_csv(path).rows()
-
-
 # ── T1 / bookTicker ────────────────────────────────────────────────
 
 
@@ -820,21 +824,140 @@ def t1_to_lrvx(
     if not symbol_name:
         symbol_name = csv_path.stem.split("-", 1)[0]
 
-    sink = _open_book_sink(csv_path, out_tape, ts_col=5,
-                           append=append, symbol_id=symbol_id,
-                           exchange_id=exchange_id,
-                           max_segment_mb=max_segment_mb,
-                           compression=compression)
+    return _write_book_file(
+        _parse_t1_file(csv_path), out_tape, append=append,
+        symbol_id=symbol_id, exchange_id=exchange_id,
+        max_segment_mb=max_segment_mb, compression=compression,
+        write_metadata=write_metadata, exchange_name=exchange_name,
+        market=market, symbol_name=symbol_name)
 
+
+class _BookEvents:
+    """The book records one bookTicker file yields, in file order, kept
+    in a file: ``(ts_ns, seq, is_snapshot, bids, asks)`` with up to two
+    levels a side (a top-of-book delta changes one level and removes at
+    most one). Pickles, so a worker can parse a file into it and hand it
+    to the process that writes the tape, which closes it."""
+
+    _CHUNK = 65_536
+
+    def __init__(self, spill_dir: Optional[Path]) -> None:
+        import tempfile
+
+        import numpy as np
+
+        self.dtype = np.dtype([("ts", "i8"), ("seq", "u8"), ("snap", "u1"),
+                               ("nb", "u1"), ("na", "u1"),
+                               ("bids", "i8", (4,)), ("asks", "i8", (4,))])
+        if spill_dir is None:
+            self._dir = tempfile.TemporaryDirectory(prefix="lrvx-archive-import-")
+            self._path = Path(self._dir.name) / "book.bin"
+            self._path.touch()
+        else:
+            fd, name = tempfile.mkstemp(dir=spill_dir, prefix="book-", suffix=".bin")
+            os.close(fd)
+            self._dir = None
+            self._path = Path(name)
+        self.count = 0
+        self._pending: list = []
+
+    @staticmethod
+    def _flat(levels: List[Tuple[int, int]]) -> tuple:
+        if len(levels) > 2:
+            raise ValueError(f"a top-of-book record has {len(levels)} levels a side")
+        flat = [0, 0, 0, 0]
+        for k, (p, q) in enumerate(levels):
+            flat[2 * k], flat[2 * k + 1] = p, q
+        return tuple(flat)
+
+    def add(self, ts_ns: int, seq: int, is_snapshot: bool,
+            bids: List[Tuple[int, int]], asks: List[Tuple[int, int]]) -> None:
+        self._pending.append((ts_ns, seq, 1 if is_snapshot else 0, len(bids),
+                              len(asks), self._flat(bids), self._flat(asks)))
+        if len(self._pending) >= self._CHUNK:
+            self.flush()
+
+    def flush(self) -> None:
+        import numpy as np
+
+        if not self._pending:
+            return
+        chunk = np.array(self._pending, dtype=self.dtype)
+        self._pending = []
+        with open(self._path, "ab") as f:
+            chunk.tofile(f)
+        self.count += len(chunk)
+
+    def records(self) -> Iterator[Tuple[int, int, bool, list, list]]:
+        import numpy as np
+
+        self.flush()
+        with open(self._path, "rb") as f:
+            for start in range(0, self.count, self._CHUNK):
+                chunk = np.fromfile(f, dtype=self.dtype,
+                                    count=min(self._CHUNK, self.count - start))
+                for ts, seq, snap, nb, na, b, a in chunk.tolist():
+                    yield (ts, seq, bool(snap),
+                           [(b[2 * k], b[2 * k + 1]) for k in range(nb)],
+                           [(a[2 * k], a[2 * k + 1]) for k in range(na)])
+
+    def close(self) -> None:
+        if self._dir is not None:
+            self._dir.cleanup()
+        else:
+            try:
+                self._path.unlink()
+            except FileNotFoundError:
+                pass
+
+    def __getstate__(self) -> dict:
+        if self._dir is not None:
+            raise TypeError("_BookEvents pickles only when built with a spill_dir")
+        if self._pending:
+            raise ValueError("flush() before handing _BookEvents on")
+        return dict(self.__dict__)
+
+
+@dataclass
+class _ParsedBook:
+    """One bookTicker file parsed and not yet written."""
+
+    path: Path
+    events: _BookEvents
+    rows_read: int
+    rows_skipped: int
+    rows_invalid: int
+    # Smallest and largest transaction_time (ms) of the rows whose time
+    # parses, whatever else in the row does: the window dedup reads.
+    span_ms: Optional[Tuple[int, int]]
+
+
+def _parse_t1_file(csv_path: Path,
+                   spill_dir: Optional[Path] = None) -> _ParsedBook:
+    """Parse one bookTicker file into its book records, nothing written
+    yet. The file is encoded on its own: its first change is a snapshot
+    and each later one a delta against the row before."""
     src = _book_csv(csv_path)
+    events = _BookEvents(spill_dir)
     rows_read = 0
     rows_skipped = 0
+    lo: Optional[int] = None
+    hi: Optional[int] = None
     prev_bids: dict = {}
     prev_asks: dict = {}
     is_first_emit = True
     try:
         for row in src.rows():
             rows_read += 1
+            try:
+                t = int(row[5])
+            except (ValueError, IndexError):
+                pass
+            else:
+                if lo is None or t < lo:
+                    lo = t
+                if hi is None or t > hi:
+                    hi = t
             try:
                 update_id = int(row[0])
                 bid_p = float(row[1])
@@ -863,23 +986,63 @@ def t1_to_lrvx(
             ts_ns = ts_ms * 1_000_000
 
             if is_first_emit:
-                sink.emit(ts_ns, update_id, True, list(cur_bids.items()),
-                          list(cur_asks.items()), 1)
+                events.add(ts_ns, update_id, True, list(cur_bids.items()),
+                           list(cur_asks.items()))
                 is_first_emit = False
             else:
                 bid_delta, ask_delta = _diff_book(
                     prev_bids, cur_bids, prev_asks, cur_asks)
-                sink.emit(ts_ns, update_id, False, bid_delta, ask_delta, 1)
+                events.add(ts_ns, update_id, False, bid_delta, ask_delta)
 
             prev_bids = cur_bids
             prev_asks = cur_asks
-    finally:
-        sink.close()
-    src.check(rows_read - src.counts.invalid)
+        events.flush()
+        src.check(rows_read - src.counts.invalid)
+    except BaseException:
+        events.close()
+        raise
+    return _ParsedBook(csv_path, events, rows_read, rows_skipped,
+                       src.counts.invalid, None if lo is None else (lo, hi))
 
+
+def _parse_t1_range_file(job: Tuple[Path, Path]) -> _ParsedBook:
+    """One file of a book range, parsed in a worker of
+    ``_range.convert_days``. A cached file that does not open is evicted
+    from the cache."""
+    path, spill_dir = job
+    with evict_if_corrupt(path):
+        return _parse_t1_file(path, spill_dir)
+
+
+def _write_book_file(parsed: _ParsedBook, out_tape: Path, *, append: bool,
+                     symbol_id: int, exchange_id: int, max_segment_mb: int,
+                     compression: str, write_metadata: bool,
+                     exchange_name: str, market: str,
+                     symbol_name: str) -> BookConvertStats:
+    """Write a parsed file's book records that are not on the tape yet:
+    a record is on the tape when one with its ``seq`` is, for
+    ``symbol_id``, inside the file's time range."""
+    import numpy as np
+
+    try:
+        on_tape = np.empty(0, dtype=np.uint64)
+        if append and parsed.span_ms is not None:
+            on_tape = _dedup.existing_book_seqs(
+                out_tape, symbol_id,
+                parsed.span_ms[0] * 1_000_000, parsed.span_ms[1] * 1_000_000)
+        sink = _BookSink(out_tape, symbol_id=symbol_id, exchange_id=exchange_id,
+                         max_segment_mb=max_segment_mb, compression=compression,
+                         on_tape=on_tape)
+        try:
+            for ts_ns, seq, is_snapshot, bids, asks in parsed.events.records():
+                sink.emit(ts_ns, seq, is_snapshot, bids, asks, 1)
+        finally:
+            sink.close()
+    finally:
+        parsed.events.close()
     return _finish_book_import(
-        sink, out_tape, rows_read=rows_read, rows_skipped=rows_skipped,
-        rows_invalid=src.counts.invalid,
+        sink, out_tape, rows_read=parsed.rows_read,
+        rows_skipped=parsed.rows_skipped, rows_invalid=parsed.rows_invalid,
         write_metadata=write_metadata, exchange_name=exchange_name,
         market=market, symbol_id=symbol_id, symbol_name=symbol_name,
         depth=1)
@@ -974,18 +1137,23 @@ def range_book_to_lrvx(
     max_segment_mb: int = 256,
     compression: str = "none",
     skip_missing: bool = False,
+    workers: Optional[int] = None,
 ) -> BookConvertStats:
     """Convert a range of UTC days (inclusive) of a book archive into
     lrvx book events. Files are cached like the aggTrades range form's,
     in ``<cache_root>/binance`` or ``mirror``, as
     ``<market>/<symbol>/<symbol>-bookTicker-<YYYY-MM-DD>.zip``. Downloads
-    run up to ``parallel`` connections in flight (default 2); conversion
-    is serial so the writer stays append-safe.
+    run up to ``parallel`` connections in flight (default 2). ``workers``
+    processes parse the files (default: one per core, at most one per
+    file; ``1`` parses in this process); the tape is written here, a day
+    at a time in date order, so it is the same tape whatever the count.
+    An import that fails leaves the tape as it was.
 
     ``book_type`` is ``"t1"`` (bookTicker) and ``market`` is
-    ``"um-futures"`` or ``"cm-futures"``; anything else, or a symbol of
-    the wrong shape, raises ValueError before any download. Missing
-    days are handled as in ``range_to_lrvx``."""
+    ``"um-futures"`` or ``"cm-futures"``; anything else, a symbol of the
+    wrong shape, or ``workers`` below 1 raises ValueError before any
+    download. Missing days are handled as in ``range_to_lrvx``."""
+    _range.check_workers(workers)
     _check_book_request(book_type, market)
     check_symbol(symbol, market)
 
@@ -1004,31 +1172,33 @@ def range_book_to_lrvx(
         days, _ensure, parallel=parallel, skip_missing=skip_missing,
         what=f"binance {market} {_BOOK_PRODUCT_NAMES[book_type]} {symbol}")
 
+    paths = [path for _, path in pairs if path is not None]
+    out_tape = Path(out_tape).expanduser()
     agg = BookConvertStats()
-    for day, path in pairs:
-        if path is None:
-            continue
-        with evict_if_corrupt(path):
-            stats = t1_to_lrvx(
-                path, out_tape,
-                symbol_id=symbol_id, symbol_name=symbol, market=market,
-                exchange_id=exchange_id, exchange_name=exchange_name,
-                append=append, max_segment_mb=max_segment_mb,
-                compression=compression, write_metadata=False,
-            )
-        _aggregate_book_stats(agg, stats)
 
-    if agg.snapshots_written + agg.deltas_written > 0:
-        _write_book_metadata(
-            Path(out_tape),
-            exchange_name=exchange_name,
-            market=market,
-            symbol_id=symbol_id,
-            symbol_name=symbol,
-            first_ts_ns=agg.first_ts_ns,
-            last_ts_ns=agg.last_ts_ns,
-            updates_added=agg.snapshots_written + agg.deltas_written,
-            depth=1,
-        )
+    def write(_: int, parsed: _ParsedBook) -> None:
+        _aggregate_book_stats(agg, _write_book_file(
+            parsed, out_tape, append=append, symbol_id=symbol_id,
+            exchange_id=exchange_id, max_segment_mb=max_segment_mb,
+            compression=compression, write_metadata=False,
+            exchange_name=exchange_name, market=market, symbol_name=symbol))
+
+    with _range.spill_dir() as spill, _range.all_or_nothing(out_tape):
+        _range.convert_days([(path, spill) for path in paths],
+                            _parse_t1_range_file,
+                            workers=_range.resolve_workers(workers, len(paths)),
+                            then=write)
+        if agg.snapshots_written + agg.deltas_written > 0:
+            _write_book_metadata(
+                out_tape,
+                exchange_name=exchange_name,
+                market=market,
+                symbol_id=symbol_id,
+                symbol_name=symbol,
+                first_ts_ns=agg.first_ts_ns,
+                last_ts_ns=agg.last_ts_ns,
+                updates_added=agg.snapshots_written + agg.deltas_written,
+                depth=1,
+            )
 
     return agg
