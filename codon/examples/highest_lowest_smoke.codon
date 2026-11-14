@@ -1,0 +1,94 @@
+# Smoke test: Highest and Lowest in lrvx.indicators.
+#
+# The window includes the current value; value is NaN (ready False) until
+# `period` values have been seen, and a NaN in the window makes the value
+# NaN until it leaves, as SMA's window does. The batch functions highest()
+# and lowest() equal the streaming classes element by element.
+
+import math
+
+from lrvx.indicators import Highest, Lowest, highest, lowest, SMA
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+def same(a: float, b: float) -> bool:
+    if math.isnan(a) or math.isnan(b):
+        return math.isnan(a) and math.isnan(b)
+    return a == b
+
+
+def same_list(a: List[float], b: List[float]) -> bool:
+    if len(a) != len(b):
+        return False
+    for i in range(len(a)):
+        if not same(a[i], b[i]):
+            return False
+    return True
+
+
+nan = math.nan
+xs = [5.0, 3.0, 4.0, 9.0, 2.0, 2.0, 1.0, 7.0]
+
+hi = Highest(3)
+check(hi.count == 0 and not hi.ready and math.isnan(hi.value), "Highest: fresh")
+got = [hi.update(x) for x in xs]
+want = [nan, nan, 5.0, 9.0, 9.0, 9.0, 2.0, 7.0]
+check(same_list(got, want), f"Highest(3) {got}")
+check(hi.value == 7.0 and hi.ready and hi.count == 8, "Highest: value / ready / count")
+check(same_list(highest(xs, 3), want), "highest() equals streaming")
+check(same_list(hi.compute(xs), want), "Highest.compute equals streaming")
+hi.reset()
+check(hi.count == 0 and math.isnan(hi.value) and not hi.ready, "Highest: reset")
+check(same_list([hi.update(x) for x in xs], want), "Highest: same values after reset")
+eq = Highest(3)
+check(same_list([eq.update(x) for x in [4.0, 4.0, 4.0, 4.0]], [nan, nan, 4.0, 4.0]),
+      "Highest: equal values")
+
+nx = [1.0, nan, 2.0, 3.0, 4.0, 5.0]
+hn = Highest(3)
+ng = [hn.update(x) for x in nx]
+check(same_list(ng, [nan, nan, nan, nan, 4.0, 5.0]), f"Highest NaN window: {ng}")
+check(same_list(highest(nx, 3), ng), "highest() equals streaming through NaN")
+sm = SMA(3)
+sg = [sm.update(x) for x in nx]
+for i in range(len(nx)):
+    check(math.isnan(ng[i]) == math.isnan(sg[i]), f"Highest NaN warm-up matches SMA at {i}")
+
+lo = Lowest(3)
+lg = [lo.update(x) for x in xs]
+lw = [nan, nan, 3.0, 3.0, 2.0, 2.0, 1.0, 1.0]
+check(same_list(lg, lw), f"Lowest(3) {lg}")
+check(same_list(lowest(xs, 3), lw), "lowest() equals streaming")
+drop = Lowest(2)
+check(same_list([drop.update(x) for x in [1.0, 5.0, 6.0, 0.0]], [nan, 1.0, 5.0, 0.0]),
+      "Lowest: the old minimum drops out")
+lo.reset()
+check(lo.count == 0 and math.isnan(lo.value), "Lowest: reset")
+ln = Lowest(3)
+check(same_list([ln.update(x) for x in nx], [nan, nan, nan, nan, 2.0, 3.0]), "Lowest NaN window")
+
+for name in ("Highest", "Lowest"):
+    refused = False
+    try:
+        if name == "Highest":
+            Highest(0)
+        else:
+            Lowest(0)
+    except ValueError:
+        refused = True
+    check(refused, f"{name}(0) is refused")
+
+if failed:
+    print(f"{failed} check(s) failed")
+    raise ValueError("highest_lowest_smoke failed")
+print("all highest / lowest checks passed")

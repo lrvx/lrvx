@@ -28,6 +28,14 @@
 #include "lrvx/indicator/slope.h"
 #include "lrvx/indicator/sma.h"
 #include "lrvx/indicator/stochastic.h"
+// Optional until the rows exist, so the cases below fail at run time (a case
+// with no registry row) instead of every binding test failing to compile.
+#if __has_include("lrvx/indicator/highest.h")
+#include "lrvx/indicator/highest.h"
+#endif
+#if __has_include("lrvx/indicator/lowest.h")
+#include "lrvx/indicator/lowest.h"
+#endif
 
 #include <gtest/gtest.h>
 
@@ -74,6 +82,8 @@ inline const std::map<std::string, std::vector<double>> kCases = {
     {"correlation", {20}},
     {"macd", {12, 26, 9}},
     {"bollinger", {20, 2.0}},
+    {"highest", {14}},
+    {"lowest", {14}},
 };
 
 struct Row

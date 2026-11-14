@@ -752,7 +752,7 @@ groups:
   indicator_functions:
     pybind11:
       status: required
-      functions: [sma, ema, rsi, macd, atr]
+      functions: [sma, ema, rsi, macd, atr, highest, lowest]
     napi:
       status: required
       functions: [sma, ema, rsi, macd, atr]
@@ -771,8 +771,10 @@ groups:
         lrvx_indicator_cvd: __lrvx_indicator_cvd
         lrvx_indicator_dema: __lrvx_indicator_dema
         lrvx_indicator_ema: __lrvx_indicator_ema
+        lrvx_indicator_highest: __lrvx_indicator_highest
         lrvx_indicator_kama: __lrvx_indicator_kama
         lrvx_indicator_kurtosis: __lrvx_indicator_kurtosis
+        lrvx_indicator_lowest: __lrvx_indicator_lowest
         lrvx_indicator_macd: __lrvx_indicator_macd
         lrvx_indicator_obv: __lrvx_indicator_obv
         lrvx_indicator_parkinson_vol: __lrvx_indicator_parkinson_vol
@@ -795,13 +797,14 @@ groups:
   streaming_indicator:
     pybind11:
       status: required
-      classes: [SMA, EMA, ATR, MACD, Bollinger, Stochastic, Correlation]
+      classes: [SMA, EMA, ATR, MACD, Bollinger, Stochastic, Correlation, Highest, Lowest]
     napi:
       status: required
-      classes: [SMA, EMA, ATR, MACD, Bollinger, Stochastic, Correlation]
+      classes: [SMA, EMA, ATR, MACD, Bollinger, Stochastic, Correlation, Highest, Lowest]
     codon: { status: required }
     quickjs:
       status: required
+      classes: [Highest, Lowest]
       functions:
         lrvx_streaming_indicator_create: __lrvx_streaming_indicator_create
         lrvx_streaming_indicator_destroy: __lrvx_streaming_indicator_destroy
@@ -922,6 +925,7 @@ groups:
     quickjs:
       status: required
       functions:
+        lrvx_bars_in_position: __lrvx_bars_in_position
         lrvx_best_ask_raw: __lrvx_best_ask
         lrvx_best_ask_raw_opt: __lrvx_best_ask
         lrvx_best_bid_raw: __lrvx_best_bid
@@ -929,8 +933,37 @@ groups:
         lrvx_get_order_status: __lrvx_get_order_status
         lrvx_last_trade_price_raw: __lrvx_last_trade_price
         lrvx_mid_price_raw: __lrvx_mid_price
+        lrvx_entry_price_raw_opt: __lrvx_entry_price
         lrvx_mid_price_raw_opt: __lrvx_mid_price
         lrvx_position_raw: __lrvx_position
+
+  # Exit rules for bar strategies (include/lrvx/strategy/exits.h). The
+  # Python classes live in lrvx.exits with the same arithmetic as the C++
+  # header, so the Python package does not call these handles.
+  exit_rules:
+    pybind11: { status: not_applicable }  # pure-Python lrvx.exits, same arithmetic
+    napi:
+      status: required
+      classes: [AtrStop, ChandelierExit, BreakEvenTrail, PercentStop, TakeProfit, TimeStop]
+    codon: { status: required }
+    quickjs:
+      status: required
+      classes: [AtrStop, ChandelierExit, BreakEvenTrail, PercentStop, TakeProfit, TimeStop]
+
+  # A fixed-capacity ring of the last values, newest first, and the
+  # crossed_above / crossed_below helpers.
+  history:
+    pybind11:
+      status: required
+      classes: [History]
+      functions: [crossed_above, crossed_below]
+    napi:
+      status: required
+      classes: [History]
+    codon: { status: required }
+    quickjs:
+      status: required
+      classes: [History]
 
   multi_tf_helpers:
     pybind11: { status: not_applicable }  # surfaced via Strategy class methods

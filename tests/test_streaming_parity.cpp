@@ -360,7 +360,7 @@ TEST(StreamingParity, CoversEveryRegistryRow)
       "DEMA", "TEMA", "Slope", "Skewness", "Kurtosis",
       "RollingZScore", "ShannonEntropy", "AutoCorrelation",
       "ATR", "CCI", "CHOP", "Stochastic", "ParkinsonVol", "RogersSatchellVol",
-      "Correlation", "MACD", "Bollinger"};
+      "Correlation", "MACD", "Bollinger", "Highest", "Lowest"};
   std::vector<std::string> registry;
 #define LRVX_INDICATOR(Cls, name, Kind, Args) registry.emplace_back(#Cls);
 #include "lrvx/indicator/registry.def"
