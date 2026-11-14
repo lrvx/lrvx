@@ -1,0 +1,2985 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/reference/node/strategy/">
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../backtest/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Strategy & Runner - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#strategy-runner" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Strategy & Runner
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../how-to/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../how-to/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../portable-sockets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sockets across platforms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../python/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Node.js
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_4" id="__nav_8_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Node.js
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy & Runner
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy & Runner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#symbolregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SymbolRegistry
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SymbolRegistry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symbol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#strategy-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy object
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Strategy object">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#order-event-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order-event callbacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bardata-bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BarData (bar)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#symbolcontext-ctx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SymbolContext (ctx)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tradedata-trade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TradeData (trade)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#emit-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        emit methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runner
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runner">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hook-setters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook setters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reporting-a-live-orders-updates-and-fills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reporting a live order's updates and fills
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-position-the-account-already-holds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A position the account already holds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trace-recording" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trace recording
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal callback
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../indicators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aggregators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bar aggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../books/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order books
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../positions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Position tracking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles & statistics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data I/O
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../codon/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codon
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../quickjs/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JavaScript (embedded)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/capi/lrvx_capi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../../errors/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../api/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core (C++ internals)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#symbolregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SymbolRegistry
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SymbolRegistry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#symbol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symbol
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#strategy-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strategy object
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Strategy object">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#order-event-callbacks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Order-event callbacks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bardata-bar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BarData (bar)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#symbolcontext-ctx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SymbolContext (ctx)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tradedata-trade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TradeData (trade)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#emit-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        emit methods
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runner
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runner">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hook-setters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook setters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reporting-a-live-orders-updates-and-fills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reporting a live order's updates and fills
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-position-the-account-already-holds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A position the account already holds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trace-recording" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trace recording
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-callback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signal callback
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="strategy-runner">Strategy, Runner<a class="headerlink" href="#strategy-runner" title="Permanent link">&para;</a></h1>
+<div class="language-javascript highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">SymbolRegistry</span><span class="p">,</span><span class="w"> </span><span class="nx">Runner</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s1">'@lrvx/lrvx'</span><span class="p">);</span>
+</span></code></pre></div>
+<hr />
+<h2 id="symbolregistry">SymbolRegistry<a class="headerlink" href="#symbolregistry" title="Permanent link">&para;</a></h2>
+<div class="language-javascript highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">registry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">lrvx</span><span class="p">.</span><span class="nx">SymbolRegistry</span><span class="p">();</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>addSymbol(exchange, name, tickSize?, lotSize?)</code></td>
+<td><code>Symbol</code></td>
+<td>Register a symbol. <code>tickSize</code> is the venue's price increment and a backtest rejects orders priced off it; left out, the book uses 0.01 and order prices are not checked. <code>lotSize</code> is the venue's quantity step and a backtest rejects an order whose quantity is not a whole number of it; left out, quantities are not checked</td>
+</tr>
+<tr>
+<td><code>symbolCount()</code></td>
+<td><code>number</code></td>
+<td>Number of registered symbols</td>
+</tr>
+<tr>
+<td><code>tickSize(symbol)</code></td>
+<td><code>number</code></td>
+<td>The price tick the entry holds now</td>
+</tr>
+<tr>
+<td><code>tickSizeDeclared(symbol)</code></td>
+<td><code>boolean</code></td>
+<td>Whether order prices on the symbol are checked against it</td>
+</tr>
+<tr>
+<td><code>lotSize(symbol)</code></td>
+<td><code>number \| null</code></td>
+<td>The quantity step the entry holds now, <code>null</code> when it declares none</td>
+</tr>
+</tbody>
+</table>
+<p>The three getters take a <code>Symbol</code> or its numeric id and read the registry entry: <code>tickSize(symbol)</code> is 0.01 with <code>tickSizeDeclared(symbol)</code> <code>false</code> for a symbol registered without a tick, and both follow a tick or lot applied to the entry later. An id that is not registered throws a <code>RangeError</code>.</p>
+<h3 id="symbol">Symbol<a class="headerlink" href="#symbol" title="Permanent link">&para;</a></h3>
+<p>Returned by <code>addSymbol</code>. Coerces to a number wherever a symbol ID is expected.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>number</code></td>
+<td>Numeric symbol ID</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>string</code></td>
+<td>Symbol name</td>
+</tr>
+<tr>
+<td><code>exchange</code></td>
+<td><code>string</code></td>
+<td>Exchange name</td>
+</tr>
+<tr>
+<td><code>tickSize</code></td>
+<td><code>number</code></td>
+<td>Tick size</td>
+</tr>
+<tr>
+<td><code>lotSize</code></td>
+<td><code>number \| null</code></td>
+<td>Quantity step the symbol was registered with, <code>null</code> when none was given</td>
+</tr>
+</tbody>
+</table>
+<div class="language-javascript highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">btc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">registry</span><span class="p">.</span><span class="nx">addSymbol</span><span class="p">(</span><span class="s1">'binance'</span><span class="p">,</span><span class="w"> </span><span class="s1">'BTCUSDT'</span><span class="p">,</span><span class="w"> </span><span class="mf">0.01</span><span class="p">);</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nx">btc</span><span class="p">.</span><span class="nx">id</span><span class="w">         </span><span class="c1">// 1</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="nx">btc</span><span class="p">.</span><span class="nx">name</span><span class="w">       </span><span class="c1">// "BTCUSDT"</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nb">Number</span><span class="p">(</span><span class="nx">btc</span><span class="p">)</span><span class="w">    </span><span class="c1">// 1</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nx">btc</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">0</span><span class="w">        </span><span class="c1">// 1</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nx">btc</span><span class="p">.</span><span class="nx">toString</span><span class="p">()</span><span class="w"> </span><span class="c1">// "Symbol(binance:BTCUSDT, id=1)"</span>
+</span></code></pre></div>
+<hr />
+<h2 id="strategy-object">Strategy object<a class="headerlink" href="#strategy-object" title="Permanent link">&para;</a></h2>
+<p>A plain JavaScript object with callback properties.</p>
+<div class="language-javascript highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">strategy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="nx">symbols</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="nx">btc</span><span class="p">],</span><span class="w">   </span><span class="c1">// array of Symbol or number</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nx">onStart</span><span class="p">()</span><span class="w"> </span><span class="p">{},</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nx">onStop</span><span class="p">()</span><span class="w"> </span><span class="p">{},</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nx">onTrade</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">trade</span><span class="p">,</span><span class="w"> </span><span class="nx">emit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nx">onBookUpdate</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">emit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nx">onTouch</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">emit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nx">onBar</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">bar</span><span class="p">,</span><span class="w"> </span><span class="nx">emit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="nx">onFill</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">ev</span><span class="p">,</span><span class="w"> </span><span class="nx">emit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="nx">onOrderUpdate</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">ev</span><span class="p">,</span><span class="w"> </span><span class="nx">emit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span><span class="nx">onQueuePositionChange</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">ev</span><span class="p">,</span><span class="w"> </span><span class="nx">emit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">    </span><span class="nx">onMarketPositionChange</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">ev</span><span class="p">,</span><span class="w"> </span><span class="nx">emit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">},</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="p">};</span>
+</span></code></pre></div>
+<p>All callbacks are optional.</p>
+<p><code>onTouch</code> fires when the touch changes (price or size on either side, or a
+side appearing or emptying): on a top-of-book frame, and right after
+<code>onBookUpdate</code> on a depth frame that moved it. <code>ctx.bestBid</code> / <code>ctx.bestAsk</code>
+are the new touch.</p>
+<h3 id="order-event-callbacks">Order-event callbacks<a class="headerlink" href="#order-event-callbacks" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Callback</th>
+<th>Fires on</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>onFill(ctx, ev, emit)</code></td>
+<td>Every fill this strategy's own orders produce (status <code>PARTIALLY_FILLED</code> or <code>FILLED</code>)</td>
+</tr>
+<tr>
+<td><code>onOrderUpdate(ctx, ev, emit)</code></td>
+<td>Every order-lifecycle status change: <code>NEW</code> / <code>ACCEPTED</code> / <code>CANCELED</code> / <code>REJECTED</code> / <code>REPLACED</code> / <code>TRIGGERED</code> / <code>TRAILING_UPDATED</code> and the rest. A fill does not fire here: a <code>PARTIALLY_FILLED</code> or <code>FILLED</code> event reaches <code>onFill</code> only</td>
+</tr>
+<tr>
+<td><code>onQueuePositionChange(ctx, ev, emit)</code></td>
+<td>A resting limit order's queue position moved with no other lifecycle transition. <code>ev.queueAhead</code> / <code>ev.queueTotal</code> carry the snapshot. Backtest only</td>
+</tr>
+<tr>
+<td><code>onMarketPositionChange(ctx, ev, emit)</code></td>
+<td>A resting limit order's categorical market position transitioned (best / behind_best / mid_spread / level_empty / crossed). Backtest only</td>
+</tr>
+</tbody>
+</table>
+<p><code>ctx.position</code> in <code>onFill</code> and <code>onOrderUpdate</code> already counts the fill being
+delivered: the runner's position tracker takes a fill before the strategy
+hears of it. After a buy of 1 from flat, <code>ctx.position</code> in that fill's
+<code>onFill</code> is 1.</p>
+<p><code>ev</code> is an <code>OrderEventData</code>: <code>orderId</code>, <code>symbolId</code>, <code>side</code>, <code>orderType</code>,
+<code>status</code>, <code>fillQty</code>, <code>fillPrice</code>, <code>exchangeTsNs</code>, <code>rejectReason</code>,
+<code>queueAhead</code>, <code>queueTotal</code>, the per-stage timestamps <code>submittedAtNs</code> /
+<code>acceptedAtNs</code> / <code>firstFillAtNs</code> / <code>lastFillAtNs</code> / <code>canceledAtNs</code> /
+<code>rejectedAtNs</code> / <code>triggeredAtNs</code> / <code>expiredAtNs</code>, plus <code>isMaker</code>,
+<code>fillRole</code>, <code>marketPosition</code> and <code>distanceToBestTicks</code>.</p>
+<p><code>exchangeTsNs</code> and the eight per-stage timestamps are <code>bigint</code>: they are
+clock readings, and a JS <code>number</code> steps 256 ns at a time at today's values.
+A stage the order has not reached reads <code>0n</code>. They compare against each
+other and against a <code>number</code>; for a latency, subtract first and convert the
+difference: <code>Number(ev.acceptedAtNs - ev.submittedAtNs)</code>.</p>
+<h3 id="bardata-bar">BarData (<code>bar</code>)<a class="headerlink" href="#bardata-bar" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>open</code>, <code>high</code>, <code>low</code>, <code>close</code></td>
+<td><code>number</code></td>
+<td>OHLC prices</td>
+</tr>
+<tr>
+<td><code>volume</code>, <code>buyVolume</code></td>
+<td><code>number</code></td>
+<td>Total / buy-side volume</td>
+</tr>
+<tr>
+<td><code>startTimeNs</code>, <code>endTimeNs</code></td>
+<td><code>bigint</code></td>
+<td>Bar window timestamps (nanoseconds)</td>
+</tr>
+<tr>
+<td><code>barType</code>, <code>barTypeParam</code></td>
+<td><code>number</code></td>
+<td>0=Time, 1=Tick, ... + interval/threshold</td>
+</tr>
+<tr>
+<td><code>closeReason</code></td>
+<td><code>number</code></td>
+<td>0=Threshold, 1=Gap, 2=Forced, 3=Warmup. The engine emits <code>Threshold</code> for a normal close, <code>Gap</code> for the bar that absorbs the remainder of a Renko price jump too wide to walk brick by brick, and <code>Forced</code> for a <code>stop()</code> flush; <code>Warmup</code> is never assigned by the engine itself -- it is for callers who construct their own <code>Bar</code> objects from historical data before calling <code>BarMatrix::warmup()</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="symbolcontext-ctx">SymbolContext (<code>ctx</code>)<a class="headerlink" href="#symbolcontext-ctx" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>position</code></td>
+<td><code>number</code></td>
+<td>Current position quantity</td>
+</tr>
+<tr>
+<td><code>symbolId</code></td>
+<td><code>number</code></td>
+<td>Symbol ID</td>
+</tr>
+<tr>
+<td><code>lastTradePrice</code></td>
+<td><code>number</code></td>
+<td>Last trade price</td>
+</tr>
+<tr>
+<td><code>bestBid</code></td>
+<td><code>number \| null</code></td>
+<td>Best bid; <code>null</code> when the bid side has no level. A book may be quoted at exactly zero, so <code>0</code> is a price, never "no quote"</td>
+</tr>
+<tr>
+<td><code>bestAsk</code></td>
+<td><code>number \| null</code></td>
+<td>Best ask; <code>null</code> when the ask side has no level</td>
+</tr>
+<tr>
+<td><code>midPrice</code></td>
+<td><code>number \| null</code></td>
+<td>Mid price; <code>null</code> unless both sides have a level</td>
+</tr>
+<tr>
+<td><code>lastUpdateNs</code></td>
+<td><code>bigint</code></td>
+<td>Exchange timestamp (ns) of the last dispatched event: trade, depth frame or bar</td>
+</tr>
+<tr>
+<td><code>lastTouchNs</code></td>
+<td><code>bigint</code></td>
+<td>Exchange timestamp (ns) of the frame that last wrote the touch. A <code>TOP_OF_BOOK</code> frame moves it without firing <code>onBookUpdate</code>, so it can be fresher than <code>lastUpdateNs</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="tradedata-trade">TradeData (<code>trade</code>)<a class="headerlink" href="#tradedata-trade" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>price</code></td>
+<td><code>number</code></td>
+<td>Trade price</td>
+</tr>
+<tr>
+<td><code>qty</code></td>
+<td><code>number</code></td>
+<td>Trade quantity</td>
+</tr>
+<tr>
+<td><code>isBuy</code></td>
+<td><code>boolean</code></td>
+<td>Buy-side aggressor</td>
+</tr>
+<tr>
+<td><code>side</code></td>
+<td><code>string</code></td>
+<td><code>"buy"</code> or <code>"sell"</code></td>
+</tr>
+<tr>
+<td><code>timestampNs</code></td>
+<td><code>BigInt</code></td>
+<td>Timestamp (nanoseconds)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="emit-methods">emit methods<a class="headerlink" href="#emit-methods" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>emit.marketBuy(qty)</code></td>
+<td><code>number</code></td>
+<td>Market buy</td>
+</tr>
+<tr>
+<td><code>emit.marketSell(qty)</code></td>
+<td><code>number</code></td>
+<td>Market sell</td>
+</tr>
+<tr>
+<td><code>emit.limitBuy(price, qty)</code></td>
+<td><code>number</code></td>
+<td>Limit buy</td>
+</tr>
+<tr>
+<td><code>emit.limitSell(price, qty)</code></td>
+<td><code>number</code></td>
+<td>Limit sell</td>
+</tr>
+<tr>
+<td><code>emit.provideLiquidity(priceLower, priceUpper, liquidity)</code></td>
+<td><code>number</code></td>
+<td>Provide AMM liquidity in a price range</td>
+</tr>
+<tr>
+<td><code>emit.withdrawLiquidity(liquidity)</code></td>
+<td><code>number</code></td>
+<td>Withdraw AMM liquidity</td>
+</tr>
+<tr>
+<td><code>emit.cancel(orderId)</code></td>
+<td><code>undefined</code></td>
+<td>Cancel order</td>
+</tr>
+<tr>
+<td><code>emit.modify(orderId, newPrice, newQty)</code></td>
+<td><code>undefined</code></td>
+<td>Change the price and quantity of a working order. It keeps its id, symbol, side and type; <code>newQty</code> is the quantity left to work. <code>newPrice</code> is the trigger of a stop-market, take-profit-market or trailing-stop order and the limit price of every other type. <code>orderId</code> is the id the emitting function returned, which is also the <code>ev.orderId</code> of the order's events. A refused modify arrives in <code>onOrderUpdate</code> as <code>REPLACE_REJECTED</code> with <code>rejectReason</code> set</td>
+</tr>
+<tr>
+<td><code>emit.closePosition()</code></td>
+<td><code>number</code></td>
+<td>Close position (reduce-only). <code>0</code> when flat: no order is sent</td>
+</tr>
+</tbody>
+</table>
+<p>The functions that send an order return its id, as the Python, Codon and
+QuickJS ones do: the <code>orderId</code> the order's events carry, and what
+<code>emit.cancel</code> and <code>emit.modify</code> take.</p>
+<div class="language-javascript highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nx">onBar</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span><span class="w"> </span><span class="nx">bar</span><span class="p">,</span><span class="w"> </span><span class="nx">emit</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="k">this</span><span class="p">.</span><span class="nx">orderId</span><span class="p">)</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="nx">orderId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">emit</span><span class="p">.</span><span class="nx">limitBuy</span><span class="p">(</span><span class="nx">bar</span><span class="p">.</span><span class="nx">close</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">);</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="k">else</span><span class="w"> </span><span class="nx">emit</span><span class="p">.</span><span class="nx">modify</span><span class="p">(</span><span class="k">this</span><span class="p">.</span><span class="nx">orderId</span><span class="p">,</span><span class="w"> </span><span class="nx">bar</span><span class="p">.</span><span class="nx">close</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">1</span><span class="p">);</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>In a backtest, a <code>limitBuy</code> / <code>limitSell</code> price that is not a whole number of the symbol's <code>tickSize</code> is rejected: <code>onOrderUpdate</code> receives <code>status</code> <code>"REJECTED"</code> with <code>rejectReason</code> <code>"price_off_tick"</code>. See <a href="../../api/backtest/simulated_executor/#order-prices-and-the-tick">SimulatedExecutor</a>.</p>
+<p>A quantity is checked when the symbol was registered with a quantity step, the fourth argument of <code>registry.addSymbol(exchange, name, tickSize, lotSize)</code>: an order whose quantity is not a whole number of <code>lotSize</code> is rejected with <code>rejectReason</code> <code>"quantity_off_lot"</code>, and an <code>emit.modify</code> to such a quantity gets <code>"REPLACE_REJECTED"</code>. Without <code>lotSize</code> quantities are not checked. The returned symbol carries it as <code>lotSize</code> (<code>null</code> when not given); a <code>lotSize</code> that is not positive throws a <code>RangeError</code>. See <a href="../../api/backtest/simulated_executor/#order-quantities-and-the-lot">SimulatedExecutor</a>.</p>
+<hr />
+<h2 id="runner">Runner<a class="headerlink" href="#runner" title="Permanent link">&para;</a></h2>
+<p>Synchronous strategy host. Strategy callbacks fire in the caller's thread before the push call returns.</p>
+<div class="language-javascript highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">runner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">lrvx</span><span class="p">.</span><span class="nx">Runner</span><span class="p">(</span><span class="nx">registry</span><span class="p">,</span><span class="w"> </span><span class="nx">onSignal</span><span class="p">);</span><span class="w">        </span><span class="c1">// synchronous</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kd">const</span><span class="w"> </span><span class="nx">runner</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">lrvx</span><span class="p">.</span><span class="nx">Runner</span><span class="p">(</span><span class="nx">registry</span><span class="p">,</span><span class="w"> </span><span class="nx">onSignal</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span><span class="w">  </span><span class="c1">// Disruptor background thread</span>
+</span></code></pre></div>
+<p>In threaded mode, events are published to a lock-free ring buffer and callbacks fire in a background C++ thread.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>addStrategy(strategy)</code></td>
+<td>Register a strategy object. The runner gives each strategy its own subscriber id, 1, 2, ... in the order added, and order ids are <code>(id &lt;&lt; 32) + n</code>, so two strategies on one runner never issue the same order id. Throws when the engine refuses the strategy</td>
+</tr>
+<tr>
+<td><code>replaceStrategy(index, strategy)</code></td>
+<td>Atomically swap the strategy at <code>index</code>. The old strategy's <code>onStop</code> fires before the swap, the new one's <code>onStart</code> after; bus subscriptions, in-flight orders and connections are untouched. Must be invoked on the V8 thread</td>
+</tr>
+<tr>
+<td><code>start()</code></td>
+<td>Start the runner</td>
+</tr>
+<tr>
+<td><code>stop()</code></td>
+<td>Stop and clean up</td>
+</tr>
+<tr>
+<td><code>onTrade(symbol, price, qty, isBuy, tsNs)</code></td>
+<td>Inject a trade tick</td>
+</tr>
+<tr>
+<td><code>onBookSnapshot(symbol, bidPrices, bidQtys, askPrices, askQtys, tsNs)</code></td>
+<td>Inject an L2 snapshot</td>
+</tr>
+<tr>
+<td><code>onBookTop(symbol, bid, ask, tsNs)</code></td>
+<td>Inject a touch-only frame: moves the strategy's touch without a book callback. <code>bid</code> / <code>ask</code> are <code>{ price, qty }</code>; <code>null</code> means that side of the book is empty</td>
+</tr>
+<tr>
+<td><code>onBar(symbol, { open, high, low, close, volume?, ... })</code></td>
+<td>Inject a closed OHLC bar</td>
+</tr>
+</tbody>
+</table>
+<p><code>symbol</code> accepts a <code>Symbol</code> object or a raw number. <code>tsNs</code> accepts a number or a <code>bigint</code>.
+<code>bidPrices</code> / <code>bidQtys</code> / <code>askPrices</code> / <code>askQtys</code> are <code>Float64Array</code>, one entry per book
+level; each price array must be the same length as its matching quantity array.</p>
+<p>Exceptions behave differently in the two modes. In sync mode, a throw from
+<code>onTrade</code> / <code>onBookSnapshot</code> / <code>onBar</code> propagates straight out of the call,
+so a <code>try</code>/<code>catch</code> around it works normally. In threaded mode there's no
+caller waiting on the call (it runs on a libuv-scheduled turn), so Node
+just logs a one-time <code>DEP0168</code> deprecation warning and drops the
+exception; the strategy quietly misses that event. Put the <code>try</code>/<code>catch</code>
+inside the callback itself if a threaded strategy needs to see its own
+exceptions.</p>
+<h3 id="hook-setters">Hook setters<a class="headerlink" href="#hook-setters" title="Permanent link">&para;</a></h3>
+<p>Each takes a plain JS object, or <code>null</code> to detach.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>setPnlTracker(tracker)</code></td>
+<td>Attach a PnL tracker</td>
+</tr>
+<tr>
+<td><code>setStorageSink(sink)</code></td>
+<td>Attach a signal storage sink</td>
+</tr>
+<tr>
+<td><code>setRiskManager(rm)</code></td>
+<td>Attach a pre-trade risk manager. Sync only — <code>allow</code> is read inline; throws when <code>threaded</code></td>
+</tr>
+<tr>
+<td><code>setKillSwitch(ks)</code></td>
+<td>Attach a kill switch. Sync only</td>
+</tr>
+<tr>
+<td><code>setOrderValidator(ov)</code></td>
+<td>Attach an order validator. Sync only</td>
+</tr>
+<tr>
+<td><code>setMarketDataRecorder(recorder)</code></td>
+<td>Attach a <code>MarketDataRecorderHook</code> or <code>BinaryLogRecorderHook</code></td>
+</tr>
+<tr>
+<td><code>setExecutor(executor)</code></td>
+<td>Replace the executor. Sync only — <code>capabilities()</code> is read inline</td>
+</tr>
+<tr>
+<td><code>orderClosed(orderId)</code></td>
+<td>Tell the runner an order it sent to the executor is finished. <code>orderId</code> is a <code>number</code> or a <code>bigint</code></td>
+</tr>
+</tbody>
+</table>
+<p>With an executor attached the runner keeps every order that can rest, by id, so that <code>emit.modify</code> reaches <code>executor.replace</code> as that order with its price and quantity changed. Nothing tells the runner of a fill, so call <code>orderClosed(orderId)</code> from wherever the executor learns an order has reached a terminal state (filled, cancelled by the venue, rejected, expired); the entry is dropped, and an id the runner does not hold is ignored. <code>emit.cancel</code> drops the entry by itself, and market, IOC and FOK orders are never kept. The two legs of an OCO leave the record together: a cancel of either leg, or <code>orderClosed</code> with either leg's id, drops both, because the venue cancels the other leg when one fills or is cancelled.</p>
+<p>An <code>emit.modify</code> that names an id the runner does not hold (never sent, not an order that rests, cancelled, or reported closed) is not sent to the executor, and after it <code>lrvx.lastError()</code> reads <code>modify: order &lt;id&gt; is not on record with this executor ... [unknown_order]</code>.</p>
+<h4 id="reading-why-a-signal-went-nowhere">Reading why a signal went nowhere<a class="headerlink" href="#reading-why-a-signal-went-nowhere" title="Permanent link">&para;</a></h4>
+<p>Every <code>emit.*</code> function clears <code>lrvx.lastError()</code> on entry. Read it right after the emit, inside the callback that emitted: <code>''</code> means nothing refused the signal, otherwise it says what did.</p>
+<table>
+<thead>
+<tr>
+<th><code>lrvx.lastError()</code> ends in</th>
+<th>What happened</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[kill_switch]</code></td>
+<td><code>killSwitch.check</code> returned <code>false</code></td>
+</tr>
+<tr>
+<td><code>[order_validator]</code></td>
+<td><code>orderValidator.validate</code> returned <code>false</code></td>
+</tr>
+<tr>
+<td><code>[risk_manager]</code></td>
+<td><code>riskManager.allow</code> returned <code>false</code></td>
+</tr>
+<tr>
+<td><code>[unknown_order]</code></td>
+<td>an <code>emit.modify</code> named an order the runner's executor record does not hold</td>
+</tr>
+</tbody>
+</table>
+<p>A dropped signal reads <code>emit: &lt;type&gt; signal for order &lt;id&gt; on symbol &lt;n&gt; was dropped by the &lt;gate&gt;; &lt;outcome&gt; [&lt;token&gt;]</code>. The gates are asked in the order kill switch, order validator, risk manager, and the first that says no is the one named. The emit still returns the order id it assigned.</p>
+<p>What is put to the gates depends on what runs the strategy:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>Runner</code> and <code>LiveEngine</code></th>
+<th><code>BacktestRunner</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Signals asked</td>
+<td>signals that create an order (market, limit, stop and take-profit, trailing stop, an OCO as one signal) and the liquidity pair</td>
+<td>signals that create an order: market, limit, stop and take-profit (market and limit), trailing stop, both legs of an OCO</td>
+</tr>
+<tr>
+<td>Pass unasked</td>
+<td>cancel, cancel-all, modify, and any reduce-only order (a <code>close_position</code>): the same rule as the backtest runner, so a triggered kill switch cannot hold back a cancel</td>
+<td>cancel, cancel-all, modify, and any reduce-only order (a <code>close_position</code>), so a tightened limit cannot hold a strategy in a position</td>
+</tr>
+<tr>
+<td>A drop skips</td>
+<td><code>onSignal</code>, the executor and the PnL / storage observers</td>
+<td>the simulator or the attached executor</td>
+</tr>
+<tr>
+<td><code>&lt;outcome&gt;</code></td>
+<td><code>it reached neither on_signal nor the executor</code></td>
+<td><code>it reached no executor</code></td>
+</tr>
+<tr>
+<td>Kill switch</td>
+<td>asked again for every signal it is asked about</td>
+<td>stays triggered for the rest of the run once it said no</td>
+</tr>
+</tbody>
+</table>
+<h3 id="reporting-a-live-orders-updates-and-fills">Reporting a live order's updates and fills<a class="headerlink" href="#reporting-a-live-orders-updates-and-fills" title="Permanent link">&para;</a></h3>
+<p><code>runner.onOrderEvent(event)</code> reports one order event a venue sent to the strategy that issued the
+order, through the callbacks a backtest uses: <code>PARTIALLY_FILLED</code> and <code>FILLED</code> reach <code>onFill</code> and
+only <code>onFill</code>, every other status reaches <code>onOrderUpdate</code>.</p>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nx">runner</span><span class="p">.</span><span class="nx">onOrderEvent</span><span class="p">({</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nx">orderId</span><span class="p">,</span><span class="w">                 </span><span class="c1">// number or bigint, as emit.limitBuy returned it</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nx">symbol</span><span class="p">,</span><span class="w">                  </span><span class="c1">// the Symbol from addSymbol, or its numeric id</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nx">side</span><span class="o">:</span><span class="w"> </span><span class="s1">'buy'</span><span class="p">,</span><span class="w">             </span><span class="c1">// 'buy' | 'sell'</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span><span class="nx">status</span><span class="o">:</span><span class="w"> </span><span class="s1">'PARTIALLY_FILLED'</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span><span class="nx">orderType</span><span class="o">:</span><span class="w"> </span><span class="s1">'limit'</span><span class="p">,</span><span class="w">      </span><span class="c1">// optional, 'limit' when omitted</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span><span class="nx">fillQty</span><span class="o">:</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w">            </span><span class="c1">// this fill's own quantity and price,</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">  </span><span class="nx">fillPrice</span><span class="o">:</span><span class="w"> </span><span class="mf">100.0</span><span class="p">,</span><span class="w">        </span><span class="c1">// not the order's running totals</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span><span class="nx">tsNs</span><span class="o">:</span><span class="w"> </span><span class="mi">1700000000000000000n</span><span class="p">,</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="nx">isMaker</span><span class="o">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="p">});</span>
+</span></code></pre></div>
+<p>Each strategy has a position of its own, as in a backtest: the fill counts in the position of the
+strategy that issued the order (its id is the high 32 bits of the order id) before <code>onFill</code> runs,
+so <code>ctx.position</code> inside <code>onFill</code> counts it, and another strategy on the same runner still reads its
+own. An order id no attached strategy issued goes to every strategy subscribed to the symbol and
+counts in no position.</p>
+<p>On a sync runner the callbacks run inside the call. On a threaded runner the event is queued behind
+the trades, books and bars published before it and the callbacks run later on the JS thread, like
+every other callback of that runner; <code>onOrderEvent</code> throws unless the runner is started. A missing
+or mistyped field, or an unknown side, status or order type, throws a <code>TypeError</code> that names the
+value.</p>
+<p>The status names are the <code>OrderEventStatus</code> names of the engine: <code>NEW</code>, <code>SUBMITTED</code>, <code>ACCEPTED</code>,
+<code>PARTIALLY_FILLED</code>, <code>FILLED</code>, <code>PENDING_CANCEL</code>, <code>CANCELED</code>, <code>EXPIRED</code>, <code>REJECTED</code>, <code>REPLACED</code>,
+<code>PENDING_TRIGGER</code>, <code>TRIGGERED</code>, <code>TRAILING_UPDATED</code>, <code>QUEUE_POSITION_UPDATED</code>,
+<code>MARKET_POSITION_CHANGED</code>, <code>REPLACE_SUBMITTED</code>, <code>REPLACE_ACCEPTED</code>, <code>REPLACE_REJECTED</code>,
+<code>REJECTED_RATE_LIMIT</code>, <code>PENDING_ONCHAIN</code>, <code>REVERTED</code>, <code>REPLACED_GAS</code>. Node and QuickJS used to read a
+<code>SUBMITTED</code> event as <code>"ACCEPTED"</code>, an <code>ACCEPTED</code> event as <code>"PENDING_NEW"</code> and
+<code>REJECTED_RATE_LIMIT</code> as <code>"UNKNOWN"</code>; Python read the last as <code>"UNKNOWN"</code> too. All three now read
+the one table.</p>
+<h3 id="a-position-the-account-already-holds">A position the account already holds<a class="headerlink" href="#a-position-the-account-already-holds" title="Permanent link">&para;</a></h3>
+<p><code>runner.seedPosition(strategyIndex, symbol, position, avgEntryPrice?)</code> sets what the strategy at
+<code>strategyIndex</code> (the order of <code>addStrategy</code>, from 0) holds before any fill is reported: after a
+restart the account may not be flat, and no <code>onOrderEvent</code> will tell of that position. <code>position</code>
+is signed, negative for a short. The strategy reads it from <code>ctx.position</code> and the fills reported
+afterwards add to it. A position is seeded once: a strategy that already holds one in the symbol,
+or an index the runner does not hold, throws.</p>
+<p><code>onSignal</code> is an observer: a runner created without one gates and forwards its signals the same way.</p>
+<h4 id="argument-checks">Argument checks<a class="headerlink" href="#argument-checks" title="Permanent link">&para;</a></h4>
+<p>Every <code>emit.*</code> function checks its arguments before it emits and throws a <code>TypeError</code> that names the call, such as <code>emit.cancel(orderId) expected: orderId is a non-negative integer Number or a BigInt</code>:</p>
+<ul>
+<li>a price, quantity or liquidity must be a <code>number</code>;</li>
+<li>an order id (<code>emit.cancel</code>, <code>emit.modify</code>) must be a non-negative integer <code>number</code> or a <code>bigint</code>. <code>emit.cancel</code> used to read it unchecked: <code>NaN</code>, a negative or a fractional number was converted and a cancel for whatever id came out was emitted, and a <code>bigint</code> threw a bare <code>A number was expected</code>;</li>
+<li>the optional symbol must be a <code>Symbol</code> or a symbol id; left out or <code>undefined</code>, it is the strategy's first symbol.</li>
+</ul>
+<h4 id="what-a-hook-is-handed">What a hook is handed<a class="headerlink" href="#what-a-hook-is-handed" title="Permanent link">&para;</a></h4>
+<p>An order — the argument to <code>Executor.submit</code> and to every
+<code>ExecutionListener</code> callback — carries <code>createdAtNs</code> and <code>exchangeTsNs</code> as
+<code>bigint</code>. They are clock readings, and a JS <code>Number</code> is a double that steps
+256 ns at present-day magnitudes. Prices, sizes and ids on the same object
+stay <code>number</code>.</p>
+<p><code>Executor.replace(oldId, order)</code> is called for a strategy's <code>emit.modify</code>.
+<code>order</code> is the order that modify named, as the executor was handed it --
+same id, symbol, side and type -- with the new price and quantity. A modify
+of an id the runner never handed to this executor (or has since seen
+cancelled) still arrives, under that id, with <code>symbol</code> 0.</p>
+<p>A trade handed to a <code>MarketDataRecorderHook</code>'s <code>onTrade</code> is a <code>TradeData</code>:
+<code>{ symbol, price, qty, isBuy, side, timestampNs }</code>, with <code>timestampNs</code> a
+<code>bigint</code>. It is the same shape a strategy's <code>onTrade</code> receives.</p>
+<p><code>onBookUpdate(symbol, isSnapshot, bids, asks, timestampNs)</code> receives
+snapshots and deltas. A top-of-book frame goes to
+<code>onBookTop(symbol, bid, ask, timestampNs)</code> instead, with <code>bid</code> / <code>ask</code> a
+<code>{ price, qty }</code> or <code>null</code> for an empty side, the shape <code>Runner.onBookTop</code>
+takes. Defining <code>onBookTop</code> does not change <code>onBookUpdate</code>, which keeps
+receiving every snapshot and delta. A hook without <code>onBookTop</code> skips tops.</p>
+<div class="admonition warning">
+<p class="admonition-title">Deprecated: <code>trade.quantity</code> and <code>trade.exchangeTsNs</code></p>
+<p>The recorder hook used to be handed <code>quantity</code> and <code>exchangeTsNs</code> in
+place of the declared <code>qty</code> and <code>timestampNs</code>. Both spellings are
+delivered for one release and the old two are removed in the next.
+<code>exchangeTsNs</code> is a <code>bigint</code> like <code>timestampNs</code> — the reading never fit
+in a double — so a hook doing arithmetic on it needs <code>Number()</code> at the
+edge, or the one-word change to <code>timestampNs</code>.</p>
+</div>
+<h3 id="trace-recording">Trace recording<a class="headerlink" href="#trace-recording" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>attachTraceRecorder(recorder)</code></td>
+<td>Auto-capture every signal into a <code>.lrvxrun</code> recorder. Sync mode only; throws otherwise</td>
+</tr>
+<tr>
+<td><code>setTraceFeedTsNs(feedTsNs)</code></td>
+<td>Stamp every recorded signal with this <code>feed_ts_ns</code> until the next call</td>
+</tr>
+<tr>
+<td><code>traceOrderEvent(opts)</code></td>
+<td>Mirror an order event into the attached recorder. No-op with no recorder attached. <code>orderId</code> and <code>parentSignalId</code> are a non-negative integer Number or a BigInt</td>
+</tr>
+<tr>
+<td><code>traceFill(opts)</code></td>
+<td>Mirror a fill into the attached recorder. <code>orderId</code> and <code>fillId</code> as above</td>
+</tr>
+</tbody>
+</table>
+<p>Arguments are checked before anything is done with them. A symbol that is not a <code>Symbol</code> or a
+whole symbol id, a price or quantity that is not a number, an <code>isBuy</code> that is not a boolean, an id
+that is NaN, fractional, negative or a string: each is a <code>TypeError</code> naming the argument
+(<code>onTrade: price must be a number</code>, <code>traceFill: fillId must be a non-negative integer Number (at
+most 2^53) or a BigInt below 2^64</code>). The same holds for <code>emit.lastClosedBar</code>,
+<code>emit.lastNClosedBars</code> and <code>emit.setBarRingCapacity</code> inside a strategy. These reads used to be
+unchecked: the call threw a bare <code>A number was expected</code>, or went ahead with whatever the
+conversion produced.</p>
+<p>The same rule holds across the Node module. A clock reading or a count is a finite Number
+(truncated toward zero) or a BigInt; a BigInt that does not fit 64 signed bits is a <code>RangeError</code>
+(it used to wrap), and anything else is a <code>TypeError</code> naming the argument. <code>addSymbol</code> refuses an
+exchange or symbol that is not a string and a tick or lot that is not a number (a non-number tick
+was taken as "no tick"). The <code>BacktestRunner</code>, <code>Runner</code> and <code>WalkForwardRunner</code> constructors
+refuse a registry that is not a <code>SymbolRegistry</code> with a <code>TypeError</code> (a plain object threw a bare
+<code>Invalid argument</code>, and an instance of another class was read as a registry). A typed array of
+the wrong element type is a <code>TypeError</code>, and these errors keep their class when a method turns
+native errors into JS ones.</p>
+<h3 id="signal-callback">Signal callback<a class="headerlink" href="#signal-callback" title="Permanent link">&para;</a></h3>
+<div class="language-javascript highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kd">function</span><span class="w"> </span><span class="nx">onSignal</span><span class="p">(</span><span class="nx">sig</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span><span class="c1">// sig.side       — "buy" | "sell"</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="c1">// sig.quantity</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="c1">// sig.price      — 0 for market orders</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="c1">// sig.orderType  — "market" | "limit" | "stop_market" | ...</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span><span class="c1">// sig.orderId</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="p">}</span>
+</span></code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
