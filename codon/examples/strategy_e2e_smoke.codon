@@ -31,6 +31,70 @@ def check(label: str, ok: bool):
     print("ok: " + label)
 
 
+def closes(strat: Strategy, sym_id: int, param: int) -> List[float]:
+    out = List[float]()
+    for b in strat.last_n_closed_bars(sym_id, 0, param, 100):
+        out.append(b.close)
+    return out
+
+
+def push_bar(runner: cobj, sym_id: int, param: int, i: int, base: float):
+    # Bar i closes at base + i.
+    c = base + float(i)
+    lrvx_runner_on_bar(runner, u32(sym_id), u8(0), u64(param),
+                        c - 0.5, c + 1.0, c - 1.0, c, 1.0, 0.5,
+                        i64(i * param), i64((i + 1) * param), u8(0))
+
+
+# Once the capacity is set to k the ring holds at most k bars: lowering it on
+# a ring already full at the default 64 leaves the newest k readable at once,
+# oldest first, and it stays at k after the next bar. Raising it keeps the
+# bars already held.
+def ring_capacity(registry: cobj, sym_id: int):
+    M1_NS = 60 * 1_000_000_000
+    strat = Strategy(symbols=[sym_id], strategy_id=2, registry=registry)
+    runner = lrvx_runner_create(registry, cobj(), cobj())
+    lrvx_runner_add_strategy(runner, strat._handle)
+    lrvx_runner_start(runner)
+
+    check("the default capacity is 64", strat.bar_ring_capacity == 64)
+    for i in range(70):
+        push_bar(runner, sym_id, M1_NS, i, 1000.25)
+    check("the default ring holds 64 bars", len(closes(strat, sym_id, M1_NS)) == 64)
+    strat.set_bar_ring_capacity(3)
+    check("the capacity reads back as 3", strat.bar_ring_capacity == 3)
+    now = closes(strat, sym_id, M1_NS)
+    check("right after set_bar_ring_capacity(3) the newest 3 are read, oldest first; got "
+          + str(len(now)) + " bars starting " + str(now[0]),
+          now == [1067.25, 1068.25, 1069.25])
+    push_bar(runner, sym_id, M1_NS, 70, 1000.25)
+    after = closes(strat, sym_id, M1_NS)
+    check("one bar later the ring still holds 3; got " + str(len(after)) + " bars",
+          after == [1068.25, 1069.25, 1070.25])
+    lrvx_runner_stop(runner)
+    lrvx_runner_destroy(runner)
+
+    raised = Strategy(symbols=[sym_id], strategy_id=3, registry=registry)
+    runner = lrvx_runner_create(registry, cobj(), cobj())
+    lrvx_runner_add_strategy(runner, raised._handle)
+    lrvx_runner_start(runner)
+    raised.set_bar_ring_capacity(3)
+    for i in range(5):
+        push_bar(runner, sym_id, M1_NS, i, 2000.5)
+    raised.set_bar_ring_capacity(5)
+    check("raising to 5 keeps the 3 held",
+          closes(raised, sym_id, M1_NS) == [2002.5, 2003.5, 2004.5])
+    push_bar(runner, sym_id, M1_NS, 5, 2000.5)
+    push_bar(runner, sym_id, M1_NS, 6, 2000.5)
+    check("the raised ring grows to 5",
+          closes(raised, sym_id, M1_NS) == [2002.5, 2003.5, 2004.5, 2005.5, 2006.5])
+    push_bar(runner, sym_id, M1_NS, 7, 2000.5)
+    check("and then evicts the oldest",
+          closes(raised, sym_id, M1_NS) == [2003.5, 2004.5, 2005.5, 2006.5, 2007.5])
+    lrvx_runner_stop(runner)
+    lrvx_runner_destroy(runner)
+
+
 def run():
     registry = lrvx_registry_create()
     exch = "test"
@@ -61,6 +125,7 @@ def run():
 
     lrvx_runner_stop(runner)
     lrvx_runner_destroy(runner)
+    ring_capacity(registry, sym_id)
     # Strategy handle is owned by Codon; the destructor will free it.
     lrvx_registry_destroy(registry)
     print("codon strategy e2e smoke ok")

@@ -868,3 +868,94 @@ TEST(CapiHighestLowest, BatchMatchesTheStreamingHandle)
   EXPECT_EQ(lrvx_last_error_code(), 2);
   lrvx_clear_last_error();
 }
+
+// ---- Closed-bar ring capacity --------------------------------------------
+
+namespace
+{
+
+struct RingRig
+{
+  LrvxRegistryHandle registry{lrvx_registry_create()};
+  uint32_t symbol{lrvx_registry_add_symbol(registry, "test", "RING", 0.01)};
+  LrvxStrategyHandle strategy{nullptr};
+  LrvxRunnerHandle runner{nullptr};
+
+  RingRig()
+  {
+    uint32_t syms[] = {symbol};
+    strategy = lrvx_strategy_create(11, syms, 1, registry, LrvxStrategyCallbacks{});
+    runner = lrvx_runner_create(registry, nullptr, nullptr);
+    lrvx_runner_add_strategy(runner, strategy);
+    lrvx_runner_start(runner);
+  }
+  ~RingRig()
+  {
+    lrvx_runner_stop(runner);
+    lrvx_runner_destroy(runner);
+    lrvx_strategy_destroy(strategy);
+    lrvx_registry_destroy(registry);
+  }
+
+  // Bar i closes at 1000 + i + 1 (the helper above closes at open + 1).
+  void push(int i) { bar(runner, symbol, i, 1000.0 + i); }
+
+  std::vector<double> closes()
+  {
+    std::vector<LrvxBar> out(128);
+    const uint32_t got = lrvx_strategy_last_n_closed_bars(
+        strategy, symbol, 0, static_cast<uint64_t>(kMinuteNs), out.data(), 128);
+    std::vector<double> c;
+    for (uint32_t k = 0; k < got; ++k)
+    {
+      c.push_back(lrvx_price_to_double(out[k].close_raw));
+    }
+    return c;
+  }
+};
+
+}  // namespace
+
+// A ring already full at the default 64 bars: after the capacity is lowered
+// to 3, a read returns only the newest 3, oldest first, and the ring stays at
+// 3 once the next bar closes.
+TEST(CapiBarRing, LoweringCapacityTrimsAFullRing)
+{
+  RingRig r;
+  ASSERT_EQ(lrvx_strategy_get_bar_ring_capacity(r.strategy), 64u);
+  for (int i = 0; i < 70; ++i)
+  {
+    r.push(i);
+  }
+  ASSERT_EQ(r.closes().size(), 64u);
+
+  lrvx_strategy_set_bar_ring_capacity(r.strategy, 3);
+  EXPECT_EQ(lrvx_strategy_get_bar_ring_capacity(r.strategy), 3u);
+  EXPECT_EQ(r.closes(), (std::vector<double>{1068.0, 1069.0, 1070.0}));
+  LrvxBar last{};
+  ASSERT_EQ(lrvx_strategy_last_closed_bar(r.strategy, r.symbol, 0,
+                                          static_cast<uint64_t>(kMinuteNs), &last),
+            1u);
+  EXPECT_DOUBLE_EQ(lrvx_price_to_double(last.close_raw), 1070.0);
+
+  r.push(70);
+  EXPECT_EQ(r.closes(), (std::vector<double>{1069.0, 1070.0, 1071.0}));
+}
+
+// Raising the capacity keeps the bars already held and lets the ring grow.
+TEST(CapiBarRing, RaisingCapacityKeepsExistingBars)
+{
+  RingRig r;
+  lrvx_strategy_set_bar_ring_capacity(r.strategy, 3);
+  for (int i = 0; i < 5; ++i)
+  {
+    r.push(i);
+  }
+  lrvx_strategy_set_bar_ring_capacity(r.strategy, 5);
+  EXPECT_EQ(r.closes(), (std::vector<double>{1003.0, 1004.0, 1005.0}));
+  r.push(5);
+  r.push(6);
+  EXPECT_EQ(r.closes(), (std::vector<double>{1003.0, 1004.0, 1005.0, 1006.0, 1007.0}));
+  r.push(7);
+  EXPECT_EQ(r.closes(), (std::vector<double>{1004.0, 1005.0, 1006.0, 1007.0, 1008.0}));
+}
