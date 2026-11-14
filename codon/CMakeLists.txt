@@ -230,6 +230,9 @@ add_codon_executable(codon_backtest_runner_stats_smoke
 add_codon_executable(codon_open_position_at_end_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/open_position_at_end_smoke.codon)
 
+add_codon_executable(codon_engine_run_open_position_smoke
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/engine_run_open_position_smoke.codon)
+
 add_codon_executable(codon_version_smoke
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/version_smoke.codon)
 

@@ -1,0 +1,135 @@
+# Smoke test: Engine.run values the position still open when the signals
+# run out. Mirrors the Engine.run block of
+# node/test/test_backtest_open_position_at_end.js and
+# python/tests/test_engine_run_open_position.py:
+#   * Engine.run replays every loaded symbol's bars merged in time order; an
+#     open position is marked at the last close the run replayed for its
+#     symbol -- the latest bar in time, not the last row loaded
+#   * unrealized_pnl is (mark - entry) * qty for a long, (entry - mark) * qty
+#     for a short, no exit fee; final_equity = initial_capital + net_pnl +
+#     unrealized_pnl; net_pnl, total_pnl and final_capital stay the closed
+#     trades'
+
+from lrvx.engine import Engine, SignalBuilder
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+def near(a: float, b: float) -> bool:
+    return abs(a - b) <= 1e-9
+
+
+CAPITAL = 10_000.0
+SEC = 1_000_000_000
+T0 = 1_767_225_600 * SEC
+CLOSES = [100.0, 102.0, 104.0, 107.0, 110.0]
+
+
+def load(eng: Engine, ts: List[int], closes: List[float], symbol: str):
+    vols = [10.0 for _ in closes]
+    eng.load_ohlcv(ts, closes, closes, closes, closes, vols, symbol)
+
+
+def single(fee: float) -> Tuple[Engine, List[int]]:
+    eng = Engine(initial_capital=CAPITAL, fee_rate=fee)
+    ts = [T0 + 60 * SEC * i for i in range(len(CLOSES))]
+    load(eng, ts, CLOSES, "")
+    return (eng, ts)
+
+
+def identity(st, tag: str):
+    check(near(st.final_equity, st.initial_capital + st.net_pnl + st.unrealized_pnl),
+          tag + ": final_equity = initial_capital + net_pnl + unrealized_pnl")
+
+
+# Long: buys 2 on bar 0 (100), sells 1 on bar 2 (104), holds 1 to the last
+# close, 110. Valued at its last fill instead, the open unit reads 4.
+eng, ts = single(0.0)
+sb = SignalBuilder()
+sb.buy(ts[0], 2.0)
+sb.sell(ts[2], 1.0)
+st = eng.run(sb)
+check(st.total_trades == 1, "long: one closed trade")
+check(near(st.total_pnl, 4.0), "long: total_pnl is the closed unit, 104 - 100")
+check(near(st.unrealized_pnl, 10.0),
+      "long: open unit marked at the last close, 110 - 100 (" + str(st.unrealized_pnl) + ")")
+identity(st, "long")
+check(near(st.final_capital, CAPITAL + st.net_pnl), "long: final_capital leaves the open unit out")
+
+# Short: sells 2 on bar 0 (100), buys 1 back on bar 2 (104), stays short 1.
+eng, ts = single(0.0)
+sb = SignalBuilder()
+sb.sell(ts[0], 2.0)
+sb.buy(ts[2], 1.0)
+st = eng.run(sb)
+check(st.total_trades == 1, "short: one closed trade")
+check(near(st.total_pnl, -4.0), "short: total_pnl is the closed unit, 100 - 104")
+check(near(st.unrealized_pnl, -10.0),
+      "short: open unit marked at the last close, 100 - 110 (" + str(st.unrealized_pnl) + ")")
+identity(st, "short")
+
+# Fees: none is taken from the open unit.
+eng, ts = single(0.001)
+sb = SignalBuilder()
+sb.buy(ts[0], 2.0)
+sb.sell(ts[2], 1.0)
+st = eng.run(sb)
+check(near(st.unrealized_pnl, 10.0), "fees: no exit fee on the open unit")
+check(st.total_fees > 0.0, "fees: the fills paid fees")
+identity(st, "fees")
+
+# Flat: nothing left to value.
+eng, ts = single(0.0)
+sb = SignalBuilder()
+sb.buy(ts[0], 1.0)
+sb.sell(ts[3], 1.0)
+st = eng.run(sb)
+check(st.total_trades == 1, "flat: one closed trade")
+check(st.unrealized_pnl == 0.0, "flat: unrealized_pnl is 0 (" + str(st.unrealized_pnl) + ")")
+check(near(st.final_equity, st.final_capital), "flat: final_equity == final_capital")
+
+# Two symbols whose bars interleave: A on the minute, B on the half minute,
+# B's last bar after A's. Long 1 A @ 100, short 2 B @ 50. A's last close is
+# 103 (+3), B's 54 (-8). Marking both at the last bar replayed (B's 54)
+# would give A -46.
+a_ts = [T0 + 60 * SEC * i for i in range(4)]
+b_ts = [T0 + 30 * SEC + 60 * SEC * i for i in range(5)]
+b_close = [50.0, 51.0, 52.0, 53.0, 54.0]
+eng = Engine(initial_capital=CAPITAL, fee_rate=0.0)
+load(eng, a_ts, [100.0, 101.0, 102.0, 103.0], "A")
+load(eng, b_ts, b_close, "B")
+sb = SignalBuilder()
+sb.buy(a_ts[0], 1.0, "A")
+sb.sell(b_ts[0], 2.0, "B")
+st = eng.run(sb)
+check(st.total_trades == 0, "two symbols: nothing closed")
+check(near(st.unrealized_pnl, 3.0 - 8.0),
+      "two symbols: each at its own last close, A 103 and B 54 (" + str(st.unrealized_pnl) + ")")
+identity(st, "two symbols")
+
+# A's rows out of time order: its last row (close 102) is not its latest
+# bar (close 103). The run replays in time order, so A is marked at 103.
+eng = Engine(initial_capital=CAPITAL, fee_rate=0.0)
+load(eng, [T0, T0 + 180 * SEC, T0 + 60 * SEC, T0 + 120 * SEC], [100.0, 103.0, 101.0, 102.0], "A")
+load(eng, b_ts, b_close, "B")
+sb = SignalBuilder()
+sb.buy(T0, 1.0, "A")
+sb.buy(b_ts[0], 1.0, "B")
+st = eng.run(sb)
+check(near(st.unrealized_pnl, 3.0 + 4.0),
+      "out-of-order rows: A at its latest bar 103, not its last row 102; B at 54 ("
+      + str(st.unrealized_pnl) + ")")
+identity(st, "out-of-order rows")
+
+if failed > 0:
+    raise ValueError(str(failed) + " check(s) failed")
+print("done")

@@ -591,6 +591,7 @@ jobs:
                    codon_base_strategy_callbacks_smoke \
                    codon_backtest_runner_stats_smoke \
                    codon_open_position_at_end_smoke codon_version_smoke \
+                   codon_engine_run_open_position_smoke \
                    codon_funding_schedule_smoke \
                    codon_runner_strategy_ids_smoke codon_last_error_smoke \
                    codon_runner_order_event_smoke \
