@@ -142,3 +142,50 @@ class PositionFacts extends Strategy {
     }
 }
 void PositionFacts;
+
+// Strategy._resolve takes a symbol name, a numeric symbol id (ctx.symbolId),
+// or nothing for the primary symbol; every symbol argument accepts all three.
+class SymbolArguments extends Strategy {
+    onTrade(ctx: SymbolContext): void {
+        const id: number = ctx.symbolId;
+        for (const s of [id, 'BTCUSDT', undefined]) {
+            const pos: number = this.position(s);
+            const last: number = this.lastPrice(s);
+            const bid: number | null = this.bestBid(s);
+            const ask: number | null = this.bestAsk(s);
+            const mid: number | null = this.midPrice(s);
+            const entry: number | null = this.entryPrice(s);
+            const held: number = this.barsInPosition(s);
+            this.cancelAll(s);
+            const closeId: number = this.closePosition(s);
+            void [pos, last, bid, ask, mid, entry, held, closeId];
+        }
+        const byId: number[] = [
+            this.position(id), this.lastPrice(id), this.closePosition(id),
+            this.marketBuy({ symbol: id, qty: 1 }),
+            this.marketSell({ symbol: id, qty: 1 }),
+            this.limitBuy({ symbol: id, price: 1, qty: 1 }),
+            this.limitSell({ symbol: id, price: 1, qty: 1, tif: 'IOC' }),
+            this.stopMarket({ symbol: id, side: 'sell', trigger: 1, qty: 1 }),
+            this.stopLimit({ symbol: id, side: 'sell', trigger: 1, price: 1, qty: 1 }),
+            this.takeProfitMarket({ symbol: id, side: 'sell', trigger: 1, qty: 1 }),
+            this.takeProfitLimit({ symbol: id, side: 'sell', trigger: 1, price: 1, qty: 1 }),
+            this.trailingStop({ symbol: id, side: 'sell', offset: 1, qty: 1 }),
+            this.trailingStopPercent({ symbol: id, side: 'sell', callbackBps: 50, qty: 1 }),
+        ];
+        const quotes: (number | null)[] = [
+            this.bestBid(id), this.bestAsk(id), this.midPrice(id), this.entryPrice(id),
+        ];
+        this.cancelAll(id);
+        this.cancelAll('BTCUSDT');
+        this.cancelAll();
+        this.marketBuy({ symbol: 'BTCUSDT', qty: 1 });
+        this.marketBuy({ qty: 1 });
+        // @ts-expect-error a symbol is a name or an id, not a boolean
+        this.position(true);
+        // @ts-expect-error a symbol is a name or an id, not a bigint
+        this.marketBuy({ symbol: 1n, qty: 1 });
+        void [byId, quotes];
+    }
+}
+void SymbolArguments;

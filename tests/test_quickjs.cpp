@@ -2626,6 +2626,62 @@ TEST(JsIntegrationTest, BestQuoteAccessorsAnswerNullForNoQuoteAndZeroForAPriceOf
   EXPECT_NEAR(readGlobalDouble(jsStrat, "askAboveZero"), 0.01, 1e-9);
 }
 
+// The symbol argument of the context queries is a name, a numeric id
+// (ctx.symbolId), or nothing for the primary. Two symbols with different
+// books: asked by id, each query answers what the name form answers for that
+// symbol, not for the primary.
+TEST(JsIntegrationTest, ContextQueriesTakeANumericSymbolIdLikeTheName)
+{
+  TempJsFile script(R"(
+    var updates = 0, compared = 0, mismatches = 0;
+    var aaaMidById = -1, bbbMidById = -1, primaryMid = -1;
+    var ids = {};
+    function cmp(a, b) { compared++; if (a !== b) mismatches++; }
+    class TestStrat extends Strategy {
+      constructor() { super({ exchange: "T", symbols: ["AAA", "BBB"] }); }
+      onBookUpdate(ctx, book) {
+        updates++;
+        ids[ctx.symbol] = ctx.symbolId;
+        var self = this;
+        Object.keys(ids).forEach(function (name) {
+          var id = ids[name];
+          cmp(self.position(id), self.position(name));
+          cmp(self.midPrice(id), self.midPrice(name));
+          cmp(self.bestBid(id), self.bestBid(name));
+          cmp(self.bestAsk(id), self.bestAsk(name));
+          cmp(self.lastPrice(id), self.lastPrice(name));
+        });
+        if (ids.AAA !== undefined) aaaMidById = this.midPrice(ids.AAA);
+        if (ids.BBB !== undefined) bbbMidById = this.midPrice(ids.BBB);
+        primaryMid = this.midPrice();
+      }
+    }
+    lrvx.register(new TestStrat());
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+  ASSERT_EQ(symIds.size(), 2u);
+
+  auto bridge = std::make_unique<BridgeStrategy>(
+      1, std::vector<SymbolId>(symIds.begin(), symIds.end()), registry, callbacks);
+  jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+
+  pushBook(*bridge, symIds[0], {{99.0, 1.0}}, {{101.0, 1.0}});
+  pushBook(*bridge, symIds[1], {{49.0, 1.0}}, {{51.0, 1.0}});
+
+  ASSERT_EQ(readGlobalInt32(jsStrat, "updates"), 2);
+  // 5 queries for AAA on the first update, 5 each for AAA and BBB on the second.
+  EXPECT_EQ(readGlobalInt32(jsStrat, "compared"), 15);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "mismatches"), 0)
+      << "a query asked by numeric symbol id answers differently from the name form";
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "aaaMidById"), 100.0);
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "bbbMidById"), 50.0);
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "primaryMid"), 100.0);
+}
+
 // The same four books, read through the objects a callback receives rather
 // than the accessors: ctx.book on every callback and book.snapshot on
 // onBookUpdate. Both used to write 0 for an empty side, the number a bid at
