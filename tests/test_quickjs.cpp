@@ -4552,8 +4552,9 @@ TEST(JsIntegrationTest, CallbackArgumentsHaveTheDocumentedTypes)
   update.replace(update.find("fillRole:string"), 15, "fillRole:null");
   EXPECT_EQ(str("updateShape"), update);
   EXPECT_EQ(str("ctxShape"),
-            "avgEntryPrice:number,book:object,lastTouchNs:bigint,lastTradePrice:number,"
-            "lastUpdateNs:bigint,position:number,symbol:string,symbolId:number");
+            "avgEntryPrice:number,barsInPosition:number,book:object,entryPrice:number,"
+            "lastTouchNs:bigint,lastTradePrice:number,lastUpdateNs:bigint,position:number,"
+            "symbol:string,symbolId:number");
 
   EXPECT_EQ(str("fillStatus"), "FILLED");
   EXPECT_EQ(readGlobalInt32(jsStrat, "fillOrderIdMatches"), 1);

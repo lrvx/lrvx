@@ -50,6 +50,8 @@ ROWS = {
     "correlation": (lrvx.Correlation, [2], lambda a: lrvx.rolling_correlation(C, H, a[0])),
     "macd": (lrvx.MACD, [1, 1, 1], lambda a: lrvx.macd(C, a[0], a[1], a[2])),
     "bollinger": (lrvx.Bollinger, [1], lambda a: lrvx.bollinger(C, a[0], 2.0)),
+    "highest": (lrvx.Highest, [1], lambda a: lrvx.highest(C, a[0])),
+    "lowest": (lrvx.Lowest, [1], lambda a: lrvx.lowest(C, a[0])),
 }
 
 

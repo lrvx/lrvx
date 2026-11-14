@@ -133,6 +133,8 @@ section('PercentStop: a fixed percentage from the entry', () => {
   check(s.update(215.0, 195.0) === false, 'low 195 above 190');
   check(s.update(212.0, 190.0) === true, 'low == stop is a hit');
   check(s.update(212.0, 190.0) === true, 'a hit does not disarm');
+  check(s.update(212.0, 191.0) === false && s.armed === true,
+        'per bar: a later bar that does not reach the stop is no hit, still armed');
   check(s.stop === 190.0, `the stop does not move (${s.stop})`);
   s.arm('short', 200.0);
   check(s.stop === 210.0, `short stop 210 (${s.stop})`);
@@ -160,6 +162,8 @@ section('TakeProfit: a fixed percentage in the position\'s favour', () => {
   check(t.update(249.0, 190.0) === false, 'high 249 below 250; a low far below is no hit');
   check(t.update(250.0, 205.0) === true, 'high == target is a hit');
   check(t.update(250.0, 205.0) === true, 'a hit does not disarm');
+  check(t.update(240.0, 205.0) === false && t.armed === true,
+        'per bar: a later bar below the target is no hit, still armed');
   t.arm('short', 200.0);
   check(t.target === 150.0, `short target 150 (${t.target})`);
   check(t.update(195.0, 151.0) === false, 'low 151 above 150');

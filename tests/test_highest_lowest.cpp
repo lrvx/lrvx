@@ -198,7 +198,10 @@ TEST(Highest, UpdateCostDoesNotGrowWithThePeriod)
       // rising for Lowest.
       h.update(1e6 - static_cast<double>(i));
       l.update(static_cast<double>(i));
-      sink += h.value() + l.value();
+      if (h.ready() && l.ready())
+      {
+        sink += h.value() + l.value();
+      }
     }
     const auto t1 = std::chrono::steady_clock::now();
     EXPECT_FALSE(std::isnan(sink));

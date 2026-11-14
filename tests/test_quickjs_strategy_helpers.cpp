@@ -157,7 +157,7 @@ section('AtrStop', function () {
   if (typeof s.destroy === 'function') s.destroy();
 });
 )",
-                14);
+                18);
 }
 
 TEST(JsExitRules, ChandelierExitHangsBelowTheHighestHighAndOnlyRises)
@@ -194,7 +194,7 @@ section('ChandelierExit', function () {
   [r, lb, sh].forEach(function (x) { if (typeof x.destroy === 'function') x.destroy(); });
 });
 )",
-                18);
+                19);
 }
 
 TEST(JsExitRules, BreakEvenTrailMovesToEntryOnTheTriggerThenTrails)
@@ -237,6 +237,7 @@ section('PercentStop', function () {
   check(s.update(215, 195) === false, 'PercentStop long: low 195 above 190');
   check(s.update(212, 190) === true, 'PercentStop long: low == stop is a hit');
   check(s.update(212, 190) === true, 'PercentStop: a hit does not disarm');
+  check(s.update(212, 191) === false && s.armed === true, 'PercentStop: per bar, no latch');
   check(s.armed === true, 'PercentStop: still armed after the hit');
   s.arm('short', 200);
   check(s.stop === 210, 'PercentStop short@200: stop ' + show(s.stop) + ', want 210');
@@ -273,6 +274,7 @@ section('TakeProfit', function () {
   check(t.update(249, 190) === false, 'TakeProfit long: high 249 short of 250');
   check(t.update(250, 205) === true, 'TakeProfit long: high == target is a hit');
   check(t.update(250, 205) === true, 'TakeProfit: a hit does not disarm');
+  check(t.update(240, 205) === false && t.armed === true, 'TakeProfit: per bar, no latch');
   t.arm('short', 200);
   check(t.target === 150, 'TakeProfit short@200: target ' + show(t.target) + ', want 150');
   check(t.update(195, 151) === false, 'TakeProfit short: low 151 above 150');
@@ -282,7 +284,7 @@ section('TakeProfit', function () {
   if (typeof t.destroy === 'function') t.destroy();
 });
 )",
-                12);
+                13);
 }
 
 TEST(JsExitRules, TimeStopFiresOnTheMaxBarsUpdate)
@@ -447,7 +449,7 @@ section('Lowest', function () {
   [l, drop, n].forEach(function (x) { if (typeof x.destroy === 'function') x.destroy(); });
 });
 )",
-                24);
+                22);
 }
 
 // ============================================================

@@ -453,7 +453,10 @@ TEST(CapiExitRules, PercentStopLevelsAndHits)
   EXPECT_DOUBLE_EQ(lrvx_exit_rule_level(r.get()), 190.0);
   EXPECT_EQ(lrvx_exit_rule_update(r.get(), 215.0, 195.0, 0.0), 0);
   EXPECT_EQ(lrvx_exit_rule_update(r.get(), 212.0, 190.0, 0.0), 1);
-  EXPECT_EQ(lrvx_exit_rule_update(r.get(), 212.0, 191.0, 0.0), 1) << "reported until disarm";
+  EXPECT_EQ(lrvx_exit_rule_update(r.get(), 212.0, 190.0, 0.0), 1) << "same bar again: still a hit";
+  EXPECT_EQ(lrvx_exit_rule_update(r.get(), 212.0, 191.0, 0.0), 0)
+      << "per bar: a later bar that does not reach the stop is no hit";
+  EXPECT_EQ(lrvx_exit_rule_armed(r.get()), 1);
   lrvx_exit_rule_arm(r.get(), 1, 200.0, 0.0);
   EXPECT_DOUBLE_EQ(lrvx_exit_rule_level(r.get()), 210.0);
   EXPECT_EQ(lrvx_exit_rule_update(r.get(), 209.0, 195.0, 0.0), 0);
@@ -476,7 +479,9 @@ TEST(CapiExitRules, TakeProfitLevelsAndHits)
   EXPECT_DOUBLE_EQ(lrvx_exit_rule_level(r.get()), 250.0);
   EXPECT_EQ(lrvx_exit_rule_update(r.get(), 249.0, 190.0, 0.0), 0);
   EXPECT_EQ(lrvx_exit_rule_update(r.get(), 250.0, 205.0, 0.0), 1);
-  EXPECT_EQ(lrvx_exit_rule_update(r.get(), 240.0, 205.0, 0.0), 1);
+  EXPECT_EQ(lrvx_exit_rule_update(r.get(), 250.0, 205.0, 0.0), 1) << "same bar again: still a hit";
+  EXPECT_EQ(lrvx_exit_rule_update(r.get(), 240.0, 205.0, 0.0), 0) << "per bar: below the target";
+  EXPECT_EQ(lrvx_exit_rule_armed(r.get()), 1);
   lrvx_exit_rule_arm(r.get(), 1, 200.0, 0.0);
   EXPECT_DOUBLE_EQ(lrvx_exit_rule_level(r.get()), 150.0);
   EXPECT_EQ(lrvx_exit_rule_update(r.get(), 195.0, 151.0, 0.0), 0);

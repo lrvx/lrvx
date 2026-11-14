@@ -25,8 +25,11 @@ def test_percent_stop_long_is_entry_times_one_minus_pct() -> None:
     assert stop.update(250.0, 190.01) is False
     assert stop.stop == 190.0  # a percent stop does not move
     assert stop.update(212.0, 190.0) is True  # low == stop is a hit
-    assert stop.update(212.0, 191.0) is True  # reported until disarm
+    assert stop.update(212.0, 190.0) is True  # the same bar again: a hit does not disarm
     assert stop.armed
+    # Per bar, like AtrStop: a later bar that does not reach the stop is no hit.
+    assert stop.update(212.0, 191.0) is False
+    assert stop.armed and stop.stop == 190.0
 
     stop.disarm()
     assert not stop.armed and math.isnan(stop.stop)
@@ -75,7 +78,9 @@ def test_take_profit_long_is_entry_times_one_plus_pct() -> None:
     assert tp.update(249.0, 190.0) is False
     assert tp.update(249.99, 1.0) is False
     assert tp.update(250.0, 205.0) is True  # high == target is a hit
-    assert tp.update(240.0, 205.0) is True  # reported until disarm
+    assert tp.update(250.0, 205.0) is True  # the same bar again: a hit does not disarm
+    assert tp.update(240.0, 205.0) is False  # per bar: below the target is no hit
+    assert tp.armed and tp.target == 250.0
     tp.disarm()
     assert not tp.armed and math.isnan(tp.target)
     assert tp.update(1000.0, 1.0) is False

@@ -37,8 +37,13 @@ TEST(PercentStop, LongStopIsEntryTimesOneMinusPct)
   EXPECT_FALSE(stop.update(250.0, 190.01)) << "a high far above does not matter to a long";
   EXPECT_DOUBLE_EQ(stop.stop(), 190.0) << "a percent stop does not move";
   EXPECT_TRUE(stop.update(212.0, 190.0)) << "low == stop is a hit";
-  EXPECT_TRUE(stop.update(212.0, 191.0)) << "a hit does not disarm; it is reported until disarm";
+  EXPECT_TRUE(stop.update(212.0, 190.0)) << "the same bar again is a hit again: a hit does not disarm";
   EXPECT_TRUE(stop.armed());
+  // Per bar, like AtrStop: update() says whether this bar reached the
+  // resting level, it does not latch an earlier hit.
+  EXPECT_FALSE(stop.update(212.0, 191.0)) << "a later bar that does not reach the stop";
+  EXPECT_TRUE(stop.armed());
+  EXPECT_DOUBLE_EQ(stop.stop(), 190.0);
 
   stop.disarm();
   EXPECT_FALSE(stop.armed());
@@ -73,7 +78,7 @@ TEST(PercentStop, RejectsNonPositivePct)
 {
   EXPECT_THROW(PercentStop(0.0), std::invalid_argument);
   EXPECT_THROW(PercentStop(-1.0), std::invalid_argument);
-  EXPECT_THROW(PercentStop(std::numeric_limits<double>::quiet_NaN()), std::invalid_argument);
+  EXPECT_THROW((PercentStop(std::numeric_limits<double>::quiet_NaN())), std::invalid_argument);
   EXPECT_NO_THROW(PercentStop(0.0001));
 }
 
@@ -91,7 +96,9 @@ TEST(TakeProfit, LongTargetIsEntryTimesOnePlusPct)
   EXPECT_FALSE(tp.update(249.0, 190.0));
   EXPECT_FALSE(tp.update(249.99, 1.0)) << "a low far below does not matter to a long target";
   EXPECT_TRUE(tp.update(250.0, 205.0)) << "high == target is a hit";
-  EXPECT_TRUE(tp.update(240.0, 205.0)) << "a hit is reported until disarm";
+  EXPECT_TRUE(tp.update(250.0, 205.0)) << "the same bar again is a hit again: a hit does not disarm";
+  EXPECT_FALSE(tp.update(240.0, 205.0)) << "per bar: a later bar below the target is no hit";
+  EXPECT_TRUE(tp.armed());
   EXPECT_DOUBLE_EQ(tp.target(), 250.0);
 
   tp.disarm();
@@ -114,7 +121,7 @@ TEST(TakeProfit, RejectsNonPositivePct)
 {
   EXPECT_THROW(TakeProfit(0.0), std::invalid_argument);
   EXPECT_THROW(TakeProfit(-25.0), std::invalid_argument);
-  EXPECT_THROW(TakeProfit(std::numeric_limits<double>::quiet_NaN()), std::invalid_argument);
+  EXPECT_THROW((TakeProfit(std::numeric_limits<double>::quiet_NaN())), std::invalid_argument);
 }
 
 TEST(TimeStop, FiresOnTheMaxBarsThUpdate)
