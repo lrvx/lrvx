@@ -284,4 +284,4 @@ SLIPPAGE_VOLUME_IMPACT: int = 3
 SUBMITTED: _lrvx.OrderGroupState  # value = <OrderGroupState.SUBMITTED: 1>
 VOLUME_SCALE: int = 100000000
 WAIT_FOR_ALL: _lrvx.FeedClockPolicy  # value = <FeedClockPolicy.WAIT_FOR_ALL: 0>
-__version__: str = '0.12.0'
+__version__: str

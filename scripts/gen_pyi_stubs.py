@@ -163,6 +163,10 @@ def fix_invalid_annotations(text: str, *, rel: Path | None = None) -> str:
         text,
     )
     text = _BARE_ELLIPSIS_PARAM_RE.sub(r"\1typing.Any", text)
+    # stubgen writes the module's __version__ with its value. The value
+    # is the build's release, so a stub carrying it would drift on every
+    # version bump (scripts/set-version.sh) with no change in the surface.
+    text = re.sub(r"^__version__: str = .*$", "__version__: str", text, flags=re.M)
     private_submodules = _PRIVATE_SUBMODULE_IMPORT_RE.findall(text)
     text = _PRIVATE_SUBMODULE_IMPORT_RE.sub(r"from . import \1 as \1", text)
     for name in private_submodules:
