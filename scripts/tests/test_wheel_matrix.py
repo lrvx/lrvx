@@ -172,3 +172,68 @@ def test_the_0_12_0_configuration_is_red_and_names_every_gap(tree: Tree):
     for needle in ("cp314", "cp315", "Python :: 3.13", "Python :: 3.14",
                    "cibuildwheel==2.22.0", "pybind11>=2.12"):
         assert needle in r.stdout, (needle, r.stdout)
+
+
+def test_a_classifier_above_the_newest_released_python_is_red(tree: Tree):
+    tree.edit("pyproject.toml", '    "Programming Language :: Python :: 3.15",\n',
+              '    "Programming Language :: Python :: 3.15",\n'
+              '    "Programming Language :: Python :: 3.16",\n')
+    r = tree.run()
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "classifier for Python 3.16" in r.stdout, r.stdout
+
+
+@pytest.mark.parametrize("bound,red", [
+    # Excludes 3.15, the newest released CPython.
+    ("<3.15", True),
+    # Admits every released CPython; 3.16 is not out.
+    ("<3.16", False),
+])
+def test_an_upper_bound_at_the_newest_released_python(tree: Tree, bound, red):
+    tree.edit("pyproject.toml", 'requires-python = ">=3.10"',
+              f'requires-python = ">=3.10,{bound}"')
+    r = tree.run()
+    assert r.returncode == (1 if red else 0), r.stdout + r.stderr
+    if red:
+        assert "excludes CPython 3.15" in r.stdout, r.stdout
+
+
+def test_a_free_threaded_selector_is_not_the_regular_wheel(tree: Tree):
+    # cp314t-* builds the free-threaded 3.14 wheel only; the regular cp314
+    # wheel is still missing.
+    tree.edit(".github/workflows/python-wheels.yml", "cp314-*", "cp314t-*")
+    r = tree.run()
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "builds no cp314 wheel" in r.stdout, r.stdout
+
+
+@pytest.mark.parametrize("pin,red", [
+    ("pybind11==3.1.0", False),
+    ("pybind11~=3.1.0", False),
+    ("pybind11==3.0.1", True),
+    ("pybind11~=3.0", True),
+])
+def test_exact_and_compatible_pybind11_pins_are_judged_by_their_version(tree: Tree, pin, red):
+    tree.edit("pyproject.toml", '"pybind11>=3.1.0"', f'"{pin}"')
+    r = tree.run()
+    assert r.returncode == (1 if red else 0), r.stdout + r.stderr
+    if red:
+        assert "pybind11>=3.1.0" in r.stdout, r.stdout
+
+
+def test_the_cibuildwheel_pin_is_read_from_the_pip_install_line(tree: Tree):
+    # An older version mentioned before the install line (a comment, a
+    # changelog note) is not the pin.
+    tree.edit(".github/workflows/python-wheels.yml", "jobs:\n",
+              "# Moved off cibuildwheel==2.22.0, which cannot build 3.14.\njobs:\n")
+    r = tree.run()
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_a_cibuildwheel_version_outside_a_pip_install_line_is_no_pin(tree: Tree):
+    tree.edit(".github/workflows/python-wheels.yml",
+              "run: pip install cibuildwheel==4.2.0",
+              "run: pip install cibuildwheel\n        # cibuildwheel==4.2.0")
+    r = tree.run()
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "cibuildwheel is not pinned" in r.stdout, r.stdout

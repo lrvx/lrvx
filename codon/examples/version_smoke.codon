@@ -2,7 +2,12 @@
 # lrvx_version() through the C API -- the same string Python's
 # lrvx.__version__, Node's lrvx.version() and QuickJS's lrvx.version()
 # report, and a separate thing from the C ABI number.
+#
+# The expected release is LRVX_EXPECTED_VERSION when the environment sets it,
+# otherwise the one `project(lrvx VERSION ...)` declares in the CMakeLists.txt
+# of the working directory (the repository root, where CI runs the smokes).
 
+import os
 from lrvx.abi import version, LRVX_CAPI_ABI_VERSION
 
 failed = 0
@@ -17,7 +22,26 @@ def check(cond: bool, msg: str):
         print("FAIL  " + msg)
 
 
+def project_version() -> str:
+    env = os.getenv("LRVX_EXPECTED_VERSION")
+    if env is not None and len(env) > 0:
+        return env
+    prefix = "project(lrvx VERSION "
+    try:
+        with open("CMakeLists.txt") as f:
+            for line in f:
+                if line.startswith(prefix):
+                    return line[len(prefix):].split(" ")[0].split(")")[0].strip()
+    except:
+        pass
+    return ""
+
+
 v = version()
+expected = project_version()
+check(len(expected) > 0,
+      "the expected release is known (set LRVX_EXPECTED_VERSION or run from the repo root)")
+check(v == expected, "version() is the project release: " + v + " == " + expected)
 check(len(v) > 0, "version() is not empty: " + v)
 parts = v.split("-")[0].split(".")
 check(len(parts) >= 3 and all(len(p) > 0 and p.isdigit() for p in parts[:3]),

@@ -155,5 +155,68 @@ attempt('BacktestResult', () => {
   check(near(u.stats().unrealizedPnl, 4), 'BacktestResult: an unmarked symbol is valued at its last fill');
 });
 
+// ── openPositions(): the array types ─────────────────────────────────
+function checkOpenTypes(open, label) {
+  check(open.symbol instanceof Uint32Array, `${label}: symbol is a Uint32Array`);
+  check(open.side instanceof Uint8Array, `${label}: side is a Uint8Array`);
+  for (const key of ['quantity', 'entryPrice', 'markPrice', 'unrealizedPnl']) {
+    check(open[key] instanceof Float64Array, `${label}: ${key} is a Float64Array`);
+  }
+  for (const key of ['symbol', 'side', 'quantity', 'entryPrice', 'markPrice', 'unrealizedPnl']) {
+    check(open[key] && open[key].length === open.symbol.length, `${label}: ${key} is row-aligned`);
+  }
+}
+
+attempt('openPositions types', () => {
+  const { bt, sym } = runner();
+  let n = 0;
+  bt.setStrategy({
+    symbols: [sym],
+    onTrade(_ctx, _trade, emit) { if (n++ === 0) { emit.marketSell(0.5); } },
+  });
+  const closes = [100, 100, 98];
+  const ts = BigInt64Array.from(closes.map((_, i) => T0 + BigInt(i) * MIN));
+  bt.runOhlcv(ts, Float64Array.from(closes), 'BTCUSDT');
+  const open = bt.openPositions();
+  checkOpenTypes(open, 'BacktestRunner.openPositions');
+  check(open.symbol.length === 1 && open.side[0] === 1, 'BacktestRunner.openPositions: one short row');
+
+  const r = new lrvx.BacktestResult(CAPITAL, FEE);
+  r.recordFill(1, 300, 'sell', 50, 3, T0);
+  r.recordFill(2, 7, 'buy', 10, 1, T0 + SEC);
+  const ropen = r.openPositions();
+  checkOpenTypes(ropen, 'BacktestResult.openPositions');
+  check(Array.from(ropen.symbol).join() === '7,300', 'BacktestResult.openPositions: symbol ids kept whole');
+  check(Array.from(ropen.side).join() === '0,1', 'BacktestResult.openPositions: sides');
+});
+
+// ── Engine.run: a signals backtest over loaded bars ──────────────────
+// Buys 2 on bar 0 (close 100), sells 1 on bar 2 (close 104) and holds the
+// other unit to the end; the last close is 110. The open unit's entry is
+// 100; it is marked at the last price the run saw, the last close.
+attempt('Engine.run', () => {
+  const eng = new lrvx.Engine(CAPITAL, 0);
+  const tsSec = [1767225600, 1767225660, 1767225720, 1767225780, 1767225840];
+  const close = [100, 102, 104, 107, 110];
+  eng.loadOhlcv({
+    ts: Float64Array.from(tsSec),
+    open: Float64Array.from(close),
+    high: Float64Array.from(close.map((c) => c + 1)),
+    low: Float64Array.from(close.map((c) => c - 1)),
+    close: Float64Array.from(close),
+    volume: Float64Array.from(close.map(() => 10)),
+  }, 'BTCUSDT');
+  const sig = new lrvx.SignalBuilder();
+  sig.buy(tsSec[0], 2);
+  sig.sell(tsSec[2], 1);
+  const s = eng.run(sig);
+  check(s.totalTrades === 1, `Engine.run: one closed trade (${s.totalTrades})`);
+  check(near(s.totalPnl, 4), `Engine.run: totalPnl is the closed unit, 104 - 100 (${s.totalPnl})`);
+  check(s.unrealizedPnl !== 0, `Engine.run: the open unit is valued (${s.unrealizedPnl})`);
+  equityIdentity(s, 'Engine.run');
+  check(near(s.unrealizedPnl, 10), `Engine.run: open unit marked at the last close, 110 - 100 (${s.unrealizedPnl})`);
+  check(near(s.finalEquity, CAPITAL + s.netPnl + 10), `Engine.run: finalEquity (${s.finalEquity})`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

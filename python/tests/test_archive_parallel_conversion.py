@@ -37,6 +37,7 @@ Run from repo root:
 """
 from __future__ import annotations
 
+import errno
 import gzip
 import io
 import json
@@ -47,6 +48,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import uuid
 import zipfile
@@ -583,6 +585,30 @@ class _ParallelConversionContract:
         self.assertFalse(bad.exists(), "the corrupt cached file was not evicted")
         self.assertEqual(written_files(tape), [],
                          "a failed parallel import left a partial tape")
+        self.assertFalse(tape.exists(),
+                         "a failed import left behind the directory it created")
+
+    def test_serial_failure_leaves_the_tape_as_it_was(self) -> None:
+        bad = self._bad_day()
+        self.case.container(bad, "id,px\n1,2\n")
+
+        # Day 1 is written before day 2 fails.
+        tape = self.tmp / "existing"
+        for path in self.files[0]:
+            self.case.single(path, tape)
+        before = tape_files(tape)
+        with self.assertRaises(ValueError):
+            self._range(tape, 1, _N_DAYS - 1, workers=1)
+        self.assertEqual(tape_files(tape), before,
+                         "a failed serial import changed the existing tape")
+
+        fresh = self.tmp / "fresh"
+        with self.assertRaises(ValueError):
+            self._range(fresh, 0, _N_DAYS - 1, workers=1)
+        self.assertEqual(written_files(fresh), [],
+                         "a failed serial import left a partial tape")
+        self.assertFalse(fresh.exists(),
+                         "a failed serial import left behind the directory it created")
 
 
 class BinanceAggTradesParallelTests(_ParallelConversionContract, unittest.TestCase):
@@ -610,6 +636,44 @@ class BybitLinearParallelTests(_ParallelConversionContract, unittest.TestCase):
         parallel = self._range(self.tmp / "parallel", workers=3)
         self.assertSameImport(serial, self.tmp / "serial",
                               parallel, self.tmp / "parallel")
+
+
+    def test_returned_stats_span_the_whole_range(self) -> None:
+        # Day 1 lists its trades newest first; the stats still run from the
+        # range's earliest trade to its latest.
+        all_ts = [bybit._parse_ts_ns(r[0]) for rows in self.rows for r in rows]
+        for workers in (1, 3):
+            with self.subTest(workers=workers):
+                stats = self._range(self.tmp / f"tape-{workers}", workers=workers)
+                self.assertEqual(stats.first_ts_ns, min(all_ts))
+                self.assertEqual(stats.last_ts_ns, max(all_ts))
+                self.assertEqual(stats.files_processed, _N_DAYS)
+
+    def test_a_failed_metadata_write_puts_the_old_metadata_back(self) -> None:
+        # The disk fills up while metadata.json is rewritten: the file is
+        # truncated, half written, and the write raises. The segments the
+        # range added go and metadata.json gets its old bytes back.
+        tape = self.tmp / "existing"
+        for path in self.files[0]:
+            self.case.single(path, tape)
+        before = tape_files(tape)
+        self.assertIn("metadata.json", [name for name, _ in before])
+
+        real_write_text = Path.write_text
+
+        def disk_full(path, data, *args, **kwargs):
+            if path.name != "metadata.json":
+                return real_write_text(path, data, *args, **kwargs)
+            with open(path, "w") as f:
+                f.write(data[: len(data) // 2])
+            raise OSError(errno.ENOSPC, "No space left on device", str(path))
+
+        with mock.patch.object(Path, "write_text", disk_full):
+            with self.assertRaises(OSError) as ctx:
+                self._range(tape, 1, _N_DAYS - 1, workers=1)
+        self.assertEqual(ctx.exception.errno, errno.ENOSPC)
+        self.assertEqual(tape_files(tape), before,
+                         "the failed import did not restore the tape")
 
 
 class BybitSpotParallelTests(_ParallelConversionContract, unittest.TestCase):
@@ -677,11 +741,53 @@ class ConvertDaysTests(unittest.TestCase):
         self.assertEqual(pids, [os.getpid()] * 4)
 
     def test_several_workers_run_in_other_processes(self) -> None:
-        pids = _within(_HANG_S, lambda: _range.convert_days(
-            list(range(6)), archive_workers.pid_of, workers=3))
-        self.assertEqual(len(pids), 6)
-        self.assertNotIn(os.getpid(), pids,
-                         "conversion with workers=3 ran in the calling process")
+        for workers in (2, 3):
+            with self.subTest(workers=workers):
+                pids = _within(_HANG_S, lambda: _range.convert_days(
+                    list(range(6)), archive_workers.pid_of, workers=workers))
+                self.assertEqual(len(pids), 6)
+                self.assertNotIn(os.getpid(), pids,
+                                 f"conversion with workers={workers} ran in the "
+                                 f"calling process")
+
+    def test_workers_run_at_most_twice_their_count_ahead_of_then(self) -> None:
+        # Each item leaves a file when a worker starts it. ``then`` waits on
+        # the first items long enough for the workers to start everything
+        # handed to them, then counts: no more than 2 * workers items past
+        # the one being handed over may have been started.
+        workers, n_items = 2, 12
+        started_dir = Path(tempfile.mkdtemp(prefix="parallel-ahead-"))
+        self.addCleanup(shutil.rmtree, started_dir, True)
+        ahead = []
+
+        def then(i, r):
+            if i < 3:
+                time.sleep(0.5)
+            ahead.append(len(list(started_dir.iterdir())) - i)
+            return r
+
+        out = _within(_HANG_S, lambda: _range.convert_days(
+            [(str(started_dir), i) for i in range(n_items)],
+            archive_workers.mark_started, workers=workers, then=then))
+        self.assertEqual(out, list(range(n_items)))
+        self.assertEqual(len(ahead), n_items)
+        self.assertLessEqual(max(ahead), 2 * workers,
+                             f"items started past the one handed to then: {ahead}")
+
+    def test_an_exception_that_does_not_pickle_still_reaches_the_caller(self) -> None:
+        from concurrent.futures.process import BrokenProcessPool
+
+        with self.assertRaises(RuntimeError) as ctx:
+            _within(_HANG_S, lambda: _range.convert_days(
+                list(range(6)), archive_workers.fail_unpicklable_on, workers=3))
+        self.assertNotIsInstance(ctx.exception, BrokenProcessPool,
+                                 "the worker's exception broke the pool")
+        self.assertIn("NeedsTwoArgs", str(ctx.exception))
+        self.assertIn("day 3: bad header", str(ctx.exception))
+        # The pool is usable again afterwards: nothing was left half shut.
+        self.assertEqual(_within(_HANG_S, lambda: _range.convert_days(
+            list(range(4)), archive_workers.tagged, workers=2)),
+            [archive_workers.tagged(i) for i in range(4)])
 
     def test_results_come_back_in_item_order(self) -> None:
         items = list(range(12))
@@ -701,6 +807,64 @@ class ConvertDaysTests(unittest.TestCase):
                         list(range(6)), archive_workers.fail_on,
                         workers=workers))
                 self.assertEqual(str(ctx.exception), "day 3 does not convert")
+
+
+class SpillCleanupTests(unittest.TestCase):
+    """The workers parse into a temporary directory of the calling
+    process (``lrvx-archive-import-*`` under the temp root). Each parsed
+    file is deleted once it is written, and the directory goes when the
+    range is done or has failed."""
+
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp(prefix="parallel-spill-"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.temp_root = self.tmp / "temp-root"
+        self.temp_root.mkdir()
+        patcher = mock.patch.object(tempfile, "tempdir", str(self.temp_root))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.mirror = self.tmp / "mirror"
+        self.files = BYBIT.build(self.mirror)
+
+    def leftovers(self) -> list:
+        return sorted(p.name for p in self.temp_root.iterdir())
+
+    def test_each_parsed_file_is_deleted_once_written(self) -> None:
+        real_write_file = bybit._write_file
+        still_there = []
+
+        def write_file(parsed, *args, **kwargs):
+            out = real_write_file(parsed, *args, **kwargs)
+            still_there.append(parsed.rows._path.exists())
+            return out
+
+        for workers in (1, 2):
+            with self.subTest(workers=workers):
+                still_there.clear()
+                with mock.patch.object(bybit, "_write_file", side_effect=write_file):
+                    BYBIT.range(self.mirror, self.tmp / f"tape-{workers}", 0,
+                                _N_DAYS - 1, workers=workers)
+                self.assertEqual(still_there, [False] * _N_DAYS,
+                                 "a parsed file outlived its write")
+
+    def test_the_spill_directory_goes_after_a_range(self) -> None:
+        for workers in (1, 2):
+            with self.subTest(workers=workers):
+                _within(_HANG_S, lambda: BYBIT.range(
+                    self.mirror, self.tmp / f"tape-{workers}", 0, _N_DAYS - 1,
+                    workers=workers))
+                self.assertEqual(self.leftovers(), [])
+
+    def test_the_spill_directory_goes_after_a_failed_range(self) -> None:
+        bad = self.files[2][0]
+        for workers in (1, 2):
+            with self.subTest(workers=workers):
+                _write_gz(bad, "id,px\n1,2\n")
+                with self.assertRaises(ValueError):
+                    _within(_HANG_S, lambda: BYBIT.range(
+                        self.mirror, self.tmp / f"tape-{workers}", 0, _N_DAYS - 1,
+                        workers=workers))
+                self.assertEqual(self.leftovers(), [])
 
 
 # ── The command line ─────────────────────────────────────────────────

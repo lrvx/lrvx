@@ -28,6 +28,7 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 namespace
@@ -128,6 +129,45 @@ TEST(CapiOpenPosition, NullHandleIsRefusedNotDereferenced)
   lrvx_clear_last_error();
   EXPECT_EQ(lrvx_backtest_result_open_positions(nullptr, nullptr, 0), 0u);
   lrvx_backtest_result_mark_price(nullptr, 1, 1.0);
+  lrvx_clear_last_error();
+}
+
+// Each accessor records the documented code for a NULL handle (1) and names
+// itself in the message, so a caller can tell which call was refused.
+TEST(CapiOpenPosition, EachNullHandleRecordsCodeOneNamingTheFunction)
+{
+  struct Case
+  {
+    const char* fn;
+    void (*call)();
+  };
+  const Case cases[] = {
+      {"lrvx_backtest_result_mark_price",
+       []
+       { lrvx_backtest_result_mark_price(nullptr, 1, 1.0); }},
+      {"lrvx_backtest_result_open_positions",
+       []
+       {
+         LrvxBacktestOpenPosition out[2]{};
+         EXPECT_EQ(lrvx_backtest_result_open_positions(nullptr, out, 2), 0u);
+       }},
+      {"lrvx_backtest_result_unrealized_pnl",
+       []
+       { EXPECT_EQ(lrvx_backtest_result_unrealized_pnl(nullptr), 0.0); }},
+      {"lrvx_backtest_result_final_equity",
+       []
+       { EXPECT_EQ(lrvx_backtest_result_final_equity(nullptr), 0.0); }},
+  };
+  for (const auto& c : cases)
+  {
+    lrvx_clear_last_error();
+    ASSERT_EQ(lrvx_last_error_code(), 0);
+    c.call();
+    EXPECT_EQ(lrvx_last_error_code(), 1) << c.fn;
+    const char* msg = lrvx_last_error_message();
+    ASSERT_NE(msg, nullptr) << c.fn;
+    EXPECT_NE(std::string(msg).find(c.fn), std::string::npos) << c.fn << ": " << msg;
+  }
   lrvx_clear_last_error();
 }
 

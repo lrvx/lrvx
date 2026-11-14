@@ -45,6 +45,33 @@ def fail_on(item):
     return item
 
 
+class NeedsTwoArgs(Exception):
+    """An exception that does not survive pickling: unpickling calls
+    ``NeedsTwoArgs(message)``, which is one argument short."""
+
+    def __init__(self, day, why):
+        super().__init__(f"day {day}: {why}")
+        self.day = day
+        self.why = why
+
+
+def fail_unpicklable_on(item):
+    """Like ``fail_on``, but item 3 raises an exception that cannot make
+    the trip back from a worker process."""
+    if item == 3:
+        raise NeedsTwoArgs(item, "bad header")
+    time.sleep(0.05)
+    return item
+
+
+def mark_started(item):
+    """``item`` is ``(directory, index)``: leaves a file named ``index`` in
+    ``directory``, so the caller can count the items a worker has begun."""
+    directory, index = item
+    (Path(directory) / str(index)).touch()
+    return index
+
+
 def _run(spec: dict) -> dict:
     import importlib
 

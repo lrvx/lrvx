@@ -33,11 +33,13 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <functional>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace lrvx;
@@ -50,6 +52,9 @@ constexpr int64_t kMinuteNs = 60 * kSec;
 constexpr int64_t kT0 = 1'767'225'600LL * kSec;  // 2026-01-01T00:00:00Z
 constexpr SymbolId kSym = 1;
 constexpr SymbolId kSym2 = 2;
+// Past BacktestResult::kMaxSymbols (256): the overflow tables.
+constexpr SymbolId kBig = 300;
+constexpr SymbolId kBig2 = 301;
 constexpr double kEps = 1e-9;
 
 Fill fill(SymbolId sym, Side side, double price, double qty, int64_t ts)
@@ -93,6 +98,18 @@ SymbolRegistry& registry()
     for (const char* name : {"BTCUSDT", "ETHUSDT"})
     {
       SymbolInfo info;
+      info.exchange = "test";
+      info.symbol = name;
+      info.type = InstrumentType::Spot;
+      info.tickSize = Price::fromDouble(0.01);
+      r->registerSymbol(info);
+    }
+    // Ids past BacktestResult::kMaxSymbols, kept in the overflow tables.
+    for (const auto& [id, name] : {std::pair<SymbolId, const char*>{300, "SOLUSDT"},
+                                   std::pair<SymbolId, const char*>{301, "XRPUSDT"}})
+    {
+      SymbolInfo info;
+      info.id = id;
       info.exchange = "test";
       info.symbol = name;
       info.type = InstrumentType::Spot;
@@ -637,4 +654,193 @@ TEST(OpenPositionAtEnd, ASecondRunDoesNotInheritTheFirstRunsMarks)
   ASSERT_EQ(open.size(), 1u);
   EXPECT_NEAR(open[0].markPrice.toDouble(), 102.0, kEps);
   EXPECT_NEAR(r.computeStats().unrealizedPnl, 1.0, kEps);
+}
+
+// ── Symbol ids past the inline tables ───────────────────────────────────
+
+static_assert(kBig >= BacktestResult::kMaxSymbols);
+
+// Open positions are listed in ascending symbol id across the inline table
+// and the overflow one, whatever order the symbols first filled in.
+TEST(OpenPositionAtEnd, OpenPositionsAreSortedAcrossInlineAndOverflowSymbols)
+{
+  BacktestResult r(makeConfig(0.0));
+  r.recordFill(fill(1000, Side::BUY, 10.0, 1.0, kT0));
+  r.recordFill(fill(kBig, Side::SELL, 20.0, 1.0, kT0 + kSec));
+  r.recordFill(fill(5, Side::BUY, 30.0, 1.0, kT0 + 2 * kSec));
+  r.recordFill(fill(257, Side::BUY, 40.0, 1.0, kT0 + 3 * kSec));
+  r.recordFill(fill(kSym, Side::SELL, 50.0, 1.0, kT0 + 4 * kSec));
+  r.markPrice(1000, 12.0);  // +2
+  r.markPrice(kBig, 19.0);  // +1
+  r.markPrice(257, 37.0);   // -3
+
+  const auto open = r.openPositions();
+  std::vector<SymbolId> ids;
+  for (const auto& p : open)
+  {
+    ids.push_back(p.symbol);
+  }
+  EXPECT_EQ(ids, (std::vector<SymbolId>{kSym, 5, 257, kBig, 1000}));
+  ASSERT_EQ(open.size(), 5u);
+  EXPECT_NEAR(open[3].unrealizedPnl.toDouble(), 1.0, kEps);
+  EXPECT_EQ(open[3].side, Side::SELL);
+  EXPECT_NEAR(open[4].markPrice.toDouble(), 12.0, kEps);
+  EXPECT_NEAR(r.computeStats().unrealizedPnl, 2.0 + 1.0 - 3.0, kEps);
+}
+
+// A symbol id past the inline table is marked at the last bar's close, not
+// the first one it saw.
+TEST(OpenPositionAtEnd, RunBarsMarksAnOverflowSymbolAtItsLastClose)
+{
+  Probe p({kBig});
+  p.onBarHook = [](Probe& s, const BarEvent&, size_t i)
+  {
+    if (i == 0)
+    {
+      s.emitMarketBuy(kBig, Quantity::fromDouble(2.0));
+    }
+  };
+  BacktestRunner runner(makeConfig());
+  runner.setStrategy(&p);
+  const BacktestResult r = runner.runBars({
+      makeBar(kBig, 100.0, 100.5, 99.5, 100.0, kT0),
+      makeBar(kBig, 101.0, 103.0, 100.0, 102.0, kT0 + kMinuteNs),
+      makeBar(kBig, 103.0, 108.0, 96.0, 97.0, kT0 + 2 * kMinuteNs),
+  });
+  ASSERT_EQ(r.fills().size(), 1u);
+  EXPECT_NEAR(fillPrice(r, 0), 101.0, kEps);
+  const auto open = r.openPositions();
+  ASSERT_EQ(open.size(), 1u);
+  EXPECT_EQ(open[0].symbol, kBig);
+  EXPECT_NEAR(open[0].markPrice.toDouble(), 97.0, kEps);
+  EXPECT_NEAR(r.computeStats().unrealizedPnl, (97.0 - 101.0) * 2.0, kEps);
+}
+
+// Tick replay marks inline and overflow symbols alike, each at its own last
+// trade, and lists them in symbol order.
+TEST(OpenPositionAtEnd, RunTapeMarksOverflowSymbolsAtTheirLastTrade)
+{
+  TapeDir tape("overflow");
+  tape.write({
+      {kT0 + 1 * kSec, 100.0, kBig2},
+      {kT0 + 2 * kSec, 50.0, kBig},
+      {kT0 + 3 * kSec, 10.0, kSym},
+      {kT0 + 4 * kSec, 104.0, kBig2},
+      {kT0 + 5 * kSec, 55.0, kBig},
+      {kT0 + 6 * kSec, 11.0, kSym},
+      {kT0 + 7 * kSec, 106.0, kBig2},
+      {kT0 + 8 * kSec, 49.0, kBig},
+      {kT0 + 9 * kSec, 12.0, kSym},
+  });
+  Probe p({kSym, kBig, kBig2});
+  std::vector<SymbolId> bought;
+  p.onTradeHook = [&](Probe& s, const TradeEvent& ev, size_t)
+  {
+    const SymbolId sym = ev.trade.symbol;
+    if (std::find(bought.begin(), bought.end(), sym) == bought.end())
+    {
+      bought.push_back(sym);
+      s.emitMarketBuy(sym, Quantity::fromDouble(1.0));
+    }
+  };
+  BacktestRunner runner(makeConfig());
+  runner.setStrategy(&p);
+  const BacktestResult r = runner.runTape(tape.path());
+  ASSERT_EQ(r.fills().size(), 3u);
+
+  const auto open = r.openPositions();
+  ASSERT_EQ(open.size(), 3u);
+  EXPECT_EQ(open[0].symbol, kSym);
+  EXPECT_EQ(open[1].symbol, kBig);
+  EXPECT_EQ(open[2].symbol, kBig2);
+  EXPECT_NEAR(open[0].markPrice.toDouble(), 12.0, kEps);
+  EXPECT_NEAR(open[1].markPrice.toDouble(), 49.0, kEps);
+  EXPECT_NEAR(open[2].markPrice.toDouble(), 106.0, kEps);
+}
+
+namespace
+{
+
+// Run 1 replays trades of `sym` and ends long, marked at 110. Run 2, on the
+// same runner, never replays a trade of `sym`: it holds book records for it,
+// and a trade of `trigger` buys `sym` against that book. With no price
+// replayed for `sym` in run 2, its position is valued at its own last fill,
+// never at run 1's mark.
+void expectNoMarkCarriedIntoASecondRun(SymbolId sym, SymbolId trigger)
+{
+  TapeDir first("carry_first");
+  first.write({{kT0 + 1 * kSec, 100.0, sym}, {kT0 + 2 * kSec, 110.0, sym}});
+  TapeDir second("carry_second");
+  second.write({{kT0 + 2 * kSec, 7.0, trigger}, {kT0 + 3 * kSec, 7.0, trigger}},
+               {{kT0 + 1 * kSec, 199.0, 201.0, sym}});
+
+  Probe p({sym, trigger});
+  bool bought = false;
+  p.onTradeHook = [&](Probe& s, const TradeEvent&, size_t)
+  {
+    if (!bought)
+    {
+      bought = true;
+      s.emitMarketBuy(sym, Quantity::fromDouble(1.0));
+    }
+  };
+  BacktestRunner runner(makeConfig());
+  runner.setStrategy(&p);
+  const BacktestResult r1 = runner.runTape(first.path());
+  ASSERT_EQ(r1.openPositions().size(), 1u);
+  ASSERT_NEAR(r1.openPositions()[0].markPrice.toDouble(), 110.0, kEps);
+
+  bought = false;
+  const BacktestResult r2 = runner.runTape(second.path());
+  ASSERT_EQ(r2.fills().size(), 1u) << "the order must fill against the book";
+  ASSERT_EQ(r2.fills()[0].symbol, sym);
+  const double entry = fillPrice(r2, 0);
+  const auto open = r2.openPositions();
+  ASSERT_EQ(open.size(), 1u);
+  EXPECT_EQ(open[0].symbol, sym);
+  EXPECT_NEAR(open[0].markPrice.toDouble(), entry, kEps)
+      << "run 2 replayed no price for the symbol; the mark came from run 1";
+  EXPECT_NEAR(r2.computeStats().unrealizedPnl, 0.0, kEps);
+}
+
+}  // namespace
+
+TEST(OpenPositionAtEnd, ASecondRunDoesNotKeepAMarkItNeverReplayed)
+{
+  expectNoMarkCarriedIntoASecondRun(kSym, kSym2);
+}
+
+TEST(OpenPositionAtEnd, ASecondRunDoesNotKeepAnOverflowMarkItNeverReplayed)
+{
+  expectNoMarkCarriedIntoASecondRun(kBig, kBig2);
+}
+
+// extractResult() moves the fills out instead of copying them; the result is
+// marked the same way result() marks it.
+TEST(OpenPositionAtEnd, ExtractResultIsMarkedLikeResult)
+{
+  TapeDir tape("extract");
+  tape.write(threeMinuteTape());
+  Probe p;
+  p.onTradeHook = [](Probe& s, const TradeEvent&, size_t i)
+  {
+    if (i == 0)
+    {
+      s.emitMarketBuy(kSym, Quantity::fromDouble(1.0));
+    }
+  };
+  BacktestRunner runner(makeConfig());
+  runner.setStrategy(&p);
+  const BacktestResult copied = runner.runTape(tape.path());
+  ASSERT_EQ(copied.fills().size(), 1u);
+  const double entry = fillPrice(copied, 0);
+
+  const BacktestResult r = runner.extractResult();
+  ASSERT_EQ(r.fills().size(), 1u);
+  const auto open = r.openPositions();
+  ASSERT_EQ(open.size(), 1u);
+  EXPECT_NEAR(open[0].markPrice.toDouble(), 110.0, kEps);
+  const auto s = r.computeStats();
+  EXPECT_NEAR(s.unrealizedPnl, 110.0 - entry, kEps);
+  EXPECT_NEAR(s.finalEquity, s.initialCapital + s.netPnl + (110.0 - entry), kEps);
 }

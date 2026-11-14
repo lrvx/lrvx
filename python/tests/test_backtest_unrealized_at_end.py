@@ -299,3 +299,30 @@ def test_backtest_result_unmarked_symbol_uses_its_last_fill():
     r.record_fill(2, 1, "sell", 104.0, 1.0, T0 + SEC)
     assert r.stats()["unrealized_pnl"] == pytest.approx(4.0, abs=1e-9)
     assert r.open_positions()["mark_price"][0] == pytest.approx(104.0)
+
+
+# ── Walk-forward: each window's stats value its own open position ─────
+
+
+def test_walk_forward_fold_stats_value_the_open_position():
+    reg = lrvx.SymbolRegistry()
+    sym = reg.add_symbol("backtest", "BTCUSDT", tick_size=0.01)
+    wfr = lrvx.WalkForwardRunner(reg, fee_rate=FEE, initial_capital=CAPITAL,
+                                 mode="sliding", train_size=3, test_size=3, step=3)
+    # Every window buys on its first bar and never sells.
+    wfr.set_strategy_factory(lambda _fold: _BarOrders([sym], {0: 1.0}))
+    start = np.array([T0 + i * MIN for i in range(6)], dtype=np.int64)
+    opens = np.array([100.0, 101.0, 102.0, 110.0, 111.0, 112.0])
+    closes = np.array([100.0, 101.0, 102.0, 110.0, 113.0, 108.0])
+    folds = wfr.run_bars(start, start + MIN, opens, np.maximum(opens, closes) + 1.0,
+                         np.minimum(opens, closes) - 1.0, closes, np.full(6, 10.0),
+                         symbol="BTCUSDT")
+    assert len(folds) == 1
+    # Train [0, 3): filled at bar 1's open (101), marked at bar 2's close (102).
+    # Test [3, 6): filled at bar 4's open (111), marked at bar 5's close (108).
+    for key, expected in (("train_stats", 1.0), ("test_stats", -3.0)):
+        stats = folds[0][key]
+        assert stats["unrealized_pnl"] == pytest.approx(expected, abs=1e-9), key
+        assert stats["final_equity"] == pytest.approx(
+            CAPITAL + stats["net_pnl"] + expected, abs=1e-9), key
+        _equity_identity(stats)
