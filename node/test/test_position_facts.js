@@ -262,22 +262,39 @@ console.log('=== add after a partial close, add to and partly close a short ==='
 }
 
 // A threaded Runner calls the strategy later, on the JS thread, than the
-// engine thread delivered the event. ctx carries the facts as they were at
-// delivery: here every event is delivered before the first callback after
-// bar 0 runs, by which time the position is flat again.
+// engine thread delivered the event; ctx carries the facts as they were at
+// delivery. Ordering: market data published after a reported fill may reach
+// the strategy before it, so each fill is awaited (its onFill has run)
+// before the next bar is published. To have the facts move between delivery
+// and the callback, two bars are published back to back and the JS thread
+// is held until the engine has handed over the second (it shows up as the
+// last closed bar): the first bar's callback then runs after the count has
+// already moved on.
 async function threadedRunnerSection() {
   console.log('=== threaded Runner: ctx facts are those at delivery ===');
-  const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-  const waitFor = async (cond, ms) => {
-    const until = Date.now() + ms;
-    while (!cond() && Date.now() < until) { await new Promise((r) => setTimeout(r, 10)); }
-    return cond();
+  const DEADLINE_MS = 5000;
+  const waitFor = async (cond, what) => {
+    const until = Date.now() + DEADLINE_MS;
+    while (!cond()) {
+      if (Date.now() > until) { throw new Error(`timed out after ${DEADLINE_MS} ms waiting for ${what}`); }
+      await new Promise((r) => setImmediate(r));
+    }
+  };
+  // Blocks the JS thread, so no callback can run, until cond() holds.
+  const holdUntil = (cond, what) => {
+    const until = Date.now() + DEADLINE_MS;
+    const cell = new Int32Array(new SharedArrayBuffer(4));
+    while (!cond()) {
+      if (Date.now() > until) { throw new Error(`timed out after ${DEADLINE_MS} ms waiting for ${what}`); }
+      Atomics.wait(cell, 0, 0, 1);
+    }
   };
   const reg = new lrvx.SymbolRegistry();
   const a = reg.addSymbol('test', 'AAA', 0.01);
   const runner = new lrvx.Runner(reg, () => {}, true);
   const log = [];
   const fills = [];
+  let emitter = null;
   let idBuy = 0;
   let idSell = 0;
   runner.addStrategy({
@@ -285,6 +302,7 @@ async function threadedRunnerSection() {
     onBar(ctx, _bar, emit) {
       log.push([ctx.entryPrice, ctx.barsInPosition, ctx.position]);
       if (!idBuy) {
+        emitter = emit;
         idBuy = emit.limitBuy(50, 4, a);
         idSell = emit.limitSell(90, 4, a);
       }
@@ -299,30 +317,29 @@ async function threadedRunnerSection() {
     runner.onBar(a, {open, high: open + 3, low: open - 2, close: open + 1, volume: 10,
                      startTimeNs: BigInt(i) * MIN, endTimeNs: BigInt(i + 1) * MIN});
   };
-  const fill = (orderId, side, fillQty, fillPrice) => runner.onOrderEvent(
-      {orderId, symbol: a, side, status: 'FILLED', fillQty, fillPrice});
+  const delivered = (i) => () => {
+    const last = emitter.lastClosedBar(a, 0, 0);
+    return last !== null && last.startNs === BigInt(i) * MIN;
+  };
+  const fill = async (orderId, side, fillQty, fillPrice) => {
+    const n = fills.length;
+    runner.onOrderEvent({orderId, symbol: a, side, status: 'FILLED', fillQty, fillPrice});
+    await waitFor(() => fills.length === n + 1, `the fill of ${fillQty} @ ${fillPrice}`);
+  };
   try {
     bar(0);
-    check(await waitFor(() => idBuy !== 0, 5000), 'premise: the first bar reached the strategy');
-    // A reported order event is only queued behind the market data published
-    // before it, so a bar published right after it may be delivered first.
-    // The JS thread is held after each publish until the engine has
-    // delivered it: every event arrives in this order, and no callback runs
-    // until all of them have.
-    const steps = [
-      () => fill(idBuy, 'buy', 1, 50),
-      () => bar(1),   // long 1 @ 50, bar 1
-      () => fill(idBuy, 'buy', 3, 70),
-      () => bar(2),   // long 4 @ 65, bar 2
-      () => fill(idSell, 'sell', 4, 80),
-      () => bar(3),   // flat
-    ];
-    for (const step of steps) {
-      step();
-      sleepSync(100);
-    }
-    check(await waitFor(() => log.length === 4 && fills.length === 3, 5000),
-          `premise: four bars and three fills reached the strategy (${log.length}, ${fills.length})`);
+    await waitFor(() => log.length === 1, 'bar 0');
+    await fill(idBuy, 'buy', 1, 50);
+    bar(1);   // long 1 @ 50, bar 1
+    bar(2);   // long 1 @ 50, bar 2
+    holdUntil(delivered(2), 'the engine to deliver bar 2');
+    await waitFor(() => log.length === 3, 'bars 1 and 2');
+    await fill(idBuy, 'buy', 3, 70);
+    bar(3);   // long 4 @ 65, bar 3
+    await waitFor(() => log.length === 4, 'bar 3');
+    await fill(idSell, 'sell', 4, 80);
+    bar(4);   // flat
+    await waitFor(() => log.length === 5, 'bar 4');
   } finally {
     runner.stop();
   }
@@ -330,12 +347,14 @@ async function threadedRunnerSection() {
   check(log[0] && log[0][0] === null && log[0][1] === 0, `bar 0 flat (${show(log[0])})`);
   check(log[1] && log[1][2] === 1 && near(log[1][0], 50) && log[1][1] === 1,
         `bar 1 long 1 @ 50, 1 bar (${show(log[1])})`);
-  check(log[2] && log[2][2] === 4 && near(log[2][0], 65) && log[2][1] === 2,
-        `bar 2 long 4 @ 65, 2 bars (${show(log[2])})`);
-  check(log[3] && log[3][2] === 0 && log[3][0] === null && log[3][1] === 0,
-        `bar 3 flat (${show(log[3])})`);
+  check(log[2] && log[2][2] === 1 && near(log[2][0], 50) && log[2][1] === 2,
+        `bar 2 long 1 @ 50, 2 bars (${show(log[2])})`);
+  check(log[3] && log[3][2] === 4 && near(log[3][0], 65) && log[3][1] === 3,
+        `bar 3 long 4 @ 65, 3 bars (${show(log[3])})`);
+  check(log[4] && log[4][2] === 0 && log[4][0] === null && log[4][1] === 0,
+        `bar 4 flat (${show(log[4])})`);
   check(fills[0] && near(fills[0][1], 50) && fills[0][2] === 0, `fill 0 (${show(fills[0])})`);
-  check(fills[1] && near(fills[1][1], 65) && fills[1][2] === 1, `fill 1 (${show(fills[1])})`);
+  check(fills[1] && near(fills[1][1], 65) && fills[1][2] === 2, `fill 1 (${show(fills[1])})`);
   check(fills[2] && fills[2][3] === 0 && fills[2][1] === null && fills[2][2] === 0,
         `the flattening fill reads no entry and 0 bars (${show(fills[2])})`);
 }
