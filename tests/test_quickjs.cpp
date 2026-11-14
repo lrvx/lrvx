@@ -1338,6 +1338,108 @@ TEST(JsIntegrationTest, MultiTfHelpersRingCapacityIsAdjustable)
   JS_FreeValue(ctx, kept);
 }
 
+// The runtime contract quickjs/types/lrvx.d.ts declares for the ring: each
+// bar has exactly open/high/low/close/volume as Numbers and startNs/endNs as
+// BigInts; null and [] before the first bar; oldest first; `n` caps the
+// array; `param` takes a Number or a BigInt and the symbol a name, an id or
+// undefined; barRingCapacity is a Number, setBarRingCapacity returns
+// undefined and bounds what the ring keeps.
+TEST(JsIntegrationTest, MultiTfHelpersMatchDeclaredShape)
+{
+  TempJsFile script(R"(
+    var M5 = 5 * 60 * 1000000000;
+    var out = {};
+    function shapeOf(b) {
+      var s = {};
+      Object.keys(b).sort().forEach(function(k) { s[k] = typeof b[k]; });
+      return s;
+    }
+    class TestStrat extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+      onStart() {
+        out.lastBefore = this.lastClosedBar("BTCUSDT", 0, M5) === null;
+        var n = this.lastNClosedBars("BTCUSDT", 0, M5, 5);
+        out.nBefore = Array.isArray(n) && n.length === 0;
+        out.defaultCapType = typeof this.barRingCapacity;
+        out.defaultCap = this.barRingCapacity;
+        out.setReturn = typeof this.setBarRingCapacity(0);
+        out.capAfterZero = this.barRingCapacity;
+        this.setBarRingCapacity(3);
+        out.capAfterSet = this.barRingCapacity;
+      }
+      onBar(ctx, bar) {
+        var last = this.lastClosedBar("BTCUSDT", 0, M5);
+        out.shape = shapeOf(last);
+        out.lastClose = last.close;
+        out.lastStartNs = String(last.startNs);
+        out.lastEndNs = String(last.endNs);
+        out.lastVolume = last.volume;
+        out.byIdBigParam = this.lastClosedBar(ctx.symbolId, 0, BigInt(M5)).close;
+        out.primary = this.lastClosedBar(undefined, 0, M5).close;
+        out.otherTf = this.lastClosedBar("BTCUSDT", 0, 2 * M5);
+        out.all = this.lastNClosedBars("BTCUSDT", 0, M5, 10).map(function(b) { return b.close; });
+        out.two = this.lastNClosedBars(ctx.symbolId, 0, BigInt(M5), 2).map(function(b) { return b.close; });
+        out.zero = this.lastNClosedBars("BTCUSDT", 0, M5, 0).length;
+        out.nShape = this.lastNClosedBars("BTCUSDT", 0, M5, 1).map(shapeOf)[0];
+      }
+    }
+    lrvx.register(new TestStrat());
+    function result() { return JSON.stringify(out); }
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+
+  auto bridge = std::make_unique<BridgeStrategy>(
+      1, std::vector<SymbolId>(symIds.begin(), symIds.end()), registry, callbacks);
+  jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+
+  bridge->start();
+
+  const int64_t m5 = 5LL * 60 * 1'000'000'000LL;
+  for (int i = 0; i < 5; ++i)
+  {
+    BarEvent ev{};
+    ev.symbol = symIds[0];
+    ev.barType = BarType::Time;
+    ev.barTypeParam = static_cast<uint64_t>(m5);
+    ev.bar.open = Price::fromDouble(100.0 + i);
+    ev.bar.close = Price::fromDouble(100.5 + i);
+    ev.bar.high = Price::fromDouble(101.0 + i);
+    ev.bar.low = Price::fromDouble(99.5 + i);
+    ev.bar.volume = Volume::fromDouble(2.5 + i);
+    ev.bar.startTime = TimePoint{std::chrono::nanoseconds{m5 * i}};
+    ev.bar.endTime = TimePoint{std::chrono::nanoseconds{m5 * (i + 1)}};
+    bridge->onBar(ev);
+  }
+
+  auto* ctx = jsStrat.engine().context();
+  JSValue fn = jsStrat.engine().getGlobalProperty("result");
+  JSValue res = JS_Call(ctx, fn, JS_UNDEFINED, 0, nullptr);
+  ASSERT_FALSE(JS_IsException(res));
+  const char* s = JS_ToCString(ctx, res);
+  std::string json = s ? s : "";
+  JS_FreeCString(ctx, s);
+  JS_FreeValue(ctx, res);
+  JS_FreeValue(ctx, fn);
+
+  const std::string shape =
+      R"({"close":"number","endNs":"bigint","high":"number","low":"number",)"
+      R"("open":"number","startNs":"bigint","volume":"number"})";
+  const std::string expected =
+      R"({"lastBefore":true,"nBefore":true,"defaultCapType":"number","defaultCap":64,)"
+      R"("setReturn":"undefined","capAfterZero":1,"capAfterSet":3,)"
+      R"("shape":)" +
+      shape +
+      R"(,"lastClose":104.5,"lastStartNs":"1200000000000","lastEndNs":"1500000000000",)"
+      R"("lastVolume":6.5,"byIdBigParam":104.5,"primary":104.5,"otherTf":null,)"
+      R"("all":[102.5,103.5,104.5],"two":[103.5,104.5],"zero":0,"nShape":)" +
+      shape + "}";
+  EXPECT_EQ(json, expected);
+}
+
 TEST(JsIntegrationTest, JsExceptionInOnTradeDoesNotCrash)
 {
   TempJsFile script(R"(

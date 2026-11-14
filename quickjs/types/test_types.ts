@@ -189,3 +189,77 @@ class SymbolArguments extends Strategy {
     }
 }
 void SymbolArguments;
+
+// The per-(symbol, barType, param) ring of closed bars. A bar is the LrvxBar
+// shape node/index.d.ts calls ClosedBar: OHLCV as Numbers, startNs / endNs as
+// BigInts, nothing else. `param` reaches the engine through JS_ToInt64Ext, so
+// a Number and a BigInt both work. The ring is empty (null, []) until a bar
+// of that timeframe closes; lastNClosedBars is oldest first.
+class BarRing extends Strategy {
+    onTrade(ctx: SymbolContext): void {
+        const M5 = 5 * 60 * 1000000000;
+        const last = this.lastClosedBar('BTCUSDT', 0, M5);
+        // @ts-expect-error null until a bar of this timeframe has closed
+        const unchecked: number = last.close;
+        if (last !== null) {
+            const open: number = last.open;
+            const high: number = last.high;
+            const low: number = last.low;
+            const close: number = last.close;
+            const volume: number = last.volume;
+            const startNs: bigint = last.startNs;
+            const endNs: bigint = last.endNs;
+            // @ts-expect-error the times are BigInts, not Numbers
+            const startAsNumber: number = last.startNs;
+            // @ts-expect-error no `ts`: this is not the loadCsv Bar
+            void last.ts;
+            // @ts-expect-error no barType on a ring bar
+            void last.barType;
+            // @ts-expect-error no closeReason on a ring bar
+            void last.closeReason;
+            // @ts-expect-error no buyVolume on a ring bar
+            void last.buyVolume;
+            // @ts-expect-error camelCase, not start_ns
+            void last.start_ns;
+            void [open, high, low, close, volume, startNs, endNs, startAsNumber];
+        }
+        type RingBar = NonNullable<ReturnType<BarRing['lastClosedBar']>>;
+        // Exactly these seven fields: a missing or an extra one fails here.
+        const fields: Record<keyof RingBar, true> = {
+            open: true, high: true, low: true, close: true, volume: true,
+            startNs: true, endNs: true,
+        };
+        const byIdBigParam: RingBar | null = this.lastClosedBar(ctx.symbolId, 0, BigInt(M5));
+        const primary: RingBar | null = this.lastClosedBar(undefined, 0, M5);
+
+        const bars = this.lastNClosedBars('BTCUSDT', 0, M5, 10);
+        const count: number = bars.length;
+        const oldest: RingBar = bars[0];
+        const same: RingBar[] = this.lastNClosedBars(ctx.symbolId, 0, BigInt(M5), 3);
+        const fromPrimary: RingBar[] = this.lastNClosedBars(undefined, 0, M5, 3);
+        // @ts-expect-error an empty ring is [], never null
+        const nullable: null = this.lastNClosedBars('BTCUSDT', 0, M5, 1);
+
+        const cap: number = this.barRingCapacity;
+        const set: void = this.setBarRingCapacity(128);
+        // @ts-expect-error setBarRingCapacity returns nothing
+        const setResult: number = this.setBarRingCapacity(128);
+        // @ts-expect-error read-only: setBarRingCapacity changes it
+        this.barRingCapacity = 8;
+        // @ts-expect-error barType is a Number (0 = Time), not a name
+        this.lastClosedBar('BTCUSDT', 'time', M5);
+        // @ts-expect-error barType is a Number (0 = Time), not a name
+        this.lastNClosedBars('BTCUSDT', 'time', M5, 3);
+        // @ts-expect-error param is a Number or a BigInt, not a timeframe string
+        this.lastClosedBar('BTCUSDT', 0, '5m');
+        // @ts-expect-error n is a count
+        this.lastNClosedBars('BTCUSDT', 0, M5);
+        // @ts-expect-error a BigInt capacity reads as 0 at run time and becomes 1
+        this.setBarRingCapacity(64n);
+        // @ts-expect-error a symbol is a name or an id, not a boolean
+        this.lastClosedBar(true, 0, M5);
+        void [fields, byIdBigParam, primary, count, oldest, same, fromPrimary, nullable, cap,
+            set, setResult];
+    }
+}
+void BarRing;
