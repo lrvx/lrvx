@@ -121,6 +121,19 @@ declare const enum OrderStatus {
     TRAILING_UPDATED = 12,
 }
 
+/** A closed bar read back from the per-(symbol, barType, param) ring by
+ *  `Strategy.lastClosedBar` / `lastNClosedBars`. Prices and volume are
+ *  Numbers; the bar's start and end times are BigInt nanoseconds. */
+interface ClosedBar {
+    readonly open: number;
+    readonly high: number;
+    readonly low: number;
+    readonly close: number;
+    readonly volume: number;
+    readonly startNs: bigint;
+    readonly endNs: bigint;
+}
+
 interface StrategyConfig {
     exchange?: string;
     symbols: string[];
@@ -169,6 +182,21 @@ declare class Strategy {
      *  as `ctx.barsInPosition` reads it; 0 when flat. */
     barsInPosition(symbol?: string | number): number;
     orderStatus(orderId: number): OrderStatus | -1;
+
+    /** Most recent closed bar of `(symbol, barType, param)`, or null until
+     *  one has closed. `barType` is 0=Time, 1=Tick, 2=Volume, 3=Renko,
+     *  4=Range, 5=Heikin-Ashi, 6=Bps-range; `param` is the interval in ns for
+     *  Time bars, a count for Tick bars, the raw threshold for Volume bars. */
+    lastClosedBar(symbol: string | number | undefined, barType: number,
+                  param: number | bigint): ClosedBar | null;
+    /** At most `n` most recent closed bars of `(symbol, barType, param)`,
+     *  oldest first; `[]` until one has closed. Arguments as `lastClosedBar`. */
+    lastNClosedBars(symbol: string | number | undefined, barType: number,
+                    param: number | bigint, n: number): ClosedBar[];
+    /** Bars kept per (symbol, barType, param) ring; 64 by default. */
+    readonly barRingCapacity: number;
+    /** Set the ring depth; clamped to at least 1. */
+    setBarRingCapacity(n: number): void;
 
     readonly primarySymbol: string;
     readonly hasPosition: boolean;
