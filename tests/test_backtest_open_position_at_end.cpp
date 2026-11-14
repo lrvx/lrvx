@@ -253,15 +253,18 @@ class TapeDir
   std::filesystem::path _dir;
 };
 
-// Bar 0 [kT0, +60 s): 100, 101. Bar 1 [+60 s, +120 s): 102, 103. Bar 2 holds
-// the last trades, 106 and 110, and is still open when the tape ends, so bar
-// replay never delivers it.
+// Bar 0 [kT0, +60 s): 100, 101. Bar 1 [+60 s, +120 s): 102, 104.5, 101.5,
+// 103 -- open 102, high 104.5, low 101.5, close 103. Bar 2 holds the last
+// trades, 106 and 110, and is still open when the tape ends, so bar replay
+// never delivers it.
 std::vector<T> threeMinuteTape()
 {
   return {
       {kT0 + 1 * kSec, 100.0},
       {kT0 + 30 * kSec, 101.0},
       {kT0 + 61 * kSec, 102.0},
+      {kT0 + 75 * kSec, 104.5},
+      {kT0 + 80 * kSec, 101.5},
       {kT0 + 90 * kSec, 103.0},
       {kT0 + 121 * kSec, 106.0},
       {kT0 + 150 * kSec, 110.0},

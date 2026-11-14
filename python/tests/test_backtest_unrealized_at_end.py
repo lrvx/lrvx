@@ -219,10 +219,12 @@ def _write_tape(path: Path, rows):
     w.close()
 
 
-# Bar 0: 100, 101. Bar 1: 102, 103. Bar 2 (still open at the end, never
-# replayed as a bar): 106, 110.
+# Bar 0: 100, 101. Bar 1: 102, 104.5, 101.5, 103 (open 102, high 104.5,
+# low 101.5, close 103). Bar 2 (still open at the end, never replayed as a
+# bar): 106, 110.
 _THREE_MINUTES = [(T0 + 1 * SEC, 100.0), (T0 + 30 * SEC, 101.0), (T0 + 61 * SEC, 102.0),
-                  (T0 + 90 * SEC, 103.0), (T0 + 121 * SEC, 106.0), (T0 + 150 * SEC, 110.0)]
+                  (T0 + 75 * SEC, 104.5), (T0 + 80 * SEC, 101.5), (T0 + 90 * SEC, 103.0),
+                  (T0 + 121 * SEC, 106.0), (T0 + 150 * SEC, 110.0)]
 
 
 def test_run_tape_bars_marks_at_the_last_replayed_bar_close(tmp_path):

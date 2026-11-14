@@ -42,10 +42,12 @@ CLOSES = [100.0, 102.0, 104.0, 107.0, 110.0]
 
 
 def _ohlcv(ts_sec, closes):
+    # open, high, low and close all differ, so a mark taken from any price
+    # but the close shows.
     closes = np.asarray(closes, dtype=np.float64)
     return {
         "ts": np.asarray(ts_sec, dtype=np.int64),
-        "open": closes,
+        "open": closes - 0.5,
         "high": closes + 1.0,
         "low": closes - 1.0,
         "close": closes,

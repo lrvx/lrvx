@@ -5087,11 +5087,14 @@ TEST(JsIntegrationTest, EngineRunValuesTheOpenPositionAtTheLastClose)
 {
   const auto rows = [](const std::vector<std::pair<int64_t, double>>& bars)
   {
+    // open, high and low differ from the close, so a mark taken from any of
+    // them shows.
     std::string out = "timestamp,open,high,low,close,volume\n";
     for (const auto& [ts, close] : bars)
     {
-      const std::string c = std::to_string(close);
-      out += std::to_string(ts) + "," + c + "," + c + "," + c + "," + c + ",10.0\n";
+      out += std::to_string(ts) + "," + std::to_string(close - 0.5) + "," +
+             std::to_string(close + 1.0) + "," + std::to_string(close - 1.0) + "," +
+             std::to_string(close) + ",10.0\n";
     }
     return out;
   };

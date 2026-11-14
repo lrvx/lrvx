@@ -193,14 +193,15 @@ attempt('openPositions types', () => {
 // ── Engine.run: a signals backtest over loaded bars ──────────────────
 // Buys 2 on bar 0 (close 100), sells 1 on bar 2 (close 104) and holds the
 // other unit to the end; the last close is 110. The open unit's entry is
-// 100; it is marked at the last price the run saw, the last close.
+// 100; it is marked at the last price the run saw, the last close. Each
+// bar's open, high and low differ from its close.
 attempt('Engine.run', () => {
   const eng = new lrvx.Engine(CAPITAL, 0);
   const tsSec = [1767225600, 1767225660, 1767225720, 1767225780, 1767225840];
   const close = [100, 102, 104, 107, 110];
   eng.loadOhlcv({
     ts: Float64Array.from(tsSec),
-    open: Float64Array.from(close),
+    open: Float64Array.from(close.map((c) => c - 0.5)),
     high: Float64Array.from(close.map((c) => c + 1)),
     low: Float64Array.from(close.map((c) => c - 1)),
     close: Float64Array.from(close),

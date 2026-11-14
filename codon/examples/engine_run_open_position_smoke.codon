@@ -34,9 +34,14 @@ T0 = 1_767_225_600 * SEC
 CLOSES = [100.0, 102.0, 104.0, 107.0, 110.0]
 
 
+# open, high and low differ from the close, so a mark taken from any of
+# them shows.
 def load(eng: Engine, ts: List[int], closes: List[float], symbol: str):
+    opens = [c - 0.5 for c in closes]
+    highs = [c + 1.0 for c in closes]
+    lows = [c - 1.0 for c in closes]
     vols = [10.0 for _ in closes]
-    eng.load_ohlcv(ts, closes, closes, closes, closes, vols, symbol)
+    eng.load_ohlcv(ts, opens, highs, lows, closes, vols, symbol)
 
 
 def single(fee: float) -> Tuple[Engine, List[int]]:
