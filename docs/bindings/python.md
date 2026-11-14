@@ -14,7 +14,8 @@ cmake -B build \
 cmake --build build
 ```
 
-Requires: Python 3.10+, pybind11 (`pip install pybind11`).
+Requires: Python 3.10+, pybind11 3.1 or newer (`pip install "pybind11>=3.1"`). The
+prebuilt wheels on PyPI cover CPython 3.10 to 3.15.
 
 The module builds at `build/python/lrvx.cpython-*.so`.
 

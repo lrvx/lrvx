@@ -97,6 +97,10 @@ class AdlRanking:
     PnlRatio: typing.ClassVar[AdlRanking]  # value = <AdlRanking.PnlRatio: 0>
     PositionSize: typing.ClassVar[AdlRanking]  # value = <AdlRanking.PositionSize: 3>
     __members__: typing.ClassVar[dict[str, AdlRanking]]  # value = {'PnlRatio': <AdlRanking.PnlRatio: 0>, 'Binance': <AdlRanking.Binance: 1>, 'Bybit': <AdlRanking.Bybit: 2>, 'PositionSize': <AdlRanking.PositionSize: 3>}
+    @typing.overload
+    def __eq__(self, other: AdlRanking) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -109,6 +113,10 @@ class AdlRanking:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: AdlRanking) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -139,6 +147,10 @@ class AggregatorEventFilter:
     Both: typing.ClassVar[AggregatorEventFilter]  # value = <AggregatorEventFilter.Both: 3>
     Trades: typing.ClassVar[AggregatorEventFilter]  # value = <AggregatorEventFilter.Trades: 1>
     __members__: typing.ClassVar[dict[str, AggregatorEventFilter]]  # value = {'Trades': <AggregatorEventFilter.Trades: 1>, 'BooksOnly': <AggregatorEventFilter.BooksOnly: 2>, 'Both': <AggregatorEventFilter.Both: 3>}
+    @typing.overload
+    def __eq__(self, other: AggregatorEventFilter) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -151,6 +163,10 @@ class AggregatorEventFilter:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: AggregatorEventFilter) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -980,6 +996,10 @@ class FeedClockPolicy:
     LEADER_FOLLOWER: typing.ClassVar[FeedClockPolicy]  # value = <FeedClockPolicy.LEADER_FOLLOWER: 2>
     WAIT_FOR_ALL: typing.ClassVar[FeedClockPolicy]  # value = <FeedClockPolicy.WAIT_FOR_ALL: 0>
     __members__: typing.ClassVar[dict[str, FeedClockPolicy]]  # value = {'WAIT_FOR_ALL': <FeedClockPolicy.WAIT_FOR_ALL: 0>, 'FIRE_ON_ANY': <FeedClockPolicy.FIRE_ON_ANY: 1>, 'LEADER_FOLLOWER': <FeedClockPolicy.LEADER_FOLLOWER: 2>}
+    @typing.overload
+    def __eq__(self, other: FeedClockPolicy) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -992,6 +1012,10 @@ class FeedClockPolicy:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: FeedClockPolicy) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -1020,6 +1044,10 @@ class FillLiquidity:
     TAKER: typing.ClassVar[FillLiquidity]  # value = <FillLiquidity.TAKER: 2>
     UNKNOWN: typing.ClassVar[FillLiquidity]  # value = <FillLiquidity.UNKNOWN: 0>
     __members__: typing.ClassVar[dict[str, FillLiquidity]]  # value = {'UNKNOWN': <FillLiquidity.UNKNOWN: 0>, 'MAKER': <FillLiquidity.MAKER: 1>, 'TAKER': <FillLiquidity.TAKER: 2>}
+    @typing.overload
+    def __eq__(self, other: FillLiquidity) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -1032,6 +1060,10 @@ class FillLiquidity:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: FillLiquidity) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -1378,6 +1410,10 @@ class LegState:
     PENDING: typing.ClassVar[LegState]  # value = <LegState.PENDING: 0>
     SUBMITTED: typing.ClassVar[LegState]  # value = <LegState.SUBMITTED: 1>
     __members__: typing.ClassVar[dict[str, LegState]]  # value = {'PENDING': <LegState.PENDING: 0>, 'SUBMITTED': <LegState.SUBMITTED: 1>, 'PARTIALLY_FILLED': <LegState.PARTIALLY_FILLED: 2>, 'FILLED': <LegState.FILLED: 3>, 'CANCELLED': <LegState.CANCELLED: 4>, 'FAILED': <LegState.FAILED: 5>}
+    @typing.overload
+    def __eq__(self, other: LegState) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -1390,6 +1426,10 @@ class LegState:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: LegState) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -1553,6 +1593,10 @@ class MarginMode:
     Cross: typing.ClassVar[MarginMode]  # value = <MarginMode.Cross: 0>
     Isolated: typing.ClassVar[MarginMode]  # value = <MarginMode.Isolated: 1>
     __members__: typing.ClassVar[dict[str, MarginMode]]  # value = {'Cross': <MarginMode.Cross: 0>, 'Isolated': <MarginMode.Isolated: 1>}
+    @typing.overload
+    def __eq__(self, other: MarginMode) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -1565,6 +1609,10 @@ class MarginMode:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: MarginMode) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -1593,6 +1641,10 @@ class MarkImpactModel:
     BookOnly: typing.ClassVar[MarkImpactModel]  # value = <MarkImpactModel.BookOnly: 2>
     None_: typing.ClassVar[MarkImpactModel]  # value = <MarkImpactModel.None_: 0>
     __members__: typing.ClassVar[dict[str, MarkImpactModel]]  # value = {'None_': <MarkImpactModel.None_: 0>, 'BookAnchored': <MarkImpactModel.BookAnchored: 1>, 'BookOnly': <MarkImpactModel.BookOnly: 2>}
+    @typing.overload
+    def __eq__(self, other: MarkImpactModel) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -1605,6 +1657,10 @@ class MarkImpactModel:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: MarkImpactModel) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -1737,6 +1793,10 @@ class OptionType:
     CALL: typing.ClassVar[OptionType]  # value = <OptionType.CALL: 0>
     PUT: typing.ClassVar[OptionType]  # value = <OptionType.PUT: 1>
     __members__: typing.ClassVar[dict[str, OptionType]]  # value = {'CALL': <OptionType.CALL: 0>, 'PUT': <OptionType.PUT: 1>}
+    @typing.overload
+    def __eq__(self, other: OptionType) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -1749,6 +1809,10 @@ class OptionType:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: OptionType) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -2030,6 +2094,10 @@ class OrderEventKind:
     REJECT: typing.ClassVar[OrderEventKind]  # value = <OrderEventKind.REJECT: 5>
     SUBMIT: typing.ClassVar[OrderEventKind]  # value = <OrderEventKind.SUBMIT: 1>
     __members__: typing.ClassVar[dict[str, OrderEventKind]]  # value = {'SUBMIT': <OrderEventKind.SUBMIT: 1>, 'CANCEL': <OrderEventKind.CANCEL: 2>, 'MODIFY': <OrderEventKind.MODIFY: 3>, 'ACK': <OrderEventKind.ACK: 4>, 'REJECT': <OrderEventKind.REJECT: 5>, 'EXPIRE': <OrderEventKind.EXPIRE: 6>}
+    @typing.overload
+    def __eq__(self, other: OrderEventKind) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -2042,6 +2110,10 @@ class OrderEventKind:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: OrderEventKind) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -2119,6 +2191,10 @@ class OrderGroupPolicy:
     BEST_EFFORT: typing.ClassVar[OrderGroupPolicy]  # value = <OrderGroupPolicy.BEST_EFFORT: 0>
     ONE_SIDED: typing.ClassVar[OrderGroupPolicy]  # value = <OrderGroupPolicy.ONE_SIDED: 2>
     __members__: typing.ClassVar[dict[str, OrderGroupPolicy]]  # value = {'BEST_EFFORT': <OrderGroupPolicy.BEST_EFFORT: 0>, 'ALL_OR_NOTHING': <OrderGroupPolicy.ALL_OR_NOTHING: 1>, 'ONE_SIDED': <OrderGroupPolicy.ONE_SIDED: 2>}
+    @typing.overload
+    def __eq__(self, other: OrderGroupPolicy) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -2131,6 +2207,10 @@ class OrderGroupPolicy:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: OrderGroupPolicy) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -2171,6 +2251,10 @@ class OrderGroupState:
     REVERTING: typing.ClassVar[OrderGroupState]  # value = <OrderGroupState.REVERTING: 5>
     SUBMITTED: typing.ClassVar[OrderGroupState]  # value = <OrderGroupState.SUBMITTED: 1>
     __members__: typing.ClassVar[dict[str, OrderGroupState]]  # value = {'PENDING': <OrderGroupState.PENDING: 0>, 'SUBMITTED': <OrderGroupState.SUBMITTED: 1>, 'PARTIALLY_FILLED': <OrderGroupState.PARTIALLY_FILLED: 2>, 'FILLED': <OrderGroupState.FILLED: 3>, 'CANCELLED': <OrderGroupState.CANCELLED: 4>, 'REVERTING': <OrderGroupState.REVERTING: 5>, 'FAILED': <OrderGroupState.FAILED: 6>}
+    @typing.overload
+    def __eq__(self, other: OrderGroupState) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -2183,6 +2267,10 @@ class OrderGroupState:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: OrderGroupState) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -2484,6 +2572,10 @@ class RateLimitEndpointFamily:
     MarketData: typing.ClassVar[RateLimitEndpointFamily]  # value = <RateLimitEndpointFamily.MarketData: 1>
     Trading: typing.ClassVar[RateLimitEndpointFamily]  # value = <RateLimitEndpointFamily.Trading: 0>
     __members__: typing.ClassVar[dict[str, RateLimitEndpointFamily]]  # value = {'Trading': <RateLimitEndpointFamily.Trading: 0>, 'MarketData': <RateLimitEndpointFamily.MarketData: 1>, 'Account': <RateLimitEndpointFamily.Account: 2>}
+    @typing.overload
+    def __eq__(self, other: RateLimitEndpointFamily) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -2496,6 +2588,10 @@ class RateLimitEndpointFamily:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: RateLimitEndpointFamily) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -3732,6 +3828,10 @@ class _ExecOrderType:
     Limit: typing.ClassVar[_ExecOrderType]  # value = <_ExecOrderType.Limit: 1>
     Market: typing.ClassVar[_ExecOrderType]  # value = <_ExecOrderType.Market: 0>
     __members__: typing.ClassVar[dict[str, _ExecOrderType]]  # value = {'Market': <_ExecOrderType.Market: 0>, 'Limit': <_ExecOrderType.Limit: 1>}
+    @typing.overload
+    def __eq__(self, other: _ExecOrderType) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -3744,6 +3844,10 @@ class _ExecOrderType:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: _ExecOrderType) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:
@@ -3769,6 +3873,10 @@ class _ExecSide:
     Buy: typing.ClassVar[_ExecSide]  # value = <_ExecSide.Buy: 0>
     Sell: typing.ClassVar[_ExecSide]  # value = <_ExecSide.Sell: 1>
     __members__: typing.ClassVar[dict[str, _ExecSide]]  # value = {'Buy': <_ExecSide.Buy: 0>, 'Sell': <_ExecSide.Sell: 1>}
+    @typing.overload
+    def __eq__(self, other: _ExecSide) -> bool:
+        ...
+    @typing.overload
     def __eq__(self, other: typing.Any) -> bool:
         ...
     def __getstate__(self) -> int:
@@ -3781,6 +3889,10 @@ class _ExecSide:
         ...
     def __int__(self) -> int:
         ...
+    @typing.overload
+    def __ne__(self, other: _ExecSide) -> bool:
+        ...
+    @typing.overload
     def __ne__(self, other: typing.Any) -> bool:
         ...
     def __repr__(self) -> str:

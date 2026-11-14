@@ -112,8 +112,8 @@ jobs:
 
     - name: Install pybind11 + numpy
       if: matrix.needs_pybind
-      # Pinned below 3.1.0 to match the committed .pyi (see ci.yml).
-      run: python3 -m pip install --break-system-packages "pybind11<3.1.0" numpy
+      # Pinned to 3.1.x to match the committed .pyi (see ci.yml).
+      run: python3 -m pip install --break-system-packages "pybind11>=3.1.0,<3.2" numpy
 
     - name: Resolve pybind11_DIR
       if: matrix.needs_pybind
