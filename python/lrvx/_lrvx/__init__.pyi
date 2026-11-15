@@ -3406,11 +3406,11 @@ class Strategy:
         ...
     def last_closed_bar(self, symbol_id: typing.SupportsInt | typing.SupportsIndex, bar_type: typing.SupportsInt | typing.SupportsIndex = 0, param: typing.SupportsInt | typing.SupportsIndex = 0) -> dict | None:
         """
-        Return the last closed bar for (symbol, bar_type, param) or None if no bar of that timeframe has been emitted yet. bar_type: 0=Time, 1=Tick, 2=Volume, 3=Renko, 4=Range, 5=HeikinAshi, 6=BpsRange. param: time bar interval in nanoseconds, or the tick / volume / range threshold the aggregator was configured with. A bar_type from 7 to 255 has no ring and reads None; one outside 0..255 raises TypeError.
+        Return the last closed bar for (symbol, bar_type, param) or None if no bar of that timeframe has been emitted yet. bar_type: 0=Time, 1=Tick, 2=Volume, 3=Renko, 4=Range, 5=HeikinAshi, 6=BpsRange. param: time bar interval in nanoseconds, or the tick / volume / range threshold the aggregator was configured with. A bar_type outside 0..6 raises LrvxError E_VAL_002.
         """
     def last_n_closed_bars(self, symbol_id: typing.SupportsInt | typing.SupportsIndex, bar_type: typing.SupportsInt | typing.SupportsIndex, param: typing.SupportsInt | typing.SupportsIndex, n: typing.SupportsInt | typing.SupportsIndex) -> list:
         """
-        Return the most recent up to n closed bars for the given (symbol, timeframe), oldest first. Returns an empty list until the aggregator has emitted at least one bar.
+        Return the most recent up to n closed bars for the given (symbol, timeframe), oldest first. Returns an empty list until the aggregator has emitted at least one bar. A bar_type outside 0..6 raises LrvxError E_VAL_002.
         """
     def last_price(self, symbol: str | None = None) -> float:
         ...
@@ -3454,7 +3454,7 @@ class Strategy:
         ...
     def set_bar_ring_capacity(self, n: typing.SupportsInt | typing.SupportsIndex) -> None:
         """
-        Set how many closed bars each (symbol, timeframe) ring keeps; 0 is taken as 1. Lowering it trims every ring to its newest bars at once; raising it keeps the bars held.
+        Set how many closed bars each (symbol, timeframe) ring keeps; 0 is taken as 1. Lowering it trims every ring to its newest bars at once; raising it keeps the bars held. A capacity above 4294967295 raises LrvxError E_VAL_002 and leaves it unchanged.
         """
     def stop_limit(self, side: str, trigger: typing.SupportsFloat | typing.SupportsIndex, limit_price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, symbol: str | None = None) -> int:
         ...

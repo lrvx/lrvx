@@ -631,8 +631,9 @@ class PyStrategyBase
   // Multi-TF alignment helpers. Bars get pushed into a per-(symbol,
   // timeframe) ring as the engine dispatches them; these accessors
   // pull the most recent N back without bookkeeping in user code.
-  std::optional<py::dict> last_closed_bar(uint32_t symbol_id, uint8_t bar_type, uint64_t param) const
+  std::optional<py::dict> last_closed_bar(uint32_t symbol_id, int64_t bar_type, uint64_t param) const
   {
+    checkBarType("last_closed_bar", bar_type);
     if (!_bridge)
     {
       return std::nullopt;
@@ -653,8 +654,9 @@ class PyStrategyBase
     return d;
   }
 
-  py::list last_n_closed_bars(uint32_t symbol_id, uint8_t bar_type, uint64_t param, size_t n) const
+  py::list last_n_closed_bars(uint32_t symbol_id, int64_t bar_type, uint64_t param, size_t n) const
   {
+    checkBarType("last_n_closed_bars", bar_type);
     py::list out;
     if (!_bridge)
     {
@@ -683,6 +685,11 @@ class PyStrategyBase
 
   void set_bar_ring_capacity(size_t n)
   {
+    if (n > std::numeric_limits<uint32_t>::max())
+    {
+      throw lrvx::LrvxError("E_VAL_002", "set_bar_ring_capacity: capacity must be 0..4294967295, got " +
+                                             std::to_string(n));
+    }
     if (_bridge)
     {
       _bridge->setBarRingCapacity(n);
@@ -690,6 +697,15 @@ class PyStrategyBase
   }
 
  private:
+  static void checkBarType(const char* method, int64_t bar_type)
+  {
+    if (bar_type < 0 || bar_type > static_cast<int64_t>(lrvx::BarType::BpsRange))
+    {
+      throw lrvx::LrvxError("E_VAL_002", std::string(method) + ": bar_type must be 0..6, got " +
+                                             std::to_string(bar_type));
+    }
+  }
+
   std::vector<uint32_t> _symbols;
   std::vector<std::string> _symbolNames;
   std::unordered_map<std::string, uint32_t> _symbolMap;
@@ -3683,24 +3699,26 @@ inline void bindStrategy(py::module_& m)
            "ctx.bars_in_position reads it; 0 when flat.")
       .def("order_status", &PyStrategyBase::order_status, py::arg("order_id"))
       .def("last_closed_bar", &PyStrategyBase::last_closed_bar,
-           py::arg("symbol_id"), py::arg("bar_type") = uint8_t{0}, py::arg("param") = uint64_t{0},
+           py::arg("symbol_id"), py::arg("bar_type") = int64_t{0}, py::arg("param") = uint64_t{0},
            "Return the last closed bar for (symbol, bar_type, param) or "
            "None if no bar of that timeframe has been emitted yet. "
            "bar_type: 0=Time, 1=Tick, 2=Volume, 3=Renko, 4=Range, "
            "5=HeikinAshi, 6=BpsRange. param: time bar interval in "
            "nanoseconds, or the tick / volume / range threshold the "
-           "aggregator was configured with. A bar_type from 7 to 255 has "
-           "no ring and reads None; one outside 0..255 raises TypeError.")
+           "aggregator was configured with. A bar_type outside 0..6 raises "
+           "LrvxError E_VAL_002.")
       .def("last_n_closed_bars", &PyStrategyBase::last_n_closed_bars,
            py::arg("symbol_id"), py::arg("bar_type"), py::arg("param"), py::arg("n"),
            "Return the most recent up to n closed bars for the given "
            "(symbol, timeframe), oldest first. Returns an empty list "
-           "until the aggregator has emitted at least one bar.")
+           "until the aggregator has emitted at least one bar. A bar_type "
+           "outside 0..6 raises LrvxError E_VAL_002.")
       .def("bar_ring_capacity", &PyStrategyBase::bar_ring_capacity)
       .def("set_bar_ring_capacity", &PyStrategyBase::set_bar_ring_capacity, py::arg("n"),
            "Set how many closed bars each (symbol, timeframe) ring keeps; "
            "0 is taken as 1. Lowering it trims every ring to its newest "
-           "bars at once; raising it keeps the bars held.")
+           "bars at once; raising it keeps the bars held. A capacity above "
+           "4294967295 raises LrvxError E_VAL_002 and leaves it unchanged.")
       .def_property_readonly("symbol_names", &PyStrategyBase::symbol_names)
       .def_property_readonly("primary_symbol_name", &PyStrategyBase::primary_symbol_name);
 

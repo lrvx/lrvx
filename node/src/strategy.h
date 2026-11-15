@@ -721,6 +721,10 @@ struct NodeStrategyHost : TsfnHost
         size_t n = argUint32(i[0], "setBarRingCapacity: capacity");
         h->bridge->setBarRingCapacity(n);
         return i.Env().Undefined(); }, "setBarRingCapacity", this));
+    em.Set("barRingCapacity", Napi::Function::New(env_, [](const Napi::CallbackInfo& i) -> Napi::Value
+                                                  {
+        auto* h = static_cast<NodeStrategyHost*>(i.Data());
+        return Napi::Number::New(i.Env(), static_cast<double>(h->bridge->barRingCapacity())); }, "barRingCapacity", this));
 
     (void)defaultSym;
     emitter = Napi::Persistent(em);

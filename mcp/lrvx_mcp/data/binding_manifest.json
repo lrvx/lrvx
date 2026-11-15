@@ -31596,6 +31596,11 @@
         },
         {
           "kind": "method",
+          "name": "barRingCapacity",
+          "parent": "EmitMethods"
+        },
+        {
+          "kind": "method",
           "name": "cancel",
           "parent": "EmitMethods"
         },

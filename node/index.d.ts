@@ -324,19 +324,22 @@ export interface EmitMethods {
   lastClosedBar(
     symbol: Symbol | number,
     barType: number,
-    barTypeParam: number,
+    barTypeParam: number | bigint,
   ): ClosedBar | null;
   /** Up to `n` most recent closed bars, oldest first. */
   lastNClosedBars(
     symbol: Symbol | number,
     barType: number,
-    barTypeParam: number,
+    barTypeParam: number | bigint,
     n: number,
   ): ClosedBar[];
   /** Ring depth kept per (symbol, timeframe); 0 is taken as 1. Lowering it
    *  trims every ring to its newest bars at once; raising it keeps the bars
    *  held. */
   setBarRingCapacity(n: number): void;
+  /** Ring depth kept per (symbol, timeframe): 64 by default, the value set
+   *  by `setBarRingCapacity`, which is taken as at least 1. */
+  barRingCapacity(): number;
 }
 
 /** Backtest signal emitted by `Runner` / collected by `SimulatedExecutor`. */

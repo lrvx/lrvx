@@ -1392,6 +1392,9 @@ allowlist_reasons:
   napi_single_pass: &napi_single_pass
     the Node DataReader walks the C++ reader once per read (DataReaderWrap::walk
     in node/src/data_ops.h); this count-then-fill pair would read the tape twice
+  napi_cpp_direct: &napi_cpp_direct
+    the Node emit object wraps the C++ strategy's bar ring directly
+    (node/src/strategy.h) rather than calling the C ABI
   napi_result_handle: &napi_result_handle
     the Node WalkForwardRunner runs through lrvx_walk_forward_run_csv_result,
     whose handle also carries each leg's valuation; the fold-array call
@@ -2274,13 +2277,13 @@ allowlist_functions:
     lrvx_strategy_create: *no_napi_wrapper
     lrvx_strategy_create_p: *no_napi_wrapper
     lrvx_strategy_destroy: *no_napi_wrapper
-    lrvx_strategy_get_bar_ring_capacity: *no_napi_wrapper
+    lrvx_strategy_get_bar_ring_capacity: *napi_cpp_direct
     lrvx_strategy_id: *no_napi_wrapper
-    lrvx_strategy_last_closed_bar: *no_napi_wrapper
-    lrvx_strategy_last_n_closed_bars: *no_napi_wrapper
+    lrvx_strategy_last_closed_bar: *napi_cpp_direct
+    lrvx_strategy_last_n_closed_bars: *napi_cpp_direct
     lrvx_strategy_replace_callbacks: *no_napi_wrapper
     lrvx_strategy_replace_callbacks_p: *no_napi_wrapper
-    lrvx_strategy_set_bar_ring_capacity: *no_napi_wrapper
+    lrvx_strategy_set_bar_ring_capacity: *napi_cpp_direct
     lrvx_strategy_set_id: *no_napi_wrapper
     lrvx_streaming_graph_add_node: *no_napi_wrapper
     lrvx_streaming_graph_bar_count: *no_napi_wrapper
