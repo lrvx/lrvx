@@ -9,6 +9,9 @@
  *   - A barType outside 0..6 (Time .. BpsRange) is a TypeError naming
  *     "<method>: barType", as a string bar type already is. 256 used to be
  *     cut to 8 bits and read the Time ring.
+ *   - emit.barRingCapacity() reads the capacity: 64 by default, the value
+ *     set, 0 taken as 1, and unchanged after a refused set.
+ *   - A BigInt barTypeParam reads the same ring as the equal Number.
  *
  * Run from repo root:
  *   cd node && node test/test_bar_ring_capacity.js
@@ -111,6 +114,67 @@ console.log('=== a bar type outside 0..6 is refused ===');
              r.emit.lastClosedBar(r.sym, 0, 0).close === 3000;
   check(ok, 'barType 6 and 0 are still read');
   r.stop();
+}
+
+console.log('=== emit.barRingCapacity() reads the capacity ===');
+{
+  // QuickJS (barRingCapacity), Python (bar_ring_capacity()), Codon and the C
+  // API read it back; Node could only set it.
+  const r = rig();
+  r.push(0, 4000);
+  const read = () => {
+    if (typeof r.emit.barRingCapacity !== 'function') {
+      return `emit.barRingCapacity is ${typeof r.emit.barRingCapacity}`;
+    }
+    return r.emit.barRingCapacity();
+  };
+  let got = read();
+  check(got === 64, `the default capacity reads 64 (${got})`);
+  r.emit.setBarRingCapacity(5);
+  got = read();
+  check(got === 5, `after setBarRingCapacity(5) it reads 5 (${got})`);
+  r.emit.setBarRingCapacity(0);
+  got = read();
+  check(got === 1, `setBarRingCapacity(0) is taken as 1 (${got})`);
+  r.emit.setBarRingCapacity(7);
+  let threw = false;
+  try { r.emit.setBarRingCapacity(4294967296); } catch (e) { threw = e instanceof TypeError; }
+  got = read();
+  check(threw && got === 7,
+        `a refused setBarRingCapacity(4294967296) leaves it at 7 (threw TypeError: ${threw}, reads ${got})`);
+  r.stop();
+}
+
+console.log('=== a BigInt barTypeParam reads the same ring as the Number ===');
+{
+  // argUint64 takes a BigInt for barTypeParam, as it does for every 64-bit
+  // value; a time bar's interval in nanoseconds is one.
+  const reg = new lrvx.SymbolRegistry();
+  const sym = reg.addSymbol('test', 'RINGP', 0.01);
+  const runner = new lrvx.Runner(reg, () => {});
+  let emit = null;
+  runner.addStrategy({symbols: [sym], onBar(_c, _b, e) { emit = e; }});
+  runner.start();
+  for (let i = 0; i < 3; ++i) {
+    const c = 5000 + i;
+    runner.onBar(sym, {open: c, high: c + 1, low: c - 1, close: c, volume: 1,
+                       startTimeNs: BigInt(i) * MIN, endTimeNs: BigInt(i + 1) * MIN,
+                       barType: 0, barTypeParam: Number(MIN)});
+  }
+  const show = (f) => {
+    try { return JSON.stringify(f(), (_k, v) => (typeof v === 'bigint' ? String(v) : v)); }
+    catch (e) { return `${e.constructor.name}: ${e.message}`; }
+  };
+  const byNumber = show(() => emit.lastClosedBar(sym, 0, Number(MIN)));
+  const byBigInt = show(() => emit.lastClosedBar(sym, 0, MIN));
+  check(byNumber.includes('"close":5002') && byBigInt === byNumber,
+        `lastClosedBar(sym, 0, ${MIN}n) is the Number form's bar (${byBigInt} vs ${byNumber})`);
+  const nNumber = show(() => emit.lastNClosedBars(sym, 0, Number(MIN), 2));
+  const nBigInt = show(() => emit.lastNClosedBars(sym, 0, MIN, 2));
+  check(nNumber.includes('"close":5001') && nBigInt === nNumber,
+        `lastNClosedBars(sym, 0, ${MIN}n, 2) is the Number form's bars (${nBigInt} vs ${nNumber})`);
+  check(emit.lastClosedBar(sym, 0, MIN + 1n) === null, 'another interval as a BigInt reads no bar');
+  runner.stop();
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

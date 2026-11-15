@@ -106,6 +106,7 @@ import {
   BarData,
   BboRecord,
   BookUpdateRecord,
+  ClosedBar,
   EmitMethods,
   Partition,
   Signal,
@@ -158,10 +159,30 @@ const strategy: Strategy = {
     const closed: number = emit.closePosition();
     void closed;
   },
-  onBar(_ctx, bar: BarData, _emit) {
+  onBar(_ctx, bar: BarData, emit: EmitMethods) {
     void bar.open;
     void bar.startTimeNs;
     void bar.barType;
+    // The ring capacity reads back, as it does in QuickJS, Python and Codon.
+    // A throw inside onBar goes to lastError, not here, so it is caught.
+    emit.setBarRingCapacity(8);
+    let cap: number | string = "not read";
+    try {
+      cap = emit.barRingCapacity();
+    } catch (e) {
+      cap = (e as Error).message;
+    }
+    check(cap === 8, `emit.barRingCapacity() reads the capacity set (${cap})`);
+    // barTypeParam is a 64-bit interval / threshold; the runtime takes a
+    // BigInt for it as it does for every 64-bit value.
+    let byBigint: ClosedBar | null = null;
+    let lastN: ClosedBar[] = [];
+    checkAcceptsBigint(() => { byBigint = emit.lastClosedBar(sym, 0, 0n); },
+                       "emit.lastClosedBar accepts a bigint barTypeParam");
+    checkAcceptsBigint(() => { lastN = emit.lastNClosedBars(sym, 0, 0n, 2); },
+                       "emit.lastNClosedBars accepts a bigint barTypeParam");
+    void byBigint;
+    void lastN;
   },
   onBookUpdate(_ctx, _emit) {},
 };
