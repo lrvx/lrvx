@@ -137,52 +137,67 @@ void _regTick;
 void _regTickDeclared;
 void _regLot;
 
+// A throw inside a strategy callback does not reach the code that drove it:
+// Runner keeps it in lastError() and goes on. Each callback below records
+// what it threw, and checkNoCallbackThrew() reports the record after a run.
+const callbackThrows: string[] = [];
+function recordingThrows(name: string, body: () => void): void {
+  try {
+    body();
+  } catch (e) {
+    callbackThrows.push(`${name}: ${(e as Error).message}`);
+  }
+}
+function checkNoCallbackThrew(run: string): void {
+  check(callbackThrows.length === 0,
+        `no strategy callback threw during ${run} (${callbackThrows.join("; ")})`);
+  callbackThrows.length = 0;
+}
+
 const strategy: Strategy = {
   symbols: [sym, 1],
   onStart() {},
   onStop() {},
   onTrade(ctx: SymbolContext, trade: TradeData, emit: EmitMethods) {
-    void ctx.position;
-    void trade.price;
-    // TradeData.timestampNs is declared bigint -- a plain `number` here
-    // would silently lose precision on a real nanosecond timestamp.
-    check(typeof trade.timestampNs === "bigint", "TradeData.timestampNs is bigint at runtime");
-    // The order-emitting functions return the order id.
-    const bought: number = emit.marketBuy(0.1);
-    const sold: number = emit.marketSell(0.1);
-    const bid: number = emit.limitBuy(100, 0.1);
-    const ask: number = emit.limitSell(100, 0.1);
-    check(typeof bought === "number" && typeof sold === "number" && typeof bid === "number" &&
-          typeof ask === "number", "emit.* returns the order id as a number at runtime");
-    emit.modify(bid, 99, 0.1);
-    emit.cancel(ask);
-    const closed: number = emit.closePosition();
-    void closed;
+    recordingThrows("onTrade", () => {
+      void ctx.position;
+      void trade.price;
+      // TradeData.timestampNs is declared bigint -- a plain `number` here
+      // would silently lose precision on a real nanosecond timestamp.
+      check(typeof trade.timestampNs === "bigint", "TradeData.timestampNs is bigint at runtime");
+      // The order-emitting functions return the order id.
+      const bought: number = emit.marketBuy(0.1);
+      const sold: number = emit.marketSell(0.1);
+      const bid: number = emit.limitBuy(100, 0.1);
+      const ask: number = emit.limitSell(100, 0.1);
+      check(typeof bought === "number" && typeof sold === "number" && typeof bid === "number" &&
+            typeof ask === "number", "emit.* returns the order id as a number at runtime");
+      emit.modify(bid, 99, 0.1);
+      emit.cancel(ask);
+      const closed: number = emit.closePosition();
+      void closed;
+    });
   },
   onBar(_ctx, bar: BarData, emit: EmitMethods) {
-    void bar.open;
-    void bar.startTimeNs;
-    void bar.barType;
-    // The ring capacity reads back, as it does in QuickJS, Python and Codon.
-    // A throw inside onBar goes to lastError, not here, so it is caught.
-    emit.setBarRingCapacity(8);
-    let cap: number | string = "not read";
-    try {
-      cap = emit.barRingCapacity();
-    } catch (e) {
-      cap = (e as Error).message;
-    }
-    check(cap === 8, `emit.barRingCapacity() reads the capacity set (${cap})`);
-    // barTypeParam is a 64-bit interval / threshold; the runtime takes a
-    // BigInt for it as it does for every 64-bit value.
-    let byBigint: ClosedBar | null = null;
-    let lastN: ClosedBar[] = [];
-    checkAcceptsBigint(() => { byBigint = emit.lastClosedBar(sym, 0, 0n); },
-                       "emit.lastClosedBar accepts a bigint barTypeParam");
-    checkAcceptsBigint(() => { lastN = emit.lastNClosedBars(sym, 0, 0n, 2); },
-                       "emit.lastNClosedBars accepts a bigint barTypeParam");
-    void byBigint;
-    void lastN;
+    recordingThrows("onBar", () => {
+      void bar.open;
+      void bar.startTimeNs;
+      void bar.barType;
+      // barTypeParam is a 64-bit interval / threshold; the runtime takes a
+      // BigInt for it as it does for every 64-bit value.
+      let byBigint: ClosedBar | null = null;
+      let lastN: ClosedBar[] = [];
+      checkAcceptsBigint(() => { byBigint = emit.lastClosedBar(sym, 0, 0n); },
+                         "emit.lastClosedBar accepts a bigint barTypeParam");
+      checkAcceptsBigint(() => { lastN = emit.lastNClosedBars(sym, 0, 0n, 2); },
+                         "emit.lastNClosedBars accepts a bigint barTypeParam");
+      void byBigint;
+      void lastN;
+      // The ring capacity reads back, as it does in QuickJS, Python and Codon.
+      emit.setBarRingCapacity(8);
+      const cap: number = emit.barRingCapacity();
+      check(cap === 8, `emit.barRingCapacity() reads the capacity set (${cap})`);
+    });
   },
   onBookUpdate(_ctx, _emit) {},
 };
@@ -202,6 +217,7 @@ runner.onBar(sym, { open: 1, high: 2, low: 0.5, close: 1.5 });
 runner.orderClosed(42);
 runner.orderClosed(42n);
 runner.stop();
+checkNoCallbackThrew("the Runner run");
 
 const threadedRunner = new Runner(registry, (_s) => {}, true);
 threadedRunner.start();
@@ -245,6 +261,7 @@ const bt = new BacktestRunner(registry, 0.0001, 100000);
 bt.setStrategy(strategy);
 const _btStats = bt.runOhlcv(tsArr, arr, "BTCUSDT");
 void _btStats.totalTrades;
+checkNoCallbackThrew("BacktestRunner.runOhlcv");
 
 const exec = new SimulatedExecutor();
 exec.submitOrder(1, "buy", 100, 0.1, "limit", 1);
