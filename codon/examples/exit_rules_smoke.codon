@@ -1,0 +1,180 @@
+# Smoke test: the exit rules in lrvx.exits.
+#
+# AtrStop, ChandelierExit and BreakEvenTrail are held to the levels
+# tests/test_exits.cpp and python/tests/test_exits.py pin; PercentStop,
+# TakeProfit and TimeStop to the levels the same files pin for them. Every
+# binding carries the same arithmetic, so every binding answers the same
+# numbers. A hit does not disarm; update before arm reports no hit; a
+# constructor given a non-positive percentage or fewer than one bar raises.
+
+import math
+
+from lrvx.exits import AtrStop, ChandelierExit, BreakEvenTrail, PercentStop, TakeProfit, TimeStop
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+LONG_BARS = [(103.0, 99.0, 2.0), (106.0, 102.0, 2.0), (110.0, 105.0, 2.5),
+             (108.0, 104.0, 2.5), (105.0, 101.5, 2.5), (103.0, 97.0, 3.0)]
+
+# ── AtrStop ───────────────────────────────────────────────────────────
+a = AtrStop(2.0)
+check(not a.armed, "AtrStop: not armed before arm")
+check(not a.update(101.0, 99.0, 2.0), "AtrStop: nothing is watched before arm")
+a.arm("long", 100.0, 2.0)
+check(a.armed and a.stop == 96.0, f"AtrStop long@100 atr 2: stop {a.stop}, want 96")
+hit = False
+for b in LONG_BARS:
+    hit = a.update(b[0], b[1], b[2])
+    check(a.stop == 96.0, "AtrStop: the stop does not move")
+    if hit:
+        break
+check(not hit, "AtrStop: the lowest low 97 stays above 96")
+a.arm("short", 100.0, 2.0)
+check(a.stop == 104.0, f"AtrStop short: stop {a.stop}, want 104")
+check(not a.update(103.0, 99.0, 2.0), "AtrStop short: high 103 below 104")
+check(a.update(104.0, 101.0, 2.0), "AtrStop short: high == stop is a hit")
+check(a.update(104.0, 101.0, 2.0), "AtrStop: a hit is reported until disarm")
+a.disarm()
+check(not a.armed and math.isnan(a.stop), "AtrStop: disarm clears the stop")
+refused = False
+try:
+    a.arm("buy", 100.0, 2.0)
+except ValueError:
+    refused = True
+check(refused, "AtrStop: side 'buy' is refused")
+
+# ── ChandelierExit ────────────────────────────────────────────────────
+ch = ChandelierExit(0, 3.0)
+ch.arm("long", 100.0, 2.0)
+check(ch.stop == 94.0, f"Chandelier: initial stop {ch.stop}, want 94")
+want = [97.0, 100.0, 102.5, 102.5]
+for i in range(4):
+    b = LONG_BARS[i]
+    check(not ch.update(b[0], b[1], b[2]), f"Chandelier bar {i}: no hit")
+    check(ch.stop == want[i], f"Chandelier bar {i}: stop {ch.stop}, want {want[i]}")
+check(ch.update(105.0, 101.5, 2.5), "Chandelier: low 101.5 reaches 102.5")
+check(ch.stop == 102.5, "Chandelier: the stop only rises")
+
+lb = ChandelierExit(2, 3.0)
+lb.arm("long", 100.0, 2.0)
+for i in range(4):
+    b = LONG_BARS[i]
+    lb.update(b[0], b[1], b[2])
+check(lb.stop == 102.5, f"Chandelier lookback 2: stop {lb.stop}, want 102.5")
+check(lb.update(105.0, 101.5, 2.5) and lb.stop == 102.5,
+      "Chandelier lookback 2: hit, and the stop never falls")
+
+sh = ChandelierExit(0, 3.0)
+sh.arm("short", 100.0, 2.0)
+check(sh.stop == 106.0, f"Chandelier short: initial {sh.stop}, want 106")
+check(not sh.update(101.0, 97.0, 2.0) and sh.stop == 103.0, "Chandelier short: 103")
+check(not sh.update(99.0, 94.0, 2.0) and sh.stop == 100.0, "Chandelier short: 100")
+check(sh.update(100.5, 96.0, 2.0), "Chandelier short: high 100.5 >= 100")
+sh.disarm()
+check(not sh.armed and math.isnan(sh.stop), "Chandelier: disarm clears the stop")
+
+# ── BreakEvenTrail ────────────────────────────────────────────────────
+be = BreakEvenTrail(2.0, 3.0, 1.5)
+be.arm("long", 100.0, 2.0)
+check(be.stop == 96.0 and not be.at_break_even, f"BreakEvenTrail: hard stop {be.stop}, want 96")
+check(not be.update(103.0, 99.0, 2.0) and be.stop == 96.0 and not be.at_break_even,
+      "BreakEvenTrail bar 0: still 96")
+check(not be.update(106.0, 102.0, 2.0) and be.at_break_even and be.stop == 103.0,
+      f"BreakEvenTrail bar 1: break even, trail 103 (got {be.stop})")
+check(not be.update(110.0, 105.0, 2.5) and be.stop == 106.25,
+      f"BreakEvenTrail bar 2: 106.25 (got {be.stop})")
+check(be.update(108.0, 104.0, 2.5) and be.stop == 106.25, "BreakEvenTrail bar 3: hit at 106.25")
+be.disarm()
+check(not be.armed and not be.at_break_even and math.isnan(be.stop), "BreakEvenTrail: disarm")
+
+# ── PercentStop ───────────────────────────────────────────────────────
+for bad in (0.0, -1.0, math.nan):
+    refused = False
+    try:
+        PercentStop(bad)
+    except ValueError:
+        refused = True
+    check(refused, f"PercentStop({bad}) is refused")
+ps = PercentStop(5.0)
+check(ps.pct == 5.0, "PercentStop.pct")
+check(not ps.armed and not ps.update(300.0, 1.0), "PercentStop: update before arm is False")
+ps.arm("long", 200.0)
+check(ps.armed and ps.stop == 190.0, f"PercentStop long@200: stop {ps.stop}, want 190")
+check(not ps.update(215.0, 195.0), "PercentStop long: low 195 above 190")
+check(ps.update(212.0, 190.0), "PercentStop long: low == stop is a hit")
+check(ps.update(212.0, 190.0) and ps.armed, "PercentStop: a hit does not disarm")
+check(not ps.update(212.0, 191.0) and ps.armed, "PercentStop: per bar, a later bar above the stop is no hit")
+ps.arm("short", 200.0)
+check(ps.stop == 210.0, f"PercentStop short@200: stop {ps.stop}, want 210")
+check(not ps.update(209.0, 195.0), "PercentStop short: high 209 below 210")
+check(ps.update(210.0, 201.0), "PercentStop short: high == stop is a hit")
+ps.disarm()
+check(not ps.armed and math.isnan(ps.stop), "PercentStop: disarm clears the stop")
+check(not ps.update(1000.0, 1.0), "PercentStop: disarmed watches nothing")
+pf = PercentStop(2.5)
+pf.arm("short", 100.0)
+check(pf.stop == 100.0 * (1.0 + 2.5 / 100.0) and pf.stop == 102.49999999999999,
+      f"PercentStop(2.5) short@100: entry * (1 + pct / 100), got {pf.stop}")
+pf.arm("long", 100.0)
+check(pf.stop == 97.5, f"PercentStop(2.5) long@100: {pf.stop}")
+
+# ── TakeProfit ────────────────────────────────────────────────────────
+for bad in (0.0, -5.0):
+    refused = False
+    try:
+        TakeProfit(bad)
+    except ValueError:
+        refused = True
+    check(refused, f"TakeProfit({bad}) is refused")
+tp = TakeProfit(25.0)
+check(tp.pct == 25.0 and not tp.update(1000.0, 1.0), "TakeProfit: update before arm is False")
+tp.arm("long", 200.0)
+check(tp.target == 250.0, f"TakeProfit long@200: target {tp.target}, want 250")
+check(not tp.update(249.0, 190.0), "TakeProfit long: high 249 short of 250")
+check(tp.update(250.0, 205.0), "TakeProfit long: high == target is a hit")
+check(tp.update(250.0, 205.0), "TakeProfit: a hit does not disarm")
+check(not tp.update(240.0, 205.0) and tp.armed, "TakeProfit: per bar, a later bar below the target is no hit")
+tp.arm("short", 200.0)
+check(tp.target == 150.0, f"TakeProfit short@200: target {tp.target}, want 150")
+check(not tp.update(195.0, 151.0), "TakeProfit short: low 151 above 150")
+check(tp.update(190.0, 150.0), "TakeProfit short: low == target is a hit")
+tp.disarm()
+check(not tp.armed and math.isnan(tp.target), "TakeProfit: disarm clears the target")
+
+# ── TimeStop ──────────────────────────────────────────────────────────
+refused = False
+try:
+    TimeStop(0)
+except ValueError:
+    refused = True
+check(refused, "TimeStop(0) is refused")
+ts = TimeStop(3)
+check(ts.max_bars == 3, "TimeStop.max_bars")
+check(not ts.armed and not ts.update(), "TimeStop: update before arm is False")
+ts.arm()
+check(ts.armed and ts.bars == 0, "TimeStop: armed, no bars yet")
+got = [ts.update(), ts.update(), ts.update(), ts.update()]
+check(got == [False, False, True, True], f"TimeStop(3) updates {got}")
+check(ts.bars == 4, f"TimeStop: bars counts updates since arm ({ts.bars})")
+ts.disarm()
+check(not ts.armed and ts.bars == 0, "TimeStop: disarm resets")
+ts.arm()
+check(not ts.update() and ts.bars == 1, "TimeStop: re-arm restarts the count")
+one = TimeStop(1)
+one.arm()
+check(one.update(), "TimeStop(1): the first update fires")
+
+if failed:
+    print(f"{failed} check(s) failed")
+    raise ValueError("exit_rules_smoke failed")
+print("all exit rule checks passed")

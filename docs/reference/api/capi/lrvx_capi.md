@@ -45,6 +45,8 @@ typedef void* LrvxCurveHandle;
 typedef void* LrvxPoolTapeHandle;
 typedef void* LrvxPoolReplayHandle;
 typedef void* LrvxStreamingIndicatorHandle;
+typedef void* LrvxHistoryHandle;
+typedef void* LrvxExitRuleHandle;
 typedef void* LrvxIndicatorGraphHandle;
 typedef LrvxIndicatorGraphHandle LrvxStreamingGraphHandle;  // alias
 typedef void* LrvxOrderGroupHandle;
@@ -734,8 +736,19 @@ id.
 | `lrvx_best_bid_raw_opt(s, sym, price_out)` | `uint8_t` | 1 with the raw bid in `price_out`, 0 if none |
 | `lrvx_best_ask_raw_opt(s, sym, price_out)` | `uint8_t` | 1 with the raw ask in `price_out`, 0 if none |
 | `lrvx_mid_price_raw_opt(s, sym, price_out)` | `uint8_t` | 1 with the raw mid in `price_out`, 0 if none |
+| `lrvx_entry_price_raw_opt(s, sym, price_out)` | `uint8_t` | 1 with the raw average entry of the open position in `price_out`, 0 when flat |
+| `lrvx_bars_in_position(s, sym)` | `uint32_t` | Bar callbacks received while holding the current position, the first counting as 1; 0 when flat |
 | `lrvx_get_symbol_context(s, sym, out)` | `void` | Fill `LrvxSymbolContext` |
 | `lrvx_get_order_status(s, order_id)` | `int32_t` | Order status (-1 = not found) |
+
+The two position facts are not fields of `LrvxSymbolContext`, whose layout is
+fixed by the ABI version; a callback asks for them with its strategy handle
+and the symbol, and gets what the context holds in that callback. Neither
+changes anything, so asking twice gives the same answer. The entry price is
+quantity-weighted: two buys of 1 at 120 and 140 give 130, a sell of 1 leaves
+130, and a sell that flips the position sets it to that fill's price. Fees do
+not move it. The bar count restarts at 1 on the first bar after a flip and
+stays 0 through a replay without bars. A NULL strategy returns 0 with code 1.
 
 ### No quote, and prices at or below zero
 
@@ -924,8 +937,10 @@ Stateless, array-in / array-out.
 | `lrvx_indicator_correlation(x, y, len, period, output)` | Rolling correlation |
 | `lrvx_indicator_adf(input, len, max_lag, regression, test_stat_out, p_value_out, used_lag_out)` | Augmented Dickey-Fuller test |
 | `lrvx_indicator_autocorrelation(input, len, window, lag, output)` | Rolling autocorrelation |
+| `lrvx_indicator_highest(input, len, period, output)` | Highest of the last `period` inputs |
+| `lrvx_indicator_lowest(input, len, period, output)` | Lowest of the last `period` inputs |
 
-That is all 27 functions in the `indicator_functions` group. `lrvx_indicator_adf` is the only one
+That is all 29 functions in the `indicator_functions` group. `lrvx_indicator_adf` is the only one
 that is not array-in / array-out: it writes three scalars through out-pointers and takes a
 `const char* regression` selector. The `lrvx_indicator_graph_*` functions are a separate group and
 are not listed here.
@@ -956,6 +971,46 @@ is one kernel step, its cost independent of how many values the handle has seen,
 
 An update function that does not match the indicator's inputs does not step it; it returns 0 and
 records code 2. `LRVX_HAS_STREAMING_INDICATOR_HANDLES` is defined by a header that declares them.
+
+## History
+
+A fixed-capacity ring of the last values of a series, newest first, over
+`lrvx::History` ([History and crossings](../strategy/history.md)).
+
+| Function | Description |
+|----------|-------------|
+| `lrvx_history_create(capacity)` | NULL and code 2 for a capacity of 0 |
+| `lrvx_history_destroy(h)` | Free the handle; NULL is a no-op |
+| `lrvx_history_push(h, value)` | Push; once full, the oldest drops out. NaN is stored as given |
+| `lrvx_history_get(h, index)` | Index 0 is the newest; 0 and code 2 for an index at or past the size |
+| `lrvx_history_size(h)` / `lrvx_history_capacity(h)` / `lrvx_history_full(h)` | |
+| `lrvx_crossed_above(a_prev, a, b_prev, b)` | 1 when `a` was at or below `b` and is strictly above it now |
+| `lrvx_crossed_below(a_prev, a, b_prev, b)` | 1 when `a` was at or above `b` and is strictly below it now |
+
+A NaN anywhere is no cross. A NULL handle returns 0 with code 1.
+
+## Exit rules
+
+One `LrvxExitRuleHandle` per exit rule of `lrvx/strategy/exits.h`; the handle
+owns the C++ class, so the levels are the [exit rules page](../strategy/exits.md)'s.
+
+| Function | Description |
+|----------|-------------|
+| `lrvx_exit_atr_stop_create(atr_multiple)` | `AtrStop` |
+| `lrvx_exit_chandelier_create(lookback, atr_multiple)` | `ChandelierExit` |
+| `lrvx_exit_break_even_trail_create(hard_stop_atr, break_even_atr, trail_atr)` | `BreakEvenTrail` |
+| `lrvx_exit_percent_stop_create(pct)` | `PercentStop`; NULL and code 2 unless `pct > 0` |
+| `lrvx_exit_take_profit_create(pct)` | `TakeProfit`; NULL and code 2 unless `pct > 0` |
+| `lrvx_exit_time_stop_create(max_bars)` | `TimeStop`; NULL and code 2 for 0 |
+| `lrvx_exit_rule_destroy(h)` | Free the handle; NULL is a no-op |
+| `lrvx_exit_rule_arm(h, side, entry_price, atr)` | Side 0 long, 1 short; any other side records code 2 and changes nothing. The percent stop and take-profit ignore `atr`; the time stop ignores all three |
+| `lrvx_exit_rule_update(h, high, low, atr)` | 1 when the bar reached the level (the time stop: from the `max_bars`-th update); 0 before `arm` |
+| `lrvx_exit_rule_level(h)` | The stop, or the take-profit's target; NaN when disarmed and always for the time stop |
+| `lrvx_exit_rule_armed(h)` / `lrvx_exit_rule_disarm(h)` | |
+| `lrvx_exit_rule_at_break_even(h)` | 1 once a break-even trail reached the entry; 0 for the other rules |
+| `lrvx_exit_rule_bars(h)` | Time stop: updates since `arm`, 0 after `disarm`; 0 for the other rules |
+
+A hit does not disarm. A NULL handle returns 0 (or nothing) with code 1.
 
 ---
 

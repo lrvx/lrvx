@@ -39,6 +39,14 @@ struct SymbolContext
   // Price that nothing in the engine ever wrote, so it read back as 0 and
   // unrealized PnL came out as the entire notional.
   std::optional<Price> avgEntryPrice{};
+  // The quantity-weighted average entry of the open position: an add moves
+  // it, a partial close leaves it, a fill that flips the position sets it to
+  // that fill's price. Empty when flat. avgEntryPrice above is the position
+  // manager's cost basis, which after a partial close is a FIFO figure.
+  std::optional<Price> entryPrice{};
+  // Bar callbacks received while holding the current position, the bar on
+  // which it is first seen counting as 1. 0 when flat; restarts on a flip.
+  uint32_t barsInPosition{0};
   Price lastTradePrice{};
   int64_t lastUpdateNs{0};
   SymbolId symbolId{0};
@@ -122,6 +130,8 @@ struct SymbolContext
     lastTouchNs = 0;
     position = Quantity{};
     avgEntryPrice.reset();
+    entryPrice.reset();
+    barsInPosition = 0;
     lastTradePrice = Price{};
     lastUpdateNs = 0;
   }

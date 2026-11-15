@@ -21,10 +21,10 @@ import time
 from lrvx.indicators import (
     SMA, EMA, RMA, RSI, KAMA, DEMA, TEMA, Slope, Skewness, Kurtosis,
     RollingZScore, ShannonEntropy, AutoCorrelation, ATR, CCI, CHOP, Stochastic,
-    ParkinsonVol, RogersSatchellVol, Correlation, MACD, Bollinger,
+    ParkinsonVol, RogersSatchellVol, Correlation, MACD, Bollinger, Highest, Lowest,
     sma, ema, rma, rsi, kama, dema, tema, slope, skewness, kurtosis,
     rolling_zscore, shannon_entropy, autocorrelation, atr, cci, chop, stochastic,
-    parkinson_vol, rogers_satchell_vol, rolling_correlation, macd, bollinger,
+    parkinson_vol, rogers_satchell_vol, rolling_correlation, macd, bollinger, highest, lowest,
 )
 
 failed = 0
@@ -135,6 +135,8 @@ check_single("Kurtosis(20)", Kurtosis(20), kurtosis(c, 20))
 check_single("RollingZScore(30)", RollingZScore(30), rolling_zscore(c, 30))
 check_single("ShannonEntropy(20,8)", ShannonEntropy(20, 8), shannon_entropy(c, 20, 8))
 check_single("AutoCorrelation(20,3)", AutoCorrelation(20, 3), autocorrelation(c, 20, 3))
+check_single("Highest(14)", Highest(14), highest(c, 14))
+check_single("Lowest(14)", Lowest(14), lowest(c, 14))
 check_bar("ATR(14)", ATR(14), atr(h, l, c, 14))
 check_bar("CCI(20)", CCI(20), cci(h, l, c, 20))
 check_bar("CHOP(14)", CHOP(14), chop(h, l, c, 14))

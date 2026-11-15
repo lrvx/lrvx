@@ -721,6 +721,24 @@ static JSValue js_mid_price(JSContext* ctx, JSValueConst, int, JSValueConst* arg
   return JS_NewFloat64(ctx, lrvx_price_to_double(raw));
 }
 
+// The position facts the strategy's context holds now: null when flat.
+static JSValue js_entry_price(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  GET_HANDLE_OR_THROW(ctx, argv);
+  int64_t raw = 0;
+  if (!lrvx_entry_price_raw_opt(h, toUint32(ctx, argv[1]), &raw))
+  {
+    return JS_NULL;
+  }
+  return JS_NewFloat64(ctx, lrvx_price_to_double(raw));
+}
+
+static JSValue js_bars_in_position(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  GET_HANDLE_OR_THROW(ctx, argv);
+  return JS_NewUint32(ctx, lrvx_bars_in_position(h, toUint32(ctx, argv[1])));
+}
+
 static JSValue js_get_order_status(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
   GET_HANDLE_OR_THROW(ctx, argv);
@@ -753,11 +771,36 @@ static JSValue jsBarFromLrvx(JSContext* ctx, const LrvxBar& b)
   return obj;
 }
 
+// An integer Number from 0 (Time) to 6 (BpsRange); anything else would be
+// truncated to uint8_t and could read another bar type's ring.
+static bool toBarTypeOrThrow(JSContext* ctx, JSValueConst val, uint32_t& out, const char* what)
+{
+  if (JS_IsNumber(val))
+  {
+    double d = 0;
+    if (JS_ToFloat64(ctx, &d, val) < 0)
+    {
+      return false;
+    }
+    if (d >= 0.0 && d <= 6.0 && d == std::floor(d))
+    {
+      out = static_cast<uint32_t>(d);
+      return true;
+    }
+  }
+  JS_ThrowTypeError(ctx, "%s must be an integer from 0 to 6", what);
+  return false;
+}
+
 static JSValue js_strategy_last_closed_bar(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
 {
   GET_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
-  uint32_t bt = toUint32(ctx, argv[2]);
+  uint32_t bt = 0;
+  if (!toBarTypeOrThrow(ctx, argv[2], bt, "lastClosedBar: barType"))
+  {
+    return JS_EXCEPTION;
+  }
   uint64_t param = static_cast<uint64_t>(toInt64(ctx, argv[3]));
   LrvxBar bar{};
   uint8_t ok = lrvx_strategy_last_closed_bar(h, sym, static_cast<uint8_t>(bt), param, &bar);
@@ -773,7 +816,11 @@ static JSValue js_strategy_last_n_closed_bars(JSContext* ctx, JSValueConst, int,
 {
   GET_HANDLE_OR_THROW(ctx, argv);
   uint32_t sym = toUint32(ctx, argv[1]);
-  uint32_t bt = toUint32(ctx, argv[2]);
+  uint32_t bt = 0;
+  if (!toBarTypeOrThrow(ctx, argv[2], bt, "lastNClosedBars: barType"))
+  {
+    return JS_EXCEPTION;
+  }
   uint64_t param = static_cast<uint64_t>(toInt64(ctx, argv[3]));
   uint32_t n = toUint32(ctx, argv[4]);
   // `n` comes straight from JS and used to size this vector with no
@@ -807,7 +854,11 @@ static JSValue js_strategy_set_bar_ring_capacity(JSContext* ctx, JSValueConst, i
                                                  JSValueConst* argv)
 {
   GET_HANDLE_OR_THROW(ctx, argv);
-  uint32_t cap = toUint32(ctx, argv[1]);
+  uint32_t cap = 0;
+  if (!toUint32OrThrow(ctx, argv[1], cap, "setBarRingCapacity: capacity"))
+  {
+    return JS_EXCEPTION;
+  }
   lrvx_strategy_set_bar_ring_capacity(h, cap);
   return JS_UNDEFINED;
 }
@@ -1321,6 +1372,224 @@ static JSValue js_indicator_correlation(JSContext* ctx, JSValueConst, int, JSVal
   std::vector<double> output(len);
   LRVX_JS_INDICATOR_CALL(ctx, lrvx_indicator_correlation(x.data(), y.data(), len, period, output.data()));
   return jsArrayFromDoubles(ctx, output);
+}
+
+static JSValue js_indicator_highest(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto data = jsArrayToDoubles(ctx, argv[0]);
+  uint32_t period = toUint32(ctx, argv[1]);
+  std::vector<double> output(data.size());
+  LRVX_JS_INDICATOR_CALL(ctx,
+                         lrvx_indicator_highest(data.data(), data.size(), period, output.data()));
+  return jsArrayFromDoubles(ctx, output);
+}
+
+static JSValue js_indicator_lowest(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto data = jsArrayToDoubles(ctx, argv[0]);
+  uint32_t period = toUint32(ctx, argv[1]);
+  std::vector<double> output(data.size());
+  LRVX_JS_INDICATOR_CALL(ctx,
+                         lrvx_indicator_lowest(data.data(), data.size(), period, output.data()));
+  return jsArrayFromDoubles(ctx, output);
+}
+
+// ============================================================
+// History and crossings (quickjs/lrvx/history.js)
+// ============================================================
+
+static JSValue js_history_create(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  lrvx_clear_last_error();
+  LrvxHistoryHandle h = lrvx_history_create(toUint32(ctx, argv[0]));
+  if (!h)
+  {
+    return JS_ThrowRangeError(ctx, "%s", lrvx_last_error_message());
+  }
+  return createHandleObject(ctx, h, lrvx_history_destroy);
+}
+
+static JSValue js_history_destroy(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  return js_generic_handle_destroy(ctx, argv[0]);
+}
+
+static JSValue js_history_push(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  if (!h)
+  {
+    return JS_ThrowTypeError(ctx, "History: destroyed");
+  }
+  lrvx_history_push(h, toDouble(ctx, argv[1]));
+  return JS_UNDEFINED;
+}
+
+static JSValue js_history_get(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  if (!h)
+  {
+    return JS_ThrowTypeError(ctx, "History: destroyed");
+  }
+  double index = toDouble(ctx, argv[1]);
+  const uint32_t size = lrvx_history_size(h);
+  if (!(index >= 0.0) || index != std::floor(index) || index >= static_cast<double>(size))
+  {
+    return JS_ThrowRangeError(ctx, "History index %g out of range (length %u)", index, size);
+  }
+  return JS_NewFloat64(ctx, lrvx_history_get(h, static_cast<uint32_t>(index)));
+}
+
+static JSValue js_history_size(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewUint32(ctx, h ? lrvx_history_size(h) : 0);
+}
+
+static JSValue js_history_capacity(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewUint32(ctx, h ? lrvx_history_capacity(h) : 0);
+}
+
+static JSValue js_history_full(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewBool(ctx, h && lrvx_history_full(h));
+}
+
+static JSValue js_crossed_above(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  return JS_NewBool(ctx, lrvx_crossed_above(toDouble(ctx, argv[0]), toDouble(ctx, argv[1]),
+                                            toDouble(ctx, argv[2]), toDouble(ctx, argv[3])) != 0);
+}
+
+static JSValue js_crossed_below(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  return JS_NewBool(ctx, lrvx_crossed_below(toDouble(ctx, argv[0]), toDouble(ctx, argv[1]),
+                                            toDouble(ctx, argv[2]), toDouble(ctx, argv[3])) != 0);
+}
+
+// ============================================================
+// Exit rules (quickjs/lrvx/exits.js)
+// ============================================================
+
+static JSValue exitRuleOrThrow(JSContext* ctx, LrvxExitRuleHandle h)
+{
+  if (!h)
+  {
+    return JS_ThrowRangeError(ctx, "%s", lrvx_last_error_message());
+  }
+  return createHandleObject(ctx, h, lrvx_exit_rule_destroy);
+}
+
+static JSValue js_exit_atr_stop_create(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  lrvx_clear_last_error();
+  return exitRuleOrThrow(ctx, lrvx_exit_atr_stop_create(toDouble(ctx, argv[0])));
+}
+
+static JSValue js_exit_chandelier_create(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  lrvx_clear_last_error();
+  return exitRuleOrThrow(
+      ctx, lrvx_exit_chandelier_create(toUint32(ctx, argv[0]), toDouble(ctx, argv[1])));
+}
+
+static JSValue js_exit_break_even_trail_create(JSContext* ctx, JSValueConst, int,
+                                               JSValueConst* argv)
+{
+  lrvx_clear_last_error();
+  return exitRuleOrThrow(ctx, lrvx_exit_break_even_trail_create(
+                                  toDouble(ctx, argv[0]), toDouble(ctx, argv[1]),
+                                  toDouble(ctx, argv[2])));
+}
+
+static JSValue js_exit_percent_stop_create(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  lrvx_clear_last_error();
+  return exitRuleOrThrow(ctx, lrvx_exit_percent_stop_create(toDouble(ctx, argv[0])));
+}
+
+static JSValue js_exit_take_profit_create(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  lrvx_clear_last_error();
+  return exitRuleOrThrow(ctx, lrvx_exit_take_profit_create(toDouble(ctx, argv[0])));
+}
+
+static JSValue js_exit_time_stop_create(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  lrvx_clear_last_error();
+  return exitRuleOrThrow(ctx, lrvx_exit_time_stop_create(toUint32(ctx, argv[0])));
+}
+
+static JSValue js_exit_rule_destroy(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  return js_generic_handle_destroy(ctx, argv[0]);
+}
+
+// arm(h, side, entryPrice, atr): side 0 long, 1 short; exits.js maps the
+// strings and refuses any other side before calling.
+static JSValue js_exit_rule_arm(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  if (!h)
+  {
+    return JS_ThrowTypeError(ctx, "exit rule: destroyed");
+  }
+  lrvx_clear_last_error();
+  lrvx_exit_rule_arm(h, static_cast<uint8_t>(toUint32(ctx, argv[1])), toDouble(ctx, argv[2]),
+                     toDouble(ctx, argv[3]));
+  if (lrvx_last_error_code() != 0)
+  {
+    return JS_ThrowRangeError(ctx, "%s", lrvx_last_error_message());
+  }
+  return JS_UNDEFINED;
+}
+
+static JSValue js_exit_rule_update(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  if (!h)
+  {
+    return JS_ThrowTypeError(ctx, "exit rule: destroyed");
+  }
+  return JS_NewBool(ctx, lrvx_exit_rule_update(h, toDouble(ctx, argv[1]), toDouble(ctx, argv[2]),
+                                               toDouble(ctx, argv[3])) != 0);
+}
+
+static JSValue js_exit_rule_level(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewFloat64(ctx, h ? lrvx_exit_rule_level(h) : std::nan(""));
+}
+
+static JSValue js_exit_rule_armed(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewBool(ctx, h && lrvx_exit_rule_armed(h));
+}
+
+static JSValue js_exit_rule_disarm(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  if (auto h = getHandle(ctx, argv[0]))
+  {
+    lrvx_exit_rule_disarm(h);
+  }
+  return JS_UNDEFINED;
+}
+
+static JSValue js_exit_rule_at_break_even(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewBool(ctx, h && lrvx_exit_rule_at_break_even(h));
+}
+
+static JSValue js_exit_rule_bars(JSContext* ctx, JSValueConst, int, JSValueConst* argv)
+{
+  auto h = getHandle(ctx, argv[0]);
+  return JS_NewUint32(ctx, h ? lrvx_exit_rule_bars(h) : 0);
 }
 
 static JSValue js_indicator_adf(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv)
@@ -7572,6 +7841,8 @@ bool registerLrvxBindings(JSContext* ctx)
   addGlobalFunc(ctx, "__lrvx_best_ask", js_best_ask, 2);
   addGlobalFunc(ctx, "__lrvx_mid_price", js_mid_price, 2);
   addGlobalFunc(ctx, "__lrvx_get_order_status", js_get_order_status, 2);
+  addGlobalFunc(ctx, "__lrvx_entry_price", js_entry_price, 2);
+  addGlobalFunc(ctx, "__lrvx_bars_in_position", js_bars_in_position, 2);
   addGlobalFunc(ctx, "__lrvx_strategy_last_closed_bar", js_strategy_last_closed_bar, 4);
   addGlobalFunc(ctx, "__lrvx_strategy_last_n_closed_bars", js_strategy_last_n_closed_bars, 5);
   addGlobalFunc(ctx, "__lrvx_strategy_get_bar_ring_capacity",
@@ -7616,6 +7887,35 @@ bool registerLrvxBindings(JSContext* ctx)
   addGlobalFunc(ctx, "__lrvx_indicator_parkinson_vol", js_indicator_parkinson_vol, 3);
   addGlobalFunc(ctx, "__lrvx_indicator_rogers_satchell_vol", js_indicator_rogers_satchell_vol, 5);
   addGlobalFunc(ctx, "__lrvx_indicator_correlation", js_indicator_correlation, 3);
+  addGlobalFunc(ctx, "__lrvx_indicator_highest", js_indicator_highest, 2);
+  addGlobalFunc(ctx, "__lrvx_indicator_lowest", js_indicator_lowest, 2);
+
+  // History and crossings
+  addGlobalFunc(ctx, "__lrvx_history_create", js_history_create, 1);
+  addGlobalFunc(ctx, "__lrvx_history_destroy", js_history_destroy, 1);
+  addGlobalFunc(ctx, "__lrvx_history_push", js_history_push, 2);
+  addGlobalFunc(ctx, "__lrvx_history_get", js_history_get, 2);
+  addGlobalFunc(ctx, "__lrvx_history_size", js_history_size, 1);
+  addGlobalFunc(ctx, "__lrvx_history_capacity", js_history_capacity, 1);
+  addGlobalFunc(ctx, "__lrvx_history_full", js_history_full, 1);
+  addGlobalFunc(ctx, "__lrvx_crossed_above", js_crossed_above, 4);
+  addGlobalFunc(ctx, "__lrvx_crossed_below", js_crossed_below, 4);
+
+  // Exit rules
+  addGlobalFunc(ctx, "__lrvx_exit_atr_stop_create", js_exit_atr_stop_create, 1);
+  addGlobalFunc(ctx, "__lrvx_exit_chandelier_create", js_exit_chandelier_create, 2);
+  addGlobalFunc(ctx, "__lrvx_exit_break_even_trail_create", js_exit_break_even_trail_create, 3);
+  addGlobalFunc(ctx, "__lrvx_exit_percent_stop_create", js_exit_percent_stop_create, 1);
+  addGlobalFunc(ctx, "__lrvx_exit_take_profit_create", js_exit_take_profit_create, 1);
+  addGlobalFunc(ctx, "__lrvx_exit_time_stop_create", js_exit_time_stop_create, 1);
+  addGlobalFunc(ctx, "__lrvx_exit_rule_destroy", js_exit_rule_destroy, 1);
+  addGlobalFunc(ctx, "__lrvx_exit_rule_arm", js_exit_rule_arm, 4);
+  addGlobalFunc(ctx, "__lrvx_exit_rule_update", js_exit_rule_update, 4);
+  addGlobalFunc(ctx, "__lrvx_exit_rule_level", js_exit_rule_level, 1);
+  addGlobalFunc(ctx, "__lrvx_exit_rule_armed", js_exit_rule_armed, 1);
+  addGlobalFunc(ctx, "__lrvx_exit_rule_disarm", js_exit_rule_disarm, 1);
+  addGlobalFunc(ctx, "__lrvx_exit_rule_at_break_even", js_exit_rule_at_break_even, 1);
+  addGlobalFunc(ctx, "__lrvx_exit_rule_bars", js_exit_rule_bars, 1);
   addGlobalFunc(ctx, "__lrvx_indicator_adf", js_indicator_adf, 3);
   addGlobalFunc(ctx, "__lrvx_indicator_autocorrelation", js_indicator_autocorrelation, 3);
 

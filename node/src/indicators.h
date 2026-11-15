@@ -26,7 +26,9 @@
 #include "lrvx/indicator/adf.h"
 #include "lrvx/indicator/autocorrelation.h"
 #include "lrvx/indicator/correlation.h"
+#include "lrvx/indicator/highest.h"
 #include "lrvx/indicator/kurtosis.h"
+#include "lrvx/indicator/lowest.h"
 #include "lrvx/indicator/parkinson_vol.h"
 #include "lrvx/indicator/rogers_satchell_vol.h"
 #include "lrvx/indicator/rolling_zscore.h"
@@ -304,6 +306,22 @@ inline Napi::Value batch_skewness(const Napi::CallbackInfo& info)
   return vec2arr(info.Env(), r);
 }
 
+inline Napi::Value batch_highest(const Napi::CallbackInfo& info)
+{
+  auto in = argFloat64Array(info[0], "highest: input");
+  size_t p = argUint32(info[1], "highest: period");
+  auto r = checkedIndicator<lrvx::indicator::Highest>(info.Env(), "highest", p).compute(arr2span(in));
+  return vec2arr(info.Env(), r);
+}
+
+inline Napi::Value batch_lowest(const Napi::CallbackInfo& info)
+{
+  auto in = argFloat64Array(info[0], "lowest: input");
+  size_t p = argUint32(info[1], "lowest: period");
+  auto r = checkedIndicator<lrvx::indicator::Lowest>(info.Env(), "lowest", p).compute(arr2span(in));
+  return vec2arr(info.Env(), r);
+}
+
 inline Napi::Value batch_kurtosis(const Napi::CallbackInfo& info)
 {
   auto in = argFloat64Array(info[0], "kurtosis: input");
@@ -480,6 +498,8 @@ WRAP_SINGLE_1(Slope, slope, length)
 WRAP_SINGLE_1(Skewness, skewness, period)
 WRAP_SINGLE_1(Kurtosis, kurtosis, period)
 WRAP_SINGLE_1(RollingZScore, rolling_zscore, period)
+WRAP_SINGLE_1(Highest, highest, period)
+WRAP_SINGLE_1(Lowest, lowest, period)
 
 #undef WRAP_SINGLE_1
 
@@ -1029,6 +1049,8 @@ inline void registerIndicators(Napi::Env env, Napi::Object exports)
   exports.Set("rollingCorrelation", Napi::Function::New(env, batch_correlation));
   exports.Set("adf", Napi::Function::New(env, batch_adf));
   exports.Set("autocorrelation", Napi::Function::New(env, batch_autocorrelation));
+  exports.Set("highest", Napi::Function::New(env, batch_highest));
+  exports.Set("lowest", Napi::Function::New(env, batch_lowest));
 
   // Streaming classes (each has compute() AND update()/value/ready/reset on
   // the same instance — single source of truth in the C++ class).
@@ -1054,6 +1076,8 @@ inline void registerIndicators(Napi::Env env, Napi::Object exports)
   exports.Set("RogersSatchellVol", RogersSatchellVolWrap::Init(env));
   exports.Set("Correlation", CorrelationWrap::Init(env));
   exports.Set("AutoCorrelation", AutoCorrelationWrap::Init(env));
+  exports.Set("Highest", HighestWrap::Init(env));
+  exports.Set("Lowest", LowestWrap::Init(env));
 
   // Discovery
   exports.Set("list_indicators", Napi::Function::New(env, list_indicators));

@@ -412,6 +412,8 @@ for v in stream:
 | `RollingZScore` | `lrvx.RollingZScore(period)` | SingleInput |
 | `ShannonEntropy` | `lrvx.ShannonEntropy(period, bins)` | SingleInput |
 | `AutoCorrelation` | `lrvx.AutoCorrelation(window, lag)` | SingleInput |
+| `Highest` | `lrvx.Highest(period)` | SingleInput |
+| `Lowest` | `lrvx.Lowest(period)` | SingleInput |
 | `ATR` | `lrvx.ATR(period)` | BarInput |
 | `CCI` | `lrvx.CCI(period)` | BarInput |
 | `CHOP` | `lrvx.CHOP(period)` | BarInput |

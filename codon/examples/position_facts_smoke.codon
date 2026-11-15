@@ -1,0 +1,167 @@
+# Smoke test: the position facts on SymbolContext -- entry_price() and
+# bars_in_position().
+#
+# entry_price() is the average entry of the open position: an add weights
+# it by quantity, a partial close leaves it, a fill that flips the position
+# sets it to that fill's price, and flat is None. Fees do not move it.
+# bars_in_position() counts the bar callbacks seen while holding the current
+# position, the bar on which it is first seen as 1; it is 0 when flat,
+# restarts at 1 on a flip, and stays 0 on a run without bars.
+#
+# Scenario A, as in every binding's test: bar i opens at 100 + 10 i (high
+# +3, low -2, close +1). Buy 1 on bar 1, buy 1 on bar 3, sell 1 on bar 5,
+# sell 3 on bar 7, buy 2 on bar 9; an order sent from on_bar fills at the
+# next bar's open.
+
+from C import lrvx_registry_create() -> cobj
+from C import lrvx_registry_destroy(cobj)
+from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+
+from lrvx.runner import BacktestRunner
+from lrvx.strategy import Strategy, SymbolContext
+from lrvx.types import BarData, OrderEventData, TradeData
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+# str() of a whole float prints no decimals in Codon: 120.0 -> "120".
+def fmt(ctx: SymbolContext) -> str:
+    e = ctx.entry_price()
+    s = "None" if e is None else str(e)
+    return s + "/" + str(ctx.bars_in_position())
+
+
+class Facts(Strategy):
+    n: int
+    log: List[str]
+    fills: List[str]
+    plan: Dict[int, float]
+
+    def __init__(self, symbols: List[int], plan: Dict[int, float]):
+        super().__init__(symbols)
+        self.n = 0
+        self.log = []
+        self.fills = []
+        self.plan = plan
+
+    def on_bar(self, ctx: SymbolContext, bar: BarData):
+        i = self.n
+        self.n += 1
+        self.log.append(fmt(ctx))
+        if i in self.plan:
+            q = self.plan[i]
+            if q > 0.0:
+                self.market_buy(q)
+            else:
+                self.market_sell(-q)
+
+    def on_trade(self, ctx: SymbolContext, trade: TradeData):
+        i = self.n
+        self.n += 1
+        self.log.append(fmt(ctx))
+        if i == 0:
+            self.market_buy(1.0)
+
+    def on_fill(self, ctx: SymbolContext, ev: OrderEventData):
+        self.fills.append(str(ev.fill_price) + ":" + str(ctx.position()) + "/" + fmt(ctx))
+
+
+PLAN_A = {1: 1.0, 3: 1.0, 5: -1.0, 7: -3.0, 9: 2.0}
+
+
+SEC = 1_000_000_000
+MIN = 60 * SEC
+T0 = 1_767_225_600 * SEC
+
+N = 12
+starts = [T0 + i * MIN for i in range(N)]
+ends = [T0 + (i + 1) * MIN for i in range(N)]
+opens = [100.0 + 10.0 * i for i in range(N)]
+highs = [o + 3.0 for o in opens]
+lows = [o - 2.0 for o in opens]
+closes = [o + 1.0 for o in opens]
+vols = [100.0] * N
+
+# Bar 4: (120 + 140) / 2. Bar 6: the partial close leaves 130 (FIFO would
+# say 140). Bar 8: selling 3 flips to -2 at 180 and the count restarts.
+WANT = ["None/0", "None/0", "120/1", "120/2", "130/3", "130/4",
+        "130/5", "130/6", "180/1", "180/2", "None/0", "None/0"]
+
+reg = lrvx_registry_create()
+sym = int(lrvx_registry_add_symbol(reg, "test".c_str(), "BTCUSDT".c_str(), 0.01))
+
+for fee in (0.0, 0.01):
+    bt = BacktestRunner(reg, fee, 1_000_000.0)
+    s = Facts([sym], PLAN_A)
+    bt.set_strategy(s)
+    bt.run_bars(starts, ends, opens, highs, lows, closes, vols, "BTCUSDT")
+    check(s.log == WANT, f"run_bars fee {fee}: {s.log}")
+    bt.close()
+
+# A second run on the same runner starts clean.
+bt = BacktestRunner(reg, 0.0, 1_000_000.0)
+s = Facts([sym], PLAN_A)
+bt.set_strategy(s)
+bt.run_bars(starts[:4], ends[:4], opens[:4], highs[:4], lows[:4], closes[:4], vols[:4], "BTCUSDT")
+check(s.log == WANT[:4], f"first run, 4 bars: {s.log}")
+s.n = 0
+s.log = []
+bt.run_bars(starts, ends, opens, highs, lows, closes, vols, "BTCUSDT")
+check(s.log == WANT, f"second run on the same runner: {s.log}")
+bt.close()
+
+# A run without bars: on_trade only. The buy sent on the first trade fills
+# at 100; there is an entry price from then on and barsInPosition stays 0.
+bt = BacktestRunner(reg, 0.0, 1_000_000.0)
+s = Facts([sym], PLAN_A)
+bt.set_strategy(s)
+bt.run_ohlcv([T0 + i * MIN for i in range(4)], [100.0, 101.5, 103.0, 104.5], "BTCUSDT")
+check(s.log == ["None/0", "100/0", "100/0", "100/0"], f"run_ohlcv: {s.log}")
+bt.close()
+
+# Scenario B: an add after a partial close, then a short added to, partly
+# closed and added to again (20 bars).
+#   bar 1 buy 1 -> 120 long 1 @120; bar 3 buy 1 -> 140 long 2 @130;
+#   bar 5 sell 1 -> 160 long 1 @130 (the manager's FIFO basis: 140);
+#   bar 7 buy 1 -> 180 long 2 @155 (FIFO: 160); bar 9 sell 4 -> 200 short 2 @200;
+#   bar 11 sell 2 -> 220 short 4 @210; bar 13 buy 1 -> 240 short 3 @210;
+#   bar 15 sell 1 -> 260 short 4 @222.5 (FIFO: 225); bar 17 buy 4 -> 280 flat.
+NB = 20
+b_starts = [T0 + i * MIN for i in range(NB)]
+b_ends = [T0 + (i + 1) * MIN for i in range(NB)]
+b_opens = [100.0 + 10.0 * i for i in range(NB)]
+b_highs = [o + 3.0 for o in b_opens]
+b_lows = [o - 2.0 for o in b_opens]
+b_closes = [o + 1.0 for o in b_opens]
+b_vols = [100.0] * NB
+PLAN_B = {1: 1.0, 3: 1.0, 5: -1.0, 7: 1.0, 9: -4.0, 11: -2.0, 13: 1.0, 15: -1.0, 17: 4.0}
+WANT_B = ["None/0", "None/0", "120/1", "120/2", "130/3", "130/4", "130/5", "130/6",
+          "155/7", "155/8", "200/1", "200/2", "210/3", "210/4", "210/5", "210/6",
+          "222.5/7", "222.5/8", "None/0", "None/0"]
+# An opening or flipping fill reads 0 bars; the flattening fill reads no
+# entry and 0 bars.
+WANT_B_FILLS = ["120:1/120/0", "140:2/130/2", "160:1/130/4", "180:2/155/6", "200:-2/200/0",
+                "220:-4/210/2", "240:-3/210/4", "260:-4/222.5/6", "280:0/None/0"]
+bt = BacktestRunner(reg, 0.0, 1_000_000.0)
+s = Facts([sym], PLAN_B)
+bt.set_strategy(s)
+bt.run_bars(b_starts, b_ends, b_opens, b_highs, b_lows, b_closes, b_vols, "BTCUSDT")
+check(s.log == WANT_B, f"scenario B on_bar: {s.log}")
+check(s.fills == WANT_B_FILLS, f"scenario B on_fill: {s.fills}")
+bt.close()
+
+lrvx_registry_destroy(reg)
+
+if failed:
+    print(f"{failed} check(s) failed")
+    raise ValueError("position_facts_smoke failed")
+print("all position fact checks passed")

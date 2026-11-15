@@ -752,7 +752,7 @@ groups:
   indicator_functions:
     pybind11:
       status: required
-      functions: [sma, ema, rsi, macd, atr]
+      functions: [sma, ema, rsi, macd, atr, highest, lowest]
     napi:
       status: required
       functions: [sma, ema, rsi, macd, atr]
@@ -771,8 +771,10 @@ groups:
         lrvx_indicator_cvd: __lrvx_indicator_cvd
         lrvx_indicator_dema: __lrvx_indicator_dema
         lrvx_indicator_ema: __lrvx_indicator_ema
+        lrvx_indicator_highest: __lrvx_indicator_highest
         lrvx_indicator_kama: __lrvx_indicator_kama
         lrvx_indicator_kurtosis: __lrvx_indicator_kurtosis
+        lrvx_indicator_lowest: __lrvx_indicator_lowest
         lrvx_indicator_macd: __lrvx_indicator_macd
         lrvx_indicator_obv: __lrvx_indicator_obv
         lrvx_indicator_parkinson_vol: __lrvx_indicator_parkinson_vol
@@ -795,13 +797,14 @@ groups:
   streaming_indicator:
     pybind11:
       status: required
-      classes: [SMA, EMA, ATR, MACD, Bollinger, Stochastic, Correlation]
+      classes: [SMA, EMA, ATR, MACD, Bollinger, Stochastic, Correlation, Highest, Lowest]
     napi:
       status: required
-      classes: [SMA, EMA, ATR, MACD, Bollinger, Stochastic, Correlation]
+      classes: [SMA, EMA, ATR, MACD, Bollinger, Stochastic, Correlation, Highest, Lowest]
     codon: { status: required }
     quickjs:
       status: required
+      classes: [Highest, Lowest]
       functions:
         lrvx_streaming_indicator_create: __lrvx_streaming_indicator_create
         lrvx_streaming_indicator_destroy: __lrvx_streaming_indicator_destroy
@@ -922,6 +925,7 @@ groups:
     quickjs:
       status: required
       functions:
+        lrvx_bars_in_position: __lrvx_bars_in_position
         lrvx_best_ask_raw: __lrvx_best_ask
         lrvx_best_ask_raw_opt: __lrvx_best_ask
         lrvx_best_bid_raw: __lrvx_best_bid
@@ -929,8 +933,62 @@ groups:
         lrvx_get_order_status: __lrvx_get_order_status
         lrvx_last_trade_price_raw: __lrvx_last_trade_price
         lrvx_mid_price_raw: __lrvx_mid_price
+        lrvx_entry_price_raw_opt: __lrvx_entry_price
         lrvx_mid_price_raw_opt: __lrvx_mid_price
         lrvx_position_raw: __lrvx_position
+
+  # Exit rules for bar strategies (include/lrvx/strategy/exits.h). The
+  # Python classes live in lrvx.exits with the same arithmetic as the C++
+  # header, so the Python package does not call these handles.
+  exit_rules:
+    pybind11: { status: not_applicable }  # pure-Python lrvx.exits, same arithmetic
+    napi:
+      status: required
+      classes: [AtrStop, ChandelierExit, BreakEvenTrail, PercentStop, TakeProfit, TimeStop]
+    codon: { status: required }
+    quickjs:
+      status: required
+      classes: [AtrStop, ChandelierExit, BreakEvenTrail, PercentStop, TakeProfit, TimeStop]
+      functions:
+        lrvx_exit_atr_stop_create: __lrvx_exit_atr_stop_create
+        lrvx_exit_break_even_trail_create: __lrvx_exit_break_even_trail_create
+        lrvx_exit_chandelier_create: __lrvx_exit_chandelier_create
+        lrvx_exit_percent_stop_create: __lrvx_exit_percent_stop_create
+        lrvx_exit_rule_arm: __lrvx_exit_rule_arm
+        lrvx_exit_rule_armed: __lrvx_exit_rule_armed
+        lrvx_exit_rule_at_break_even: __lrvx_exit_rule_at_break_even
+        lrvx_exit_rule_bars: __lrvx_exit_rule_bars
+        lrvx_exit_rule_destroy: __lrvx_exit_rule_destroy
+        lrvx_exit_rule_disarm: __lrvx_exit_rule_disarm
+        lrvx_exit_rule_level: __lrvx_exit_rule_level
+        lrvx_exit_rule_update: __lrvx_exit_rule_update
+        lrvx_exit_take_profit_create: __lrvx_exit_take_profit_create
+        lrvx_exit_time_stop_create: __lrvx_exit_time_stop_create
+
+  # A fixed-capacity ring of the last values, newest first, and the
+  # crossed_above / crossed_below helpers.
+  history:
+    pybind11:
+      status: required
+      classes: [History]
+      functions: [crossed_above, crossed_below]
+    napi:
+      status: required
+      classes: [History]
+    codon: { status: required }
+    quickjs:
+      status: required
+      classes: [History]
+      functions:
+        lrvx_crossed_above: __lrvx_crossed_above
+        lrvx_crossed_below: __lrvx_crossed_below
+        lrvx_history_capacity: __lrvx_history_capacity
+        lrvx_history_create: __lrvx_history_create
+        lrvx_history_destroy: __lrvx_history_destroy
+        lrvx_history_full: __lrvx_history_full
+        lrvx_history_get: __lrvx_history_get
+        lrvx_history_push: __lrvx_history_push
+        lrvx_history_size: __lrvx_history_size
 
   multi_tf_helpers:
     pybind11: { status: not_applicable }  # surfaced via Strategy class methods
@@ -1334,6 +1392,9 @@ allowlist_reasons:
   napi_single_pass: &napi_single_pass
     the Node DataReader walks the C++ reader once per read (DataReaderWrap::walk
     in node/src/data_ops.h); this count-then-fill pair would read the tape twice
+  napi_cpp_direct: &napi_cpp_direct
+    the Node emit object wraps the C++ strategy's bar ring directly
+    (node/src/strategy.h) rather than calling the C ABI
   napi_result_handle: &napi_result_handle
     the Node WalkForwardRunner runs through lrvx_walk_forward_run_csv_result,
     whose handle also carries each leg's valuation; the fold-array call
@@ -1611,6 +1672,7 @@ allowlist_functions:
     lrvx_indicator_cvd: *cpp_direct
     lrvx_indicator_dema: *cpp_direct
     lrvx_indicator_ema: *cpp_direct
+    lrvx_indicator_highest: *cpp_direct
     lrvx_indicator_graph_add_node: *cpp_direct
     lrvx_indicator_graph_bar_count: *cpp_direct
     lrvx_indicator_graph_close: *cpp_direct
@@ -1630,6 +1692,7 @@ allowlist_functions:
     lrvx_indicator_graph_volume: *cpp_direct
     lrvx_indicator_kama: *cpp_direct
     lrvx_indicator_kurtosis: *cpp_direct
+    lrvx_indicator_lowest: *cpp_direct
     lrvx_indicator_macd: *cpp_direct
     lrvx_indicator_obv: *cpp_direct
     lrvx_indicator_parkinson_vol: *cpp_direct
@@ -2136,6 +2199,7 @@ allowlist_functions:
     lrvx_indicator_cvd: *no_napi_wrapper
     lrvx_indicator_dema: *no_napi_wrapper
     lrvx_indicator_ema: *no_napi_wrapper
+    lrvx_indicator_highest: *no_napi_wrapper
     lrvx_indicator_graph_add_node: *no_napi_wrapper
     lrvx_indicator_graph_bar_count: *no_napi_wrapper
     lrvx_indicator_graph_close: *no_napi_wrapper
@@ -2155,6 +2219,7 @@ allowlist_functions:
     lrvx_indicator_graph_volume: *no_napi_wrapper
     lrvx_indicator_kama: *no_napi_wrapper
     lrvx_indicator_kurtosis: *no_napi_wrapper
+    lrvx_indicator_lowest: *no_napi_wrapper
     lrvx_indicator_macd: *no_napi_wrapper
     lrvx_indicator_obv: *no_napi_wrapper
     lrvx_indicator_parkinson_vol: *no_napi_wrapper
@@ -2212,13 +2277,13 @@ allowlist_functions:
     lrvx_strategy_create: *no_napi_wrapper
     lrvx_strategy_create_p: *no_napi_wrapper
     lrvx_strategy_destroy: *no_napi_wrapper
-    lrvx_strategy_get_bar_ring_capacity: *no_napi_wrapper
+    lrvx_strategy_get_bar_ring_capacity: *napi_cpp_direct
     lrvx_strategy_id: *no_napi_wrapper
-    lrvx_strategy_last_closed_bar: *no_napi_wrapper
-    lrvx_strategy_last_n_closed_bars: *no_napi_wrapper
+    lrvx_strategy_last_closed_bar: *napi_cpp_direct
+    lrvx_strategy_last_n_closed_bars: *napi_cpp_direct
     lrvx_strategy_replace_callbacks: *no_napi_wrapper
     lrvx_strategy_replace_callbacks_p: *no_napi_wrapper
-    lrvx_strategy_set_bar_ring_capacity: *no_napi_wrapper
+    lrvx_strategy_set_bar_ring_capacity: *napi_cpp_direct
     lrvx_strategy_set_id: *no_napi_wrapper
     lrvx_streaming_graph_add_node: *no_napi_wrapper
     lrvx_streaming_graph_bar_count: *no_napi_wrapper

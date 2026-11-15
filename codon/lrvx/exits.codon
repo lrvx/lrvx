@@ -1,0 +1,271 @@
+# lrvx/exits.codon -- exit rules for bar strategies.
+#
+# AtrStop, ChandelierExit, BreakEvenTrail, PercentStop, TakeProfit and
+# TimeStop. Each holds one lrvx_exit_* handle that owns the C++ rule of
+# include/lrvx/strategy/exits.h, so the levels are the C++ arithmetic.
+#
+#   stop = AtrStop(2.0)
+#   stop.arm("long", fill_price, atr)      # when the position opens
+#   if stop.update(high, low, atr): ...    # once per closed bar
+#   stop.stop, stop.armed, stop.disarm()
+#
+# update() tests the bar against the level resting before it, then moves
+# the level. A hit does not disarm: it is reported until disarm(). The level
+# is NaN when disarmed. The side is "long" or "short"; anything else raises
+# ValueError. PercentStop and TakeProfit take arm(side, entry_price) and
+# update(high, low); TimeStop takes arm() and update().
+
+# The C ABI handshake runs when this module is imported: see
+# lrvx/abi.codon. Every module that declares a `from C import`
+# pulls it in, so no entry point into the binding skips it.
+from lrvx.abi import check_abi_version
+
+from C import lrvx_exit_atr_stop_create(f64) -> cobj
+from C import lrvx_exit_chandelier_create(u32, f64) -> cobj
+from C import lrvx_exit_break_even_trail_create(f64, f64, f64) -> cobj
+from C import lrvx_exit_percent_stop_create(f64) -> cobj
+from C import lrvx_exit_take_profit_create(f64) -> cobj
+from C import lrvx_exit_time_stop_create(u32) -> cobj
+from C import lrvx_exit_rule_destroy(cobj)
+from C import lrvx_exit_rule_arm(cobj, u8, f64, f64)
+from C import lrvx_exit_rule_update(cobj, f64, f64, f64) -> u8
+from C import lrvx_exit_rule_level(cobj) -> f64
+from C import lrvx_exit_rule_armed(cobj) -> u8
+from C import lrvx_exit_rule_disarm(cobj)
+from C import lrvx_exit_rule_at_break_even(cobj) -> u8
+from C import lrvx_exit_rule_bars(cobj) -> u32
+from C import lrvx_last_error_message() -> cobj
+
+
+def _side(side: str) -> u8:
+    if side == "long":
+        return u8(0)
+    if side == "short":
+        return u8(1)
+    raise ValueError(f"side must be 'long' or 'short'; got {side}")
+
+
+def _require(h: cobj) -> cobj:
+    if h == cobj():
+        raise ValueError(str.from_ptr(lrvx_last_error_message()))
+    return h
+
+
+def _positive_pct(rule: str, pct: float) -> float:
+    if not pct > 0.0:
+        raise ValueError(f"{rule}: pct must be > 0; got {pct}")
+    return pct
+
+
+class AtrStop:
+    """A stop atr_multiple ATRs from the entry, frozen there."""
+    _h: cobj
+    atr_multiple: float
+
+    def __init__(self, atr_multiple: float):
+        self.atr_multiple = atr_multiple
+        self._h = _require(lrvx_exit_atr_stop_create(atr_multiple))
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._h != cobj():
+            lrvx_exit_rule_destroy(self._h)
+            self._h = cobj()
+
+    def arm(self, side: str, entry_price: float, atr: float):
+        lrvx_exit_rule_arm(self._h, _side(side), entry_price, atr)
+
+    def update(self, high: float, low: float, atr: float) -> bool:
+        return lrvx_exit_rule_update(self._h, high, low, atr) != u8(0)
+
+    @property
+    def stop(self) -> float: return lrvx_exit_rule_level(self._h)
+
+    @property
+    def armed(self) -> bool: return lrvx_exit_rule_armed(self._h) != u8(0)
+
+    def disarm(self):
+        lrvx_exit_rule_disarm(self._h)
+
+
+class ChandelierExit:
+    """The stop hangs atr_multiple ATRs below the highest high since the
+    entry (above the lowest low for a short), looking back at most lookback
+    bars (0: to the entry). It only moves in the position's favour."""
+    _h: cobj
+    lookback: int
+    atr_multiple: float
+
+    def __init__(self, lookback: int, atr_multiple: float):
+        if lookback < 0:
+            raise ValueError(f"ChandelierExit: lookback must be >= 0; got {lookback}")
+        self.lookback = lookback
+        self.atr_multiple = atr_multiple
+        self._h = _require(lrvx_exit_chandelier_create(u32(lookback), atr_multiple))
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._h != cobj():
+            lrvx_exit_rule_destroy(self._h)
+            self._h = cobj()
+
+    def arm(self, side: str, entry_price: float, atr: float):
+        lrvx_exit_rule_arm(self._h, _side(side), entry_price, atr)
+
+    def update(self, high: float, low: float, atr: float) -> bool:
+        return lrvx_exit_rule_update(self._h, high, low, atr) != u8(0)
+
+    @property
+    def stop(self) -> float: return lrvx_exit_rule_level(self._h)
+
+    @property
+    def armed(self) -> bool: return lrvx_exit_rule_armed(self._h) != u8(0)
+
+    def disarm(self):
+        lrvx_exit_rule_disarm(self._h)
+
+
+class BreakEvenTrail:
+    """A hard stop hard_stop_atr ATRs from the entry; once the position has
+    moved break_even_atr ATRs in its favour the stop moves to the entry, then
+    trails the best price at trail_atr ATRs."""
+    _h: cobj
+
+    def __init__(self, hard_stop_atr: float, break_even_atr: float, trail_atr: float):
+        self._h = _require(lrvx_exit_break_even_trail_create(hard_stop_atr, break_even_atr,
+                                                             trail_atr))
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._h != cobj():
+            lrvx_exit_rule_destroy(self._h)
+            self._h = cobj()
+
+    def arm(self, side: str, entry_price: float, atr: float):
+        lrvx_exit_rule_arm(self._h, _side(side), entry_price, atr)
+
+    def update(self, high: float, low: float, atr: float) -> bool:
+        return lrvx_exit_rule_update(self._h, high, low, atr) != u8(0)
+
+    @property
+    def stop(self) -> float: return lrvx_exit_rule_level(self._h)
+
+    @property
+    def at_break_even(self) -> bool: return lrvx_exit_rule_at_break_even(self._h) != u8(0)
+
+    @property
+    def armed(self) -> bool: return lrvx_exit_rule_armed(self._h) != u8(0)
+
+    def disarm(self):
+        lrvx_exit_rule_disarm(self._h)
+
+
+class PercentStop:
+    """A stop at entry_price * (1 - pct / 100) for a long, entry_price *
+    (1 + pct / 100) for a short. Raises ValueError unless pct > 0."""
+    _h: cobj
+    pct: float
+
+    def __init__(self, pct: float):
+        self.pct = _positive_pct("PercentStop", pct)
+        self._h = _require(lrvx_exit_percent_stop_create(pct))
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._h != cobj():
+            lrvx_exit_rule_destroy(self._h)
+            self._h = cobj()
+
+    def arm(self, side: str, entry_price: float):
+        lrvx_exit_rule_arm(self._h, _side(side), entry_price, 0.0)
+
+    def update(self, high: float, low: float) -> bool:
+        return lrvx_exit_rule_update(self._h, high, low, 0.0) != u8(0)
+
+    @property
+    def stop(self) -> float: return lrvx_exit_rule_level(self._h)
+
+    @property
+    def armed(self) -> bool: return lrvx_exit_rule_armed(self._h) != u8(0)
+
+    def disarm(self):
+        lrvx_exit_rule_disarm(self._h)
+
+
+class TakeProfit:
+    """A target at entry_price * (1 + pct / 100) for a long (reached when
+    high >= target), entry_price * (1 - pct / 100) for a short. Raises
+    ValueError unless pct > 0."""
+    _h: cobj
+    pct: float
+
+    def __init__(self, pct: float):
+        self.pct = _positive_pct("TakeProfit", pct)
+        self._h = _require(lrvx_exit_take_profit_create(pct))
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._h != cobj():
+            lrvx_exit_rule_destroy(self._h)
+            self._h = cobj()
+
+    def arm(self, side: str, entry_price: float):
+        lrvx_exit_rule_arm(self._h, _side(side), entry_price, 0.0)
+
+    def update(self, high: float, low: float) -> bool:
+        return lrvx_exit_rule_update(self._h, high, low, 0.0) != u8(0)
+
+    @property
+    def target(self) -> float: return lrvx_exit_rule_level(self._h)
+
+    @property
+    def armed(self) -> bool: return lrvx_exit_rule_armed(self._h) != u8(0)
+
+    def disarm(self):
+        lrvx_exit_rule_disarm(self._h)
+
+
+class TimeStop:
+    """True from the max_bars-th update after arm() on. Raises ValueError for
+    fewer than one bar."""
+    _h: cobj
+    max_bars: int
+
+    def __init__(self, max_bars: int):
+        if max_bars < 1:
+            raise ValueError(f"TimeStop: max_bars must be >= 1; got {max_bars}")
+        self.max_bars = max_bars
+        self._h = _require(lrvx_exit_time_stop_create(u32(max_bars)))
+
+    def __del__(self):
+        self.close()
+
+    def close(self):
+        if self._h != cobj():
+            lrvx_exit_rule_destroy(self._h)
+            self._h = cobj()
+
+    def arm(self):
+        lrvx_exit_rule_arm(self._h, u8(0), 0.0, 0.0)
+
+    def update(self) -> bool:
+        return lrvx_exit_rule_update(self._h, 0.0, 0.0, 0.0) != u8(0)
+
+    @property
+    def bars(self) -> int: return int(lrvx_exit_rule_bars(self._h))
+
+    @property
+    def armed(self) -> bool: return lrvx_exit_rule_armed(self._h) != u8(0)
+
+    def disarm(self):
+        lrvx_exit_rule_disarm(self._h)

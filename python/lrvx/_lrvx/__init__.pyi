@@ -8,7 +8,7 @@ import numpy.typing
 import typing
 from . import _heatmap as _heatmap
 from . import targets
-__all__: list[str] = ['_heatmap', 'ALL_OR_NOTHING', 'ATR', 'Account', 'AdlRanking', 'AggregatorEventFilter', 'AmmCurve', 'AutoCorrelation', 'BEST_EFFORT', 'BacktestResult', 'BacktestRunner', 'BarData', 'BarDispatchRecorder', 'BinCountAggregator', 'Binance', 'BinaryLogRecorderHook', 'Bollinger', 'BookAnchored', 'BookOnly', 'BookSnapshotBinAggregator', 'Bybit', 'CANCELLED', 'CAPI_ABI_VERSION', 'CCI', 'CHOP', 'CompositeBookMatrix', 'ConstantLatency', 'Correlation', 'Cross', 'DEMA', 'DataReader', 'DataWriter', 'DeltaBookEncoder', 'DeltaBookReplayer', 'EMA', 'EmpiricalLatency', 'Engine', 'EventTypeStatsAggregator', 'ExchangeCapabilities', 'ExecutionListener', 'Executor', 'ExponentialLatency', 'FAILED', 'FILLED', 'FIRE_ON_ANY', 'FeeSchedule', 'FeeTier', 'FeedClockPolicy', 'FillLiquidity', 'FootprintBar', 'FundingPayment', 'FundingSchedule', 'FundingTapeEntry', 'GaussianLatency', 'GridSearch', 'ISSUE_BLOCK_DECOMPRESSION_FAILED', 'ISSUE_BLOCK_MAGIC_INVALID', 'ISSUE_BLOCK_SIZE_MISMATCH', 'ISSUE_EVENT_COUNT_MISMATCH', 'ISSUE_FILE_NOT_FOUND', 'ISSUE_FILE_READ_ERROR', 'ISSUE_FILE_TRUNCATED', 'ISSUE_FRAME_CRC_MISMATCH', 'ISSUE_FRAME_SIZE_TOO_LARGE', 'ISSUE_FRAME_TRUNCATED', 'ISSUE_FRAME_TYPE_UNKNOWN', 'ISSUE_HEADER_CORRUPTED', 'ISSUE_INDEX_CRC_MISMATCH', 'ISSUE_INDEX_MAGIC_INVALID', 'ISSUE_INDEX_NOT_SORTED', 'ISSUE_INDEX_OUT_OF_BOUNDS', 'ISSUE_INVALID_FLAGS', 'ISSUE_INVALID_MAGIC', 'ISSUE_INVALID_VERSION', 'ISSUE_SEGMENT_RANGE_OVERLAP', 'ISSUE_TIMESTAMP_JUMP_TOO_LARGE', 'ISSUE_TIMESTAMP_OUT_OF_ORDER', 'IndicatorGraph', 'Isolated', 'KAMA', 'KillSwitch', 'Kurtosis', 'L3Book', 'LEADER_FOLLOWER', 'LatencyDistribution', 'LatencyModel', 'LatencySample', 'LegState', 'LiquidationEngine', 'LiveQueuePositionEstimator', 'LrvxError', 'MACD', 'MarginMode', 'MarkImpactModel', 'MarketDataRecorderHook', 'MarketProfile', 'MergedTapeReader', 'MultiFeedClock', 'None_', 'OHLCBinAggregator', 'ONE_SIDED', 'ORDER_FLAG_IOC', 'ORDER_FLAG_POST_ONLY', 'ORDER_FLAG_REDUCE_ONLY', 'ORDER_TYPE_NAMES', 'OptionType', 'Order', 'OrderBook', 'OrderEventData', 'OrderEventKind', 'OrderGroup', 'OrderGroupPolicy', 'OrderGroupState', 'OrderJourneyTracer', 'OrderTracker', 'OrderValidator', 'PARTIALLY_FILLED', 'PENDING', 'PRICE_SCALE', 'ParkinsonVol', 'Partitioner', 'PeakAggregator', 'PnLTracker', 'PnlRatio', 'PoolReplay', 'PoolTape', 'PositionGroupTracker', 'PositionSize', 'PositionTracker', 'QUANTITY_SCALE', 'QUEUE_FULL', 'QUEUE_NONE', 'QUEUE_TOB', 'QuantileAggregator', 'REVERTING', 'RMA', 'RSI', 'RateLimitEndpointFamily', 'RateLimitPolicy', 'ReplayEvent', 'ReplaySource', 'RiskManager', 'RogersSatchellVol', 'RollingZScore', 'Runner', 'SIGNAL_FLAG_ENTER', 'SIGNAL_FLAG_EXIT', 'SIGNAL_FLAG_REBALANCE', 'SLIPPAGE_FIXED_BPS', 'SLIPPAGE_FIXED_TICKS', 'SLIPPAGE_NONE', 'SLIPPAGE_VOLUME_IMPACT', 'SMA', 'SUBMITTED', 'ShannonEntropy', 'Signal', 'SignalBuilder', 'SimulatedClock', 'SimulatedExecutor', 'Skewness', 'Slope', 'Stats', 'Stochastic', 'StorageSink', 'Strategy', 'StreamingIndicatorGraph', 'Symbol', 'SymbolContext', 'SymbolRegistry', 'TEMA', 'TapeRef', 'TraceReader', 'TraceRecorder', 'TradeData', 'VOLUME_SCALE', 'VenueAvailability', 'VenueExecutor', 'VenueStack', 'VolSurface', 'VolumeBinAggregator', 'VolumeProfile', 'WAIT_FOR_ALL', 'WalkForwardRunner', 'adf', 'adx', 'aggregate_heikin_ashi_bars', 'aggregate_range_bars', 'aggregate_renko_bars', 'aggregate_tick_bars', 'aggregate_time_bars', 'aggregate_volume_bars', 'atr', 'autocorrelation', 'bar_returns', 'baw_price', 'binomial_price', 'bollinger', 'bootstrap_ci', 'bs_price', 'bs_price_discrete_dividends', 'bs_vega', 'build_surface_as_of', 'calibrate_svi', 'capi_abi_version', 'cci', 'chop', 'correlation', 'cost_of_carry', 'cvd', 'deflated_sharpe', 'dema', 'ema', 'export_data', 'extract_symbols', 'extract_time_range', 'forward_price', 'greeks', 'grid_neighborhood', 'hurst_dfa', 'i256_roundtrip', 'implied_percentile_in_cone', 'implied_vol', 'inspect', 'kama', 'kurtosis', 'last_error', 'list_indicators', 'macd', 'merge', 'merge_dir', 'obv', 'order_type_code', 'order_type_name', 'parkinson_vol', 'pbo_cscv', 'permutation_test', 'prices_to_double', 'profit_factor', 'quantities_to_double', 'realized_vol', 'recompress', 'rma', 'rogers_satchell_vol', 'rolling_correlation', 'rolling_hurst', 'rolling_zscore', 'rsi', 'second_order_greeks', 'set_log_callback', 'shannon_entropy', 'skewness', 'slope', 'sma', 'split', 'stochastic', 'targets', 'tema', 'trade_pnl', 'u256_from_hex', 'u256_roundtrip', 'validate', 'validate_dataset', 'version', 'vol_cone', 'volumes_to_double', 'vwap', 'whites_reality_check', 'win_rate']
+__all__: list[str] = ['_heatmap', 'ALL_OR_NOTHING', 'ATR', 'Account', 'AdlRanking', 'AggregatorEventFilter', 'AmmCurve', 'AutoCorrelation', 'BEST_EFFORT', 'BacktestResult', 'BacktestRunner', 'BarData', 'BarDispatchRecorder', 'BinCountAggregator', 'Binance', 'BinaryLogRecorderHook', 'Bollinger', 'BookAnchored', 'BookOnly', 'BookSnapshotBinAggregator', 'Bybit', 'CANCELLED', 'CAPI_ABI_VERSION', 'CCI', 'CHOP', 'CompositeBookMatrix', 'ConstantLatency', 'Correlation', 'Cross', 'DEMA', 'DataReader', 'DataWriter', 'DeltaBookEncoder', 'DeltaBookReplayer', 'EMA', 'EmpiricalLatency', 'Engine', 'EventTypeStatsAggregator', 'ExchangeCapabilities', 'ExecutionListener', 'Executor', 'ExponentialLatency', 'FAILED', 'FILLED', 'FIRE_ON_ANY', 'FeeSchedule', 'FeeTier', 'FeedClockPolicy', 'FillLiquidity', 'FootprintBar', 'FundingPayment', 'FundingSchedule', 'FundingTapeEntry', 'GaussianLatency', 'GridSearch', 'Highest', 'History', 'ISSUE_BLOCK_DECOMPRESSION_FAILED', 'ISSUE_BLOCK_MAGIC_INVALID', 'ISSUE_BLOCK_SIZE_MISMATCH', 'ISSUE_EVENT_COUNT_MISMATCH', 'ISSUE_FILE_NOT_FOUND', 'ISSUE_FILE_READ_ERROR', 'ISSUE_FILE_TRUNCATED', 'ISSUE_FRAME_CRC_MISMATCH', 'ISSUE_FRAME_SIZE_TOO_LARGE', 'ISSUE_FRAME_TRUNCATED', 'ISSUE_FRAME_TYPE_UNKNOWN', 'ISSUE_HEADER_CORRUPTED', 'ISSUE_INDEX_CRC_MISMATCH', 'ISSUE_INDEX_MAGIC_INVALID', 'ISSUE_INDEX_NOT_SORTED', 'ISSUE_INDEX_OUT_OF_BOUNDS', 'ISSUE_INVALID_FLAGS', 'ISSUE_INVALID_MAGIC', 'ISSUE_INVALID_VERSION', 'ISSUE_SEGMENT_RANGE_OVERLAP', 'ISSUE_TIMESTAMP_JUMP_TOO_LARGE', 'ISSUE_TIMESTAMP_OUT_OF_ORDER', 'IndicatorGraph', 'Isolated', 'KAMA', 'KillSwitch', 'Kurtosis', 'L3Book', 'LEADER_FOLLOWER', 'LatencyDistribution', 'LatencyModel', 'LatencySample', 'LegState', 'LiquidationEngine', 'LiveQueuePositionEstimator', 'Lowest', 'LrvxError', 'MACD', 'MarginMode', 'MarkImpactModel', 'MarketDataRecorderHook', 'MarketProfile', 'MergedTapeReader', 'MultiFeedClock', 'None_', 'OHLCBinAggregator', 'ONE_SIDED', 'ORDER_FLAG_IOC', 'ORDER_FLAG_POST_ONLY', 'ORDER_FLAG_REDUCE_ONLY', 'ORDER_TYPE_NAMES', 'OptionType', 'Order', 'OrderBook', 'OrderEventData', 'OrderEventKind', 'OrderGroup', 'OrderGroupPolicy', 'OrderGroupState', 'OrderJourneyTracer', 'OrderTracker', 'OrderValidator', 'PARTIALLY_FILLED', 'PENDING', 'PRICE_SCALE', 'ParkinsonVol', 'Partitioner', 'PeakAggregator', 'PnLTracker', 'PnlRatio', 'PoolReplay', 'PoolTape', 'PositionGroupTracker', 'PositionSize', 'PositionTracker', 'QUANTITY_SCALE', 'QUEUE_FULL', 'QUEUE_NONE', 'QUEUE_TOB', 'QuantileAggregator', 'REVERTING', 'RMA', 'RSI', 'RateLimitEndpointFamily', 'RateLimitPolicy', 'ReplayEvent', 'ReplaySource', 'RiskManager', 'RogersSatchellVol', 'RollingZScore', 'Runner', 'SIGNAL_FLAG_ENTER', 'SIGNAL_FLAG_EXIT', 'SIGNAL_FLAG_REBALANCE', 'SLIPPAGE_FIXED_BPS', 'SLIPPAGE_FIXED_TICKS', 'SLIPPAGE_NONE', 'SLIPPAGE_VOLUME_IMPACT', 'SMA', 'SUBMITTED', 'ShannonEntropy', 'Signal', 'SignalBuilder', 'SimulatedClock', 'SimulatedExecutor', 'Skewness', 'Slope', 'Stats', 'Stochastic', 'StorageSink', 'Strategy', 'StreamingIndicatorGraph', 'Symbol', 'SymbolContext', 'SymbolRegistry', 'TEMA', 'TapeRef', 'TraceReader', 'TraceRecorder', 'TradeData', 'VOLUME_SCALE', 'VenueAvailability', 'VenueExecutor', 'VenueStack', 'VolSurface', 'VolumeBinAggregator', 'VolumeProfile', 'WAIT_FOR_ALL', 'WalkForwardRunner', 'adf', 'adx', 'aggregate_heikin_ashi_bars', 'aggregate_range_bars', 'aggregate_renko_bars', 'aggregate_tick_bars', 'aggregate_time_bars', 'aggregate_volume_bars', 'atr', 'autocorrelation', 'bar_returns', 'baw_price', 'binomial_price', 'bollinger', 'bootstrap_ci', 'bs_price', 'bs_price_discrete_dividends', 'bs_vega', 'build_surface_as_of', 'calibrate_svi', 'capi_abi_version', 'cci', 'chop', 'correlation', 'cost_of_carry', 'crossed_above', 'crossed_below', 'cvd', 'deflated_sharpe', 'dema', 'ema', 'export_data', 'extract_symbols', 'extract_time_range', 'forward_price', 'greeks', 'grid_neighborhood', 'highest', 'hurst_dfa', 'i256_roundtrip', 'implied_percentile_in_cone', 'implied_vol', 'inspect', 'kama', 'kurtosis', 'last_error', 'list_indicators', 'lowest', 'macd', 'merge', 'merge_dir', 'obv', 'order_type_code', 'order_type_name', 'parkinson_vol', 'pbo_cscv', 'permutation_test', 'prices_to_double', 'profit_factor', 'quantities_to_double', 'realized_vol', 'recompress', 'rma', 'rogers_satchell_vol', 'rolling_correlation', 'rolling_hurst', 'rolling_zscore', 'rsi', 'second_order_greeks', 'set_log_callback', 'shannon_entropy', 'skewness', 'slope', 'sma', 'split', 'stochastic', 'targets', 'tema', 'trade_pnl', 'u256_from_hex', 'u256_roundtrip', 'validate', 'validate_dataset', 'version', 'vol_cone', 'volumes_to_double', 'vwap', 'whites_reality_check', 'win_rate']
 class ATR:
     def __init__(self, period: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
@@ -1213,6 +1213,48 @@ class GridSearch:
         """
     def total(self) -> int:
         ...
+class Highest:
+    def __init__(self, period: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    def compute(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64]) -> numpy.typing.NDArray[numpy.float64]:
+        ...
+    def reset(self) -> None:
+        ...
+    def update(self, value: typing.SupportsFloat | typing.SupportsIndex) -> float | None:
+        ...
+    @property
+    def count(self) -> int:
+        ...
+    @property
+    def ready(self) -> bool:
+        ...
+    @property
+    def value(self) -> float | None:
+        ...
+class History:
+    """
+    The last `capacity` values of a series, newest first: h[0] is the value pushed last, h[1] the one before. Once full, a push drops the oldest. NaN is stored as given.
+    """
+    def __getitem__(self, index: typing.SupportsInt | typing.SupportsIndex) -> float:
+        ...
+    def __init__(self, capacity: typing.SupportsInt | typing.SupportsIndex) -> None:
+        """
+        Raises ValueError for a capacity below 1.
+        """
+    def __len__(self) -> int:
+        ...
+    def get(self, index: typing.SupportsInt | typing.SupportsIndex) -> float:
+        """
+        0 is the newest value. Raises IndexError outside 0 .. len - 1.
+        """
+    def push(self, value: typing.SupportsFloat | typing.SupportsIndex) -> None:
+        ...
+    @property
+    def capacity(self) -> int:
+        ...
+    @property
+    def full(self) -> bool:
+        ...
 class IndicatorGraph:
     def __init__(self) -> None:
         ...
@@ -1552,6 +1594,24 @@ class LiveQueuePositionEstimator:
     def snapshot(self, order_id: typing.SupportsInt | typing.SupportsIndex, now_ns: typing.SupportsInt | typing.SupportsIndex = 0) -> typing.Any:
         ...
     def tracked_order_count(self) -> int:
+        ...
+class Lowest:
+    def __init__(self, period: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    def compute(self, arg0: typing.Annotated[numpy.typing.ArrayLike, numpy.float64]) -> numpy.typing.NDArray[numpy.float64]:
+        ...
+    def reset(self) -> None:
+        ...
+    def update(self, value: typing.SupportsFloat | typing.SupportsIndex) -> float | None:
+        ...
+    @property
+    def count(self) -> int:
+        ...
+    @property
+    def ready(self) -> bool:
+        ...
+    @property
+    def value(self) -> float | None:
         ...
 class LrvxError(Exception):
     pass
@@ -3286,6 +3346,10 @@ class Strategy:
         ...
     def bar_ring_capacity(self) -> int:
         ...
+    def bars_in_position(self, symbol: str | None = None) -> int:
+        """
+        Bar callbacks received while holding the symbol's current position, as ctx.bars_in_position reads it; 0 when flat.
+        """
     def best_ask(self, symbol: str | None = None) -> float | None:
         ...
     def best_bid(self, symbol: str | None = None) -> float | None:
@@ -3334,15 +3398,19 @@ class Strategy:
         ...
     def emit_withdraw_liquidity(self, pool: typing.SupportsInt | typing.SupportsIndex, liquidity: typing.SupportsFloat | typing.SupportsIndex) -> int:
         ...
+    def entry_price(self, symbol: str | None = None) -> float | None:
+        """
+        Quantity-weighted average entry of the symbol's open position, as ctx.entry_price reads it; None when flat.
+        """
     def get_order_status(self, order_id: typing.SupportsInt | typing.SupportsIndex) -> int:
         ...
     def last_closed_bar(self, symbol_id: typing.SupportsInt | typing.SupportsIndex, bar_type: typing.SupportsInt | typing.SupportsIndex = 0, param: typing.SupportsInt | typing.SupportsIndex = 0) -> dict | None:
         """
-        Return the last closed bar for (symbol, bar_type, param) or None if no bar of that timeframe has been emitted yet. bar_type: 0=Time, 1=Tick, 2=Volume, 3=Renko, 4=Range, 5=HeikinAshi, 6=BpsRange. param: time bar interval in nanoseconds, or the tick / volume / range threshold the aggregator was configured with.
+        Return the last closed bar for (symbol, bar_type, param) or None if no bar of that timeframe has been emitted yet. bar_type: 0=Time, 1=Tick, 2=Volume, 3=Renko, 4=Range, 5=HeikinAshi, 6=BpsRange. param: time bar interval in nanoseconds, or the tick / volume / range threshold the aggregator was configured with. A bar_type outside 0..6 raises LrvxError E_VAL_002.
         """
     def last_n_closed_bars(self, symbol_id: typing.SupportsInt | typing.SupportsIndex, bar_type: typing.SupportsInt | typing.SupportsIndex, param: typing.SupportsInt | typing.SupportsIndex, n: typing.SupportsInt | typing.SupportsIndex) -> list:
         """
-        Return the most recent up to n closed bars for the given (symbol, timeframe), oldest first. Returns an empty list until the aggregator has emitted at least one bar.
+        Return the most recent up to n closed bars for the given (symbol, timeframe), oldest first. Returns an empty list until the aggregator has emitted at least one bar. A bar_type outside 0..6 raises LrvxError E_VAL_002.
         """
     def last_price(self, symbol: str | None = None) -> float:
         ...
@@ -3385,7 +3453,9 @@ class Strategy:
     def position(self, symbol: typing.SupportsInt | typing.SupportsIndex | None = None) -> float:
         ...
     def set_bar_ring_capacity(self, n: typing.SupportsInt | typing.SupportsIndex) -> None:
-        ...
+        """
+        Set how many closed bars each (symbol, timeframe) ring keeps; 0 is taken as 1. Lowering it trims every ring to its newest bars at once; raising it keeps the bars held. A capacity above 4294967295 raises LrvxError E_VAL_002 and leaves it unchanged.
+        """
     def stop_limit(self, side: str, trigger: typing.SupportsFloat | typing.SupportsIndex, limit_price: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, symbol: str | None = None) -> int:
         ...
     def stop_market(self, side: str, trigger: typing.SupportsFloat | typing.SupportsIndex, qty: typing.SupportsFloat | typing.SupportsIndex, symbol: str | None = None) -> int:
@@ -3450,6 +3520,14 @@ class SymbolContext:
     def is_short(self) -> bool:
         ...
     @property
+    def bars_in_position(self) -> int:
+        """
+        Bar callbacks received while holding the current position, the bar on which it is first seen counting as 1; 0 when flat, 1 again after a flip.
+        """
+    @bars_in_position.setter
+    def bars_in_position(self, arg0: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    @property
     def best_ask(self) -> float | None:
         ...
     @best_ask.setter
@@ -3460,6 +3538,14 @@ class SymbolContext:
         ...
     @best_bid.setter
     def best_bid(self, arg0: typing.SupportsFloat | typing.SupportsIndex | None) -> None:
+        ...
+    @property
+    def entry_price(self) -> float | None:
+        """
+        Quantity-weighted average entry of the open position: an add moves it, a partial close leaves it, a flip sets it to the flipping fill's price. None when flat.
+        """
+    @entry_price.setter
+    def entry_price(self, arg0: typing.SupportsFloat | typing.SupportsIndex | None) -> None:
         ...
     @property
     def last_touch_ns(self) -> int:
@@ -4088,6 +4174,14 @@ def cost_of_carry(rate: typing.SupportsFloat | typing.SupportsIndex, dividend_yi
     """
     Cost-of-carry b = rate - dividend_yield - borrow_rate. Crypto/Black-76 pass all zero; equity nets the financing pieces; FX passes the foreign rate as dividend_yield.
     """
+def crossed_above(a_prev: typing.SupportsFloat | typing.SupportsIndex | None, a: typing.SupportsFloat | typing.SupportsIndex | None, b_prev: typing.SupportsFloat | typing.SupportsIndex | None, b: typing.SupportsFloat | typing.SupportsIndex | None) -> bool:
+    """
+    True when a was at or below b on the previous step and is strictly above it now. For a level, pass it as both b_prev and b. None or NaN anywhere is no cross.
+    """
+def crossed_below(a_prev: typing.SupportsFloat | typing.SupportsIndex | None, a: typing.SupportsFloat | typing.SupportsIndex | None, b_prev: typing.SupportsFloat | typing.SupportsIndex | None, b: typing.SupportsFloat | typing.SupportsIndex | None) -> bool:
+    """
+    True when a was at or above b on the previous step and is strictly below it now. None or NaN anywhere is no cross.
+    """
 def cvd(open: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], high: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], low: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], close: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], volume: typing.Annotated[numpy.typing.ArrayLike, numpy.float64]) -> numpy.typing.NDArray[numpy.float64]:
     ...
 def deflated_sharpe(returns: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], trial_sharpes: typing.Annotated[numpy.typing.ArrayLike, numpy.float64] | None = None) -> dict:
@@ -4115,6 +4209,10 @@ def greeks(option_type: OptionType, spot: typing.SupportsFloat | typing.Supports
 def grid_neighborhood(values: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], radius: typing.SupportsInt | typing.SupportsIndex = 1) -> dict:
     """
     The neighbourhood of every point of a parameter grid. `values` is an n-dimensional array of one metric per grid point; a cell's neighbours are the cells whose index differs by at most `radius` on every axis, the cell itself excluded, NaN values skipped. Returns neighbor_mean (the mean of the neighbours' values, NaN when there are none) and neighbor_count, both shaped like `values`.
+    """
+def highest(input: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], period: typing.SupportsInt | typing.SupportsIndex) -> numpy.typing.NDArray[numpy.float64]:
+    """
+    The highest of the last `period` inputs, the current one included. NaN until `period` inputs are in, and for every window a NaN input sits in.
     """
 def hurst_dfa(returns: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], scales: typing.Any = None) -> float:
     """
@@ -4153,6 +4251,10 @@ def last_error() -> str:
 def list_indicators() -> list:
     """
     Return the list of indicator names registered in this build (both batch compute() and streaming update()/value on each).
+    """
+def lowest(input: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], period: typing.SupportsInt | typing.SupportsIndex) -> numpy.typing.NDArray[numpy.float64]:
+    """
+    The lowest of the last `period` inputs, the current one included. NaN until `period` inputs are in, and for every window a NaN input sits in.
     """
 def macd(input: typing.Annotated[numpy.typing.ArrayLike, numpy.float64], fast: typing.SupportsInt | typing.SupportsIndex = 12, slow: typing.SupportsInt | typing.SupportsIndex = 26, signal: typing.SupportsInt | typing.SupportsIndex = 9) -> dict:
     ...

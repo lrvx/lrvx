@@ -24,9 +24,11 @@
 #include "lrvx/indicator/cvd.h"
 #include "lrvx/indicator/dema.h"
 #include "lrvx/indicator/ema.h"
+#include "lrvx/indicator/highest.h"
 #include "lrvx/indicator/hurst.h"
 #include "lrvx/indicator/kama.h"
 #include "lrvx/indicator/kurtosis.h"
+#include "lrvx/indicator/lowest.h"
 #include "lrvx/indicator/macd.h"
 #include "lrvx/indicator/obv.h"
 #include "lrvx/indicator/params.h"
@@ -300,6 +302,20 @@ inline void bindIndicators(py::module_& m)
       "sma", [](contiguous_double input, size_t period)
       { return computeSingle(checkedIndicator<lrvx::indicator::SMA>("sma", period), input); },
       py::arg("input"), py::arg("period"));
+
+  m.def(
+      "highest", [](contiguous_double input, size_t period)
+      { return computeSingle(checkedIndicator<lrvx::indicator::Highest>("highest", period), input); },
+      py::arg("input"), py::arg("period"),
+      "The highest of the last `period` inputs, the current one included. NaN until "
+      "`period` inputs are in, and for every window a NaN input sits in.");
+
+  m.def(
+      "lowest", [](contiguous_double input, size_t period)
+      { return computeSingle(checkedIndicator<lrvx::indicator::Lowest>("lowest", period), input); },
+      py::arg("input"), py::arg("period"),
+      "The lowest of the last `period` inputs, the current one included. NaN until "
+      "`period` inputs are in, and for every window a NaN input sits in.");
 
   m.def(
       "rsi", [](contiguous_double input, size_t period)
@@ -1052,6 +1068,12 @@ inline void bindIndicators(py::module_& m)
 
   bindSingleIndicator<lrvx::indicator::AutoCorrelation>(m, "AutoCorrelation")
       .def(checkedInit<lrvx::indicator::AutoCorrelation, size_t, size_t>("autocorrelation"), py::arg("window"), py::arg("lag"));
+
+  bindSingleIndicator<lrvx::indicator::Highest>(m, "Highest")
+      .def(checkedInit<lrvx::indicator::Highest, size_t>("highest"), py::arg("period"));
+
+  bindSingleIndicator<lrvx::indicator::Lowest>(m, "Lowest")
+      .def(checkedInit<lrvx::indicator::Lowest, size_t>("lowest"), py::arg("period"));
 
   // ── Discovery API ────────────────────────────────────────────────
   // Generated from include/lrvx/indicator/registry.def. Adding an indicator

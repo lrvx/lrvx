@@ -545,6 +545,14 @@ class Strategy:
         """Mid price, or None unless both sides have a level. Defaults to primary symbol."""
         return self.ctx(self._resolve(symbol)).mid_price()
 
+    def entry_price(self, symbol: Optional[str] = None) -> Optional[float]:
+        """Average entry of the open position, or None when flat. Defaults to primary symbol."""
+        return self.ctx(self._resolve(symbol)).entry_price()
+
+    def bars_in_position(self, symbol: Optional[str] = None) -> int:
+        """Bar callbacks received while holding the current position; 0 when flat. Defaults to primary symbol."""
+        return self.ctx(self._resolve(symbol)).bars_in_position()
+
     def order_status(self, order_id: int) -> int:
         """Get order status. Returns -1 if not found."""
         return self.get_order_status(order_id)
@@ -557,8 +565,17 @@ class Strategy:
     # ...; `param` is interval-ns / count / threshold.
     # ------------------------------------------------------------------
 
+    def _check_bar_type(self, method: str, bar_type: int):
+        # Outside 0 (Time) .. 6 (BpsRange), u8() would wrap 256 to Time.
+        if bar_type < 0 or bar_type > 6:
+            raise ValueError(
+                method + ": bar_type " + str(bar_type) +
+                " is not a bar type; it must be from 0 to 6")
+
     def last_closed_bar(self, symbol: int, bar_type: int, param: int) -> Optional[BarData]:
-        """Most recent closed bar for (symbol, bar_type, param), or None."""
+        """Most recent closed bar for (symbol, bar_type, param), or None.
+        A bar_type outside 0..6 raises ValueError."""
+        self._check_bar_type("last_closed_bar", bar_type)
         buf = Ptr[byte](_LRVXBAR_SIZE)
         ok = lrvx_strategy_last_closed_bar(
             self._handle, u32(symbol), u8(bar_type), u64(param), buf)
@@ -569,7 +586,9 @@ class Strategy:
 
     def last_n_closed_bars(self, symbol: int, bar_type: int, param: int,
                            n: int) -> List[BarData]:
-        """Up to `n` most recent closed bars, oldest-first."""
+        """Up to `n` most recent closed bars, oldest-first. A bar_type
+        outside 0..6 raises ValueError."""
+        self._check_bar_type("last_n_closed_bars", bar_type)
         if n <= 0:
             return list[BarData]()
         buf = Ptr[byte](_LRVXBAR_SIZE * n)
@@ -588,5 +607,12 @@ class Strategy:
         return int(lrvx_strategy_get_bar_ring_capacity(self._handle))
 
     def set_bar_ring_capacity(self, n: int):
-        """Resize the per-(symbol, bar_type, param) ring."""
+        """Resize the per-(symbol, bar_type, param) ring; 0 is taken as 1.
+        Lowering it trims every ring to its newest bars at once; raising it
+        keeps the bars held. n below 0 or above 4294967295 raises ValueError
+        and leaves the capacity unchanged."""
+        if n < 0 or n > 0xFFFFFFFF:
+            raise ValueError(
+                "set_bar_ring_capacity: capacity " + str(n) +
+                " must be from 0 to 4294967295")
         lrvx_strategy_set_bar_ring_capacity(self._handle, u32(n))

@@ -13,6 +13,14 @@ interface SymbolContext {
     readonly symbol: string;
     readonly position: number;
     readonly avgEntryPrice: number;
+    /** Quantity-weighted average entry of the open position: an add moves
+     *  it, a partial close leaves it, a flip sets it to the flipping fill's
+     *  price. `null` when flat. */
+    readonly entryPrice: number | null;
+    /** Bar callbacks received while holding the current position, the bar
+     *  on which it is first seen counting as 1; 0 when flat, 1 again after a
+     *  flip. */
+    readonly barsInPosition: number;
     readonly lastTradePrice: number;
     readonly lastUpdateNs: bigint;
     readonly lastTouchNs: bigint;
@@ -37,26 +45,26 @@ interface BookData {
 }
 
 interface MarketOrderOpts {
-    symbol?: string;
+    symbol?: string | number;
     qty: number;
 }
 
 interface LimitOrderOpts {
-    symbol?: string;
+    symbol?: string | number;
     price: number;
     qty: number;
     tif?: "GTC" | "IOC" | "FOK" | "POST_ONLY";
 }
 
 interface StopMarketOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     trigger: number;
     qty: number;
 }
 
 interface StopLimitOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     trigger: number;
     price: number;
@@ -64,14 +72,14 @@ interface StopLimitOpts {
 }
 
 interface TakeProfitMarketOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     trigger: number;
     qty: number;
 }
 
 interface TakeProfitLimitOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     trigger: number;
     price: number;
@@ -79,14 +87,14 @@ interface TakeProfitLimitOpts {
 }
 
 interface TrailingStopOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     offset: number;
     qty: number;
 }
 
 interface TrailingStopPercentOpts {
-    symbol?: string;
+    symbol?: string | number;
     side: "buy" | "sell";
     callbackBps: number;
     qty: number;
@@ -111,6 +119,19 @@ declare const enum OrderStatus {
     PENDING_TRIGGER = 10,
     TRIGGERED = 11,
     TRAILING_UPDATED = 12,
+}
+
+/** A closed bar read back from the per-(symbol, barType, param) ring by
+ *  `Strategy.lastClosedBar` / `lastNClosedBars`. Prices and volume are
+ *  Numbers; the bar's start and end times are BigInt nanoseconds. */
+interface ClosedBar {
+    readonly open: number;
+    readonly high: number;
+    readonly low: number;
+    readonly close: number;
+    readonly volume: number;
+    readonly startNs: bigint;
+    readonly endNs: bigint;
 }
 
 interface StrategyConfig {
@@ -143,18 +164,44 @@ declare class Strategy {
     /** `orderId` is a non-negative integer Number or a BigInt; anything else
      *  is a TypeError and nothing is emitted. */
     cancel(orderId: number | bigint): void;
-    cancelAll(symbol?: string): void;
+    cancelAll(symbol?: string | number): void;
     modify(orderId: number | bigint, opts: ModifyOpts): void;
-    closePosition(symbol?: string): number;
+    closePosition(symbol?: string | number): number;
 
-    position(symbol?: string): number;
-    lastPrice(symbol?: string): number;
+    position(symbol?: string | number): number;
+    lastPrice(symbol?: string | number): number;
     /** null when the side is empty; a price below zero, and a price of
      *  exactly 0, are quotes like any other. */
-    bestBid(symbol?: string): number | null;
-    bestAsk(symbol?: string): number | null;
-    midPrice(symbol?: string): number | null;
+    bestBid(symbol?: string | number): number | null;
+    bestAsk(symbol?: string | number): number | null;
+    midPrice(symbol?: string | number): number | null;
+    /** Quantity-weighted average entry of the symbol's open position, as
+     *  `ctx.entryPrice` reads it; null when flat. */
+    entryPrice(symbol?: string | number): number | null;
+    /** Bar callbacks received while holding the symbol's current position,
+     *  as `ctx.barsInPosition` reads it; 0 when flat. */
+    barsInPosition(symbol?: string | number): number;
     orderStatus(orderId: number): OrderStatus | -1;
+
+    /** Most recent closed bar of `(symbol, barType, param)`, or null until
+     *  one has closed. `barType` is 0=Time, 1=Tick, 2=Volume, 3=Renko,
+     *  4=Range, 5=Heikin-Ashi, 6=Bps-range; `param` is the interval in ns for
+     *  Time bars, a count for Tick bars, the raw threshold for Volume bars.
+     *  A `barType` that is not an integer Number from 0 to 6 throws a
+     *  `TypeError`. */
+    lastClosedBar(symbol: string | number | undefined, barType: number,
+                  param: number | bigint): ClosedBar | null;
+    /** At most `n` most recent closed bars of `(symbol, barType, param)`,
+     *  oldest first; `[]` until one has closed. Arguments as `lastClosedBar`. */
+    lastNClosedBars(symbol: string | number | undefined, barType: number,
+                    param: number | bigint, n: number): ClosedBar[];
+    /** Bars kept per (symbol, barType, param) ring; 64 by default. */
+    readonly barRingCapacity: number;
+    /** Set the ring depth; clamped to at least 1. Lowering it trims every
+     *  ring to its newest bars at once; raising it keeps the bars held. A
+     *  value that is not an integer Number from 0 to 4294967295 throws a
+     *  `TypeError` and leaves the depth unchanged. */
+    setBarRingCapacity(n: number): void;
 
     readonly primarySymbol: string;
     readonly hasPosition: boolean;
@@ -362,6 +409,35 @@ declare class AutoCorrelation {
     /** Frees the C handle now; otherwise the finalizer frees it. */
     destroy(): void;
     static compute(data: number[], window: number, lag: number): number[];
+}
+
+/** The highest of the last `period` inputs, the current one included; `null`
+ *  until `period` inputs are in and while a NaN is in the window. */
+declare class Highest {
+    constructor(period: number);
+    update(value: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(data: number[], period: number): number[];
+}
+
+/** The lowest of the last `period` inputs; same contract as Highest. */
+declare class Lowest {
+    constructor(period: number);
+    update(value: number): number | null;
+    readonly value: number | null;
+    readonly ready: boolean;
+    /** Updates since construction or the last reset(). */
+    readonly count: number;
+    reset(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+    static compute(data: number[], period: number): number[];
 }
 
 declare class Stochastic {
@@ -1373,3 +1449,114 @@ declare class BinaryLogRecorderHook {
     // Private — passed to runner attach API.
     _asRecorderHandle(): unknown;
 }
+
+// --- Exit rules (lrvx/exits.js) ---
+//
+// Each holds one C handle owning the C++ rule of lrvx/strategy/exits.h.
+// update() tests the bar against the level resting before it; a hit does
+// not disarm and is reported until disarm(). The level reads `null` when
+// disarmed. A side other than "long" / "short" throws.
+
+type ExitSide = "long" | "short";
+
+/** A stop `atrMultiple` ATRs from the entry, frozen there. */
+declare class AtrStop {
+    constructor(atrMultiple: number);
+    readonly atrMultiple: number;
+    arm(side: ExitSide, entryPrice: number, atr: number): void;
+    update(high: number, low: number, atr: number): boolean;
+    readonly stop: number | null;
+    readonly armed: boolean;
+    disarm(): void;
+    /** Frees the C handle now; otherwise the finalizer frees it. */
+    destroy(): void;
+}
+
+/** The stop hangs `atrMultiple` ATRs from the best price of the last
+ *  `lookback` bars (0: since the entry) and only moves in the position's
+ *  favour. */
+declare class ChandelierExit {
+    constructor(lookback: number, atrMultiple: number);
+    readonly lookback: number;
+    readonly atrMultiple: number;
+    arm(side: ExitSide, entryPrice: number, atr: number): void;
+    update(high: number, low: number, atr: number): boolean;
+    readonly stop: number | null;
+    readonly armed: boolean;
+    disarm(): void;
+    destroy(): void;
+}
+
+/** A hard stop that moves to the entry once the position is `breakEvenAtr`
+ *  ATRs in profit, then trails the best price at `trailAtr` ATRs. */
+declare class BreakEvenTrail {
+    constructor(hardStopAtr: number, breakEvenAtr: number, trailAtr: number);
+    arm(side: ExitSide, entryPrice: number, atr: number): void;
+    update(high: number, low: number, atr: number): boolean;
+    readonly stop: number | null;
+    readonly atBreakEven: boolean;
+    readonly armed: boolean;
+    disarm(): void;
+    destroy(): void;
+}
+
+/** A stop at entry * (1 - pct / 100) for a long, entry * (1 + pct / 100)
+ *  for a short. Throws unless pct > 0. */
+declare class PercentStop {
+    constructor(pct: number);
+    readonly pct: number;
+    arm(side: ExitSide, entryPrice: number): void;
+    update(high: number, low: number): boolean;
+    readonly stop: number | null;
+    readonly armed: boolean;
+    disarm(): void;
+    destroy(): void;
+}
+
+/** A target at entry * (1 + pct / 100) for a long, entry * (1 - pct / 100)
+ *  for a short. Throws unless pct > 0. */
+declare class TakeProfit {
+    constructor(pct: number);
+    readonly pct: number;
+    arm(side: ExitSide, entryPrice: number): void;
+    update(high: number, low: number): boolean;
+    readonly target: number | null;
+    readonly armed: boolean;
+    disarm(): void;
+    destroy(): void;
+}
+
+/** True from the `maxBars`-th update after arm() on. Throws for 0. */
+declare class TimeStop {
+    constructor(maxBars: number);
+    readonly maxBars: number;
+    arm(): void;
+    update(): boolean;
+    /** Updates since arm(); 0 after disarm(). */
+    readonly bars: number;
+    readonly armed: boolean;
+    disarm(): void;
+    destroy(): void;
+}
+
+// --- History (lrvx/history.js) ---
+
+/** The last `capacity` values of a series, newest first. */
+declare class History {
+    /** Throws RangeError unless capacity is a whole number >= 1. */
+    constructor(capacity: number);
+    push(value: number): void;
+    /** 0 is the newest value; throws RangeError outside 0 .. length - 1. */
+    get(index: number): number;
+    readonly length: number;
+    readonly capacity: number;
+    readonly full: boolean;
+    destroy(): void;
+}
+
+/** a was at or below b on the previous step and is strictly above it now.
+ *  For a level, pass it as both bPrev and b. A NaN, null or undefined
+ *  anywhere is no cross. */
+declare function crossedAbove(aPrev: number, a: number, bPrev: number, b: number): boolean;
+/** a was at or above b on the previous step and is strictly below it now. */
+declare function crossedBelow(aPrev: number, a: number, bPrev: number, b: number): boolean;

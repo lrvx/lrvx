@@ -219,6 +219,8 @@ volume / range threshold the aggregator was configured with.
 | `unrealized_pnl` | `float` | Unrealized P&L, or `NaN` when the position manager reports no entry price (see below) |
 | `last_update_ns` | `int` | Exchange timestamp (ns) of the last dispatched event: trade, depth frame or bar |
 | `last_touch_ns` | `int` | Exchange timestamp (ns) of the frame that last wrote the touch. A `TOP_OF_BOOK` frame moves it without firing `on_book_update`, so it can be fresher than `last_update_ns` |
+| `entry_price` | `float \| None` | Quantity-weighted average entry of the open position: an add moves it, a partial close leaves it, a fill that flips the position sets it to that fill's price. `None` when flat. Fees do not move it |
+| `bars_in_position` | `int` | Bar callbacks received while holding the current position, the bar on which it is first seen counting as 1. `0` when flat, `1` again on the first bar after a flip, `0` throughout a replay without bars |
 | `book_spread()` | `float \| None` | Bid-ask spread; `None` unless both sides have a level |
 | `is_long()` | `bool` | True if long |
 | `is_short()` | `bool` | True if short |
@@ -230,6 +232,65 @@ none, and the field is `NaN` rather than a number. Check it with
 `math.isnan()` before comparing against a threshold; the two shipped managers,
 `PositionTracker` and `MultiModePositionTracker`, always report one while a
 position is open.
+
+`entry_price` and `bars_in_position` are what a bar strategy needs to exit at
+a percentage from its entry or after N bars, with no bookkeeping of its own.
+Buying 1 at 120 and 1 at 140 gives an `entry_price` of 130; selling 1 leaves
+130; selling 3 more flips the position to short 2 at the fill price. On the
+fill bar `bars_in_position` is 1.
+
+## Strategy helpers
+
+Exit rules (module `lrvx.exits`, pure Python with the arithmetic of
+`lrvx/strategy/exits.h`): `AtrStop`, `ChandelierExit`, `BreakEvenTrail`,
+`PercentStop(pct)`, `TakeProfit(pct)`, `TimeStop(max_bars)`. Each has
+`arm(...)`, `update(...) -> bool`, `armed`, `disarm()`; the level is `stop` (the
+take-profit's is `target`). The side is `"long"` or `"short"`. A hit does not
+disarm. `PercentStop` and `TakeProfit` take `arm(side, entry_price)` and
+`update(high, low)` and report whether that bar reached the level;
+`TimeStop` takes `arm()` and `update()` and is true from the `max_bars`-th
+update on. A `pct` that is not above 0, or fewer than one bar, raises
+`ValueError`. The levels are on the [exit rules page](../api/strategy/exits.md).
+
+`lrvx.History(capacity)` keeps the last `capacity` values of a series, newest
+first: `h[0]` (or `h.get(0)`) is the value pushed last. It has `push(value)`,
+`len(h)`, `capacity` and `full`; an index outside `0 .. len(h) - 1` raises
+`IndexError`, a capacity below 1 `ValueError`.
+
+`lrvx.crossed_above(a_prev, a, b_prev, b)` is true when `a` was at or below `b`
+and is now strictly above it; `lrvx.crossed_below` is the mirror. Pass a fixed
+level as both `b_prev` and `b`. `None` or NaN anywhere is no cross.
+
+```python
+import lrvx
+from lrvx.exits import PercentStop, TimeStop
+
+
+class Breakout(lrvx.Strategy):
+    def __init__(self, symbols):
+        super().__init__(symbols)
+        self.highs = lrvx.Highest(20)
+        self.closes = lrvx.History(2)
+        self.stop = PercentStop(2.0)
+        self.timeout = TimeStop(30)
+
+    def on_bar(self, ctx, bar):
+        level = self.highs.value
+        self.highs.update(bar.high)
+        self.closes.push(bar.close)
+        if ctx.is_flat():
+            if level is not None and len(self.closes) == 2 and lrvx.crossed_above(
+                    self.closes[1], self.closes[0], level, level):
+                self.market_buy(1.0)
+            return
+        if ctx.bars_in_position == 1:
+            self.stop.arm("long", ctx.entry_price)
+            self.timeout.arm()
+        if self.stop.update(bar.high, bar.low) | self.timeout.update():
+            self.close_position()
+            self.stop.disarm()
+            self.timeout.disarm()
+```
 
 ## Class: `lrvx.TradeData`
 

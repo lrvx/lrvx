@@ -13,6 +13,8 @@ struct SymbolContext
   int64_t lastTouchNs{0};
   Quantity position{};
   std::optional<Price> avgEntryPrice{};
+  std::optional<Price> entryPrice{};
+  uint32_t barsInPosition{0};
   Price lastTradePrice{};
   int64_t lastUpdateNs{0};
   SymbolId symbolId{0};
@@ -33,10 +35,26 @@ struct SymbolContext
 | `touchBid` / `touchAsk` | `std::optional<BookLevel>` | The most recent best bid/ask. Depth frames set it from the applied book; `TOP_OF_BOOK` frames, which the book ignores, update it directly. Empty when that side has no quote |
 | `lastTouchNs` | `int64_t` | Exchange timestamp of the frame that last wrote the touch; `lastUpdateNs` only covers trades, depth frames and bars |
 | `position` | `Quantity` | Net position (positive=long, negative=short) |
-| `avgEntryPrice` | `std::optional<Price>` | Volume-weighted average entry price, empty when the attached position manager reports none |
+| `avgEntryPrice` | `std::optional<Price>` | The attached position manager's cost basis, empty when it reports none. On the shipped trackers it is a FIFO figure after a partial close |
+| `entryPrice` | `std::optional<Price>` | Quantity-weighted average entry of the open position: an add moves it, a partial close leaves it, a fill that flips the position sets it to that fill's price. Empty when flat |
+| `barsInPosition` | `uint32_t` | Bar callbacks received while holding the current position, the bar on which it is first seen counting as 1. 0 when flat, 1 again on the first bar after a flip, and 0 throughout a replay without bars |
 | `lastTradePrice` | `Price` | Most recent trade price |
 | `lastUpdateNs` | `int64_t` | Last update timestamp (nanoseconds) |
 | `symbolId` | `SymbolId` | Symbol identifier |
+
+## Position facts
+
+`Strategy` keeps `entryPrice` and `barsInPosition` up to date before every
+hook runs, in a backtest (every runner mode) and on the live runners. The
+entry moves on the fills the strategy is told of: two buys of 1 at 120 and
+140 give 130, a sell of 1 leaves 130 (a FIFO cost basis would say 140), and
+a sell of 3 that flips the position to short 2 at 180 gives 180. A position
+that changes without a fill price (one seeded on a live runner) takes the
+position manager's cost basis. Fees do not move it.
+
+A bar strategy that exits after N bars, or at a percentage from its entry,
+reads both here instead of keeping its own bookkeeping; see
+[Exit rules](exits.md).
 
 ## Computed Properties
 

@@ -1,0 +1,94 @@
+# Smoke test: lrvx.history -- History (a fixed-capacity ring read newest
+# first) and crossed_above / crossed_below.
+#
+# crossed_above(a_prev, a, b_prev, b) is a_prev <= b_prev and a > b;
+# crossed_below is a_prev >= b_prev and a < b. A fixed level is passed as
+# both b values. Touching without crossing is not a cross; leaving from an
+# equal start is. Any NaN input answers False.
+
+import math
+
+from lrvx.history import History, crossed_above, crossed_below
+
+failed = 0
+
+
+def check(cond: bool, msg: str):
+    global failed
+    if cond:
+        print("ok  " + msg)
+    else:
+        failed += 1
+        print("FAIL  " + msg)
+
+
+refused = False
+try:
+    History(0)
+except ValueError:
+    refused = True
+check(refused, "History(0) is refused")
+
+h = History(3)
+check(h.capacity == 3, "History.capacity")
+check(len(h) == 0 and not h.full, "History: empty")
+raised = False
+try:
+    h.get(0)
+except IndexError:
+    raised = True
+check(raised, "History: get(0) on empty raises IndexError")
+h.push(10.0)
+check(h.get(0) == 10.0 and h[0] == 10.0 and len(h) == 1, "History: one value")
+h.push(20.0)
+check(h[0] == 20.0 and h[1] == 10.0, "History: 0 is newest, 1 previous")
+check(not h.full, "History: not full at 2 of 3")
+h.push(30.0)
+check(h.full and len(h) == 3, "History: full at 3")
+h.push(40.0)
+check(h[0] == 40.0 and h[1] == 30.0 and h[2] == 20.0, "History: the oldest drops out")
+check(len(h) == 3, "History: length stays at capacity")
+raised = False
+try:
+    h[3]
+except IndexError:
+    raised = True
+check(raised, "History: index == len raises IndexError")
+h.push(math.nan)
+check(math.isnan(h[0]) and h[1] == 40.0, "History: NaN stored as given")
+one = History(1)
+one.push(1.0)
+one.push(2.0)
+check(one[0] == 2.0 and len(one) == 1 and one.full, "History(1)")
+
+# A fixed level is passed as both b values.
+check(crossed_above(1.0, 3.0, 2.0, 2.0), "above: from below to above")
+check(crossed_above(2.0, 3.0, 2.0, 2.0), "above: leaving from an equal start is a cross")
+check(not crossed_above(1.0, 2.0, 2.0, 2.0), "above: touching is not a cross")
+check(not crossed_above(3.0, 4.0, 2.0, 2.0), "above: already above")
+check(not crossed_above(2.0, 2.0, 2.0, 2.0), "above: equal throughout")
+check(not crossed_above(3.0, 1.0, 2.0, 2.0), "above: a fall is not a rise")
+check(crossed_below(3.0, 1.0, 2.0, 2.0), "below: from above to below")
+check(crossed_below(2.0, 1.0, 2.0, 2.0), "below: leaving from an equal start is a cross")
+check(not crossed_below(3.0, 2.0, 2.0, 2.0), "below: touching is not a cross")
+check(not crossed_below(1.0, 0.0, 2.0, 2.0), "below: already below")
+check(not crossed_below(2.0, 2.0, 2.0, 2.0), "below: equal throughout")
+check(crossed_above(1.0, 3.0, 2.0, 2.5), "above: two series")
+check(not crossed_above(1.0, 2.5, 0.5, 3.0), "above: a was above b before")
+check(crossed_below(3.0, 1.0, 2.0, 1.5), "below: two series")
+check(crossed_below(10.0, 5.0, 4.0, 6.0), "below: b rising through a")
+check(crossed_above(5.0, 10.0, 6.0, 4.0), "above: b falling through a")
+nan = math.nan
+check(not crossed_above(nan, 3.0, 2.0, 2.0), "above: NaN a_prev")
+check(not crossed_above(1.0, nan, 2.0, 2.0), "above: NaN a")
+check(not crossed_above(1.0, 3.0, nan, 2.0), "above: NaN b_prev")
+check(not crossed_above(1.0, 3.0, 2.0, nan), "above: NaN b")
+check(not crossed_below(nan, 1.0, 2.0, 2.0), "below: NaN a_prev")
+check(not crossed_below(3.0, nan, 2.0, 2.0), "below: NaN a")
+check(not crossed_below(3.0, 1.0, nan, 2.0), "below: NaN b_prev")
+check(not crossed_below(3.0, 1.0, 2.0, nan), "below: NaN b")
+
+if failed:
+    print(f"{failed} check(s) failed")
+    raise ValueError("history_cross_smoke failed")
+print("all history and crossing checks passed")

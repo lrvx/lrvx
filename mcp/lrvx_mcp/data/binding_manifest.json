@@ -360,6 +360,11 @@
         {
           "group": "context_queries",
           "kind": "function",
+          "name": "lrvx_bars_in_position"
+        },
+        {
+          "group": "context_queries",
+          "kind": "function",
           "name": "lrvx_best_ask_raw"
         },
         {
@@ -561,6 +566,16 @@
           "group": "composite_book",
           "kind": "function",
           "name": "lrvx_composite_book_mark_stale"
+        },
+        {
+          "group": "history",
+          "kind": "function",
+          "name": "lrvx_crossed_above"
+        },
+        {
+          "group": "history",
+          "kind": "function",
+          "name": "lrvx_crossed_below"
         },
         {
           "group": "amm_curve",
@@ -923,6 +938,11 @@
           "name": "lrvx_emit_trailing_stop_percent"
         },
         {
+          "group": "context_queries",
+          "kind": "function",
+          "name": "lrvx_entry_price_raw_opt"
+        },
+        {
           "group": "tape_aggregator",
           "kind": "function",
           "name": "lrvx_event_type_stats_aggregator_create"
@@ -1046,6 +1066,76 @@
           "group": "execution",
           "kind": "function",
           "name": "lrvx_executor_get_capabilities"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_atr_stop_create"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_break_even_trail_create"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_chandelier_create"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_percent_stop_create"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_rule_arm"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_rule_armed"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_rule_at_break_even"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_rule_bars"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_rule_destroy"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_rule_disarm"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_rule_level"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_rule_update"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_take_profit_create"
+        },
+        {
+          "group": "exit_rules",
+          "kind": "function",
+          "name": "lrvx_exit_time_stop_create"
         },
         {
           "group": "fee_schedule",
@@ -1303,6 +1393,41 @@
           "name": "lrvx_grid_search_total"
         },
         {
+          "group": "history",
+          "kind": "function",
+          "name": "lrvx_history_capacity"
+        },
+        {
+          "group": "history",
+          "kind": "function",
+          "name": "lrvx_history_create"
+        },
+        {
+          "group": "history",
+          "kind": "function",
+          "name": "lrvx_history_destroy"
+        },
+        {
+          "group": "history",
+          "kind": "function",
+          "name": "lrvx_history_full"
+        },
+        {
+          "group": "history",
+          "kind": "function",
+          "name": "lrvx_history_get"
+        },
+        {
+          "group": "history",
+          "kind": "function",
+          "name": "lrvx_history_push"
+        },
+        {
+          "group": "history",
+          "kind": "function",
+          "name": "lrvx_history_size"
+        },
+        {
           "group": "dex_amount",
           "kind": "function",
           "name": "lrvx_i256_roundtrip"
@@ -1450,12 +1575,22 @@
         {
           "group": "indicator_functions",
           "kind": "function",
+          "name": "lrvx_indicator_highest"
+        },
+        {
+          "group": "indicator_functions",
+          "kind": "function",
           "name": "lrvx_indicator_kama"
         },
         {
           "group": "indicator_functions",
           "kind": "function",
           "name": "lrvx_indicator_kurtosis"
+        },
+        {
+          "group": "indicator_functions",
+          "kind": "function",
+          "name": "lrvx_indicator_lowest"
         },
         {
           "group": "indicator_functions",
@@ -4315,6 +4450,10 @@
         },
         {
           "kind": "handle",
+          "name": "LrvxExitRuleHandle"
+        },
+        {
+          "kind": "handle",
           "name": "LrvxFeeScheduleHandle"
         },
         {
@@ -4332,6 +4471,10 @@
         {
           "kind": "handle",
           "name": "LrvxGridSearchHandle"
+        },
+        {
+          "kind": "handle",
+          "name": "LrvxHistoryHandle"
         },
         {
           "kind": "handle",
@@ -4514,6 +4657,7 @@
         "execution",
         "execution_algos",
         "executor_fill",
+        "exit_rules",
         "fee_schedule",
         "feed_clock",
         "fixed_point",
@@ -4522,6 +4666,7 @@
         "grid_search",
         "heatmap",
         "heikin_ashi",
+        "history",
         "indicator_functions",
         "indicatorgraph",
         "l3_order",
@@ -4591,6 +4736,10 @@
         },
         {
           "kind": "class",
+          "name": "AtrStop"
+        },
+        {
+          "kind": "class",
           "name": "AutoCorrelation"
         },
         {
@@ -4639,6 +4788,10 @@
         },
         {
           "kind": "class",
+          "name": "BreakEvenTrail"
+        },
+        {
+          "kind": "class",
           "name": "BucketState"
         },
         {
@@ -4648,6 +4801,10 @@
         {
           "kind": "class",
           "name": "CHOP"
+        },
+        {
+          "kind": "class",
+          "name": "ChandelierExit"
         },
         {
           "kind": "class",
@@ -4755,6 +4912,14 @@
         },
         {
           "kind": "class",
+          "name": "Highest"
+        },
+        {
+          "kind": "class",
+          "name": "History"
+        },
+        {
+          "kind": "class",
           "name": "IcebergExecutor"
         },
         {
@@ -4800,6 +4965,10 @@
         {
           "kind": "class",
           "name": "LiveQueueSnapshot"
+        },
+        {
+          "kind": "class",
+          "name": "Lowest"
         },
         {
           "kind": "class",
@@ -4876,6 +5045,10 @@
         {
           "kind": "class",
           "name": "Partitioner"
+        },
+        {
+          "kind": "class",
+          "name": "PercentStop"
         },
         {
           "kind": "class",
@@ -5003,11 +5176,19 @@
         },
         {
           "kind": "class",
+          "name": "TakeProfit"
+        },
+        {
+          "kind": "class",
           "name": "TapeDiffSummary"
         },
         {
           "kind": "class",
           "name": "TfHandle"
+        },
+        {
+          "kind": "class",
+          "name": "TimeStop"
         },
         {
           "kind": "class",
@@ -5147,6 +5328,14 @@
         },
         {
           "kind": "function",
+          "name": "crossed_above"
+        },
+        {
+          "kind": "function",
+          "name": "crossed_below"
+        },
+        {
+          "kind": "function",
           "name": "cvd"
         },
         {
@@ -5199,6 +5388,10 @@
         },
         {
           "kind": "function",
+          "name": "highest"
+        },
+        {
+          "kind": "function",
           "name": "kama"
         },
         {
@@ -5208,6 +5401,10 @@
         {
           "kind": "function",
           "name": "last_error"
+        },
+        {
+          "kind": "function",
+          "name": "lowest"
         },
         {
           "kind": "function",
@@ -5484,6 +5681,36 @@
           "kind": "method",
           "name": "volume",
           "parent": "AggBar"
+        },
+        {
+          "kind": "method",
+          "name": "arm",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "AtrStop"
         },
         {
           "kind": "method",
@@ -5767,6 +5994,41 @@
         },
         {
           "kind": "method",
+          "name": "arm",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "at_break_even",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
           "name": "close",
           "parent": "CCI"
         },
@@ -5829,6 +6091,36 @@
           "kind": "method",
           "name": "value",
           "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "arm",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "ChandelierExit"
         },
         {
           "kind": "method",
@@ -6402,6 +6694,71 @@
         },
         {
           "kind": "method",
+          "name": "close",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "compute",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "compute_static",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "value",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "capacity",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "full",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "get",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "push",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
           "name": "destroy",
           "parent": "IcebergExecutor"
         },
@@ -6888,6 +7245,46 @@
         {
           "kind": "method",
           "name": "close",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "compute",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "compute_static",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "value",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "close",
           "parent": "MACD"
         },
         {
@@ -7339,6 +7736,36 @@
           "kind": "method",
           "name": "per_symbol",
           "parent": "Partitioner"
+        },
+        {
+          "kind": "method",
+          "name": "arm",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "PercentStop"
         },
         {
           "kind": "method",
@@ -8197,6 +8624,11 @@
         },
         {
           "kind": "method",
+          "name": "_check_bar_type",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "_create_handle",
           "parent": "Strategy"
         },
@@ -8233,6 +8665,11 @@
         {
           "kind": "method",
           "name": "bar_ring_capacity",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
+          "name": "bars_in_position",
           "parent": "Strategy"
         },
         {
@@ -8343,6 +8780,11 @@
         {
           "kind": "method",
           "name": "emit_trailing_stop_percent",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
+          "name": "entry_price",
           "parent": "Strategy"
         },
         {
@@ -8562,6 +9004,11 @@
         },
         {
           "kind": "method",
+          "name": "bars_in_position",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
           "name": "best_ask",
           "parent": "SymbolContext"
         },
@@ -8573,6 +9020,11 @@
         {
           "kind": "method",
           "name": "book_spread",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
+          "name": "entry_price",
           "parent": "SymbolContext"
         },
         {
@@ -8687,6 +9139,36 @@
         },
         {
           "kind": "method",
+          "name": "arm",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "target",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
           "name": "close",
           "parent": "TfHandle"
         },
@@ -8704,6 +9186,36 @@
           "kind": "method",
           "name": "sma",
           "parent": "TfHandle"
+        },
+        {
+          "kind": "method",
+          "name": "arm",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "bars",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "close",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "TimeStop"
         },
         {
           "kind": "method",
@@ -9301,6 +9813,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_bars_in_position"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_best_ask_raw"
         },
         {
@@ -9462,6 +9978,14 @@
         {
           "kind": "c_import",
           "name": "lrvx_composite_book_mark_stale"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_crossed_above"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_crossed_below"
         },
         {
           "kind": "c_import",
@@ -9753,6 +10277,10 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_entry_price_raw_opt"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_event_type_stats_aggregator_create"
         },
         {
@@ -9850,6 +10378,62 @@
         {
           "kind": "c_import",
           "name": "lrvx_executor_get_capabilities"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_atr_stop_create"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_break_even_trail_create"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_chandelier_create"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_percent_stop_create"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_rule_arm"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_rule_armed"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_rule_at_break_even"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_rule_bars"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_rule_destroy"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_rule_disarm"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_rule_level"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_rule_update"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_take_profit_create"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_exit_time_stop_create"
         },
         {
           "kind": "c_import",
@@ -10057,6 +10641,34 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_history_capacity"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_history_create"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_history_destroy"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_history_full"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_history_get"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_history_push"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_history_size"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_i256_roundtrip"
         },
         {
@@ -10173,11 +10785,19 @@
         },
         {
           "kind": "c_import",
+          "name": "lrvx_indicator_highest"
+        },
+        {
+          "kind": "c_import",
           "name": "lrvx_indicator_kama"
         },
         {
           "kind": "c_import",
           "name": "lrvx_indicator_kurtosis"
+        },
+        {
+          "kind": "c_import",
+          "name": "lrvx_indicator_lowest"
         },
         {
           "kind": "c_import",
@@ -13066,6 +13686,16 @@
           "name": "HeikinAshiBarPolicy"
         },
         {
+          "header": "include/lrvx/indicator/highest.h",
+          "kind": "type",
+          "name": "Highest"
+        },
+        {
+          "header": "include/lrvx/strategy/history.h",
+          "kind": "type",
+          "name": "History"
+        },
+        {
           "header": "include/lrvx/replay/aggregator.h",
           "kind": "type",
           "name": "IAggregator"
@@ -13399,6 +14029,11 @@
           "header": "include/lrvx/position/position_tracker.h",
           "kind": "type",
           "name": "Lot"
+        },
+        {
+          "header": "include/lrvx/indicator/lowest.h",
+          "kind": "type",
+          "name": "Lowest"
         },
         {
           "header": "include/lrvx/error/lrvx_error.h",
@@ -13796,6 +14431,11 @@
           "name": "PerSidePositionState"
         },
         {
+          "header": "include/lrvx/strategy/exits.h",
+          "kind": "type",
+          "name": "PercentStop"
+        },
+        {
           "header": "include/lrvx/net/socket.h",
           "kind": "type",
           "name": "PollResult"
@@ -14069,6 +14709,11 @@
           "header": "include/lrvx/indicator/rogers_satchell_vol.h",
           "kind": "type",
           "name": "RogersSatchellVolKernel"
+        },
+        {
+          "header": "include/lrvx/indicator/highest.h",
+          "kind": "type",
+          "name": "RollingExtremeKernel"
         },
         {
           "header": "include/lrvx/indicator/rolling_zscore.h",
@@ -14381,6 +15026,11 @@
           "name": "TWAPExecutor"
         },
         {
+          "header": "include/lrvx/strategy/exits.h",
+          "kind": "type",
+          "name": "TakeProfit"
+        },
+        {
           "header": "include/lrvx/replay/tape_diff.h",
           "kind": "type",
           "name": "TapeDiffMismatch"
@@ -14444,6 +15094,11 @@
           "header": "include/lrvx/replay/time_utils.h",
           "kind": "type",
           "name": "TimeRangeEx"
+        },
+        {
+          "header": "include/lrvx/strategy/exits.h",
+          "kind": "type",
+          "name": "TimeStop"
         },
         {
           "header": "include/lrvx/replay/time_utils.h",
@@ -19287,6 +19942,46 @@
         },
         {
           "kind": "method",
+          "name": "compute",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "period",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "at",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "capacity",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "full",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "push",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "requireCapacity",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "size",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
           "name": "cloneEmpty",
           "parent": "IAggregator"
         },
@@ -21154,6 +21849,16 @@
           "kind": "method",
           "name": "wouldPassAtFullCapacity",
           "parent": "LiveRateLimitBudgeter"
+        },
+        {
+          "kind": "method",
+          "name": "compute",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "period",
+          "parent": "Lowest"
         },
         {
           "kind": "method",
@@ -23572,6 +24277,36 @@
         },
         {
           "kind": "method",
+          "name": "arm",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "pct",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
           "name": "bind",
           "parent": "PollResult"
         },
@@ -24749,6 +25484,26 @@
           "kind": "method",
           "name": "step",
           "parent": "RogersSatchellVolKernel"
+        },
+        {
+          "kind": "method",
+          "name": "back",
+          "parent": "RollingExtremeKernel"
+        },
+        {
+          "kind": "method",
+          "name": "beats",
+          "parent": "RollingExtremeKernel"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "RollingExtremeKernel"
+        },
+        {
+          "kind": "method",
+          "name": "step",
+          "parent": "RollingExtremeKernel"
         },
         {
           "kind": "method",
@@ -26312,6 +27067,11 @@
         },
         {
           "kind": "method",
+          "name": "countBarInPosition",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "ctx",
           "parent": "Strategy"
         },
@@ -26403,6 +27163,11 @@
         {
           "kind": "method",
           "name": "emitWithdrawLiquidity",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
+          "name": "followEntry",
           "parent": "Strategy"
         },
         {
@@ -26967,6 +27732,36 @@
         },
         {
           "kind": "method",
+          "name": "arm",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "pct",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "target",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
           "name": "reset",
           "parent": "TemaKernel"
         },
@@ -27209,6 +28004,36 @@
           "kind": "method",
           "name": "toTime",
           "parent": "TimeRangeEx"
+        },
+        {
+          "kind": "method",
+          "name": "arm",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "bars",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "maxBars",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "TimeStop"
         },
         {
           "kind": "method",
@@ -28118,6 +28943,10 @@
         },
         {
           "kind": "class",
+          "name": "AtrStop"
+        },
+        {
+          "kind": "class",
           "name": "AutoCorrelation"
         },
         {
@@ -28190,11 +29019,19 @@
         },
         {
           "kind": "class",
+          "name": "BreakEvenTrail"
+        },
+        {
+          "kind": "class",
           "name": "CCI"
         },
         {
           "kind": "class",
           "name": "CHOP"
+        },
+        {
+          "kind": "class",
+          "name": "ChandelierExit"
         },
         {
           "kind": "class",
@@ -28382,6 +29219,14 @@
         },
         {
           "kind": "class",
+          "name": "Highest"
+        },
+        {
+          "kind": "class",
+          "name": "History"
+        },
+        {
+          "kind": "class",
           "name": "HookErrorRecord"
         },
         {
@@ -28435,6 +29280,10 @@
         {
           "kind": "class",
           "name": "LiveQueueSnapshot"
+        },
+        {
+          "kind": "class",
+          "name": "Lowest"
         },
         {
           "kind": "class",
@@ -28567,6 +29416,10 @@
         {
           "kind": "class",
           "name": "PeakWindowResult"
+        },
+        {
+          "kind": "class",
+          "name": "PercentStop"
         },
         {
           "kind": "class",
@@ -28734,6 +29587,10 @@
         },
         {
           "kind": "class",
+          "name": "TakeProfit"
+        },
+        {
+          "kind": "class",
           "name": "TapeDiffMismatch"
         },
         {
@@ -28747,6 +29604,10 @@
         {
           "kind": "class",
           "name": "TapeDiffTrade"
+        },
+        {
+          "kind": "class",
+          "name": "TimeStop"
         },
         {
           "kind": "class",
@@ -28946,6 +29807,14 @@
         },
         {
           "kind": "function",
+          "name": "crossedAbove"
+        },
+        {
+          "kind": "function",
+          "name": "crossedBelow"
+        },
+        {
+          "kind": "function",
           "name": "cvd"
         },
         {
@@ -28978,6 +29847,10 @@
         },
         {
           "kind": "function",
+          "name": "highest"
+        },
+        {
+          "kind": "function",
           "name": "i256Roundtrip"
         },
         {
@@ -28999,6 +29872,10 @@
         {
           "kind": "function",
           "name": "list_indicators"
+        },
+        {
+          "kind": "function",
+          "name": "lowest"
         },
         {
           "kind": "function",
@@ -29336,6 +30213,36 @@
           "kind": "method",
           "name": "volume",
           "parent": "AggregatedBar"
+        },
+        {
+          "kind": "method",
+          "name": "arm",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "atrMultiple",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "AtrStop"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "AtrStop"
         },
         {
           "kind": "method",
@@ -30044,6 +30951,36 @@
         },
         {
           "kind": "method",
+          "name": "arm",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "atBreakEven",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "BreakEvenTrail"
+        },
+        {
+          "kind": "method",
           "name": "compute",
           "parent": "CCI"
         },
@@ -30101,6 +31038,41 @@
           "kind": "method",
           "name": "value",
           "parent": "CHOP"
+        },
+        {
+          "kind": "method",
+          "name": "arm",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "atrMultiple",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "lookback",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "ChandelierExit"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "ChandelierExit"
         },
         {
           "kind": "method",
@@ -30621,6 +31593,11 @@
           "kind": "method",
           "name": "value",
           "parent": "EMA"
+        },
+        {
+          "kind": "method",
+          "name": "barRingCapacity",
+          "parent": "EmitMethods"
         },
         {
           "kind": "method",
@@ -31504,6 +32481,61 @@
         },
         {
           "kind": "method",
+          "name": "compute",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "value",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "capacity",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "full",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "get",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "push",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "size",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
           "name": "hook",
           "parent": "HookErrorRecord"
         },
@@ -31996,6 +33028,36 @@
           "kind": "method",
           "name": "total",
           "parent": "LiveQueueSnapshot"
+        },
+        {
+          "kind": "method",
+          "name": "compute",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "value",
+          "parent": "Lowest"
         },
         {
           "kind": "method",
@@ -33096,6 +34158,36 @@
           "kind": "method",
           "name": "windowNs",
           "parent": "PeakWindowResult"
+        },
+        {
+          "kind": "method",
+          "name": "arm",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "pct",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "stop",
+          "parent": "PercentStop"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "PercentStop"
         },
         {
           "kind": "method",
@@ -34464,12 +35556,22 @@
         },
         {
           "kind": "method",
+          "name": "barsInPosition",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
           "name": "bestAsk",
           "parent": "SymbolContext"
         },
         {
           "kind": "method",
           "name": "bestBid",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
+          "name": "entryPrice",
           "parent": "SymbolContext"
         },
         {
@@ -34604,6 +35706,36 @@
         },
         {
           "kind": "method",
+          "name": "arm",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "pct",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "target",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "TakeProfit"
+        },
+        {
+          "kind": "method",
           "name": "index",
           "parent": "TapeDiffMismatch"
         },
@@ -34686,6 +35818,36 @@
           "kind": "method",
           "name": "symbolId",
           "parent": "TapeDiffTrade"
+        },
+        {
+          "kind": "method",
+          "name": "arm",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "armed",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "bars",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "disarm",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "maxBars",
+          "parent": "TimeStop"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "TimeStop"
         },
         {
           "kind": "method",
@@ -35706,6 +36868,14 @@
         },
         {
           "kind": "class",
+          "name": "Highest"
+        },
+        {
+          "kind": "class",
+          "name": "History"
+        },
+        {
+          "kind": "class",
           "name": "IndicatorGraph"
         },
         {
@@ -35747,6 +36917,10 @@
         {
           "kind": "class",
           "name": "LiveQueuePositionEstimator"
+        },
+        {
+          "kind": "class",
+          "name": "Lowest"
         },
         {
           "kind": "class",
@@ -36158,6 +37332,14 @@
         },
         {
           "kind": "function",
+          "name": "crossed_above"
+        },
+        {
+          "kind": "function",
+          "name": "crossed_below"
+        },
+        {
+          "kind": "function",
           "name": "cvd"
         },
         {
@@ -36198,6 +37380,10 @@
         },
         {
           "kind": "function",
+          "name": "highest"
+        },
+        {
+          "kind": "function",
           "name": "hurst_dfa"
         },
         {
@@ -36231,6 +37417,10 @@
         {
           "kind": "function",
           "name": "list_indicators"
+        },
+        {
+          "kind": "function",
+          "name": "lowest"
         },
         {
           "kind": "function",
@@ -37819,6 +39009,56 @@
         },
         {
           "kind": "method",
+          "name": "compute",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "value",
+          "parent": "Highest"
+        },
+        {
+          "kind": "method",
+          "name": "capacity",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "full",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "get",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
+          "name": "push",
+          "parent": "History"
+        },
+        {
+          "kind": "method",
           "name": "add_node",
           "parent": "IndicatorGraph"
         },
@@ -38321,6 +39561,36 @@
           "kind": "method",
           "name": "tracked_order_count",
           "parent": "LiveQueuePositionEstimator"
+        },
+        {
+          "kind": "method",
+          "name": "compute",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "count",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "ready",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "reset",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "update",
+          "parent": "Lowest"
+        },
+        {
+          "kind": "method",
+          "name": "value",
+          "parent": "Lowest"
         },
         {
           "kind": "method",
@@ -40264,6 +41534,11 @@
         },
         {
           "kind": "method",
+          "name": "bars_in_position",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
           "name": "best_ask",
           "parent": "Strategy"
         },
@@ -40380,6 +41655,11 @@
         {
           "kind": "method",
           "name": "emit_withdraw_liquidity",
+          "parent": "Strategy"
+        },
+        {
+          "kind": "method",
+          "name": "entry_price",
           "parent": "Strategy"
         },
         {
@@ -40574,6 +41854,11 @@
         },
         {
           "kind": "method",
+          "name": "bars_in_position",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
           "name": "best_ask",
           "parent": "SymbolContext"
         },
@@ -40585,6 +41870,11 @@
         {
           "kind": "method",
           "name": "book_spread",
+          "parent": "SymbolContext"
+        },
+        {
+          "kind": "method",
+          "name": "entry_price",
           "parent": "SymbolContext"
         },
         {
@@ -41188,6 +42478,22 @@
       "symbols": [
         {
           "kind": "class",
+          "name": "ADX"
+        },
+        {
+          "kind": "class",
+          "name": "ATR"
+        },
+        {
+          "kind": "class",
+          "name": "AtrStop"
+        },
+        {
+          "kind": "class",
+          "name": "AutoCorrelation"
+        },
+        {
+          "kind": "class",
           "name": "BacktestResult"
         },
         {
@@ -41196,7 +42502,43 @@
         },
         {
           "kind": "class",
+          "name": "Bollinger"
+        },
+        {
+          "kind": "class",
+          "name": "BreakEvenTrail"
+        },
+        {
+          "kind": "class",
+          "name": "CCI"
+        },
+        {
+          "kind": "class",
+          "name": "CHOP"
+        },
+        {
+          "kind": "class",
+          "name": "CVD"
+        },
+        {
+          "kind": "class",
+          "name": "ChandelierExit"
+        },
+        {
+          "kind": "class",
           "name": "CompositeBook"
+        },
+        {
+          "kind": "class",
+          "name": "ConstantLatency"
+        },
+        {
+          "kind": "class",
+          "name": "Correlation"
+        },
+        {
+          "kind": "class",
+          "name": "DEMA"
         },
         {
           "kind": "class",
@@ -41208,7 +42550,19 @@
         },
         {
           "kind": "class",
+          "name": "EMA"
+        },
+        {
+          "kind": "class",
+          "name": "EmpiricalLatency"
+        },
+        {
+          "kind": "class",
           "name": "Engine"
+        },
+        {
+          "kind": "class",
+          "name": "ExponentialLatency"
         },
         {
           "kind": "class",
@@ -41216,7 +42570,35 @@
         },
         {
           "kind": "class",
+          "name": "GaussianLatency"
+        },
+        {
+          "kind": "class",
+          "name": "Highest"
+        },
+        {
+          "kind": "class",
+          "name": "History"
+        },
+        {
+          "kind": "class",
+          "name": "KAMA"
+        },
+        {
+          "kind": "class",
+          "name": "Kurtosis"
+        },
+        {
+          "kind": "class",
           "name": "L3Book"
+        },
+        {
+          "kind": "class",
+          "name": "Lowest"
+        },
+        {
+          "kind": "class",
+          "name": "MACD"
         },
         {
           "kind": "class",
@@ -41228,7 +42610,19 @@
         },
         {
           "kind": "class",
+          "name": "MultiFeedClock"
+        },
+        {
+          "kind": "class",
+          "name": "OBV"
+        },
+        {
+          "kind": "class",
           "name": "OrderBook"
+        },
+        {
+          "kind": "class",
+          "name": "OrderGroup"
         },
         {
           "kind": "class",
@@ -41240,7 +42634,15 @@
         },
         {
           "kind": "class",
+          "name": "ParkinsonVol"
+        },
+        {
+          "kind": "class",
           "name": "Partitioner"
+        },
+        {
+          "kind": "class",
+          "name": "PercentStop"
         },
         {
           "kind": "class",
@@ -41252,11 +42654,67 @@
         },
         {
           "kind": "class",
+          "name": "RMA"
+        },
+        {
+          "kind": "class",
+          "name": "RSI"
+        },
+        {
+          "kind": "class",
+          "name": "RogersSatchellVol"
+        },
+        {
+          "kind": "class",
+          "name": "RollingZScore"
+        },
+        {
+          "kind": "class",
+          "name": "SMA"
+        },
+        {
+          "kind": "class",
+          "name": "ShannonEntropy"
+        },
+        {
+          "kind": "class",
           "name": "SignalBuilder"
         },
         {
           "kind": "class",
           "name": "SimulatedExecutor"
+        },
+        {
+          "kind": "class",
+          "name": "Skewness"
+        },
+        {
+          "kind": "class",
+          "name": "Slope"
+        },
+        {
+          "kind": "class",
+          "name": "Stochastic"
+        },
+        {
+          "kind": "class",
+          "name": "Strategy"
+        },
+        {
+          "kind": "class",
+          "name": "TEMA"
+        },
+        {
+          "kind": "class",
+          "name": "TakeProfit"
+        },
+        {
+          "kind": "class",
+          "name": "TimeStop"
+        },
+        {
+          "kind": "class",
+          "name": "VWAP"
         },
         {
           "kind": "class",
@@ -41544,6 +43002,10 @@
         },
         {
           "kind": "global",
+          "name": "__lrvx_bars_in_position"
+        },
+        {
+          "kind": "global",
           "name": "__lrvx_best_ask"
         },
         {
@@ -41661,6 +43123,14 @@
         {
           "kind": "global",
           "name": "__lrvx_cb_mark_stale"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_crossed_above"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_crossed_below"
         },
         {
           "kind": "global",
@@ -41828,6 +43298,10 @@
         },
         {
           "kind": "global",
+          "name": "__lrvx_entry_price"
+        },
+        {
+          "kind": "global",
           "name": "__lrvx_exec_destroy"
         },
         {
@@ -41873,6 +43347,62 @@
         {
           "kind": "global",
           "name": "__lrvx_exec_vwap_create"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_atr_stop_create"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_break_even_trail_create"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_chandelier_create"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_percent_stop_create"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_rule_arm"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_rule_armed"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_rule_at_break_even"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_rule_bars"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_rule_destroy"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_rule_disarm"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_rule_level"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_rule_update"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_take_profit_create"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_exit_time_stop_create"
         },
         {
           "kind": "global",
@@ -42072,6 +43602,34 @@
         },
         {
           "kind": "global",
+          "name": "__lrvx_history_capacity"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_history_create"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_history_destroy"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_history_full"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_history_get"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_history_push"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_history_size"
+        },
+        {
+          "kind": "global",
           "name": "__lrvx_indicator_adf"
         },
         {
@@ -42116,11 +43674,19 @@
         },
         {
           "kind": "global",
+          "name": "__lrvx_indicator_highest"
+        },
+        {
+          "kind": "global",
           "name": "__lrvx_indicator_kama"
         },
         {
           "kind": "global",
           "name": "__lrvx_indicator_kurtosis"
+        },
+        {
+          "kind": "global",
+          "name": "__lrvx_indicator_lowest"
         },
         {
           "kind": "global",
@@ -44029,10 +45595,12 @@
     },
     "context_queries": {
       "capi_functions": [
+        "lrvx_bars_in_position",
         "lrvx_best_ask_raw",
         "lrvx_best_ask_raw_opt",
         "lrvx_best_bid_raw",
         "lrvx_best_bid_raw_opt",
+        "lrvx_entry_price_raw_opt",
         "lrvx_get_order_status",
         "lrvx_get_symbol_context",
         "lrvx_last_trade_price_raw",
@@ -44057,8 +45625,10 @@
       "quickjs": {
         "classes": [],
         "functions": [
+          "__lrvx_bars_in_position",
           "__lrvx_best_ask",
           "__lrvx_best_bid",
+          "__lrvx_entry_price",
           "__lrvx_get_order_status",
           "__lrvx_last_trade_price",
           "__lrvx_mid_price",
@@ -44440,6 +46010,72 @@
         "status": "required"
       }
     },
+    "exit_rules": {
+      "capi_functions": [
+        "lrvx_exit_atr_stop_create",
+        "lrvx_exit_break_even_trail_create",
+        "lrvx_exit_chandelier_create",
+        "lrvx_exit_percent_stop_create",
+        "lrvx_exit_rule_arm",
+        "lrvx_exit_rule_armed",
+        "lrvx_exit_rule_at_break_even",
+        "lrvx_exit_rule_bars",
+        "lrvx_exit_rule_destroy",
+        "lrvx_exit_rule_disarm",
+        "lrvx_exit_rule_level",
+        "lrvx_exit_rule_update",
+        "lrvx_exit_take_profit_create",
+        "lrvx_exit_time_stop_create"
+      ],
+      "codon": {
+        "present": true,
+        "status": "required"
+      },
+      "napi": {
+        "classes": [
+          "AtrStop",
+          "ChandelierExit",
+          "BreakEvenTrail",
+          "PercentStop",
+          "TakeProfit",
+          "TimeStop"
+        ],
+        "functions": [],
+        "status": "required"
+      },
+      "pybind11": {
+        "classes": [],
+        "functions": [],
+        "status": "not_applicable"
+      },
+      "quickjs": {
+        "classes": [
+          "AtrStop",
+          "ChandelierExit",
+          "BreakEvenTrail",
+          "PercentStop",
+          "TakeProfit",
+          "TimeStop"
+        ],
+        "functions": [
+          "__lrvx_exit_atr_stop_create",
+          "__lrvx_exit_break_even_trail_create",
+          "__lrvx_exit_chandelier_create",
+          "__lrvx_exit_percent_stop_create",
+          "__lrvx_exit_rule_arm",
+          "__lrvx_exit_rule_armed",
+          "__lrvx_exit_rule_at_break_even",
+          "__lrvx_exit_rule_bars",
+          "__lrvx_exit_rule_destroy",
+          "__lrvx_exit_rule_disarm",
+          "__lrvx_exit_rule_level",
+          "__lrvx_exit_rule_update",
+          "__lrvx_exit_take_profit_create",
+          "__lrvx_exit_time_stop_create"
+        ],
+        "status": "required"
+      }
+    },
     "fee_schedule": {
       "capi_functions": [
         "lrvx_fee_schedule_add_tier",
@@ -44747,6 +46383,57 @@
         "status": "required"
       }
     },
+    "history": {
+      "capi_functions": [
+        "lrvx_crossed_above",
+        "lrvx_crossed_below",
+        "lrvx_history_capacity",
+        "lrvx_history_create",
+        "lrvx_history_destroy",
+        "lrvx_history_full",
+        "lrvx_history_get",
+        "lrvx_history_push",
+        "lrvx_history_size"
+      ],
+      "codon": {
+        "present": true,
+        "status": "required"
+      },
+      "napi": {
+        "classes": [
+          "History"
+        ],
+        "functions": [],
+        "status": "required"
+      },
+      "pybind11": {
+        "classes": [
+          "History"
+        ],
+        "functions": [
+          "crossed_above",
+          "crossed_below"
+        ],
+        "status": "required"
+      },
+      "quickjs": {
+        "classes": [
+          "History"
+        ],
+        "functions": [
+          "__lrvx_crossed_above",
+          "__lrvx_crossed_below",
+          "__lrvx_history_capacity",
+          "__lrvx_history_create",
+          "__lrvx_history_destroy",
+          "__lrvx_history_full",
+          "__lrvx_history_get",
+          "__lrvx_history_push",
+          "__lrvx_history_size"
+        ],
+        "status": "required"
+      }
+    },
     "indicator_functions": {
       "capi_functions": [
         "lrvx_indicator_adf",
@@ -44760,8 +46447,10 @@
         "lrvx_indicator_cvd",
         "lrvx_indicator_dema",
         "lrvx_indicator_ema",
+        "lrvx_indicator_highest",
         "lrvx_indicator_kama",
         "lrvx_indicator_kurtosis",
+        "lrvx_indicator_lowest",
         "lrvx_indicator_macd",
         "lrvx_indicator_obv",
         "lrvx_indicator_parkinson_vol",
@@ -44799,7 +46488,9 @@
           "ema",
           "rsi",
           "macd",
-          "atr"
+          "atr",
+          "highest",
+          "lowest"
         ],
         "status": "required"
       },
@@ -44817,8 +46508,10 @@
           "__lrvx_indicator_cvd",
           "__lrvx_indicator_dema",
           "__lrvx_indicator_ema",
+          "__lrvx_indicator_highest",
           "__lrvx_indicator_kama",
           "__lrvx_indicator_kurtosis",
+          "__lrvx_indicator_lowest",
           "__lrvx_indicator_macd",
           "__lrvx_indicator_obv",
           "__lrvx_indicator_parkinson_vol",
@@ -46451,7 +48144,9 @@
           "MACD",
           "Bollinger",
           "Stochastic",
-          "Correlation"
+          "Correlation",
+          "Highest",
+          "Lowest"
         ],
         "functions": [],
         "status": "required"
@@ -46464,13 +48159,18 @@
           "MACD",
           "Bollinger",
           "Stochastic",
-          "Correlation"
+          "Correlation",
+          "Highest",
+          "Lowest"
         ],
         "functions": [],
         "status": "required"
       },
       "quickjs": {
-        "classes": [],
+        "classes": [
+          "Highest",
+          "Lowest"
+        ],
         "functions": [
           "__lrvx_streaming_indicator_count",
           "__lrvx_streaming_indicator_create",

@@ -339,6 +339,8 @@ series = cci(highs, lows, closes, 20)      # batch via the free function
 | `RollingZScore` | `RollingZScore(period)` | SingleInput | none — free function `rolling_zscore(data, period)` |
 | `ShannonEntropy` | `ShannonEntropy(period, bins=10)` | SingleInput | none — free function `shannon_entropy(data, period, bins=10)` |
 | `AutoCorrelation` | `AutoCorrelation(window, lag)` | SingleInput | none — free function `autocorrelation(data, window, lag)` |
+| `Highest` | `Highest(period)` | SingleInput | instance `compute(data)`, static `compute_static(data, period)` |
+| `Lowest` | `Lowest(period)` | SingleInput | instance `compute(data)`, static `compute_static(data, period)` |
 | `ATR` | `ATR(period)` | BarInput | instance `compute(h, l, c)` |
 | `CCI` | `CCI(period)` | BarInput | none — free function `cci(high, low, close, period)` |
 | `CHOP` | `CHOP(period)` | BarInput | instance `compute(h, l, c)` |
@@ -353,7 +355,8 @@ Streaming only, with no `compute()` at all — call the matching free function f
 `Skewness`, `Kurtosis`, `RollingZScore`, `ShannonEntropy`, `AutoCorrelation`, `CCI`,
 `Stochastic`, `ParkinsonVol`, `RogersSatchellVol`, `Correlation`.
 
-`SMA.compute_static(data, period)` is the only static batch method in the module.
+Static batch methods: `SMA.compute_static(data, period)`, `Highest.compute_static(data,
+period)`, `Lowest.compute_static(data, period)`.
 
 
 <!-- INDICATOR-LIST-END -->

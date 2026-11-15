@@ -69,9 +69,11 @@
 #include "lrvx/indicator/cvd.h"
 #include "lrvx/indicator/dema.h"
 #include "lrvx/indicator/ema.h"
+#include "lrvx/indicator/highest.h"
 #include "lrvx/indicator/indicator_pipeline.h"
 #include "lrvx/indicator/kama.h"
 #include "lrvx/indicator/kurtosis.h"
+#include "lrvx/indicator/lowest.h"
 #include "lrvx/indicator/macd.h"
 #include "lrvx/indicator/obv.h"
 #include "lrvx/indicator/params.h"
@@ -126,6 +128,8 @@
 #include "lrvx/replay/readers/binary_log_reader.h"
 #include "lrvx/replay/writers/binary_log_writer.h"
 #include "lrvx/strategy/abstract_signal_handler.h"
+#include "lrvx/strategy/exits.h"
+#include "lrvx/strategy/history.h"
 #include "lrvx/testing/bar_dispatch_recorder.h"
 #include "lrvx/util/int/i256.h"
 #include "lrvx/util/int/u256.h"
@@ -959,6 +963,29 @@ uint8_t lrvx_mid_price_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* p
   LRVX_CAPI_LEAVE;
 }
 
+uint8_t lrvx_entry_price_raw_opt(LrvxStrategyHandle s, uint32_t symbol, int64_t* price_out)
+{
+  LRVX_CAPI_ENTER(s);
+  const auto& entry = toStrategy(s)->ctx(symbol).entryPrice;
+  if (!entry)
+  {
+    return 0;
+  }
+  if (price_out)
+  {
+    *price_out = entry->raw();
+  }
+  return 1;
+  LRVX_CAPI_LEAVE;
+}
+
+uint32_t lrvx_bars_in_position(LrvxStrategyHandle s, uint32_t symbol)
+{
+  LRVX_CAPI_ENTER(s);
+  return toStrategy(s)->ctx(symbol).barsInPosition;
+  LRVX_CAPI_LEAVE;
+}
+
 void lrvx_get_symbol_context(LrvxStrategyHandle s, uint32_t symbol, LrvxSymbolContext* out)
 {
   LRVX_CAPI_ENTER_VOID(s);
@@ -1287,6 +1314,24 @@ void lrvx_indicator_correlation(const double* x, const double* y, size_t len, si
   indicator::Correlation ind(period);
   ind.compute(std::span<const double>(x, len), std::span<const double>(y, len),
               std::span<double>(output, len));
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_indicator_highest(const double* input, size_t len, size_t period, double* output)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("highest", {period});
+  indicator::Highest ind(period);
+  ind.compute(std::span<const double>(input, len), std::span<double>(output, len));
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_indicator_lowest(const double* input, size_t len, size_t period, double* output)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  indicator::requireParams("lowest", {period});
+  indicator::Lowest ind(period);
+  ind.compute(std::span<const double>(input, len), std::span<double>(output, len));
   LRVX_CAPI_LEAVE_VOID;
 }
 
@@ -1770,6 +1815,288 @@ void lrvx_streaming_indicator_reset(LrvxStreamingIndicatorHandle h)
   LRVX_CAPI_ENTER_VOID(h);
   toStreamingIndicator(h)->reset();
   LRVX_CAPI_LEAVE_VOID;
+}
+
+// ============================================================
+// History
+// ============================================================
+
+namespace
+{
+
+History* toHistory(LrvxHistoryHandle h) { return static_cast<History*>(h); }
+
+}  // namespace
+
+LrvxHistoryHandle lrvx_history_create(uint32_t capacity)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  if (capacity == 0)
+  {
+    throw std::invalid_argument("History capacity must be >= 1");
+  }
+  return static_cast<LrvxHistoryHandle>(new History(capacity));
+  LRVX_CAPI_LEAVE;
+}
+
+void lrvx_history_destroy(LrvxHistoryHandle h)
+{
+  LRVX_CAPI_ENTER_DESTROY(h);
+  delete toHistory(h);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_history_push(LrvxHistoryHandle h, double value)
+{
+  LRVX_CAPI_ENTER_VOID(h);
+  toHistory(h)->push(value);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+double lrvx_history_get(LrvxHistoryHandle h, uint32_t index)
+{
+  LRVX_CAPI_ENTER(h);
+  return toHistory(h)->at(index);
+  LRVX_CAPI_LEAVE;
+}
+
+uint32_t lrvx_history_size(LrvxHistoryHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return static_cast<uint32_t>(toHistory(h)->size());
+  LRVX_CAPI_LEAVE;
+}
+
+uint32_t lrvx_history_capacity(LrvxHistoryHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return static_cast<uint32_t>(toHistory(h)->capacity());
+  LRVX_CAPI_LEAVE;
+}
+
+uint8_t lrvx_history_full(LrvxHistoryHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return toHistory(h)->full() ? 1 : 0;
+  LRVX_CAPI_LEAVE;
+}
+
+uint8_t lrvx_crossed_above(double a_prev, double a, double b_prev, double b)
+{
+  return crossedAbove(a_prev, a, b_prev, b) ? 1 : 0;
+}
+
+uint8_t lrvx_crossed_below(double a_prev, double a, double b_prev, double b)
+{
+  return crossedBelow(a_prev, a, b_prev, b) ? 1 : 0;
+}
+
+// ============================================================
+// Exit rules
+// ============================================================
+//
+// A handle owns one rule of lrvx/strategy/exits.h behind the interface
+// below; the arithmetic is the class's.
+
+namespace
+{
+
+class ExitRuleHandle
+{
+ public:
+  virtual ~ExitRuleHandle() = default;
+  virtual void arm(Side side, double entryPrice, double atr) = 0;
+  virtual bool update(double high, double low, double atr) = 0;
+  virtual double level() const = 0;
+  virtual bool armed() const = 0;
+  virtual void disarm() = 0;
+  virtual bool atBreakEven() const { return false; }
+  virtual uint32_t bars() const { return 0; }
+};
+
+// AtrStop, ChandelierExit, BreakEvenTrail: arm(side, entry, atr),
+// update(high, low, atr), stop().
+template <typename Rule>
+class AtrExitRule final : public ExitRuleHandle
+{
+ public:
+  explicit AtrExitRule(Rule rule) : _rule(std::move(rule)) {}
+  void arm(Side side, double entryPrice, double atr) override { _rule.arm(side, entryPrice, atr); }
+  bool update(double high, double low, double atr) override
+  {
+    return _rule.update(high, low, atr);
+  }
+  double level() const override { return _rule.stop(); }
+  bool armed() const override { return _rule.armed(); }
+  void disarm() override { _rule.disarm(); }
+  bool atBreakEven() const override
+  {
+    if constexpr (std::is_same_v<Rule, exits::BreakEvenTrail>)
+    {
+      return _rule.atBreakEven();
+    }
+    else
+    {
+      return false;
+    }
+  }
+
+ private:
+  Rule _rule;
+};
+
+class PercentStopRule final : public ExitRuleHandle
+{
+ public:
+  explicit PercentStopRule(double pct) : _rule(pct) {}
+  void arm(Side side, double entryPrice, double) override { _rule.arm(side, entryPrice); }
+  bool update(double high, double low, double) override { return _rule.update(high, low); }
+  double level() const override { return _rule.stop(); }
+  bool armed() const override { return _rule.armed(); }
+  void disarm() override { _rule.disarm(); }
+
+ private:
+  exits::PercentStop _rule;
+};
+
+class TakeProfitRule final : public ExitRuleHandle
+{
+ public:
+  explicit TakeProfitRule(double pct) : _rule(pct) {}
+  void arm(Side side, double entryPrice, double) override { _rule.arm(side, entryPrice); }
+  bool update(double high, double low, double) override { return _rule.update(high, low); }
+  double level() const override { return _rule.target(); }
+  bool armed() const override { return _rule.armed(); }
+  void disarm() override { _rule.disarm(); }
+
+ private:
+  exits::TakeProfit _rule;
+};
+
+class TimeStopRule final : public ExitRuleHandle
+{
+ public:
+  explicit TimeStopRule(size_t maxBars) : _rule(maxBars) {}
+  void arm(Side, double, double) override { _rule.arm(); }
+  bool update(double, double, double) override { return _rule.update(); }
+  double level() const override { return std::numeric_limits<double>::quiet_NaN(); }
+  bool armed() const override { return _rule.armed(); }
+  void disarm() override { _rule.disarm(); }
+  uint32_t bars() const override { return static_cast<uint32_t>(_rule.bars()); }
+
+ private:
+  exits::TimeStop _rule;
+};
+
+ExitRuleHandle* toExitRule(LrvxExitRuleHandle h) { return static_cast<ExitRuleHandle*>(h); }
+
+}  // namespace
+
+LrvxExitRuleHandle lrvx_exit_atr_stop_create(double atr_multiple)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  return static_cast<LrvxExitRuleHandle>(
+      new AtrExitRule<exits::AtrStop>(exits::AtrStop(atr_multiple)));
+  LRVX_CAPI_LEAVE;
+}
+
+LrvxExitRuleHandle lrvx_exit_chandelier_create(uint32_t lookback, double atr_multiple)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  return static_cast<LrvxExitRuleHandle>(
+      new AtrExitRule<exits::ChandelierExit>(exits::ChandelierExit(lookback, atr_multiple)));
+  LRVX_CAPI_LEAVE;
+}
+
+LrvxExitRuleHandle lrvx_exit_break_even_trail_create(double hard_stop_atr, double break_even_atr,
+                                                     double trail_atr)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  return static_cast<LrvxExitRuleHandle>(new AtrExitRule<exits::BreakEvenTrail>(
+      exits::BreakEvenTrail(hard_stop_atr, break_even_atr, trail_atr)));
+  LRVX_CAPI_LEAVE;
+}
+
+LrvxExitRuleHandle lrvx_exit_percent_stop_create(double pct)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  return static_cast<LrvxExitRuleHandle>(new PercentStopRule(pct));
+  LRVX_CAPI_LEAVE;
+}
+
+LrvxExitRuleHandle lrvx_exit_take_profit_create(double pct)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  return static_cast<LrvxExitRuleHandle>(new TakeProfitRule(pct));
+  LRVX_CAPI_LEAVE;
+}
+
+LrvxExitRuleHandle lrvx_exit_time_stop_create(uint32_t max_bars)
+{
+  LRVX_CAPI_ENTER_NOHANDLE;
+  return static_cast<LrvxExitRuleHandle>(new TimeStopRule(max_bars));
+  LRVX_CAPI_LEAVE;
+}
+
+void lrvx_exit_rule_destroy(LrvxExitRuleHandle h)
+{
+  LRVX_CAPI_ENTER_DESTROY(h);
+  delete toExitRule(h);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+void lrvx_exit_rule_arm(LrvxExitRuleHandle h, uint8_t side, double entry_price, double atr)
+{
+  LRVX_CAPI_ENTER_VOID(h);
+  if (side > 1)
+  {
+    throw std::invalid_argument("side " + std::to_string(side) +
+                                " is neither 0 (long / buy) nor 1 (short / sell)");
+  }
+  toExitRule(h)->arm(side == 0 ? Side::BUY : Side::SELL, entry_price, atr);
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+uint8_t lrvx_exit_rule_update(LrvxExitRuleHandle h, double high, double low, double atr)
+{
+  LRVX_CAPI_ENTER(h);
+  return toExitRule(h)->update(high, low, atr) ? 1 : 0;
+  LRVX_CAPI_LEAVE;
+}
+
+double lrvx_exit_rule_level(LrvxExitRuleHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return toExitRule(h)->level();
+  LRVX_CAPI_LEAVE;
+}
+
+uint8_t lrvx_exit_rule_armed(LrvxExitRuleHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return toExitRule(h)->armed() ? 1 : 0;
+  LRVX_CAPI_LEAVE;
+}
+
+void lrvx_exit_rule_disarm(LrvxExitRuleHandle h)
+{
+  LRVX_CAPI_ENTER_VOID(h);
+  toExitRule(h)->disarm();
+  LRVX_CAPI_LEAVE_VOID;
+}
+
+uint8_t lrvx_exit_rule_at_break_even(LrvxExitRuleHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return toExitRule(h)->atBreakEven() ? 1 : 0;
+  LRVX_CAPI_LEAVE;
+}
+
+uint32_t lrvx_exit_rule_bars(LrvxExitRuleHandle h)
+{
+  LRVX_CAPI_ENTER(h);
+  return toExitRule(h)->bars();
+  LRVX_CAPI_LEAVE;
 }
 
 // ============================================================

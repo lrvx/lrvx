@@ -72,6 +72,7 @@ lrvx_bar_dispatch_recorder_finalize|void|LrvxBarDispatchRecorderHandle
 lrvx_bar_dispatch_recorder_on_trade|void|LrvxBarDispatchRecorderHandle|uint32_t|double|double|int64_t
 lrvx_bar_dispatch_recorder_param_at|uint64_t|LrvxBarDispatchRecorderHandle|uint32_t
 lrvx_bar_dispatch_recorder_type_at|uint8_t|LrvxBarDispatchRecorderHandle|uint32_t
+lrvx_bars_in_position|uint32_t|LrvxStrategyHandle|uint32_t
 lrvx_best_ask_raw|int64_t|LrvxStrategyHandle|uint32_t
 lrvx_best_ask_raw_opt|uint8_t|LrvxStrategyHandle|uint32_t|int64_t *
 lrvx_best_bid_raw|int64_t|LrvxStrategyHandle|uint32_t
@@ -113,6 +114,8 @@ lrvx_composite_book_create|LrvxCompositeBookHandle
 lrvx_composite_book_destroy|void|LrvxCompositeBookHandle
 lrvx_composite_book_has_arb|uint8_t|LrvxCompositeBookHandle|uint32_t
 lrvx_composite_book_mark_stale|void|LrvxCompositeBookHandle|uint32_t|uint32_t
+lrvx_crossed_above|uint8_t|double|double|double|double
+lrvx_crossed_below|uint8_t|double|double|double|double
 lrvx_curve_amount_out|uint8_t|LrvxCurveHandle|size_t|size_t|const char *|char *|size_t
 lrvx_curve_apply_swap|uint8_t|LrvxCurveHandle|size_t|size_t|const char *|char *|size_t
 lrvx_curve_balance|uint8_t|LrvxCurveHandle|size_t|char *|size_t
@@ -185,6 +188,7 @@ lrvx_emit_take_profit_limit|uint64_t|LrvxStrategyHandle|uint32_t|uint8_t|int64_t
 lrvx_emit_take_profit_market|uint64_t|LrvxStrategyHandle|uint32_t|uint8_t|int64_t|int64_t
 lrvx_emit_trailing_stop|uint64_t|LrvxStrategyHandle|uint32_t|uint8_t|int64_t|int64_t
 lrvx_emit_trailing_stop_percent|uint64_t|LrvxStrategyHandle|uint32_t|uint8_t|int32_t|int64_t
+lrvx_entry_price_raw_opt|uint8_t|LrvxStrategyHandle|uint32_t|int64_t *
 lrvx_event_type_stats_aggregator_create|LrvxAggregatorHandle|LrvxAggregatorEventFilter|const uint32_t *|uint32_t
 lrvx_event_type_stats_read_result|uint32_t|LrvxAggregatorHandle|LrvxEventTypeStatsRow *|uint32_t
 lrvx_exec_clear_pending|void|LrvxExecAlgoHandle
@@ -210,6 +214,20 @@ lrvx_executor_create|LrvxExecutorHandle|LrvxExecutorCallbacks
 lrvx_executor_create_p|LrvxExecutorHandle|const LrvxExecutorCallbacks *
 lrvx_executor_destroy|void|LrvxExecutorHandle
 lrvx_executor_get_capabilities|void|LrvxExecutorHandle|LrvxExchangeCapabilities *
+lrvx_exit_atr_stop_create|LrvxExitRuleHandle|double
+lrvx_exit_break_even_trail_create|LrvxExitRuleHandle|double|double|double
+lrvx_exit_chandelier_create|LrvxExitRuleHandle|uint32_t|double
+lrvx_exit_percent_stop_create|LrvxExitRuleHandle|double
+lrvx_exit_rule_arm|void|LrvxExitRuleHandle|uint8_t|double|double
+lrvx_exit_rule_armed|uint8_t|LrvxExitRuleHandle
+lrvx_exit_rule_at_break_even|uint8_t|LrvxExitRuleHandle
+lrvx_exit_rule_bars|uint32_t|LrvxExitRuleHandle
+lrvx_exit_rule_destroy|void|LrvxExitRuleHandle
+lrvx_exit_rule_disarm|void|LrvxExitRuleHandle
+lrvx_exit_rule_level|double|LrvxExitRuleHandle
+lrvx_exit_rule_update|uint8_t|LrvxExitRuleHandle|double|double|double
+lrvx_exit_take_profit_create|LrvxExitRuleHandle|double
+lrvx_exit_time_stop_create|LrvxExitRuleHandle|uint32_t
 lrvx_fee_schedule_add_tier|void|LrvxFeeScheduleHandle|double|double|double
 lrvx_fee_schedule_bind_account|void|LrvxFeeScheduleHandle|LrvxAccountHandle
 lrvx_fee_schedule_clear_account_binding|void|LrvxFeeScheduleHandle
@@ -261,6 +279,13 @@ lrvx_grid_search_result_final_equity|double|LrvxGridSearchHandle|uint64_t
 lrvx_grid_search_result_unrealized_pnl|double|LrvxGridSearchHandle|uint64_t
 lrvx_grid_search_run|uint64_t|LrvxGridSearchHandle|LrvxGridSearchFactoryFn|void *|LrvxBacktestStats *|uint32_t
 lrvx_grid_search_total|uint64_t|LrvxGridSearchHandle
+lrvx_history_capacity|uint32_t|LrvxHistoryHandle
+lrvx_history_create|LrvxHistoryHandle|uint32_t
+lrvx_history_destroy|void|LrvxHistoryHandle
+lrvx_history_full|uint8_t|LrvxHistoryHandle
+lrvx_history_get|double|LrvxHistoryHandle|uint32_t
+lrvx_history_push|void|LrvxHistoryHandle|double
+lrvx_history_size|uint32_t|LrvxHistoryHandle
 lrvx_i256_roundtrip|uint8_t|const char *|char *|size_t
 lrvx_indicator_adf|void|const double *|size_t|size_t|const char *|double *|double *|size_t *
 lrvx_indicator_adx|void|const double *|const double *|const double *|size_t|size_t|double *|double *|double *
@@ -290,8 +315,10 @@ lrvx_indicator_graph_reset_all|void|LrvxIndicatorGraphHandle
 lrvx_indicator_graph_set_bars|void|LrvxIndicatorGraphHandle|uint32_t|const double *|const double *|const double *|const double *|size_t
 lrvx_indicator_graph_step|void|LrvxIndicatorGraphHandle|uint32_t|double|double|double|double|double
 lrvx_indicator_graph_volume|const double *|LrvxIndicatorGraphHandle|uint32_t|size_t *
+lrvx_indicator_highest|void|const double *|size_t|size_t|double *
 lrvx_indicator_kama|void|const double *|size_t|size_t|size_t|size_t|double *
 lrvx_indicator_kurtosis|void|const double *|size_t|size_t|double *
+lrvx_indicator_lowest|void|const double *|size_t|size_t|double *
 lrvx_indicator_macd|void|const double *|size_t|size_t|size_t|size_t|double *|double *|double *
 lrvx_indicator_obv|void|const double *|const double *|size_t|double *
 lrvx_indicator_parkinson_vol|void|const double *|const double *|size_t|size_t|double *

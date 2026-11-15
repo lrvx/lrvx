@@ -110,6 +110,8 @@ for (const v of stream) {
 | `RollingZScore` | `new RollingZScore(period)` | SingleInput | static `RollingZScore.compute(data, period)` |
 | `ShannonEntropy` | `new ShannonEntropy(period, bins=10)` | SingleInput | static `ShannonEntropy.compute(data, period, bins=10)`, instance `compute(data)` |
 | `AutoCorrelation` | `new AutoCorrelation(window, lag)` | SingleInput | static `AutoCorrelation.compute(data, window, lag)`, instance `compute(data)` |
+| `Highest` | `new Highest(period)` | SingleInput | static `Highest.compute(data, period)` |
+| `Lowest` | `new Lowest(period)` | SingleInput | static `Lowest.compute(data, period)` |
 | `ATR` | `new ATR(period)` | BarInput | static `ATR.compute(high, low, close, period)` |
 | `CCI` | `new CCI(period)` | BarInput | static `CCI.compute(high, low, close, period)` |
 | `CHOP` | `new CHOP(period)` | BarInput | static `CHOP.compute(high, low, close, period)` |

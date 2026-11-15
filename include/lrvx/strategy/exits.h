@@ -9,13 +9,14 @@
 
 #pragma once
 
-// Exit rules for bar strategies: an ATR stop, a Chandelier exit and a
-// break-even trail. Each one tracks one open position and answers, bar by
-// bar, where the stop is and whether the bar reached it. The strategy owns
+// Exit rules for bar strategies: an ATR stop, a Chandelier exit, a
+// break-even trail, a percent stop, a take-profit and a time stop. Each one
+// tracks one open position and answers, bar by bar, where the stop is and
+// whether the bar reached it. The strategy owns
 // the entry, the ATR (an indicator::ATR fed with the same bars) and the exit
 // order; these classes own the arithmetic of the level.
 //
-// One shape for the three:
+// One shape for the three ATR rules:
 //   arm(side, entryPrice, atr)   when the position opens, with the fill
 //                                price and the ATR of that bar
 //   update(high, low, atr)       once per closed bar from the fill bar on;
@@ -30,8 +31,14 @@
 // not disarm: the strategy exits and disarms, and the same hit is reported
 // again until it does.
 //
-// The python package carries the same three classes in lrvx.exits with the
-// same arithmetic; tests on both sides pin one scenario to the same levels.
+// PercentStop and TakeProfit take no ATR: arm(side, entryPrice) and
+// update(high, low), with the level at entryPrice * (1 -/+ pct / 100).
+// Like the ATR rules, update() reports whether this bar reached the level;
+// a hit leaves the rule armed and the level where it was. TimeStop takes no
+// prices at all: arm() and update(), true from the maxBars-th update on.
+//
+// The python package carries the same classes in lrvx.exits with the same
+// arithmetic; tests on both sides pin one scenario to the same levels.
 
 #include "lrvx/common.h"
 
@@ -40,6 +47,8 @@
 #include <cstddef>
 #include <deque>
 #include <limits>
+#include <stdexcept>
+#include <string>
 
 namespace lrvx::exits
 {
@@ -50,6 +59,15 @@ namespace detail
 inline bool reached(Side side, double high, double low, double stop)
 {
   return side == Side::BUY ? low <= stop : high >= stop;
+}
+
+inline double requirePositivePct(double pct, const char* rule)
+{
+  if (!(pct > 0.0))
+  {
+    throw std::invalid_argument(std::string(rule) + ": pct must be > 0");
+  }
+  return pct;
 }
 
 }  // namespace detail
@@ -236,6 +254,130 @@ class BreakEvenTrail
   double _stop{std::numeric_limits<double>::quiet_NaN()};
   double _best{0.0};
   bool _breakEven{false};
+  bool _armed{false};
+};
+
+// A stop `pct` percent from the entry, frozen there: entry * (1 - pct / 100)
+// for a long, entry * (1 + pct / 100) for a short. Throws
+// std::invalid_argument unless pct > 0.
+class PercentStop
+{
+ public:
+  explicit PercentStop(double pct) : _pct(detail::requirePositivePct(pct, "PercentStop")) {}
+
+  void arm(Side side, double entryPrice) noexcept
+  {
+    _side = side;
+    _stop = side == Side::BUY ? entryPrice * (1.0 - _pct / 100.0)
+                              : entryPrice * (1.0 + _pct / 100.0);
+    _armed = true;
+  }
+
+  // Whether this bar's range reached the stop.
+  bool update(double high, double low) const noexcept
+  {
+    return _armed && detail::reached(_side, high, low, _stop);
+  }
+
+  double stop() const noexcept { return _stop; }
+  bool armed() const noexcept { return _armed; }
+  void disarm() noexcept
+  {
+    _armed = false;
+    _stop = std::numeric_limits<double>::quiet_NaN();
+  }
+  double pct() const noexcept { return _pct; }
+
+ private:
+  double _pct;
+  Side _side{Side::BUY};
+  double _stop{std::numeric_limits<double>::quiet_NaN()};
+  bool _armed{false};
+};
+
+// A profit target `pct` percent from the entry: entry * (1 + pct / 100) for a
+// long, reached when high >= target; entry * (1 - pct / 100) for a short,
+// reached when low <= target. Throws std::invalid_argument unless pct > 0.
+class TakeProfit
+{
+ public:
+  explicit TakeProfit(double pct) : _pct(detail::requirePositivePct(pct, "TakeProfit")) {}
+
+  void arm(Side side, double entryPrice) noexcept
+  {
+    _side = side;
+    _target = side == Side::BUY ? entryPrice * (1.0 + _pct / 100.0)
+                                : entryPrice * (1.0 - _pct / 100.0);
+    _armed = true;
+  }
+
+  // Whether this bar's range reached the target.
+  bool update(double high, double low) const noexcept
+  {
+    if (!_armed)
+    {
+      return false;
+    }
+    return _side == Side::BUY ? high >= _target : low <= _target;
+  }
+
+  double target() const noexcept { return _target; }
+  bool armed() const noexcept { return _armed; }
+  void disarm() noexcept
+  {
+    _armed = false;
+    _target = std::numeric_limits<double>::quiet_NaN();
+  }
+  double pct() const noexcept { return _pct; }
+
+ private:
+  double _pct;
+  Side _side{Side::BUY};
+  double _target{std::numeric_limits<double>::quiet_NaN()};
+  bool _armed{false};
+};
+
+// Exit after a number of bars: update() counts the bars since arm() and is
+// true from the maxBars-th one on. Throws std::invalid_argument for 0 bars.
+class TimeStop
+{
+ public:
+  explicit TimeStop(std::size_t maxBars) : _maxBars(maxBars)
+  {
+    if (maxBars < 1)
+    {
+      throw std::invalid_argument("TimeStop: maxBars must be >= 1");
+    }
+  }
+
+  void arm() noexcept
+  {
+    _bars = 0;
+    _armed = true;
+  }
+
+  bool update() noexcept
+  {
+    if (!_armed)
+    {
+      return false;
+    }
+    ++_bars;
+    return _bars >= _maxBars;
+  }
+
+  std::size_t bars() const noexcept { return _bars; }
+  std::size_t maxBars() const noexcept { return _maxBars; }
+  bool armed() const noexcept { return _armed; }
+  void disarm() noexcept
+  {
+    _armed = false;
+    _bars = 0;
+  }
+
+ private:
+  std::size_t _maxBars;
+  std::size_t _bars{0};
   bool _armed{false};
 };
 

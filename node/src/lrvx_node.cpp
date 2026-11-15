@@ -33,6 +33,7 @@
 #include "run_trace.h"
 #include "stats.h"
 #include "strategy.h"
+#include "strategy_helpers.h"
 #include "tape_aggregators.h"
 #include "tape_diff.h"
 #include "targets.h"
@@ -77,6 +78,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports)
   node_lrvx::registerLiveQueuePositionEstimator(env, exports);
   node_lrvx::registerBarDispatchRecorder(env, exports);
   node_lrvx::registerFeedClock(env, exports);
+  node_lrvx::registerStrategyHelpers(env, exports);
   node_lrvx::registerTapeDiff(env, exports);
   node_lrvx::registerDexAmount(env, exports);
   node_lrvx::registerAmmCurve(env, exports);

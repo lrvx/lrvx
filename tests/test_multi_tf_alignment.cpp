@@ -15,6 +15,7 @@
 
 #include <chrono>
 #include <memory>
+#include <vector>
 
 namespace
 {
@@ -136,4 +137,70 @@ TEST(MultiTfAlignment, MultiSymbolRingsStayIndependent)
   ASSERT_TRUE(ethBar.has_value());
   EXPECT_NEAR(btcBar->close.toDouble(), 50100.0, 1e-9);
   EXPECT_NEAR(ethBar->close.toDouble(), 3010.0, 1e-9);
+}
+
+namespace
+{
+
+std::vector<double> closesOf(const std::vector<lrvx::Bar>& bars)
+{
+  std::vector<double> out;
+  for (const auto& b : bars)
+  {
+    out.push_back(b.close.toDouble());
+  }
+  return out;
+}
+
+}  // namespace
+
+// A ring already full at the default 64 bars: lowering the capacity to 3
+// leaves only the newest 3 readable at once, oldest first, and the ring stays
+// at 3 after the next bar.
+TEST(MultiTfAlignment, LoweringCapacityTrimsAFullRing)
+{
+  Fixture f;
+  TestStrategy s(1, std::vector<lrvx::SymbolId>{f.btc}, *f.reg);
+  const uint64_t M5 = 300'000'000'000ull;
+  ASSERT_EQ(s.barRingCapacity(), 64u);
+  for (int i = 0; i < 70; ++i)
+  {
+    s.onBar(makeTimeBar(f.btc, M5, 1000.0 + i, 1000.25 + i, (int64_t)M5 * i));
+  }
+  ASSERT_EQ(s.lastNClosedBars(f.btc, lrvx::BarType::Time, M5, 100).size(), 64u);
+
+  s.setBarRingCapacity(3);
+  EXPECT_EQ(s.barRingCapacity(), 3u);
+  EXPECT_EQ(closesOf(s.lastNClosedBars(f.btc, lrvx::BarType::Time, M5, 100)),
+            (std::vector<double>{1067.25, 1068.25, 1069.25}));
+  auto last = s.lastClosedBar(f.btc, lrvx::BarType::Time, M5);
+  ASSERT_TRUE(last.has_value());
+  EXPECT_NEAR(last->close.toDouble(), 1069.25, 1e-9);
+
+  s.onBar(makeTimeBar(f.btc, M5, 1070.0, 1070.25, (int64_t)M5 * 70));
+  EXPECT_EQ(closesOf(s.lastNClosedBars(f.btc, lrvx::BarType::Time, M5, 100)),
+            (std::vector<double>{1068.25, 1069.25, 1070.25}));
+}
+
+// Raising the capacity keeps every bar already in the ring and lets it grow.
+TEST(MultiTfAlignment, RaisingCapacityKeepsExistingBars)
+{
+  Fixture f;
+  TestStrategy s(1, std::vector<lrvx::SymbolId>{f.btc}, *f.reg);
+  const uint64_t M5 = 300'000'000'000ull;
+  s.setBarRingCapacity(3);
+  for (int i = 0; i < 5; ++i)
+  {
+    s.onBar(makeTimeBar(f.btc, M5, 2000.0 + i, 2000.5 + i, (int64_t)M5 * i));
+  }
+  s.setBarRingCapacity(5);
+  EXPECT_EQ(closesOf(s.lastNClosedBars(f.btc, lrvx::BarType::Time, M5, 100)),
+            (std::vector<double>{2002.5, 2003.5, 2004.5}));
+  s.onBar(makeTimeBar(f.btc, M5, 2005.0, 2005.5, (int64_t)M5 * 5));
+  s.onBar(makeTimeBar(f.btc, M5, 2006.0, 2006.5, (int64_t)M5 * 6));
+  EXPECT_EQ(closesOf(s.lastNClosedBars(f.btc, lrvx::BarType::Time, M5, 100)),
+            (std::vector<double>{2002.5, 2003.5, 2004.5, 2005.5, 2006.5}));
+  s.onBar(makeTimeBar(f.btc, M5, 2007.0, 2007.5, (int64_t)M5 * 7));
+  EXPECT_EQ(closesOf(s.lastNClosedBars(f.btc, lrvx::BarType::Time, M5, 100)),
+            (std::vector<double>{2003.5, 2004.5, 2005.5, 2006.5, 2007.5}));
 }

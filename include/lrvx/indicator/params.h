@@ -53,6 +53,8 @@ inline constexpr RowParamFloors kRowParamFloors[] = {
     {"rolling_zscore", {{{"period", 2}}}, 1},
     {"shannon_entropy", {{{"period", 2}, {"bins", 2}}}, 2},
     {"autocorrelation", {{{"window", 2}, {"lag", 1}}}, 2},
+    {"highest", {{{"period", 1}}}, 1},
+    {"lowest", {{{"period", 1}}}, 1},
     {"atr", {{{"period", 1}}}, 1},
     {"cci", {{{"period", 1}}}, 1},
     {"chop", {{{"period", 2}}}, 1},

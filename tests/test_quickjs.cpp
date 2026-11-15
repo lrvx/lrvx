@@ -1338,6 +1338,285 @@ TEST(JsIntegrationTest, MultiTfHelpersRingCapacityIsAdjustable)
   JS_FreeValue(ctx, kept);
 }
 
+// The runtime contract quickjs/types/lrvx.d.ts declares for the ring: each
+// bar has exactly open/high/low/close/volume as Numbers and startNs/endNs as
+// BigInts; null and [] before the first bar; oldest first; `n` caps the
+// array; `param` takes a Number or a BigInt and the symbol a name, an id or
+// undefined; barRingCapacity is a Number, setBarRingCapacity returns
+// undefined and bounds what the ring keeps.
+TEST(JsIntegrationTest, MultiTfHelpersMatchDeclaredShape)
+{
+  TempJsFile script(R"(
+    var M5 = 5 * 60 * 1000000000;
+    var out = {};
+    function shapeOf(b) {
+      var s = {};
+      Object.keys(b).sort().forEach(function(k) { s[k] = typeof b[k]; });
+      return s;
+    }
+    class TestStrat extends Strategy {
+      constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+      onStart() {
+        out.lastBefore = this.lastClosedBar("BTCUSDT", 0, M5) === null;
+        var n = this.lastNClosedBars("BTCUSDT", 0, M5, 5);
+        out.nBefore = Array.isArray(n) && n.length === 0;
+        out.defaultCapType = typeof this.barRingCapacity;
+        out.defaultCap = this.barRingCapacity;
+        out.setReturn = typeof this.setBarRingCapacity(0);
+        out.capAfterZero = this.barRingCapacity;
+        this.setBarRingCapacity(3);
+        out.capAfterSet = this.barRingCapacity;
+      }
+      onBar(ctx, bar) {
+        var last = this.lastClosedBar("BTCUSDT", 0, M5);
+        out.shape = shapeOf(last);
+        out.lastClose = last.close;
+        out.lastStartNs = String(last.startNs);
+        out.lastEndNs = String(last.endNs);
+        out.lastVolume = last.volume;
+        out.byIdBigParam = this.lastClosedBar(ctx.symbolId, 0, BigInt(M5)).close;
+        out.primary = this.lastClosedBar(undefined, 0, M5).close;
+        out.otherTf = this.lastClosedBar("BTCUSDT", 0, 2 * M5);
+        out.all = this.lastNClosedBars("BTCUSDT", 0, M5, 10).map(function(b) { return b.close; });
+        out.two = this.lastNClosedBars(ctx.symbolId, 0, BigInt(M5), 2).map(function(b) { return b.close; });
+        out.zero = this.lastNClosedBars("BTCUSDT", 0, M5, 0).length;
+        out.nShape = this.lastNClosedBars("BTCUSDT", 0, M5, 1).map(shapeOf)[0];
+      }
+    }
+    lrvx.register(new TestStrat());
+    function result() { return JSON.stringify(out); }
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+
+  auto bridge = std::make_unique<BridgeStrategy>(
+      1, std::vector<SymbolId>(symIds.begin(), symIds.end()), registry, callbacks);
+  jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+
+  bridge->start();
+
+  const int64_t m5 = 5LL * 60 * 1'000'000'000LL;
+  for (int i = 0; i < 5; ++i)
+  {
+    BarEvent ev{};
+    ev.symbol = symIds[0];
+    ev.barType = BarType::Time;
+    ev.barTypeParam = static_cast<uint64_t>(m5);
+    ev.bar.open = Price::fromDouble(100.0 + i);
+    ev.bar.close = Price::fromDouble(100.5 + i);
+    ev.bar.high = Price::fromDouble(101.0 + i);
+    ev.bar.low = Price::fromDouble(99.5 + i);
+    ev.bar.volume = Volume::fromDouble(2.5 + i);
+    ev.bar.startTime = TimePoint{std::chrono::nanoseconds{m5 * i}};
+    ev.bar.endTime = TimePoint{std::chrono::nanoseconds{m5 * (i + 1)}};
+    bridge->onBar(ev);
+  }
+
+  auto* ctx = jsStrat.engine().context();
+  JSValue fn = jsStrat.engine().getGlobalProperty("result");
+  JSValue res = JS_Call(ctx, fn, JS_UNDEFINED, 0, nullptr);
+  ASSERT_FALSE(JS_IsException(res));
+  const char* s = JS_ToCString(ctx, res);
+  std::string json = s ? s : "";
+  JS_FreeCString(ctx, s);
+  JS_FreeValue(ctx, res);
+  JS_FreeValue(ctx, fn);
+
+  const std::string shape =
+      R"({"close":"number","endNs":"bigint","high":"number","low":"number",)"
+      R"("open":"number","startNs":"bigint","volume":"number"})";
+  const std::string expected =
+      R"({"lastBefore":true,"nBefore":true,"defaultCapType":"number","defaultCap":64,)"
+      R"("setReturn":"undefined","capAfterZero":1,"capAfterSet":3,)"
+      R"("shape":)" +
+      shape +
+      R"(,"lastClose":104.5,"lastStartNs":"1200000000000","lastEndNs":"1500000000000",)"
+      R"("lastVolume":6.5,"byIdBigParam":104.5,"primary":104.5,"otherTf":null,)"
+      R"("all":[102.5,103.5,104.5],"two":[103.5,104.5],"zero":0,"nShape":)" +
+      shape + "}";
+  EXPECT_EQ(json, expected);
+}
+
+namespace
+{
+// A strategy kept in the global `S`, with its ring read back through the
+// functions the scripts below define.
+struct RingScript
+{
+  TempJsFile script;
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat;
+  std::vector<SymbolId> symIds;
+  std::unique_ptr<BridgeStrategy> bridge;
+
+  explicit RingScript(const std::string& body)
+      : script(R"(
+          var M5 = 5 * 60 * 1000000000;
+          class RingStrat extends Strategy {
+            constructor() { super({ exchange: "Test", symbols: ["BTCUSDT"] }); }
+          }
+          var S = new RingStrat();
+          lrvx.register(S);
+          function closes() {
+            return S.lastNClosedBars("BTCUSDT", 0, M5, 100).map(function(b) { return b.close; });
+          }
+        )" + body),
+        jsStrat(script.path(), registry)
+  {
+    auto ids = jsStrat.symbolIds();
+    symIds.assign(ids.begin(), ids.end());
+    bridge = std::make_unique<BridgeStrategy>(1, symIds, registry, jsStrat.getCallbacks());
+    jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+    bridge->start();
+  }
+
+  // Bar i closes at base + i.
+  void push(int i, double base)
+  {
+    const int64_t m5 = 5LL * 60 * 1'000'000'000LL;
+    BarEvent ev{};
+    ev.symbol = symIds[0];
+    ev.barType = BarType::Time;
+    ev.barTypeParam = static_cast<uint64_t>(m5);
+    ev.bar.open = Price::fromDouble(base + i - 0.5);
+    ev.bar.close = Price::fromDouble(base + i);
+    ev.bar.high = Price::fromDouble(base + i + 1.0);
+    ev.bar.low = Price::fromDouble(base + i - 1.0);
+    ev.bar.startTime = TimePoint{std::chrono::nanoseconds{m5 * i}};
+    ev.bar.endTime = TimePoint{std::chrono::nanoseconds{m5 * (i + 1)}};
+    bridge->onBar(ev);
+  }
+
+  // JSON of what the global function `name` returns.
+  std::string call(const char* name)
+  {
+    auto* ctx = jsStrat.engine().context();
+    JSValue fn = jsStrat.engine().getGlobalProperty(name);
+    JSValue res = JS_Call(ctx, fn, JS_UNDEFINED, 0, nullptr);
+    std::string out;
+    if (JS_IsException(res))
+    {
+      JSValue exc = JS_GetException(ctx);
+      const char* m = JS_ToCString(ctx, exc);
+      out = std::string("threw: ") + (m ? m : "?");
+      JS_FreeCString(ctx, m);
+      JS_FreeValue(ctx, exc);
+    }
+    else
+    {
+      JSValue json = JS_JSONStringify(ctx, res, JS_UNDEFINED, JS_UNDEFINED);
+      const char* s = JS_ToCString(ctx, json);
+      out = s ? s : "";
+      JS_FreeCString(ctx, s);
+      JS_FreeValue(ctx, json);
+    }
+    JS_FreeValue(ctx, res);
+    JS_FreeValue(ctx, fn);
+    return out;
+  }
+};
+}  // namespace
+
+// A ring already full at the default 64 bars: once the script lowers the
+// capacity to 3, reads return only the newest 3, oldest first, and the ring
+// stays at 3 after the next bar.
+TEST(JsIntegrationTest, MultiTfHelpersLoweringCapacityTrimsAFullRing)
+{
+  RingScript r(R"(
+    function before() { return { cap: S.barRingCapacity, n: closes().length }; }
+    function lower() {
+      S.setBarRingCapacity(3);
+      return { cap: S.barRingCapacity, closes: closes(),
+               last: S.lastClosedBar("BTCUSDT", 0, M5).close };
+    }
+  )");
+  for (int i = 0; i < 70; ++i)
+  {
+    r.push(i, 1000.25);
+  }
+  ASSERT_EQ(r.call("before"), R"({"cap":64,"n":64})");
+  EXPECT_EQ(r.call("lower"), R"({"cap":3,"closes":[1067.25,1068.25,1069.25],"last":1069.25})");
+  r.push(70, 1000.25);
+  EXPECT_EQ(r.call("closes"), "[1068.25,1069.25,1070.25]");
+}
+
+// Raising the capacity keeps every bar already held and lets the ring grow.
+TEST(JsIntegrationTest, MultiTfHelpersRaisingCapacityKeepsExistingBars)
+{
+  RingScript r(R"(
+    function setThree() { S.setBarRingCapacity(3); return S.barRingCapacity; }
+    function setFive() { S.setBarRingCapacity(5); return closes(); }
+  )");
+  ASSERT_EQ(r.call("setThree"), "3");
+  for (int i = 0; i < 5; ++i)
+  {
+    r.push(i, 2000.5);
+  }
+  EXPECT_EQ(r.call("setFive"), "[2002.5,2003.5,2004.5]");
+  r.push(5, 2000.5);
+  r.push(6, 2000.5);
+  EXPECT_EQ(r.call("closes"), "[2002.5,2003.5,2004.5,2005.5,2006.5]");
+  r.push(7, 2000.5);
+  EXPECT_EQ(r.call("closes"), "[2003.5,2004.5,2005.5,2006.5,2007.5]");
+}
+
+// The ring's arguments are checked as the other QuickJS globals check theirs
+// (toUint32OrThrow, and Node's argUint32 for the same methods): a capacity
+// that is not an integer Number from 0 to 4294967295 throws a TypeError whose
+// message names "setBarRingCapacity: capacity" and leaves the capacity as it
+// was; a barType that is not an integer Number from 0 to 6 (Time .. BpsRange)
+// throws a TypeError naming "lastClosedBar: barType" or
+// "lastNClosedBars: barType" instead of reading some other bar type's ring.
+TEST(JsIntegrationTest, MultiTfHelpersRejectBadRingArguments)
+{
+  RingScript r(R"(
+    function attempt(f, needle) {
+      try { f(); return "no throw"; }
+      catch (e) {
+        if (!(e instanceof TypeError)) return "not a TypeError: " + e;
+        return String(e.message).indexOf(needle) >= 0 ? "TypeError" : "unnamed: " + e.message;
+      }
+    }
+    function capacity() {
+      var out = {};
+      [["bigint", 64n], ["string", "8"], ["fraction", 2.5], ["negative", -1],
+       ["NaN", NaN], ["undefined", undefined]].forEach(function(c) {
+        out[c[0]] = attempt(function() { S.setBarRingCapacity(c[1]); },
+                            "setBarRingCapacity: capacity");
+      });
+      out.capAfter = S.barRingCapacity;
+      return out;
+    }
+    function barType() {
+      var out = {};
+      [["string", "0"], ["name", "time"], ["seven", 7], ["wraps to Time", 256],
+       ["negative", -1], ["fraction", 1.5]].forEach(function(c) {
+        out["last " + c[0]] = attempt(function() { S.lastClosedBar("BTCUSDT", c[1], M5); },
+                                      "lastClosedBar: barType");
+        out["n " + c[0]] = attempt(function() { S.lastNClosedBars("BTCUSDT", c[1], M5, 5); },
+                                   "lastNClosedBars: barType");
+      });
+      out.wellFormed = S.lastClosedBar("BTCUSDT", 6, M5) === null &&
+                       S.lastClosedBar("BTCUSDT", 0, M5).close;
+      return out;
+    }
+  )");
+  r.push(0, 3000.0);
+  EXPECT_EQ(r.call("capacity"),
+            R"({"bigint":"TypeError","string":"TypeError","fraction":"TypeError",)"
+            R"("negative":"TypeError","NaN":"TypeError","undefined":"TypeError","capAfter":64})");
+  EXPECT_EQ(r.call("barType"),
+            R"({"last string":"TypeError","n string":"TypeError",)"
+            R"("last name":"TypeError","n name":"TypeError",)"
+            R"("last seven":"TypeError","n seven":"TypeError",)"
+            R"("last wraps to Time":"TypeError","n wraps to Time":"TypeError",)"
+            R"("last negative":"TypeError","n negative":"TypeError",)"
+            R"("last fraction":"TypeError","n fraction":"TypeError","wellFormed":3000})");
+}
+
 TEST(JsIntegrationTest, JsExceptionInOnTradeDoesNotCrash)
 {
   TempJsFile script(R"(
@@ -2624,6 +2903,62 @@ TEST(JsIntegrationTest, BestQuoteAccessorsAnswerNullForNoQuoteAndZeroForAPriceOf
   EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "midZeroValue"), 0.0);
   EXPECT_NEAR(readGlobalDouble(jsStrat, "bidBelowZero"), -0.01, 1e-9);
   EXPECT_NEAR(readGlobalDouble(jsStrat, "askAboveZero"), 0.01, 1e-9);
+}
+
+// The symbol argument of the context queries is a name, a numeric id
+// (ctx.symbolId), or nothing for the primary. Two symbols with different
+// books: asked by id, each query answers what the name form answers for that
+// symbol, not for the primary.
+TEST(JsIntegrationTest, ContextQueriesTakeANumericSymbolIdLikeTheName)
+{
+  TempJsFile script(R"(
+    var updates = 0, compared = 0, mismatches = 0;
+    var aaaMidById = -1, bbbMidById = -1, primaryMid = -1;
+    var ids = {};
+    function cmp(a, b) { compared++; if (a !== b) mismatches++; }
+    class TestStrat extends Strategy {
+      constructor() { super({ exchange: "T", symbols: ["AAA", "BBB"] }); }
+      onBookUpdate(ctx, book) {
+        updates++;
+        ids[ctx.symbol] = ctx.symbolId;
+        var self = this;
+        Object.keys(ids).forEach(function (name) {
+          var id = ids[name];
+          cmp(self.position(id), self.position(name));
+          cmp(self.midPrice(id), self.midPrice(name));
+          cmp(self.bestBid(id), self.bestBid(name));
+          cmp(self.bestAsk(id), self.bestAsk(name));
+          cmp(self.lastPrice(id), self.lastPrice(name));
+        });
+        if (ids.AAA !== undefined) aaaMidById = this.midPrice(ids.AAA);
+        if (ids.BBB !== undefined) bbbMidById = this.midPrice(ids.BBB);
+        primaryMid = this.midPrice();
+      }
+    }
+    lrvx.register(new TestStrat());
+  )");
+
+  SymbolRegistry registry;
+  LrvxJsStrategy jsStrat(script.path(), registry);
+  auto callbacks = jsStrat.getCallbacks();
+  auto symIds = jsStrat.symbolIds();
+  ASSERT_EQ(symIds.size(), 2u);
+
+  auto bridge = std::make_unique<BridgeStrategy>(
+      1, std::vector<SymbolId>(symIds.begin(), symIds.end()), registry, callbacks);
+  jsStrat.injectHandle(static_cast<LrvxStrategyHandle>(bridge.get()));
+
+  pushBook(*bridge, symIds[0], {{99.0, 1.0}}, {{101.0, 1.0}});
+  pushBook(*bridge, symIds[1], {{49.0, 1.0}}, {{51.0, 1.0}});
+
+  ASSERT_EQ(readGlobalInt32(jsStrat, "updates"), 2);
+  // 5 queries for AAA on the first update, 5 each for AAA and BBB on the second.
+  EXPECT_EQ(readGlobalInt32(jsStrat, "compared"), 15);
+  EXPECT_EQ(readGlobalInt32(jsStrat, "mismatches"), 0)
+      << "a query asked by numeric symbol id answers differently from the name form";
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "aaaMidById"), 100.0);
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "bbbMidById"), 50.0);
+  EXPECT_DOUBLE_EQ(readGlobalDouble(jsStrat, "primaryMid"), 100.0);
 }
 
 // The same four books, read through the objects a callback receives rather
@@ -4552,8 +4887,9 @@ TEST(JsIntegrationTest, CallbackArgumentsHaveTheDocumentedTypes)
   update.replace(update.find("fillRole:string"), 15, "fillRole:null");
   EXPECT_EQ(str("updateShape"), update);
   EXPECT_EQ(str("ctxShape"),
-            "avgEntryPrice:number,book:object,lastTouchNs:bigint,lastTradePrice:number,"
-            "lastUpdateNs:bigint,position:number,symbol:string,symbolId:number");
+            "avgEntryPrice:number,barsInPosition:number,book:object,entryPrice:number,"
+            "lastTouchNs:bigint,lastTradePrice:number,lastUpdateNs:bigint,position:number,"
+            "symbol:string,symbolId:number");
 
   EXPECT_EQ(str("fillStatus"), "FILLED");
   EXPECT_EQ(readGlobalInt32(jsStrat, "fillOrderIdMatches"), 1);
