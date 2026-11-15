@@ -1,0 +1,135 @@
+# Backtest and live with the same strategy class — Codon.
+#
+# The same SMAStrategy works in three modes:
+#   - BacktestRunner:          replay CSV, SimulatedExecutor fills orders
+#   - Runner:                  synchronous live, push ticks from your connector
+#   - Runner(threaded=True):   Disruptor-based, lock-free publish, consumer threads
+#
+# Build:
+#   codon build -exe -o build/codon/codon_backtest_vs_live \
+#     -L build/src/capi -llrvx_capi examples/codon_backtest_vs_live.codon
+#
+# Run:
+#   DYLD_LIBRARY_PATH=build/src/capi:~/.local/lib/codon \
+#     ./build/codon/codon_backtest_vs_live
+
+from lrvx.indicators import SMA
+from lrvx.runner import Runner, BacktestRunner, Signal
+from lrvx.strategy import Strategy, SymbolContext, TradeData
+
+
+class SMAStrategy(Strategy):
+    """SMA(10/30) crossover."""
+
+    fast_sma: SMA
+    slow_sma: SMA
+    trade_count: int
+
+    def __init__(self, symbols: List[int]):
+        super().__init__(symbols)
+        self.fast_sma = SMA(10)
+        self.slow_sma = SMA(30)
+        self.trade_count = 0
+
+    def on_start(self):
+        self.trade_count = 0
+        print("  SMAStrategy started")
+
+    def on_stop(self):
+        print(f"  SMAStrategy stopped  ({self.trade_count} signals emitted)")
+
+    def on_trade(self, ctx: SymbolContext, trade: TradeData):
+        price = trade.price.to_double()
+        fv = self.fast_sma.update(price)
+        sv = self.slow_sma.update(price)
+        if not self.slow_sma.ready:
+            return
+        if fv > sv and ctx.is_flat():
+            self.market_buy(0.01)
+            self.trade_count += 1
+        elif fv < sv and ctx.is_flat():
+            self.market_sell(0.01)
+            self.trade_count += 1
+
+
+def main():
+    from C import lrvx_registry_create() -> cobj
+    from C import lrvx_registry_add_symbol(cobj, cobj, cobj, float) -> u32
+
+    DATA = "docs/examples/data/btcusdt_1m.csv"
+
+    reg = lrvx_registry_create()
+    btc = lrvx_registry_add_symbol(reg, "binance".c_str(), "BTCUSDT".c_str(), 0.01)
+
+    signals_received: List[Signal] = []
+
+    def on_signal(sig: Signal):
+        signals_received.append(sig)
+
+    # ── 1. BacktestRunner — replay historical CSV ─────────────────────
+
+    print("── Backtest ──────────────────────────────────────────────────────")
+
+    bt = BacktestRunner(reg, fee_rate=0.0004, initial_capital=10_000.0)
+    bt.set_strategy(SMAStrategy([int(btc)]))
+    stats = bt.run_csv(DATA, "BTCUSDT")
+
+    sign = "+" if stats.return_pct >= 0.0 else ""
+    print(f"  Return   : {sign}{stats.return_pct:.4f}%")
+    print(f"  Trades   : {stats.total_trades}  win={stats.win_rate * 100.0:.1f}%")
+    print(f"  Sharpe   : {stats.sharpe_ratio:.4f}")
+    print(f"  Max DD   : {stats.max_drawdown_pct:.4f}%")
+    print(f"  Net PnL  : {stats.net_pnl:.4f}")
+
+    # ── 2. Runner — synchronous live ──────────────────────────────────
+
+    print("\n── Runner (live, sync) ───────────────────────────────────────────")
+
+    live_sigs: List[Signal] = []
+
+    def on_live_signal(sig: Signal):
+        live_sigs.append(sig)
+
+    runner = Runner(reg, on_live_signal)
+    runner.add_strategy(SMAStrategy([int(btc)]))
+    runner.start()
+
+    prices: List[float] = [float(50000 + i * 50) for i in range(40)]
+    ts_ns = i64(1_700_000_000_000_000_000)
+    for i, p in enumerate(prices):
+        runner.on_trade(int(btc), p, 0.1, i % 2 == 0, int(ts_ns))
+        ts_ns += i64(1_000_000_000)
+
+    runner.stop()
+    print(f"  Signals received: {len(live_sigs)}")
+    for s in live_sigs[:3]:
+        print(f"    {s.side:4s}  {s.quantity:.4f} @ {s.price:.2f}  [{s.order_type}]")
+
+    # ── 3. Runner(threaded=True) — Disruptor, lock-free publish ───────
+
+    print("\n── Runner (threaded=True) ────────────────────────────────────────")
+
+    from C import usleep(u32)
+
+    engine_sigs: List[Signal] = []
+
+    def on_engine_signal(sig: Signal):
+        engine_sigs.append(sig)
+
+    engine = Runner(reg, on_engine_signal, True)
+    engine.add_strategy(SMAStrategy([int(btc)]))
+    engine.start()
+
+    ts_ns = i64(1_700_000_000_000_000_000)
+    for i, p in enumerate(prices):
+        engine.on_trade(int(btc), p, 0.1, i % 2 == 0, int(ts_ns))
+        ts_ns += i64(1_000_000_000)
+
+    usleep(u32(50_000))  # 50 ms
+    engine.stop()
+    print(f"  Signals received: {len(engine_sigs)}")
+
+    print("\nDone.")
+
+
+main()

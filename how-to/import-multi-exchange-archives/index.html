@@ -1,0 +1,5280 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI-native framework for building trading systems.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.lrvx.dev/how-to/import-multi-exchange-archives/">
+      
+      
+        <link rel="prev" href="../import-binance-book-archive/">
+      
+      
+        <link rel="next" href="../iterate-orderbook/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Import multi-exchange archives - lrvx</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#import-multi-exchange-public-archives" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="lrvx" class="md-header__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            lrvx
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Import multi-exchange archives
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../tutorials/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../bindings/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Bindings
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  How-To Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../venue/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Venue
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../explanation/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Explanation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../spec/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="lrvx" class="md-nav__button md-logo" aria-label="lrvx" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M8 3a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2H3v2h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2v-2H8v-5a2 2 0 0 0-2-2 2 2 0 0 0 2-2V5h2V3m6 0a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1v2h-1a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2v-2h2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5h-2V3z"/></svg>
+
+    </a>
+    lrvx
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/lrvx/lrvx" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    lrvx/lrvx
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../tutorials/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../bindings/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bindings
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How-To Guides
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    How-To Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy & Backtest
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Strategy & Backtest
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lrvx-new/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scaffold a Project (lrvx new)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy Classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../typescript-strategy-authoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript strategy authoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-hot-reload/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Strategy hot-reload
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../delta-book-compression/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta book compression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lrvxrun/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Record a strategy run as .lrvxrun
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lrvxrun-auto-capture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capture a strategy run automatically
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../replay-viewer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inspect a tape and run in the replay viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-tf-context/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Read multi-timeframe context from a strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../read-the-touch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Read the touch from a strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../composite-conditions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compose multi-symbol multi-TF entry conditions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-leg-order-group/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Submit a multi-leg order group
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-feed-clock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wait for multiple feeds with staleness budget
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ccxt-adapter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connect to CCXT exchange
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../latency-contour/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Measure per-hop latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../alpha-to-onnx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    From alpha to ONNX inference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../colo-host-memory/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prepare a colo host (memory profile)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtesting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-html-report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest HTML report
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../heatmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Heatmap rendering
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-realistic-fills/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Realistic Backtest Fills
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../iceberg-orders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Native iceberg orders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../realistic-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Realistic backtest in one call
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross-margin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-margin accounts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../liquidation-and-adl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Liquidation and ADL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../perpetual-funding/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Perpetual funding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../price-a-dex-swap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Price a DEX swap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-an-lp-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest an LP position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../route-and-arb-dex-pools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Route, arb, and ingest DEX pools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dex-on-node/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Price and backtest DEX pools on Node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../options-pricing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Price options and implied volatility
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../options-greeks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compute option greeks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../order-tif-flags/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order TIF flags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../self-match-prevention/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self-match prevention
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matching-modes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Matching modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rate-limits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rate limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../venue-downtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue downtime
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../calibrate-live-queue/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Calibrate live queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tape-record/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Record and replay market data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engine-sim/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a paper engine (lrvx engine sim)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-tape/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Merge multiple tapes on read
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../import-binance-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Import Binance public archives
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../import-binance-book-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Import Binance book archives
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Import multi-exchange archives
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Import multi-exchange archives
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-every-importer-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What every importer checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#days-and-time-zones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Days and time zones
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#symbols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symbols
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#downloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downloads
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conversion-in-worker-processes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conversion in worker processes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#append-and-dedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Append and dedup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quantity-units" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quantity units
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bybit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bybit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bybit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#url-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        URL layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-form" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Range form
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#okx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OKX
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OKX">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#url-layout_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        URL layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#columns_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bitget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bitget
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bitget">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#columns_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shared-download-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared download cache
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-exchange-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-exchange research
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-exchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new exchange
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../iterate-orderbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Iterate the order book from a tape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rolling-thresholds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rolling top-K thresholds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross-sectional-panel/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-sectional panel builder
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../interactive-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../grid-search/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grid Search
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sweep-over-bars/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sweep parameters over bars
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bar-exits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Exits for bar strategies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../walk-forward/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Walk-forward
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../whites-reality-check/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    White's reality check
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../robustness-statistics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overfitting checks for a parameter sweep
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mlflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Log to MLflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../advanced-orders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Orders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bracket-orders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Submit a native bracket order
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../order-group-replace/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replace a leg of an active OrderGroup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../order-replace-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model order replace acknowledgement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../order-state-timestamps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-lifecycle-stage order timestamps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../order-journey-forensics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Record and analyse order journeys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../maker-taker-classification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Read maker / taker on a fill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../queue-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Read queue position from a strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-queue-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Estimate queue position from live events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hidden-order-attribution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Attribute hidden / iceberg flow in queue estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../resting-order-market-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Track a resting order's market position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../level-empty-detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Detect when a resting order is alone at its level
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../submit-latency-modeling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model submit-side ack latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cancel-latency-modeling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model cancellation ack latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../latency-distributions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configure ack-latency distributions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../latency-profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apply a named latency profile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tiered-fees/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model venue volume-tiered fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-recipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../strategy-pump/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sweep a signal over a tape
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-exchange-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Exchange Trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-runtime-inspection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inspect engine over MCP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../paper-trading/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paper trading
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reproducibility-bundles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reproducibility bundles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-control-plane/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Control engine over MCP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mcp-live-analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live analytics over MCP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../lookahead-detector/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lookahead-bias detector
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../portfolio-risk/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Portfolio risk aggregator
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../backtest-with-latency/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backtest with latency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../execution-algorithms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Execution algorithms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rl-environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RL environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../indicator-graph/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicators & Aggregation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../optimize-performance/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance (system-level)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../add-an-indicator/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the core (C++)
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../project-layout/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project ops
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../venue/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Venue
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../explanation/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Explanation
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../spec/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specifications
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+      
+        
+        
+      
+    
+    <li class="md-nav__item md-nav__item--pruned md-nav__item--nested">
+      
+        
+  
+  
+  
+    <a href="../../reference/" class="md-nav__link">
+      
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      
+        <span class="md-nav__icon md-icon"></span>
+      
+    </a>
+  
+
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-every-importer-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What every importer checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#days-and-time-zones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Days and time zones
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#symbols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Symbols
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#downloads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Downloads
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conversion-in-worker-processes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conversion in worker processes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#append-and-dedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Append and dedup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quantity-units" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quantity units
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#network-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Network tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bybit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bybit
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bybit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#url-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        URL layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#range-form" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Range form
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#okx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OKX
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OKX">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#url-layout_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        URL layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#columns_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bitget" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bitget
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Bitget">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#columns_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shared-download-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shared download cache
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-exchange-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-exchange research
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-exchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new exchange
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="import-multi-exchange-public-archives">Import multi-exchange public archives<a class="headerlink" href="#import-multi-exchange-public-archives" title="Permanent link">&para;</a></h1>
+<p><code>lrvx.archives</code> collects the per-exchange importers under one namespace. Each submodule exposes the same two entry points and the matching CLI subcommand:</p>
+<table>
+<thead>
+<tr>
+<th>Exchange</th>
+<th>Module</th>
+<th>Trade entry point</th>
+<th>CLI</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Binance</td>
+<td><code>lrvx.archives.binance</code></td>
+<td><code>aggtrades_to_lrvx</code></td>
+<td><code>lrvx archive binance ...</code></td>
+</tr>
+<tr>
+<td>Bybit</td>
+<td><code>lrvx.archives.bybit</code></td>
+<td><code>trades_to_lrvx</code></td>
+<td><code>lrvx archive bybit ...</code></td>
+</tr>
+<tr>
+<td>OKX</td>
+<td><code>lrvx.archives.okx</code></td>
+<td><code>trades_to_lrvx</code></td>
+<td><code>lrvx archive okx ...</code></td>
+</tr>
+<tr>
+<td>Bitget</td>
+<td><code>lrvx.archives.bitget</code></td>
+<td><code>trades_to_lrvx</code></td>
+<td><code>lrvx archive bitget ...</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each importer reads the files the exchange publishes today, at the URLs below. Deribit is not in the list: it publishes no public trade file archive.</p>
+<p>Adding a new venue is a self-contained module under <code>lrvx/archives/</code> that implements <code>trades_to_lrvx</code> + <code>range_to_lrvx</code> matching the <code>ArchiveReader</code> Protocol.</p>
+<h2 id="what-every-importer-checks">What every importer checks<a class="headerlink" href="#what-every-importer-checks" title="Permanent link">&para;</a></h2>
+<p>The CSV layout is recognised from the file's header row (or, for Binance files without one, from the column count). A file whose first row matches no layout the exchange publishes raises <code>lrvx.archives.UnknownLayoutError</code>, naming the row it found and the layouts it expected; nothing is written. A file with data rows of which none parse raises <code>lrvx.archives.NothingParsedError</code>. Rows that fail to parse in a file where others parse are counted in <code>rows_invalid</code>. An import that writes nothing because every trade is on the tape already is not an error: it returns <code>trades_written=0</code> with the trades counted in <code>rows_skipped</code>. The CLI reports either error as one line on stderr and exits with status 1.</p>
+<h2 id="days-and-time-zones">Days and time zones<a class="headerlink" href="#days-and-time-zones" title="Permanent link">&para;</a></h2>
+<p><code>--from</code> and <code>--to</code> (<code>date_from</code> / <code>date_to</code>) name the exchange's own daily files, both included, and the exchanges do not cut their days at the same hour:</p>
+<table>
+<thead>
+<tr>
+<th>Exchange</th>
+<th>A day is</th>
+<th><code>--from 2024-01-15 --to 2024-01-15</code> covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Binance</td>
+<td>a UTC day</td>
+<td>2024-01-15T00:00Z to 2024-01-16T00:00Z</td>
+</tr>
+<tr>
+<td>Bybit</td>
+<td>a UTC day</td>
+<td>2024-01-15T00:00Z to 2024-01-16T00:00Z</td>
+</tr>
+<tr>
+<td>OKX</td>
+<td>a UTC+8 day</td>
+<td>2024-01-14T16:00Z to 2024-01-15T16:00Z</td>
+</tr>
+<tr>
+<td>Bitget</td>
+<td>a UTC+8 day</td>
+<td>2024-01-14T16:00Z to 2024-01-15T16:00Z</td>
+</tr>
+</tbody>
+</table>
+<p>Asking OKX or Bitget for one UTC day therefore yields a day shifted eight hours earlier; to cover the UTC day 2024-01-15 in full, import 2024-01-15 and 2024-01-16 from them. The tape stores every trade at its exchange timestamp, so the shift is in which trades land, not in their times. The CLI summary line names the first and last trade actually written, in UTC, and for an OKX or Bitget range also the UTC span the requested days cover:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>lrvx archive okx: trades_written=... rows_read=... rows_skipped=0 rows_invalid=0 rows_other_instruments=0 files=1 first_trade=2024-01-14T16:00:00.071Z last_trade=2024-01-15T15:59:59.934Z (OKX days are UTC+8 days: 2024-01-15 to 2024-01-15 covers 2024-01-14T16:00:00Z to 2024-01-15T16:00:00Z)
+</span></code></pre></div>
+<p>The same two timestamps are in the returned stats as <code>first_ts_ns</code> and <code>last_ts_ns</code> (nanoseconds, 0 when nothing was written). Each module states its boundary as <code>DAY_UTC_OFFSET_HOURS</code> (0 or 8).</p>
+<h2 id="symbols">Symbols<a class="headerlink" href="#symbols" title="Permanent link">&para;</a></h2>
+<p>Each range form checks the symbol against the form its exchange and market use before making any request, and fails with an example of the expected form:</p>
+<table>
+<thead>
+<tr>
+<th>Exchange</th>
+<th>Market</th>
+<th>Symbol</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Binance</td>
+<td>spot</td>
+<td><code>BTCUSDT</code></td>
+</tr>
+<tr>
+<td>Binance</td>
+<td>um-futures</td>
+<td><code>BTCUSDT</code>, <code>BTCUSDT_240329</code></td>
+</tr>
+<tr>
+<td>Binance</td>
+<td>cm-futures</td>
+<td><code>BTCUSD_PERP</code>, <code>BTCUSD_240329</code></td>
+</tr>
+<tr>
+<td>Bybit</td>
+<td>spot</td>
+<td><code>BTCUSDT</code></td>
+</tr>
+<tr>
+<td>Bybit</td>
+<td>linear</td>
+<td><code>BTCUSDT</code>, <code>BTCPERP</code>, <code>BTC-27DEC24</code></td>
+</tr>
+<tr>
+<td>Bybit</td>
+<td>inverse</td>
+<td><code>BTCUSD</code>, <code>BTCUSDZ24</code></td>
+</tr>
+<tr>
+<td>OKX</td>
+<td>spot / swap</td>
+<td><code>BTC-USDT</code> / <code>BTC-USDT-SWAP</code></td>
+</tr>
+<tr>
+<td>OKX</td>
+<td>futures / option</td>
+<td><code>BTC-USD-240329</code> / <code>BTC-USD-240329-50000-C</code></td>
+</tr>
+<tr>
+<td>Bitget</td>
+<td>spot, umcbl / cmcbl / dmcbl</td>
+<td><code>BTCUSDT</code> / <code>BTCPERP</code> / <code>BTCUSD</code> (no <code>_UMCBL</code>-style suffix)</td>
+</tr>
+</tbody>
+</table>
+<p>The check is on the shape only; whether the exchange lists the symbol shows when its files are looked up.</p>
+<h2 id="downloads">Downloads<a class="headerlink" href="#downloads" title="Permanent link">&para;</a></h2>
+<p>The range forms share one download policy:</p>
+<ul>
+<li>A file the archive does not publish (HTTP 404 or 410, or the 403 a CDN answers for a missing object) is asked for once and not retried.</li>
+<li>A timeout, a dropped connection, a 5xx answer, a body shorter than its <code>Content-Length</code>, and a body that does not open as the zip or gzip it should be are retried, three attempts in all with a growing pause; if all fail the import stops with the URL and the last error.</li>
+<li>Without <code>--skip-missing</code>, a missing day stops the range with an error naming its URL. With <code>--skip-missing</code> the range steps over days the archive does not publish; a download that keeps failing for another reason still stops it.</li>
+<li>A range in which no day is published fails, with or without <code>--skip-missing</code>, naming the symbol, market and dates and the first URL tried. The CLI exits with status 1.</li>
+</ul>
+<h2 id="conversion-in-worker-processes">Conversion in worker processes<a class="headerlink" href="#conversion-in-worker-processes" title="Permanent link">&para;</a></h2>
+<p>Parsing the CSVs is the slow part of an import, so the range forms parse the files of a range in worker processes: <code>workers</code> (<code>--workers N</code>) of them, by default one per CPU core and at most one per file (a Bitget part counts as one file). <code>--workers 1</code> parses in the importing process. <code>parallel</code> (<code>--parallel</code>) is the number of downloads in flight and does not change how many processes convert.</p>
+<p>The tape is written by the importing process alone, a file at a time in date order, with the dedup described below, so a range imported with any worker count gives the same tape: the same records in the same order, one segment per file, the same <code>metadata.json</code> and the same counters. A worker parses a file into a temporary file in the system temp directory (about 33 bytes per trade) and the workers run at most two files per worker ahead of the writer, so the temporary space stays at a few days' worth however long the range.</p>
+<p>An import that fails leaves the tape as it found it, whatever the worker count: the error is the one the file raised (<code>UnknownLayoutError</code>, <code>NothingParsedError</code>, <code>CorruptArchiveError</code>, ...) and names the file, the segments written for earlier files of the range are removed and <code>metadata.json</code> keeps its old content. A cached file that does not open is removed from the cache, so the next run downloads it again.</p>
+<p>The workers are started with the <code>spawn</code> method, on every platform. A script that calls a range importer from its top level needs the usual <code>if __name__ == "__main__":</code> guard; without it, pass <code>workers=1</code>.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>lrvx<span class="w"> </span>archive<span class="w"> </span>bybit<span class="w"> </span>--symbol<span class="w"> </span>BTCUSDT<span class="w"> </span>--market<span class="w"> </span>linear<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--from<span class="w"> </span><span class="m">2026</span>-08-01<span class="w"> </span>--to<span class="w"> </span><span class="m">2026</span>-10-31<span class="w"> </span>--out<span class="w"> </span>./tapes/bybit-linear-BTCUSDT<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--workers<span class="w"> </span><span class="m">8</span>
+</span></code></pre></div>
+<p>On a 14-core Mac, the 92 Bybit BTCUSDT linear days from 2026-08-01 to 2026-10-31 (146 million trades, from a local mirror) import in 40 s with the default worker count and in 5 min 9 s with <code>--workers 1</code>, into the same tape.</p>
+<h2 id="append-and-dedup">Append and dedup<a class="headerlink" href="#append-and-dedup" title="Permanent link">&para;</a></h2>
+<p>All four trade importers append by default and dedup the same way: a row is skipped when its trade id is already on the tape for the same symbol within the incoming file's time range. A trade keeps its exchange timestamp, so only that range can hold a copy of it, and the dedup read covers that range instead of the whole tape. Re-importing a day adds nothing, a new day lands in full, an overlapping range keeps each trade once, and days may be imported in any order (a later day first, or a day that fills a gap). <code>--no-append</code> turns the check off.</p>
+<p>Each import writes new segments named by the time of the import, so a tape filled out of order lists its segments out of time order. Readers and <code>run_tape</code> order segments by their first event, so the tape still replays forward in time.</p>
+<p>Within a file, the Bybit, OKX and Bitget importers write trades in timestamp order (rows with the same timestamp keep their file order), whatever order the file lists them in; the Binance importer writes them in file order. Memory does not grow with the size of the day: a file is parsed in batches of 16,384 rows into a temporary file (about 33 bytes per row, in the system temp directory, removed when the import ends), files not in time order are merged back from sorted runs, and the dedup read pulls the tape's ids for the file's time range in short time windows. Only the ids already on the tape for that range stay in memory for the whole import, 8 bytes per trade. A two-million-trade Bybit day imports in about 60 MB of resident memory, and re-importing it takes about 90 MB.</p>
+<p>The Binance bookTicker importer (<code>--book t1</code>) follows the same rule on the book record's update id, and encodes every file on its own, starting from a snapshot, so book days may be imported in any order too. See <a href="../import-binance-book-archive/#append-safe-and-idempotent">Import Binance book archives</a>.</p>
+<h2 id="quantity-units">Quantity units<a class="headerlink" href="#quantity-units" title="Permanent link">&para;</a></h2>
+<p>The tape stores each trade's quantity in the unit the archive publishes it in, which is also the unit the live path reports for that venue (the native Bybit and Bitget connectors pass the venue's size through, and the ccxt bridge reports contract markets in contracts). <code>metadata.json</code> records it under <code>custom.qty_unit</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Exchange</th>
+<th>Market</th>
+<th>Quantity</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Binance</td>
+<td>spot, um-futures</td>
+<td>base asset</td>
+</tr>
+<tr>
+<td>Binance</td>
+<td>cm-futures</td>
+<td>contracts (<code>BTCUSD_PERP</code> 100 USD each, other symbols 10 USD)</td>
+</tr>
+<tr>
+<td>Bybit</td>
+<td>spot, linear</td>
+<td>base coin</td>
+</tr>
+<tr>
+<td>Bybit</td>
+<td>inverse</td>
+<td>USD contracts (1 USD each)</td>
+</tr>
+<tr>
+<td>OKX</td>
+<td>spot</td>
+<td>base currency</td>
+</tr>
+<tr>
+<td>OKX</td>
+<td>swap, futures, option</td>
+<td>contracts (<code>BTC-USDT-SWAP</code> 0.01 BTC, <code>BTC-USD-SWAP</code> and BTC-USD futures 100 USD)</td>
+</tr>
+<tr>
+<td>Bitget</td>
+<td>every market</td>
+<td>base coin</td>
+</tr>
+</tbody>
+</table>
+<p>The importers do not know contract sizes. Binance aggTrades and OKX take <code>qty_multiplier</code> (<code>--qty-multiplier</code> on the CLI), a constant every quantity is multiplied by, recorded under <code>custom.qty_multiplier</code>; pass the instrument's contract size from the exchange's instrument metadata (OKX <code>ctVal</code> from <code>/api/v5/public/instruments</code>) to store a linear contract in the base coin. For an inverse contract the multiplier gives the USD notional, not coins.</p>
+<h2 id="network-tests">Network tests<a class="headerlink" href="#network-tests" title="Permanent link">&para;</a></h2>
+<p>The tests under <code>python/tests/</code> build their CSV fixtures from the real headers and row shapes. Each importer also has tests that download one small real day per market and compare decoded trades with the downloaded file; they are skipped unless <code>LRVX_ARCHIVE_NETWORK_TESTS=1</code> is set:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">LRVX_ARCHIVE_NETWORK_TESTS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">PYTHONPATH</span><span class="o">=</span>build/python<span class="w"> </span>python3<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>python/tests/test_binance_archive.py<span class="w"> </span>python/tests/test_binance_book_archive.py<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>python/tests/test_bybit_archive.py<span class="w"> </span>python/tests/test_okx_archive.py<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>python/tests/test_bitget_archive.py<span class="w"> </span>-k<span class="w"> </span>Real
+</span></code></pre></div>
+<h2 id="bybit">Bybit<a class="headerlink" href="#bybit" title="Permanent link">&para;</a></h2>
+<p>Bybit publishes one gzipped CSV per symbol and UTC day at <code>https://public.bybit.com/</code>, which serves a directory listing of every symbol and file.</p>
+<h3 id="url-layout">URL layout<a class="headerlink" href="#url-layout" title="Permanent link">&para;</a></h3>
+<ul>
+<li>spot: <code>public.bybit.com/spot/&lt;SYMBOL&gt;/&lt;SYMBOL&gt;_&lt;YYYY-MM-DD&gt;.csv.gz</code> (BTCUSDT from 2022-11-10)</li>
+<li>linear: <code>public.bybit.com/trading/&lt;SYMBOL&gt;/&lt;SYMBOL&gt;&lt;YYYY-MM-DD&gt;.csv.gz</code> (BTCUSDT from 2020-03-25)</li>
+<li>inverse: <code>public.bybit.com/trading/&lt;SYMBOL&gt;/&lt;SYMBOL&gt;&lt;YYYY-MM-DD&gt;.csv.gz</code></li>
+</ul>
+<p>Linear and inverse differ only in symbol naming (<code>BTCUSDT</code>, <code>BTCUSD</code>). The converter accepts the symbol verbatim; cross-exchange symbol normalisation is a connectors concern, not an importer one. Each tape keys its own <code>(metadata.exchange, name)</code> so <code>MergedTapeReader</code> treats <code>binance:BTCUSDT</code> and <code>bybit:BTCUSDT</code> as distinct global symbols.</p>
+<h3 id="columns">Columns<a class="headerlink" href="#columns" title="Permanent link">&para;</a></h3>
+<p>Linear and inverse files:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>timestamp,symbol,side,size,price,tickDirection,trdMatchID,grossValue,homeNotional,foreignNotional
+</span></code></pre></div>
+<p>Recent files add a trailing <code>RPI</code> column. <code>timestamp</code> is Unix seconds with a decimal fraction. <code>side</code> is the taker side, <code>Buy</code> / <code>Sell</code>, mapped to lrvx's <code>Side::BUY</code> / <code>Side::SELL</code>. <code>trdMatchID</code> is a UUID string that the importer folds into the 64-bit lrvx <code>trade_id</code> (the first 8 bytes of its MD5 digest, read big-endian); the folded ids carry no order, which the membership dedup above does not need. <code>size</code> is in the base coin for linear and in USD contracts for inverse. Older files list trades newest first.</p>
+<p>Spot files:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>id,timestamp,price,volume,side
+</span></code></pre></div>
+<p>Recent files add a trailing <code>rpi</code> column. <code>timestamp</code> is Unix milliseconds, <code>side</code> is <code>buy</code> / <code>sell</code>, <code>volume</code> is in the base coin, and <code>id</code> counts the day's trades from 1; it is the lrvx <code>trade_id</code>.</p>
+<h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
+<p>The script below builds a Bybit-style gzipped CSV in memory, runs <code>trades_to_lrvx</code>, then reads the produced tape back through <code>DataReader.read_trades</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="sd">"""Bybit public archive round-trip — build a gzipped CSV in the layout</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="sd">Bybit publishes for linear and inverse contracts, push it through</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="sd">`bybit.trades_to_lrvx`, and read the resulting `.lrvx` tape</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="sd">back via `DataReader` to confirm the trade stream round-trips.</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="sd">CI-runnable companion to</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="sd">[Import multi-exchange archives](../how-to/import-multi-exchange-archives.md).</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="sd">No network — the fixture is built in memory.</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="sd">Usage:</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="sd">    cd /path/to/lrvx</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="sd">    PYTHONPATH=build/python python3 docs/examples/python_bybit_archive.py</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="sd">"""</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="kn">import</span><span class="w"> </span><span class="nn">gzip</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="kn">import</span><span class="w"> </span><span class="nn">lrvx</span>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lrvx.archives</span><span class="w"> </span><span class="kn">import</span> <span class="n">bybit</span>
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>
+</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>
+</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="c1"># timestamp, symbol, side, size, price, tickDirection, trdMatchID,</span>
+</span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a><span class="c1"># grossValue, homeNotional, foreignNotional</span>
+</span><span id="__span-5-28"><a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a><span class="n">_ROWS</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-5-29"><a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>    <span class="p">(</span><span class="s2">"1700000000.5000"</span><span class="p">,</span> <span class="s2">"BTCUSDT"</span><span class="p">,</span> <span class="s2">"Buy"</span><span class="p">,</span>  <span class="mf">0.01</span><span class="p">,</span> <span class="mf">42_100.5</span><span class="p">,</span> <span class="s2">"ZeroPlusTick"</span><span class="p">,</span>
+</span><span id="__span-5-30"><a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>     <span class="s2">"08ff9568-cb50-55d6-b497-13727eec09dc"</span><span class="p">,</span> <span class="mf">4.21005e+10</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">,</span> <span class="mf">421.005</span><span class="p">),</span>
+</span><span id="__span-5-31"><a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>    <span class="p">(</span><span class="s2">"1700000001.2500"</span><span class="p">,</span> <span class="s2">"BTCUSDT"</span><span class="p">,</span> <span class="s2">"Sell"</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">,</span> <span class="mf">42_101.0</span><span class="p">,</span> <span class="s2">"ZeroMinusTick"</span><span class="p">,</span>
+</span><span id="__span-5-32"><a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>     <span class="s2">"3f1d562a-57d4-5755-b305-2ade260deeaf"</span><span class="p">,</span> <span class="mf">8.4202e+10</span><span class="p">,</span> <span class="mf">0.02</span><span class="p">,</span> <span class="mf">842.02</span><span class="p">),</span>
+</span><span id="__span-5-33"><a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a>    <span class="p">(</span><span class="s2">"1700000002.0000"</span><span class="p">,</span> <span class="s2">"BTCUSDT"</span><span class="p">,</span> <span class="s2">"Buy"</span><span class="p">,</span>  <span class="mf">0.03</span><span class="p">,</span> <span class="mf">42_100.7</span><span class="p">,</span> <span class="s2">"PlusTick"</span><span class="p">,</span>
+</span><span id="__span-5-34"><a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a>     <span class="s2">"f0039dc6-a46b-5c4d-b550-cad3be2fca6e"</span><span class="p">,</span> <span class="mf">1.263021e+11</span><span class="p">,</span> <span class="mf">0.03</span><span class="p">,</span> <span class="mf">1263.021</span><span class="p">),</span>
+</span><span id="__span-5-35"><a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a><span class="p">]</span>
+</span><span id="__span-5-36"><a id="__codelineno-5-36" name="__codelineno-5-36" href="#__codelineno-5-36"></a>
+</span><span id="__span-5-37"><a id="__codelineno-5-37" name="__codelineno-5-37" href="#__codelineno-5-37"></a>
+</span><span id="__span-5-38"><a id="__codelineno-5-38" name="__codelineno-5-38" href="#__codelineno-5-38"></a><span class="k">def</span><span class="w"> </span><span class="nf">_build_gz</span><span class="p">(</span><span class="n">dest</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+</span><span id="__span-5-39"><a id="__codelineno-5-39" name="__codelineno-5-39" href="#__codelineno-5-39"></a>    <span class="n">buf</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">StringIO</span><span class="p">()</span>
+</span><span id="__span-5-40"><a id="__codelineno-5-40" name="__codelineno-5-40" href="#__codelineno-5-40"></a>    <span class="n">buf</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"timestamp,symbol,side,size,price,tickDirection,"</span>
+</span><span id="__span-5-41"><a id="__codelineno-5-41" name="__codelineno-5-41" href="#__codelineno-5-41"></a>              <span class="s2">"trdMatchID,grossValue,homeNotional,foreignNotional</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-5-42"><a id="__codelineno-5-42" name="__codelineno-5-42" href="#__codelineno-5-42"></a>    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">_ROWS</span><span class="p">:</span>
+</span><span id="__span-5-43"><a id="__codelineno-5-43" name="__codelineno-5-43" href="#__codelineno-5-43"></a>        <span class="n">buf</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">","</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">r</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-5-44"><a id="__codelineno-5-44" name="__codelineno-5-44" href="#__codelineno-5-44"></a>    <span class="k">with</span> <span class="n">gzip</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="s2">"wt"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+</span><span id="__span-5-45"><a id="__codelineno-5-45" name="__codelineno-5-45" href="#__codelineno-5-45"></a>        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">buf</span><span class="o">.</span><span class="n">getvalue</span><span class="p">())</span>
+</span><span id="__span-5-46"><a id="__codelineno-5-46" name="__codelineno-5-46" href="#__codelineno-5-46"></a>    <span class="k">return</span> <span class="n">dest</span>
+</span><span id="__span-5-47"><a id="__codelineno-5-47" name="__codelineno-5-47" href="#__codelineno-5-47"></a>
+</span><span id="__span-5-48"><a id="__codelineno-5-48" name="__codelineno-5-48" href="#__codelineno-5-48"></a>
+</span><span id="__span-5-49"><a id="__codelineno-5-49" name="__codelineno-5-49" href="#__codelineno-5-49"></a><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-5-50"><a id="__codelineno-5-50" name="__codelineno-5-50" href="#__codelineno-5-50"></a>    <span class="n">workdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"lrvx-bybit-"</span><span class="p">))</span>
+</span><span id="__span-5-51"><a id="__codelineno-5-51" name="__codelineno-5-51" href="#__codelineno-5-51"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-5-52"><a id="__codelineno-5-52" name="__codelineno-5-52" href="#__codelineno-5-52"></a>        <span class="n">gz_path</span> <span class="o">=</span> <span class="n">workdir</span> <span class="o">/</span> <span class="s2">"BTCUSDT2024-01-15.csv.gz"</span>
+</span><span id="__span-5-53"><a id="__codelineno-5-53" name="__codelineno-5-53" href="#__codelineno-5-53"></a>        <span class="n">_build_gz</span><span class="p">(</span><span class="n">gz_path</span><span class="p">)</span>
+</span><span id="__span-5-54"><a id="__codelineno-5-54" name="__codelineno-5-54" href="#__codelineno-5-54"></a>
+</span><span id="__span-5-55"><a id="__codelineno-5-55" name="__codelineno-5-55" href="#__codelineno-5-55"></a>        <span class="n">tape</span> <span class="o">=</span> <span class="n">workdir</span> <span class="o">/</span> <span class="s2">"tape"</span>
+</span><span id="__span-5-56"><a id="__codelineno-5-56" name="__codelineno-5-56" href="#__codelineno-5-56"></a>        <span class="n">stats</span> <span class="o">=</span> <span class="n">bybit</span><span class="o">.</span><span class="n">trades_to_lrvx</span><span class="p">(</span>
+</span><span id="__span-5-57"><a id="__codelineno-5-57" name="__codelineno-5-57" href="#__codelineno-5-57"></a>            <span class="n">gz_path</span><span class="p">,</span> <span class="n">tape</span><span class="p">,</span>
+</span><span id="__span-5-58"><a id="__codelineno-5-58" name="__codelineno-5-58" href="#__codelineno-5-58"></a>            <span class="n">symbol_id</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">symbol_name</span><span class="o">=</span><span class="s2">"BTCUSDT"</span><span class="p">,</span> <span class="n">market</span><span class="o">=</span><span class="s2">"linear"</span><span class="p">,</span>
+</span><span id="__span-5-59"><a id="__codelineno-5-59" name="__codelineno-5-59" href="#__codelineno-5-59"></a>        <span class="p">)</span>
+</span><span id="__span-5-60"><a id="__codelineno-5-60" name="__codelineno-5-60" href="#__codelineno-5-60"></a>        <span class="n">trades</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">DataReader</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">tape</span><span class="p">))</span><span class="o">.</span><span class="n">read_trades</span><span class="p">()</span>
+</span><span id="__span-5-61"><a id="__codelineno-5-61" name="__codelineno-5-61" href="#__codelineno-5-61"></a>        <span class="nb">print</span><span class="p">(</span>
+</span><span id="__span-5-62"><a id="__codelineno-5-62" name="__codelineno-5-62" href="#__codelineno-5-62"></a>            <span class="sa">f</span><span class="s2">"converted: rows_read=</span><span class="si">{</span><span class="n">stats</span><span class="o">.</span><span class="n">rows_read</span><span class="si">}</span><span class="s2"> "</span>
+</span><span id="__span-5-63"><a id="__codelineno-5-63" name="__codelineno-5-63" href="#__codelineno-5-63"></a>            <span class="sa">f</span><span class="s2">"trades_written=</span><span class="si">{</span><span class="n">stats</span><span class="o">.</span><span class="n">trades_written</span><span class="si">}</span><span class="s2"> "</span>
+</span><span id="__span-5-64"><a id="__codelineno-5-64" name="__codelineno-5-64" href="#__codelineno-5-64"></a>            <span class="sa">f</span><span class="s2">"tape_trades=</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">trades</span><span class="o">.</span><span class="n">size</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+</span><span id="__span-5-65"><a id="__codelineno-5-65" name="__codelineno-5-65" href="#__codelineno-5-65"></a>        <span class="p">)</span>
+</span><span id="__span-5-66"><a id="__codelineno-5-66" name="__codelineno-5-66" href="#__codelineno-5-66"></a>        <span class="c1"># Buy → Side::BUY (0); Sell → Side::SELL (1).</span>
+</span><span id="__span-5-67"><a id="__codelineno-5-67" name="__codelineno-5-67" href="#__codelineno-5-67"></a>        <span class="n">sides</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="s2">"side"</span><span class="p">])</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">trades</span><span class="p">]</span>
+</span><span id="__span-5-68"><a id="__codelineno-5-68" name="__codelineno-5-68" href="#__codelineno-5-68"></a>        <span class="k">assert</span> <span class="n">sides</span> <span class="o">==</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">sides</span>
+</span><span id="__span-5-69"><a id="__codelineno-5-69" name="__codelineno-5-69" href="#__codelineno-5-69"></a>    <span class="k">finally</span><span class="p">:</span>
+</span><span id="__span-5-70"><a id="__codelineno-5-70" name="__codelineno-5-70" href="#__codelineno-5-70"></a>        <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-5-71"><a id="__codelineno-5-71" name="__codelineno-5-71" href="#__codelineno-5-71"></a>
+</span><span id="__span-5-72"><a id="__codelineno-5-72" name="__codelineno-5-72" href="#__codelineno-5-72"></a>
+</span><span id="__span-5-73"><a id="__codelineno-5-73" name="__codelineno-5-73" href="#__codelineno-5-73"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+</span><span id="__span-5-74"><a id="__codelineno-5-74" name="__codelineno-5-74" href="#__codelineno-5-74"></a>    <span class="n">main</span><span class="p">()</span>
+</span></code></pre></div>
+<h3 id="range-form">Range form<a class="headerlink" href="#range-form" title="Permanent link">&para;</a></h3>
+<p>For multi-day backfills, <code>range_to_lrvx</code> downloads missing files from the public archive and reuses anything already in the local mirror cache:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>lrvx.archives.bybit.range_to_lrvx(
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    symbol="BTCUSDT",
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    market="linear",
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    date_from="2024-01-01",
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    date_to="2024-12-31",
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    out_tape="/path/lrvx/BTCUSDT_bybit",
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    mirror=None,        # default = ~/.lrvx/archive-cache/bybit
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    parallel=4,         # downloads in flight
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    skip_missing=False,
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    workers=None,       # processes parsing files; None = one per core
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>)
+</span></code></pre></div>
+<p>CLI form:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>lrvx<span class="w"> </span>archive<span class="w"> </span>bybit<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--symbol<span class="w"> </span>BTCUSDT<span class="w"> </span>--market<span class="w"> </span>linear<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>--from<span class="w"> </span><span class="m">2024</span>-01-01<span class="w"> </span>--to<span class="w"> </span><span class="m">2024</span>-12-31<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>--out<span class="w"> </span>./tapes/bybit-linear-BTCUSDT<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>--parallel<span class="w"> </span><span class="m">4</span>
+</span></code></pre></div>
+<h2 id="okx">OKX<a class="headerlink" href="#okx" title="Permanent link">&para;</a></h2>
+<p>OKX publishes daily trade files on its CDN and lists them through the public endpoint <code>GET https://www.okx.com/api/v5/public/market-data-history</code> (module <code>1</code>, tick-by-tick trades). A day is a UTC+8 calendar day: the file for 2024-01-15 holds trades from 2024-01-14T16:00Z to 2024-01-15T16:00Z. Files usually appear two days after the day ends.</p>
+<h3 id="url-layout_1">URL layout<a class="headerlink" href="#url-layout_1" title="Permanent link">&para;</a></h3>
+<p>All markets share one prefix, <code>https://static.okx.com/cdn/okex/traderecords/trades/daily/&lt;YYYYMMDD&gt;/</code>:</p>
+<ul>
+<li>spot:    <code>&lt;INSTRUMENT&gt;-trades-&lt;YYYY-MM-DD&gt;.zip</code> (<code>BTC-USDT</code>)</li>
+<li>swap:    <code>&lt;INSTRUMENT&gt;-trades-&lt;YYYY-MM-DD&gt;.zip</code> (<code>BTC-USDT-SWAP</code>)</li>
+<li>futures: <code>&lt;FAMILY&gt;-futureschain-trades-&lt;YYYY-MM-DD&gt;.zip</code>, every expiry of the family in one file (<code>BTC-USD</code> for <code>BTC-USD-240329</code>)</li>
+<li>option:  <code>&lt;FAMILY&gt;-optionchain-trades-&lt;YYYY-MM-DD&gt;.zip</code>, every option of the family in one file (<code>BTC-USD</code> for <code>BTC-USD-240329-50000-C</code>)</li>
+</ul>
+<p>For BTC, spot and futures files start in September 2021, swap in October 2021 and options in 2023.</p>
+<h3 id="columns_1">Columns<a class="headerlink" href="#columns_1" title="Permanent link">&para;</a></h3>
+<p>The layout is read from the header. OKX publishes:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>instrument_name,trade_id,side,price,size,created_time
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>instrument_name,trade_id,side,price,size,created_time,source
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>trade_id,side,size,price,created_time
+</span></code></pre></div>
+<p>The last is a legacy per-instrument layout whose header cells carry a Chinese translation after a <code>/</code> (<code>trade_id/...</code>); OKX states these headers are being replaced. <code>created_time</code> is Unix milliseconds, <code>side</code> is the taker side (<code>buy</code> / <code>sell</code>, upper case in some older files), and <code>trade_id</code> is an integer that increases per instrument; it is the lrvx <code>trade_id</code>.</p>
+<p>One tape holds one instrument. A futures or option import reads the family's chain file and keeps the rows of the requested instrument; the rest are counted in <code>rows_other_instruments</code>. A chain file holding no trade of the instrument raises <code>InstrumentNotInFileError</code> on a single-file import; in a range, such a day adds nothing, and the range raises only when no day holds a trade of it. A single-file import of a chain file needs <code>symbol_name</code> (<code>--symbol</code>).</p>
+<h3 id="example_1">Example<a class="headerlink" href="#example_1" title="Permanent link">&para;</a></h3>
+<p>The script below builds an OKX-style zipped CSV in memory and round-trips it through the converter:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="sd">"""OKX public archive round-trip — build an OKX trade file in the</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="sd">layout OKX publishes (`instrument_name,trade_id,side,price,size,</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="sd">created_time`) in memory, run `okx.trades_to_lrvx`, then read the</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="sd">resulting `.lrvx` back through `DataReader` to confirm the trade</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="sd">stream round-trips. Swap sizes are contracts; `qty_multiplier=0.01`</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="sd">stores BTC-USDT-SWAP contracts (0.01 BTC each) in BTC.</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="sd">CI-runnable companion to</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="sd">[Import multi-exchange archives](../how-to/import-multi-exchange-archives.md).</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="sd">No network — the fixture is built in memory.</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="sd">Usage:</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="sd">    cd /path/to/lrvx</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="sd">    PYTHONPATH=build/python python3 docs/examples/python_okx_archive.py</span>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="sd">"""</span>
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+</span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+</span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="kn">import</span><span class="w"> </span><span class="nn">zipfile</span>
+</span><span id="__span-9-22"><a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span id="__span-9-23"><a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>
+</span><span id="__span-9-24"><a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="kn">import</span><span class="w"> </span><span class="nn">lrvx</span>
+</span><span id="__span-9-25"><a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lrvx.archives</span><span class="w"> </span><span class="kn">import</span> <span class="n">okx</span>
+</span><span id="__span-9-26"><a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a>
+</span><span id="__span-9-27"><a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a>
+</span><span id="__span-9-28"><a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a><span class="c1"># (instrument_name, trade_id, side, price, size, created_time)</span>
+</span><span id="__span-9-29"><a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a><span class="n">_ROWS</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-9-30"><a id="__codelineno-9-30" name="__codelineno-9-30" href="#__codelineno-9-30"></a>    <span class="p">(</span><span class="s2">"BTC-USDT-SWAP"</span><span class="p">,</span> <span class="mi">720073478</span><span class="p">,</span> <span class="s2">"buy"</span><span class="p">,</span>  <span class="mf">42897.9</span><span class="p">,</span>  <span class="mf">8.0</span><span class="p">,</span> <span class="mi">1_705_248_000_179</span><span class="p">),</span>
+</span><span id="__span-9-31"><a id="__codelineno-9-31" name="__codelineno-9-31" href="#__codelineno-9-31"></a>    <span class="p">(</span><span class="s2">"BTC-USDT-SWAP"</span><span class="p">,</span> <span class="mi">720073479</span><span class="p">,</span> <span class="s2">"sell"</span><span class="p">,</span> <span class="mf">42897.8</span><span class="p">,</span>  <span class="mf">1.0</span><span class="p">,</span> <span class="mi">1_705_248_000_412</span><span class="p">),</span>
+</span><span id="__span-9-32"><a id="__codelineno-9-32" name="__codelineno-9-32" href="#__codelineno-9-32"></a>    <span class="p">(</span><span class="s2">"BTC-USDT-SWAP"</span><span class="p">,</span> <span class="mi">720073480</span><span class="p">,</span> <span class="s2">"buy"</span><span class="p">,</span>  <span class="mf">42898.0</span><span class="p">,</span> <span class="mf">25.0</span><span class="p">,</span> <span class="mi">1_705_248_001_003</span><span class="p">),</span>
+</span><span id="__span-9-33"><a id="__codelineno-9-33" name="__codelineno-9-33" href="#__codelineno-9-33"></a><span class="p">]</span>
+</span><span id="__span-9-34"><a id="__codelineno-9-34" name="__codelineno-9-34" href="#__codelineno-9-34"></a>
+</span><span id="__span-9-35"><a id="__codelineno-9-35" name="__codelineno-9-35" href="#__codelineno-9-35"></a>
+</span><span id="__span-9-36"><a id="__codelineno-9-36" name="__codelineno-9-36" href="#__codelineno-9-36"></a><span class="k">def</span><span class="w"> </span><span class="nf">_build_zip</span><span class="p">(</span><span class="n">dest</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+</span><span id="__span-9-37"><a id="__codelineno-9-37" name="__codelineno-9-37" href="#__codelineno-9-37"></a>    <span class="n">buf</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">StringIO</span><span class="p">()</span>
+</span><span id="__span-9-38"><a id="__codelineno-9-38" name="__codelineno-9-38" href="#__codelineno-9-38"></a>    <span class="n">buf</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"instrument_name,trade_id,side,price,size,created_time</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-9-39"><a id="__codelineno-9-39" name="__codelineno-9-39" href="#__codelineno-9-39"></a>    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">_ROWS</span><span class="p">:</span>
+</span><span id="__span-9-40"><a id="__codelineno-9-40" name="__codelineno-9-40" href="#__codelineno-9-40"></a>        <span class="n">buf</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">","</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">r</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-9-41"><a id="__codelineno-9-41" name="__codelineno-9-41" href="#__codelineno-9-41"></a>    <span class="k">with</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">,</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZIP_DEFLATED</span><span class="p">)</span> <span class="k">as</span> <span class="n">zf</span><span class="p">:</span>
+</span><span id="__span-9-42"><a id="__codelineno-9-42" name="__codelineno-9-42" href="#__codelineno-9-42"></a>        <span class="n">zf</span><span class="o">.</span><span class="n">writestr</span><span class="p">(</span><span class="n">dest</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">".csv"</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">buf</span><span class="o">.</span><span class="n">getvalue</span><span class="p">())</span>
+</span><span id="__span-9-43"><a id="__codelineno-9-43" name="__codelineno-9-43" href="#__codelineno-9-43"></a>    <span class="k">return</span> <span class="n">dest</span>
+</span><span id="__span-9-44"><a id="__codelineno-9-44" name="__codelineno-9-44" href="#__codelineno-9-44"></a>
+</span><span id="__span-9-45"><a id="__codelineno-9-45" name="__codelineno-9-45" href="#__codelineno-9-45"></a>
+</span><span id="__span-9-46"><a id="__codelineno-9-46" name="__codelineno-9-46" href="#__codelineno-9-46"></a><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-9-47"><a id="__codelineno-9-47" name="__codelineno-9-47" href="#__codelineno-9-47"></a>    <span class="n">workdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"lrvx-okx-"</span><span class="p">))</span>
+</span><span id="__span-9-48"><a id="__codelineno-9-48" name="__codelineno-9-48" href="#__codelineno-9-48"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-9-49"><a id="__codelineno-9-49" name="__codelineno-9-49" href="#__codelineno-9-49"></a>        <span class="n">z</span> <span class="o">=</span> <span class="n">workdir</span> <span class="o">/</span> <span class="s2">"BTC-USDT-SWAP-trades-2024-01-15.zip"</span>
+</span><span id="__span-9-50"><a id="__codelineno-9-50" name="__codelineno-9-50" href="#__codelineno-9-50"></a>        <span class="n">_build_zip</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
+</span><span id="__span-9-51"><a id="__codelineno-9-51" name="__codelineno-9-51" href="#__codelineno-9-51"></a>
+</span><span id="__span-9-52"><a id="__codelineno-9-52" name="__codelineno-9-52" href="#__codelineno-9-52"></a>        <span class="n">tape</span> <span class="o">=</span> <span class="n">workdir</span> <span class="o">/</span> <span class="s2">"tape"</span>
+</span><span id="__span-9-53"><a id="__codelineno-9-53" name="__codelineno-9-53" href="#__codelineno-9-53"></a>        <span class="n">stats</span> <span class="o">=</span> <span class="n">okx</span><span class="o">.</span><span class="n">trades_to_lrvx</span><span class="p">(</span>
+</span><span id="__span-9-54"><a id="__codelineno-9-54" name="__codelineno-9-54" href="#__codelineno-9-54"></a>            <span class="n">z</span><span class="p">,</span> <span class="n">tape</span><span class="p">,</span>
+</span><span id="__span-9-55"><a id="__codelineno-9-55" name="__codelineno-9-55" href="#__codelineno-9-55"></a>            <span class="n">symbol_id</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">symbol_name</span><span class="o">=</span><span class="s2">"BTC-USDT-SWAP"</span><span class="p">,</span> <span class="n">market</span><span class="o">=</span><span class="s2">"swap"</span><span class="p">,</span>
+</span><span id="__span-9-56"><a id="__codelineno-9-56" name="__codelineno-9-56" href="#__codelineno-9-56"></a>            <span class="n">qty_multiplier</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
+</span><span id="__span-9-57"><a id="__codelineno-9-57" name="__codelineno-9-57" href="#__codelineno-9-57"></a>        <span class="p">)</span>
+</span><span id="__span-9-58"><a id="__codelineno-9-58" name="__codelineno-9-58" href="#__codelineno-9-58"></a>        <span class="n">trades</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">DataReader</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">tape</span><span class="p">))</span><span class="o">.</span><span class="n">read_trades</span><span class="p">()</span>
+</span><span id="__span-9-59"><a id="__codelineno-9-59" name="__codelineno-9-59" href="#__codelineno-9-59"></a>        <span class="nb">print</span><span class="p">(</span>
+</span><span id="__span-9-60"><a id="__codelineno-9-60" name="__codelineno-9-60" href="#__codelineno-9-60"></a>            <span class="sa">f</span><span class="s2">"converted: rows_read=</span><span class="si">{</span><span class="n">stats</span><span class="o">.</span><span class="n">rows_read</span><span class="si">}</span><span class="s2"> "</span>
+</span><span id="__span-9-61"><a id="__codelineno-9-61" name="__codelineno-9-61" href="#__codelineno-9-61"></a>            <span class="sa">f</span><span class="s2">"trades_written=</span><span class="si">{</span><span class="n">stats</span><span class="o">.</span><span class="n">trades_written</span><span class="si">}</span><span class="s2"> "</span>
+</span><span id="__span-9-62"><a id="__codelineno-9-62" name="__codelineno-9-62" href="#__codelineno-9-62"></a>            <span class="sa">f</span><span class="s2">"tape_trades=</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">trades</span><span class="o">.</span><span class="n">size</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+</span><span id="__span-9-63"><a id="__codelineno-9-63" name="__codelineno-9-63" href="#__codelineno-9-63"></a>        <span class="p">)</span>
+</span><span id="__span-9-64"><a id="__codelineno-9-64" name="__codelineno-9-64" href="#__codelineno-9-64"></a>        <span class="n">sides</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="s2">"side"</span><span class="p">])</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">trades</span><span class="p">]</span>
+</span><span id="__span-9-65"><a id="__codelineno-9-65" name="__codelineno-9-65" href="#__codelineno-9-65"></a>        <span class="k">assert</span> <span class="n">sides</span> <span class="o">==</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">sides</span>
+</span><span id="__span-9-66"><a id="__codelineno-9-66" name="__codelineno-9-66" href="#__codelineno-9-66"></a>        <span class="n">btc</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="s2">"qty_raw"</span><span class="p">])</span> <span class="o">/</span> <span class="mf">1e8</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">trades</span><span class="p">]</span>
+</span><span id="__span-9-67"><a id="__codelineno-9-67" name="__codelineno-9-67" href="#__codelineno-9-67"></a>        <span class="k">assert</span> <span class="n">btc</span> <span class="o">==</span> <span class="p">[</span><span class="mf">0.08</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">],</span> <span class="n">btc</span>
+</span><span id="__span-9-68"><a id="__codelineno-9-68" name="__codelineno-9-68" href="#__codelineno-9-68"></a>    <span class="k">finally</span><span class="p">:</span>
+</span><span id="__span-9-69"><a id="__codelineno-9-69" name="__codelineno-9-69" href="#__codelineno-9-69"></a>        <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-9-70"><a id="__codelineno-9-70" name="__codelineno-9-70" href="#__codelineno-9-70"></a>
+</span><span id="__span-9-71"><a id="__codelineno-9-71" name="__codelineno-9-71" href="#__codelineno-9-71"></a>
+</span><span id="__span-9-72"><a id="__codelineno-9-72" name="__codelineno-9-72" href="#__codelineno-9-72"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+</span><span id="__span-9-73"><a id="__codelineno-9-73" name="__codelineno-9-73" href="#__codelineno-9-73"></a>    <span class="n">main</span><span class="p">()</span>
+</span></code></pre></div>
+<h3 id="cli">CLI<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Single day from a local zip</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>lrvx<span class="w"> </span>archive<span class="w"> </span>okx<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>--csv<span class="w"> </span>./BTC-USDT-SWAP-trades-2024-01-15.zip<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span>--out<span class="w"> </span>./tapes/okx-swap-BTC-USDT-SWAP<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span>--symbol<span class="w"> </span>BTC-USDT-SWAP<span class="w"> </span>--market<span class="w"> </span>swap
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Multi-day range with download, contracts stored in BTC</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>lrvx<span class="w"> </span>archive<span class="w"> </span>okx<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">  </span>--symbol<span class="w"> </span>BTC-USDT-SWAP<span class="w"> </span>--market<span class="w"> </span>swap<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">  </span>--from<span class="w"> </span><span class="m">2024</span>-01-01<span class="w"> </span>--to<span class="w"> </span><span class="m">2024</span>-12-31<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">  </span>--out<span class="w"> </span>./tapes/okx-swap-BTC-USDT-SWAP<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">  </span>--qty-multiplier<span class="w"> </span><span class="m">0</span>.01<span class="w"> </span>--parallel<span class="w"> </span><span class="m">4</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="c1"># One dated future, from the BTC-USD futures chain files</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>lrvx<span class="w"> </span>archive<span class="w"> </span>okx<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">  </span>--symbol<span class="w"> </span>BTC-USD-240329<span class="w"> </span>--market<span class="w"> </span>futures<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-17"><a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="w">  </span>--from<span class="w"> </span><span class="m">2024</span>-01-01<span class="w"> </span>--to<span class="w"> </span><span class="m">2024</span>-03-29<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-18"><a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="w">  </span>--out<span class="w"> </span>./tapes/okx-futures-BTC-USD-240329
+</span></code></pre></div>
+<h2 id="bitget">Bitget<a class="headerlink" href="#bitget" title="Permanent link">&para;</a></h2>
+<p>Bitget publishes daily trade files through its History data download page (<code>https://www.bitget.com/data-download</code>, "Transaction history", daily). The files sit on its CDN at</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>https://img.bitgetimg.com/online/trades/&lt;CODE&gt;/&lt;SYMBOL&gt;/&lt;PART&gt;.zip
+</span></code></pre></div>
+<p>with <code>&lt;CODE&gt;</code> by market:</p>
+<table>
+<thead>
+<tr>
+<th><code>--market</code></th>
+<th>Code</th>
+<th>Contracts</th>
+<th>Symbol</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>spot</code></td>
+<td><code>SPBL</code></td>
+<td>spot</td>
+<td><code>BTCUSDT</code></td>
+</tr>
+<tr>
+<td><code>umcbl</code></td>
+<td><code>UMCBL</code></td>
+<td>USDT-margined perpetuals</td>
+<td><code>BTCUSDT</code></td>
+</tr>
+<tr>
+<td><code>cmcbl</code></td>
+<td><code>CMCBL</code></td>
+<td>USDC-margined perpetuals</td>
+<td><code>BTCPERP</code></td>
+</tr>
+<tr>
+<td><code>dmcbl</code></td>
+<td><code>DMCBL</code></td>
+<td>coin-margined perpetuals</td>
+<td><code>BTCUSD</code></td>
+</tr>
+</tbody>
+</table>
+<p>A day is split into numbered parts of at most 100,000 trades. The part name has changed over time, and a day uses exactly one of:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>&lt;SYMBOL&gt;_&lt;CODE&gt;_&lt;YYYYMMDD&gt;_&lt;NNN&gt;     older days (2021 to 2024 in the files checked)
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>&lt;YYYYMMDD&gt;_&lt;NNN&gt;                     later days (end of 2024 to mid 2026)
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>&lt;SYMBOL&gt;_&lt;YYYYMMDD&gt;_&lt;NNN&gt;            recent days (November 2026)
+</span></code></pre></div>
+<p>The range form tries them in that order and downloads parts <code>_001</code>, <code>_002</code>, ... until the next one is missing (the CDN answers 403 for a missing file); the part list of a finished day is kept in the mirror, so a later run does not probe again. These names are what the download page hands out, not a documented API; a renaming shows up as a day the importer cannot find. A day is a UTC+8 calendar day, as the download page states. USDT-margined BTCUSDT files start in 2021; coverage of other symbols and markets varies, so long ranges usually want <code>--skip-missing</code>.</p>
+<h3 id="columns_2">Columns<a class="headerlink" href="#columns_2" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>trade_id,timestamp,price,side,volume(quote),size(base)
+</span></code></pre></div>
+<p><code>timestamp</code> is Unix milliseconds (recent files carry whole seconds). <code>side</code> is the taker side, <code>buy</code> / <code>sell</code>. <code>trade_id</code> is a 19-digit integer and the lrvx <code>trade_id</code>. <code>size(base)</code> is the quantity in the base coin for every market, coin-margined included, and is what the tape stores; <code>volume(quote)</code> is the quote notional and is not stored.</p>
+<h3 id="example_2">Example<a class="headerlink" href="#example_2" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="sd">"""Bitget public archive round-trip — build one part of a Bitget trade</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="sd">day in the layout Bitget publishes (`trade_id,timestamp,price,side,</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="sd">volume(quote),size(base)`) in memory, run `bitget.trades_to_lrvx`,</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="sd">then read the resulting `.lrvx` back through `DataReader`.</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="sd">CI-runnable companion to</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="sd">[Import multi-exchange archives](../how-to/import-multi-exchange-archives.md).</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="sd">No network — the fixture is built in memory.</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="sd">Usage:</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="sd">    cd /path/to/lrvx</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="sd">    PYTHONPATH=build/python python3 docs/examples/python_bitget_archive.py</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="sd">"""</span>
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>
+</span><span id="__span-14-16"><a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a><span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+</span><span id="__span-14-17"><a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a><span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+</span><span id="__span-14-18"><a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+</span><span id="__span-14-19"><a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a><span class="kn">import</span><span class="w"> </span><span class="nn">zipfile</span>
+</span><span id="__span-14-20"><a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span id="__span-14-21"><a id="__codelineno-14-21" name="__codelineno-14-21" href="#__codelineno-14-21"></a>
+</span><span id="__span-14-22"><a id="__codelineno-14-22" name="__codelineno-14-22" href="#__codelineno-14-22"></a><span class="kn">import</span><span class="w"> </span><span class="nn">lrvx</span>
+</span><span id="__span-14-23"><a id="__codelineno-14-23" name="__codelineno-14-23" href="#__codelineno-14-23"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lrvx.archives</span><span class="w"> </span><span class="kn">import</span> <span class="n">bitget</span>
+</span><span id="__span-14-24"><a id="__codelineno-14-24" name="__codelineno-14-24" href="#__codelineno-14-24"></a>
+</span><span id="__span-14-25"><a id="__codelineno-14-25" name="__codelineno-14-25" href="#__codelineno-14-25"></a>
+</span><span id="__span-14-26"><a id="__codelineno-14-26" name="__codelineno-14-26" href="#__codelineno-14-26"></a><span class="c1"># (trade_id, timestamp_ms, price, side, volume(quote), size(base))</span>
+</span><span id="__span-14-27"><a id="__codelineno-14-27" name="__codelineno-14-27" href="#__codelineno-14-27"></a><span class="n">_ROWS</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-14-28"><a id="__codelineno-14-28" name="__codelineno-14-28" href="#__codelineno-14-28"></a>    <span class="p">(</span><span class="mi">1503354649689448450</span><span class="p">,</span> <span class="mi">1_794_153_600_000</span><span class="p">,</span> <span class="mf">75943.5</span><span class="p">,</span> <span class="s2">"buy"</span><span class="p">,</span>  <span class="mf">7.59435</span><span class="p">,</span>   <span class="mf">0.0001</span><span class="p">),</span>
+</span><span id="__span-14-29"><a id="__codelineno-14-29" name="__codelineno-14-29" href="#__codelineno-14-29"></a>    <span class="p">(</span><span class="mi">1503354771215212544</span><span class="p">,</span> <span class="mi">1_794_153_629_000</span><span class="p">,</span> <span class="mf">75941.9</span><span class="p">,</span> <span class="s2">"sell"</span><span class="p">,</span> <span class="mf">25576.832</span><span class="p">,</span> <span class="mf">0.3368</span><span class="p">),</span>
+</span><span id="__span-14-30"><a id="__codelineno-14-30" name="__codelineno-14-30" href="#__codelineno-14-30"></a>    <span class="p">(</span><span class="mi">1503354771215212546</span><span class="p">,</span> <span class="mi">1_794_153_629_000</span><span class="p">,</span> <span class="mf">75941.8</span><span class="p">,</span> <span class="s2">"buy"</span><span class="p">,</span>  <span class="mf">721.44710</span><span class="p">,</span> <span class="mf">0.0095</span><span class="p">),</span>
+</span><span id="__span-14-31"><a id="__codelineno-14-31" name="__codelineno-14-31" href="#__codelineno-14-31"></a><span class="p">]</span>
+</span><span id="__span-14-32"><a id="__codelineno-14-32" name="__codelineno-14-32" href="#__codelineno-14-32"></a>
+</span><span id="__span-14-33"><a id="__codelineno-14-33" name="__codelineno-14-33" href="#__codelineno-14-33"></a>
+</span><span id="__span-14-34"><a id="__codelineno-14-34" name="__codelineno-14-34" href="#__codelineno-14-34"></a><span class="k">def</span><span class="w"> </span><span class="nf">_build_zip</span><span class="p">(</span><span class="n">dest</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+</span><span id="__span-14-35"><a id="__codelineno-14-35" name="__codelineno-14-35" href="#__codelineno-14-35"></a>    <span class="n">buf</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">StringIO</span><span class="p">()</span>
+</span><span id="__span-14-36"><a id="__codelineno-14-36" name="__codelineno-14-36" href="#__codelineno-14-36"></a>    <span class="n">buf</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">"trade_id,timestamp,price,side,volume(quote),size(base)</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-14-37"><a id="__codelineno-14-37" name="__codelineno-14-37" href="#__codelineno-14-37"></a>    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">_ROWS</span><span class="p">:</span>
+</span><span id="__span-14-38"><a id="__codelineno-14-38" name="__codelineno-14-38" href="#__codelineno-14-38"></a>        <span class="n">buf</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">","</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">r</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-14-39"><a id="__codelineno-14-39" name="__codelineno-14-39" href="#__codelineno-14-39"></a>    <span class="k">with</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="n">dest</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">,</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZIP_DEFLATED</span><span class="p">)</span> <span class="k">as</span> <span class="n">zf</span><span class="p">:</span>
+</span><span id="__span-14-40"><a id="__codelineno-14-40" name="__codelineno-14-40" href="#__codelineno-14-40"></a>        <span class="n">zf</span><span class="o">.</span><span class="n">writestr</span><span class="p">(</span><span class="n">dest</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">".csv"</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">buf</span><span class="o">.</span><span class="n">getvalue</span><span class="p">())</span>
+</span><span id="__span-14-41"><a id="__codelineno-14-41" name="__codelineno-14-41" href="#__codelineno-14-41"></a>    <span class="k">return</span> <span class="n">dest</span>
+</span><span id="__span-14-42"><a id="__codelineno-14-42" name="__codelineno-14-42" href="#__codelineno-14-42"></a>
+</span><span id="__span-14-43"><a id="__codelineno-14-43" name="__codelineno-14-43" href="#__codelineno-14-43"></a>
+</span><span id="__span-14-44"><a id="__codelineno-14-44" name="__codelineno-14-44" href="#__codelineno-14-44"></a><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-14-45"><a id="__codelineno-14-45" name="__codelineno-14-45" href="#__codelineno-14-45"></a>    <span class="n">workdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"lrvx-bitget-"</span><span class="p">))</span>
+</span><span id="__span-14-46"><a id="__codelineno-14-46" name="__codelineno-14-46" href="#__codelineno-14-46"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-14-47"><a id="__codelineno-14-47" name="__codelineno-14-47" href="#__codelineno-14-47"></a>        <span class="n">z</span> <span class="o">=</span> <span class="n">workdir</span> <span class="o">/</span> <span class="s2">"BTCUSDT_UMCBL_20261109_001.zip"</span>
+</span><span id="__span-14-48"><a id="__codelineno-14-48" name="__codelineno-14-48" href="#__codelineno-14-48"></a>        <span class="n">_build_zip</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
+</span><span id="__span-14-49"><a id="__codelineno-14-49" name="__codelineno-14-49" href="#__codelineno-14-49"></a>
+</span><span id="__span-14-50"><a id="__codelineno-14-50" name="__codelineno-14-50" href="#__codelineno-14-50"></a>        <span class="n">tape</span> <span class="o">=</span> <span class="n">workdir</span> <span class="o">/</span> <span class="s2">"tape"</span>
+</span><span id="__span-14-51"><a id="__codelineno-14-51" name="__codelineno-14-51" href="#__codelineno-14-51"></a>        <span class="n">stats</span> <span class="o">=</span> <span class="n">bitget</span><span class="o">.</span><span class="n">trades_to_lrvx</span><span class="p">(</span>
+</span><span id="__span-14-52"><a id="__codelineno-14-52" name="__codelineno-14-52" href="#__codelineno-14-52"></a>            <span class="n">z</span><span class="p">,</span> <span class="n">tape</span><span class="p">,</span>
+</span><span id="__span-14-53"><a id="__codelineno-14-53" name="__codelineno-14-53" href="#__codelineno-14-53"></a>            <span class="n">symbol_id</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">symbol_name</span><span class="o">=</span><span class="s2">"BTCUSDT"</span><span class="p">,</span> <span class="n">market</span><span class="o">=</span><span class="s2">"umcbl"</span><span class="p">,</span>
+</span><span id="__span-14-54"><a id="__codelineno-14-54" name="__codelineno-14-54" href="#__codelineno-14-54"></a>        <span class="p">)</span>
+</span><span id="__span-14-55"><a id="__codelineno-14-55" name="__codelineno-14-55" href="#__codelineno-14-55"></a>        <span class="n">trades</span> <span class="o">=</span> <span class="n">lrvx</span><span class="o">.</span><span class="n">DataReader</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">tape</span><span class="p">))</span><span class="o">.</span><span class="n">read_trades</span><span class="p">()</span>
+</span><span id="__span-14-56"><a id="__codelineno-14-56" name="__codelineno-14-56" href="#__codelineno-14-56"></a>        <span class="nb">print</span><span class="p">(</span>
+</span><span id="__span-14-57"><a id="__codelineno-14-57" name="__codelineno-14-57" href="#__codelineno-14-57"></a>            <span class="sa">f</span><span class="s2">"converted: rows_read=</span><span class="si">{</span><span class="n">stats</span><span class="o">.</span><span class="n">rows_read</span><span class="si">}</span><span class="s2"> "</span>
+</span><span id="__span-14-58"><a id="__codelineno-14-58" name="__codelineno-14-58" href="#__codelineno-14-58"></a>            <span class="sa">f</span><span class="s2">"trades_written=</span><span class="si">{</span><span class="n">stats</span><span class="o">.</span><span class="n">trades_written</span><span class="si">}</span><span class="s2"> "</span>
+</span><span id="__span-14-59"><a id="__codelineno-14-59" name="__codelineno-14-59" href="#__codelineno-14-59"></a>            <span class="sa">f</span><span class="s2">"tape_trades=</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">trades</span><span class="o">.</span><span class="n">size</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+</span><span id="__span-14-60"><a id="__codelineno-14-60" name="__codelineno-14-60" href="#__codelineno-14-60"></a>        <span class="p">)</span>
+</span><span id="__span-14-61"><a id="__codelineno-14-61" name="__codelineno-14-61" href="#__codelineno-14-61"></a>        <span class="n">sides</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="s2">"side"</span><span class="p">])</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">trades</span><span class="p">]</span>
+</span><span id="__span-14-62"><a id="__codelineno-14-62" name="__codelineno-14-62" href="#__codelineno-14-62"></a>        <span class="k">assert</span> <span class="n">sides</span> <span class="o">==</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">sides</span>
+</span><span id="__span-14-63"><a id="__codelineno-14-63" name="__codelineno-14-63" href="#__codelineno-14-63"></a>    <span class="k">finally</span><span class="p">:</span>
+</span><span id="__span-14-64"><a id="__codelineno-14-64" name="__codelineno-14-64" href="#__codelineno-14-64"></a>        <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">workdir</span><span class="p">,</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-14-65"><a id="__codelineno-14-65" name="__codelineno-14-65" href="#__codelineno-14-65"></a>
+</span><span id="__span-14-66"><a id="__codelineno-14-66" name="__codelineno-14-66" href="#__codelineno-14-66"></a>
+</span><span id="__span-14-67"><a id="__codelineno-14-67" name="__codelineno-14-67" href="#__codelineno-14-67"></a><span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+</span><span id="__span-14-68"><a id="__codelineno-14-68" name="__codelineno-14-68" href="#__codelineno-14-68"></a>    <span class="n">main</span><span class="p">()</span>
+</span></code></pre></div>
+<h3 id="cli_1">CLI<a class="headerlink" href="#cli_1" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># One part from a local file</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>lrvx<span class="w"> </span>archive<span class="w"> </span>bitget<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span>--csv<span class="w"> </span>./BTCUSDT_UMCBL_20240115_001.zip<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span>--out<span class="w"> </span>./tapes/bitget-umcbl-BTCUSDT<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span>--symbol<span class="w"> </span>BTCUSDT<span class="w"> </span>--market<span class="w"> </span>umcbl
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="c1"># Multi-day range with download, every part of each day</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>lrvx<span class="w"> </span>archive<span class="w"> </span>bitget<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">  </span>--symbol<span class="w"> </span>BTCUSDT<span class="w"> </span>--market<span class="w"> </span>umcbl<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-15-10"><a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">  </span>--from<span class="w"> </span><span class="m">2024</span>-01-01<span class="w"> </span>--to<span class="w"> </span><span class="m">2024</span>-12-31<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-15-11"><a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">  </span>--out<span class="w"> </span>./tapes/bitget-umcbl-BTCUSDT<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-15-12"><a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">  </span>--parallel<span class="w"> </span><span class="m">4</span>
+</span></code></pre></div>
+<h2 id="shared-download-cache">Shared download cache<a class="headerlink" href="#shared-download-cache" title="Permanent link">&para;</a></h2>
+<p>Every range form, for every exchange and product (Binance aggTrades and bookTicker included), keeps the files it downloads in one on-disk cache, so a second run over the same days downloads nothing. The layout is the same for all of them:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>~/.lrvx/archive-cache/&lt;exchange&gt;/&lt;market&gt;/&lt;symbol&gt;/&lt;file name as published&gt;
+</span></code></pre></div>
+<p><code>&lt;symbol&gt;</code> is the symbol in the file's URL: the instrument family (<code>BTC-USD</code>) for OKX futures and options chain files. Bitget also keeps a <code>&lt;symbol&gt;-&lt;YYYY-MM-DD&gt;.parts</code> list of a finished day's parts there.</p>
+<ul>
+<li><code>LRVX_ARCHIVE_CACHE=/some/path</code> moves the root (<code>/some/path/&lt;exchange&gt;/...</code>).</li>
+<li><code>--mirror DIR</code> (<code>mirror=DIR</code>) uses <code>DIR</code> in place of <code>~/.lrvx/archive-cache/&lt;exchange&gt;</code> for that import, with the same layout below it.</li>
+</ul>
+<p>A download is written to a temporary name (<code>.&lt;file&gt;.&lt;random&gt;.part</code>) in the destination directory and renamed onto the file's real name only when it has arrived in full and opens as an archive, so an interrupted run never leaves a partial file under the real name. If a cached file nevertheless fails to open during an import, it is deleted from the cache and the import stops with an error; running it again downloads the file afresh. A file passed with <code>--csv</code> is never deleted.</p>
+<p>The cache is not evicted automatically and grows with what you import. To clear it, delete the directory (<code>rm -rf ~/.lrvx/archive-cache</code>, or one exchange's subdirectory, or single files); the next import downloads what is missing.</p>
+<h2 id="cross-exchange-research">Cross-exchange research<a class="headerlink" href="#cross-exchange-research" title="Permanent link">&para;</a></h2>
+<p>Tapes from different exchanges sit side by side in <code>MergedTapeReader</code>. The reader assigns one global symbol id per <code>(exchange, name)</code> pair, so a strategy or analysis that consumes both <code>binance:BTCUSDT</code> and <code>bybit:BTCUSDT</code> sees two distinct streams with the right exchange tag on every event.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>import lrvx
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>reader = lrvx.MergedTapeReader([
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>    "./tapes/binance-um-BTCUSDT",
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>    "./tapes/bybit-linear-BTCUSDT",
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>])
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>trades = reader.read_trades()
+</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>sym_table = reader.symbol_table()   # [{global_id, exchange, name, ...}, ...]
+</span></code></pre></div>
+<p>The <code>(exchange, name)</code> keying is the contract: every cross-exchange analysis that wants the right interpretation of an event must hold the exchange tag alongside the symbol id.</p>
+<h2 id="adding-a-new-exchange">Adding a new exchange<a class="headerlink" href="#adding-a-new-exchange" title="Permanent link">&para;</a></h2>
+<p>A new exchange importer is one module under <code>lrvx/archives/&lt;exchange&gt;.py</code> exposing:</p>
+<ul>
+<li><code>trades_to_lrvx(csv_path, out_tape, *, symbol_id, symbol_name, market, ...)</code> — parse one day's CSV, write trades via <code>DataWriter</code>, append-safe by the venue's trade id. <code>lrvx.archives._layout.CsvFile</code> recognises the layouts the exchange publishes and counts unparsable rows; <code>lrvx.archives._dedup.TradeFile</code> and <code>write_trade_file</code> do the bounded parse and the dedup described above.</li>
+<li><code>range_to_lrvx(symbol, market, date_from, date_to, out_tape, *, mirror, parallel, ...)</code> — download a date range, hand each day to the single-day function, merge <code>metadata.json</code> with the union counters. <code>lrvx.archives._download.fetch</code> downloads one file under the policy above, <code>lrvx.archives._range.fetch_days</code> fetches the days of a range and handles missing ones, and <code>lrvx.archives._cache.exchange_dir</code> resolves the cache directory.</li>
+<li><code>check_symbol(symbol, market)</code> — the local symbol shape check, and <code>DAY_UTC_OFFSET_HOURS</code>, the UTC offset in hours of the exchange's day boundary.</li>
+</ul>
+<p>Register the new module in <code>archives/__init__.py</code>, add a <code>lrvx archive &lt;exchange&gt;</code> subparser in <code>lrvx/cli.py</code>, and write tests under <code>python/tests/</code> whose fixtures copy the real header and row shapes, plus a real-download test gated on <code>LRVX_ARCHIVE_NETWORK_TESTS=1</code>. The CLI and tests work generically against the <code>ArchiveReader</code> Protocol; no changes elsewhere in the framework are required.</p>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../import-binance-archive/">Import Binance public archives</a> — trade stream.</li>
+<li><a href="../import-binance-book-archive/">Import Binance book archives</a> — bookTicker (best bid / ask) for um-futures and cm-futures.</li>
+<li><a href="../multi-tape/">Merge multiple tapes on read</a> — <code>MergedTapeReader</code> semantics across multiple exchanges.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "navigation.prune", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

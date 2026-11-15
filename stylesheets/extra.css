@@ -1,0 +1,262 @@
+/* lrvx Documentation - Clean Corporate Style */
+
+:root {
+  /* Primary colors - professional blue-grey palette */
+  --md-primary-fg-color: #37474f;
+  --md-primary-fg-color--light: #546e7a;
+  --md-primary-fg-color--dark: #263238;
+  --md-accent-fg-color: #00897b;
+  --md-accent-fg-color--transparent: rgba(0, 137, 123, 0.1);
+
+  /* Typography */
+  --md-text-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --md-code-font: "JetBrains Mono", "Fira Code", monospace;
+}
+
+/* Dark mode adjustments */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #455a64;
+  --md-default-bg-color: #1a1a2e;
+  --md-default-bg-color--light: #16213e;
+}
+
+/* Header - clean professional look */
+.md-header {
+  background-color: var(--md-primary-fg-color--dark);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.md-header__title {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Navigation tabs */
+.md-tabs {
+  background-color: var(--md-primary-fg-color);
+}
+
+.md-tabs__link {
+  font-weight: 500;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.85;
+}
+
+.md-tabs__link--active,
+.md-tabs__link:hover {
+  opacity: 1;
+}
+
+/* Content area - fixed width centered layout like ColoCrossing */
+.md-main__inner {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.md-sidebar--primary {
+  width: 12rem;
+}
+
+.md-sidebar--secondary {
+  width: 12rem;
+}
+
+.md-content {
+  max-width: none;
+}
+
+.md-content__inner {
+  padding-top: 1.5rem;
+  max-width: 900px;
+}
+
+/* Headings - professional hierarchy */
+.md-typeset h1 {
+  font-weight: 700;
+  color: var(--md-primary-fg-color--dark);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--md-accent-fg-color);
+}
+
+.md-typeset h2 {
+  font-weight: 600;
+  color: var(--md-primary-fg-color);
+  margin-top: 2rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  color: var(--md-primary-fg-color--light);
+}
+
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3 {
+  color: #eceff1;
+}
+
+[data-md-color-scheme="slate"] .md-typeset h1 {
+  border-bottom-color: var(--md-accent-fg-color);
+}
+
+[data-md-color-scheme="slate"] .md-typeset h2 {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Tables - clean corporate style */
+.md-typeset table:not([class]) {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--md-primary-fg-color);
+  color: white;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  padding: 0.8rem 1rem;
+}
+
+.md-typeset table:not([class]) td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.md-typeset table:not([class]) tr:hover td {
+  background-color: var(--md-accent-fg-color--transparent);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) td {
+  border-bottom-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Code blocks - professional styling */
+.md-typeset pre {
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.md-typeset code {
+  border-radius: 3px;
+  padding: 0.1em 0.4em;
+  font-size: 0.85em;
+}
+
+.md-typeset pre > code {
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+/* Admonitions - subtle professional look */
+.md-typeset .admonition {
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-left-width: 4px;
+}
+
+.md-typeset .admonition-title {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+}
+
+/* Links - professional accent */
+.md-typeset a {
+  color: var(--md-accent-fg-color);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.md-typeset a:hover {
+  border-bottom-color: var(--md-accent-fg-color);
+}
+
+/* Sidebar navigation */
+.md-nav__title {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
+  color: var(--md-primary-fg-color);
+}
+
+.md-nav__link {
+  font-size: 0.85rem;
+}
+
+.md-nav__link--active {
+  font-weight: 600;
+  color: var(--md-accent-fg-color);
+}
+
+/* Search */
+.md-search__input {
+  border-radius: 4px;
+}
+
+/* Footer */
+.md-footer {
+  background-color: var(--md-primary-fg-color--dark);
+}
+
+/* Mermaid diagrams - better styling */
+.mermaid {
+  background: transparent !important;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+/* TOC - cleaner look */
+.md-sidebar--secondary .md-nav__link {
+  font-size: 0.8rem;
+}
+
+/* Content width for readability */
+@media screen and (min-width: 76.25em) {
+  .md-content {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Better list styling */
+.md-typeset ul li,
+.md-typeset ol li {
+  margin-bottom: 0.4em;
+}
+
+/* Inline code in tables */
+.md-typeset table code {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* Button-like links for quick actions */
+.md-typeset a.md-button {
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+}
+
+/* Keep sidebar space even when empty for consistent layout */
+.md-sidebar--primary {
+  min-width: 12rem;
+}
+

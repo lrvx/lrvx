@@ -1,0 +1,221 @@
+# Full Codon Backtest -- exercises the real C API end-to-end.
+#
+# Generates synthetic data, runs SMA crossover through SimulatedExecutor,
+# tracks positions, computes volume profile, runs statistics.
+#
+# Build:
+#   codon build -exe -o build/codon/codon_full_backtest \
+#     -L build/src/capi -llrvx_capi examples/codon_full_backtest.codon
+#
+# Run:
+#   DYLD_LIBRARY_PATH=build/src/capi:~/.local/lib/codon \
+#     ./build/codon/codon_full_backtest
+
+from lrvx.indicators import SMA, EMA, RSI
+from lrvx.tools import (SimulatedExecutor, PositionTracker, VolumeProfile,
+                        OrderTracker, FootprintBar, OrderBook, L3Book,
+                        correlation, profit_factor, win_rate,
+                        bootstrap_ci, BUY_SIDE, SELL_SIDE)
+import math
+
+
+def generate_prices(n: int, start: float, seed: int) -> List[float]:
+    """Simple LCG random walk for reproducible synthetic data."""
+    prices = [0.0] * n
+    prices[0] = start
+    state = seed
+    for i in range(1, n):
+        state = (state * 1103515245 + 12345) & 0x7FFFFFFF
+        u = float(state) / float(0x7FFFFFFF)
+        ret = (u - 0.498) * 0.003
+        prices[i] = prices[i - 1] * (1.0 + ret)
+    return prices
+
+
+def main():
+    N = 3000
+    print(f"Generating {N} bars of synthetic data...")
+
+    prices = generate_prices(N, 50000.0, 42)
+    print(f"  Start: {prices[0]:.2f}, End: {prices[N-1]:.2f}")
+
+    min_p = prices[0]
+    max_p = prices[0]
+    for p in prices:
+        if p < min_p:
+            min_p = p
+        if p > max_p:
+            max_p = p
+    print(f"  Range: {min_p:.2f} - {max_p:.2f}")
+
+    # -- Streaming indicators --
+    print("\nComputing indicators...")
+    fast_sma = SMA(10)
+    slow_sma = SMA(30)
+    rsi = RSI(14)
+    ema20 = EMA(20)
+
+    for i in range(N):
+        fast_sma.update(prices[i])
+        slow_sma.update(prices[i])
+        rsi.update(prices[i])
+        ema20.update(prices[i])
+
+    print(f"  SMA(10):  {fast_sma.value:.2f}")
+    print(f"  SMA(30):  {slow_sma.value:.2f}")
+    print(f"  RSI(14):  {rsi.value:.2f}")
+    print(f"  EMA(20):  {ema20.value:.2f}")
+
+    # -- SMA Crossover via SimulatedExecutor --
+    print("\nRunning SMA crossover backtest...")
+    executor = SimulatedExecutor()
+    tracker = PositionTracker(0)
+    order_tracker = OrderTracker()
+    sym = 1
+    order_id = 1
+    position = 0
+    trade_count = 0
+    base_ns: int = 1704067200000000000
+
+    fast = SMA(10)
+    slow = SMA(30)
+    prev_fast_above = False
+
+    for i in range(N):
+        ts = base_ns + i * 60000000000
+        executor.advance_clock(ts)
+        executor.on_bar(sym, prices[i])
+
+        fast_val = fast.update(prices[i])
+        slow_val = slow.update(prices[i])
+
+        if not slow.ready:
+            prev_fast_above = fast_val > slow_val
+            continue
+
+        fast_above = fast_val > slow_val
+
+        if fast_above and not prev_fast_above and position <= 0:
+            if position < 0:
+                # Close short
+                executor.submit_order(order_id, "buy", 0.0, 1.0, "limit", sym)
+                order_tracker.on_submitted(order_id, sym, "buy", prices[i], 1.0)
+                tracker.on_fill(sym, "buy", prices[i], 1.0)
+                order_id += 1
+                trade_count += 1
+            # Open long
+            executor.submit_order(order_id, "buy", 0.0, 1.0, "limit", sym)
+            order_tracker.on_submitted(order_id, sym, "buy", prices[i], 1.0)
+            tracker.on_fill(sym, "buy", prices[i], 1.0)
+            order_id += 1
+            position = 1
+            trade_count += 1
+        elif not fast_above and prev_fast_above and position >= 0:
+            if position > 0:
+                # Close long
+                executor.submit_order(order_id, "sell", 0.0, 1.0, "limit", sym)
+                order_tracker.on_submitted(order_id, sym, "sell", prices[i], 1.0)
+                tracker.on_fill(sym, "sell", prices[i], 1.0)
+                order_id += 1
+                trade_count += 1
+            # Open short
+            executor.submit_order(order_id, "sell", 0.0, 1.0, "limit", sym)
+            order_tracker.on_submitted(order_id, sym, "sell", prices[i], 1.0)
+            tracker.on_fill(sym, "sell", prices[i], 1.0)
+            order_id += 1
+            position = -1
+            trade_count += 1
+
+        prev_fast_above = fast_above
+
+    print(f"\n=== Backtest Results ===")
+    print(f"  Trades executed: {trade_count}")
+    print(f"  Executor fills:  {executor.fill_count}")
+    print(f"  Final position:  {tracker.position(sym):.4f}")
+    print(f"  Avg entry price: {tracker.avg_entry_price(sym):.2f}")
+    print(f"  Realized PnL:    {tracker.realized_pnl(sym):.2f}")
+    print(f"  Orders tracked:  {order_tracker.total_count}")
+
+    # -- Volume Profile --
+    print("\nBuilding volume profile...")
+    vp = VolumeProfile(1.0)
+    for i in range(N):
+        is_buy = i == 0 or prices[i] >= prices[i - 1]
+        vp.add_trade(prices[i], 10.0, is_buy)
+
+    print(f"  POC:              {vp.poc():.2f}")
+    print(f"  Value Area High:  {vp.value_area_high():.2f}")
+    print(f"  Value Area Low:   {vp.value_area_low():.2f}")
+    print(f"  Total volume:     {vp.total_volume():.0f}")
+
+    # -- Footprint --
+    print("\nFootprint bar (last 100 trades)...")
+    fp = FootprintBar(1.0)
+    for i in range(N - 100, N):
+        is_buy = prices[i] >= prices[i - 1]
+        fp.add_trade(prices[i], 5.0, is_buy)
+    print(f"  Total delta:  {fp.total_delta():.2f}")
+    print(f"  Total volume: {fp.total_volume():.2f}")
+    print(f"  Levels:       {fp.num_levels}")
+
+    # -- Order Book --
+    print("\nOrder book test...")
+    book = OrderBook(0.01)
+    bid_prices = [50000.0, 49999.0, 49998.0]
+    bid_qtys = [1.5, 2.0, 3.0]
+    ask_prices = [50001.0, 50002.0, 50003.0]
+    ask_qtys = [0.5, 1.0, 2.0]
+    book.apply_snapshot(bid_prices, bid_qtys, ask_prices, ask_qtys)
+
+    bb = book.best_bid()
+    ba = book.best_ask()
+    mid = book.mid()
+    spread = book.spread()
+    if bb is not None:
+        print(f"  Best bid: {bb:.2f}")
+    if ba is not None:
+        print(f"  Best ask: {ba:.2f}")
+    if mid is not None:
+        print(f"  Mid:      {mid:.2f}")
+    if spread is not None:
+        print(f"  Spread:   {spread:.2f}")
+
+    # -- L3 Book --
+    print("\nL3 order book test...")
+    l3 = L3Book()
+    l3.add_order(1, 50000.0, 1.5, "buy")
+    l3.add_order(2, 49999.0, 2.0, "buy")
+    l3.add_order(3, 50001.0, 0.5, "sell")
+    l3.add_order(4, 50002.0, 1.0, "sell")
+
+    l3_bid = l3.best_bid()
+    l3_ask = l3.best_ask()
+    if l3_bid is not None:
+        print(f"  Best bid: {l3_bid:.2f}")
+    if l3_ask is not None:
+        print(f"  Best ask: {l3_ask:.2f}")
+    print(f"  Bid qty @ 50000: {l3.bid_at_price(50000.0):.2f}")
+
+    # -- Statistics --
+    print("\nStatistics...")
+    returns: List[float] = []
+    for i in range(1, N):
+        returns.append((prices[i] - prices[i - 1]) / prices[i - 1])
+
+    print(f"  Win rate:       {win_rate(returns) * 100.0:.1f}%")
+    print(f"  Profit factor:  {profit_factor(returns):.4f}")
+
+    # Correlation test
+    x = [1.0, 2.0, 3.0, 4.0, 5.0]
+    y = [1.1, 2.2, 2.9, 4.1, 5.0]
+    print(f"  Correlation:    {correlation(x, y):.4f}")
+
+    # Bootstrap CI
+    lo, med, hi = bootstrap_ci(returns, 0.95, 5000)
+    print(f"  95% CI: [{lo*100:.4f}%, {hi*100:.4f}%]")
+    print(f"  Median: {med*100:.4f}%")
+
+    print("\nDone.")
+
+
+main()
