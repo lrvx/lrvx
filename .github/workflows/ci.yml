@@ -1103,13 +1103,15 @@ jobs:
         # Only what the image does not already carry: choco reports a package
         # that is already there as a warning on every run. LLVM is not in the
         # list; scripts/ci-select-clang-cl.ps1 picks the compiler.
-        $missing = @('ninja', 'sccache') | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) }
-        if (-not $missing) {
+        # @(...) keeps one missing package an array: a lone string would be
+        # handed to choco letter by letter.
+        $missing = @(@('ninja', 'sccache') | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) })
+        if ($missing.Count -eq 0) {
           Write-Host 'ninja and sccache are already on PATH'
           exit 0
         }
         for ($i = 1; $i -le 3; $i++) {
-          choco install @missing -y
+          choco install $missing -y
           if ($LASTEXITCODE -eq 0) { break }
           Write-Host "::warning::choco install $missing failed (attempt $i/3, exit $LASTEXITCODE)"
           if ($i -lt 3) { Start-Sleep -Seconds (20 * $i) }
@@ -1293,13 +1295,15 @@ jobs:
         # Only what the image does not already carry: choco reports a package
         # that is already there as a warning on every run. LLVM is not in the
         # list; scripts/ci-select-clang-cl.ps1 picks the compiler.
-        $missing = @('ninja', 'sccache') | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) }
-        if (-not $missing) {
+        # @(...) keeps one missing package an array: a lone string would be
+        # handed to choco letter by letter.
+        $missing = @(@('ninja', 'sccache') | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) })
+        if ($missing.Count -eq 0) {
           Write-Host 'ninja and sccache are already on PATH'
           exit 0
         }
         for ($i = 1; $i -le 3; $i++) {
-          choco install @missing -y
+          choco install $missing -y
           if ($LASTEXITCODE -eq 0) { break }
           Write-Host "::warning::choco install $missing failed (attempt $i/3, exit $LASTEXITCODE)"
           if ($i -lt 3) { Start-Sleep -Seconds (20 * $i) }
