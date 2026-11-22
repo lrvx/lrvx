@@ -662,6 +662,30 @@ void test_closed_on_the_fix_wire()
   const std::string halted(out.begin(), out.end());
   CHECK(halted.find("\x01"
                     "326=2") != std::string::npos);
+
+  // A delisted instrument is not tradeable and must never go out as 17
+  // (Ready to Trade). 326 has no delisting value, so it is 18 with the
+  // reason in Text.
+  st.status = TradingStatus::Delisted;
+  st.reason = TradingStatusReason::Administrative;
+  out.clear();
+  enc.increment(st, out);
+  const std::string delisted(out.begin(), out.end());
+  CHECK(delisted.find("\x01"
+                      "326=18") != std::string::npos);
+  CHECK(delisted.find("\x01"
+                      "326=17") == std::string::npos);
+  CHECK(delisted.find("Delisted") != std::string::npos);
+
+  // A status value this encoder does not know (a newer engine's) is
+  // published as not tradeable too.
+  st.status = static_cast<TradingStatus>(200);
+  out.clear();
+  enc.increment(st, out);
+  const std::string unknown(out.begin(), out.end());
+  CHECK(unknown.find("\x01"
+                     "326=18") != std::string::npos);
+  CHECK(unknown.find("Not available for trading") != std::string::npos);
 }
 
 // End to end: the engine's own close reaches a market-data subscriber as a

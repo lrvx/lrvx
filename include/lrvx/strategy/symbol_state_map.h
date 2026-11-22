@@ -20,6 +20,14 @@
 #include <type_traits>
 #include <utility>
 
+// The MSVC ABI ignores the standard [[no_unique_address]] (clang-cl says so
+// with -Wunknown-attributes, cl says nothing) and honours its own spelling.
+#if defined(_MSC_VER)
+#define LRVX_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+#else
+#define LRVX_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#endif
+
 namespace lrvx
 {
 
@@ -446,7 +454,7 @@ class SymbolStateMap
   // move-constructible (see operator[] above). Never aliases `flat[0]` or
   // any other real symbol; not reachable through tryGet/contains/forEach,
   // so it never masquerades as a real symbol's data either.
-  [[no_unique_address]] std::conditional_t<std::is_move_constructible_v<State>, char, State>
+  LRVX_NO_UNIQUE_ADDRESS std::conditional_t<std::is_move_constructible_v<State>, char, State>
       _overflowScratch{};
 
   // Accessor for overflow (only valid for movable types)

@@ -19,6 +19,7 @@
 #if defined(_WIN32)
 #include <fcntl.h>
 #include <io.h>
+#include <share.h>
 #include <sys/stat.h>
 #else
 #include <fcntl.h>
@@ -44,7 +45,15 @@ inline Fd openForWrite(const std::string& path, OpenMode mode)
 #if defined(_WIN32)
   const int flags = _O_WRONLY | _O_CREAT | _O_BINARY |
                     (mode == OpenMode::Truncate ? _O_TRUNC : _O_APPEND);
-  return ::_open(path.c_str(), flags, _S_IREAD | _S_IWRITE);
+  // _sopen_s, not _open: the CRT marks _open deprecated, and this header is
+  // public, so the warning would land in every consumer's build. _SH_DENYNO
+  // is the sharing mode _open uses.
+  int fd = kInvalidFd;
+  if (::_sopen_s(&fd, path.c_str(), flags, _SH_DENYNO, _S_IREAD | _S_IWRITE) != 0)
+  {
+    return kInvalidFd;
+  }
+  return fd;
 #else
   const int flags = O_WRONLY | O_CREAT | (mode == OpenMode::Truncate ? O_TRUNC : O_APPEND);
   return ::open(path.c_str(), flags, 0644);

@@ -91,7 +91,7 @@ jobs:
     # build on a cold cache.
     - name: Restore ccache
       id: ccache-restore
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ${{ env.CCACHE_DIR }}
         key: ccache-${{ runner.os }}-gcc14-matrix-${{ matrix.name }}-${{ hashFiles('CMakeLists.txt', 'cmake/**', '**/CMakeLists.txt') }}-${{ github.run_id }}
@@ -155,7 +155,7 @@ jobs:
     # Main only; see ci.yml's linux-gcc Save ccache for why.
     - name: Save ccache
       if: always() && github.ref == 'refs/heads/main'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: ${{ env.CCACHE_DIR }}
         key: ${{ steps.ccache-restore.outputs.cache-primary-key }}

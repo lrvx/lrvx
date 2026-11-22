@@ -720,9 +720,15 @@ class FixMdEncoder final : public MdEncoder
       case lrvx::venue::TradingStatus::AuctionUncross:
         return FixMdCodec::kStatusUncrossing;
       case lrvx::venue::TradingStatus::Closed:
+      // 326 has no value for a delisting. "Not Available For Trading" is the
+      // one that says what a subscriber must act on; the reason goes into
+      // Text (58), as it does for a volatility pause.
+      case lrvx::venue::TradingStatus::Delisted:
         return FixMdCodec::kStatusClosed;
     }
-    return FixMdCodec::kStatusTrading;
+    // A status this encoder does not know is never published as tradeable
+    // (see the note on TradingStatus in messages.h).
+    return FixMdCodec::kStatusClosed;
   }
 
   // FIX 4.4's HaltReason (327) has no value for a volatility pause, so the
@@ -750,10 +756,12 @@ class FixMdEncoder final : public MdEncoder
         return "Auction uncross";
       case lrvx::venue::TradingStatus::Closed:
         return "Session closed";
+      case lrvx::venue::TradingStatus::Delisted:
+        return "Delisted";
       case lrvx::venue::TradingStatus::LuldPause:
         break;
     }
-    return "Trading";
+    return "Not available for trading";
   }
 
   static void emit(std::vector<uint8_t>& out, const std::string& body)

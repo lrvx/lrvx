@@ -299,6 +299,13 @@ endif()
 if(WIN32)
   # Prevent Windows.h from defining min/max macros that break std::min/max
   target_compile_definitions(${LRVX} PUBLIC NOMINMAX)
+  # The CRT marks fopen, getenv, gmtime, strerror, sscanf and strncpy
+  # deprecated in favour of its own _s variants, which exist nowhere else.
+  # This tree calls the standard ones on every platform, so the deprecation
+  # is noise here: 70-odd warnings per clang-cl build. Directory scope, not a
+  # PUBLIC definition: it covers the sources, tests and venue built from this
+  # tree and is not imposed on a consumer's code.
+  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 endif()
 
 # LRVX_NATIVE controls whether Release builds target the build machine's
