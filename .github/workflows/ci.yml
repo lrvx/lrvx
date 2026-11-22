@@ -1081,6 +1081,7 @@ jobs:
       # vcpkg release 2026.07.29. A tag, resolved to its commit, so the
       # toolchain is the same on every run and the cache key is stable.
       VCPKG_PIN: 'c76c06644034521fb761a39f8f52d8e87d1103d5'
+      VCPKG_PACKAGES: 'lz4:x64-windows gtest:x64-windows benchmark:x64-windows'
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
 
     steps:
@@ -1138,11 +1139,15 @@ jobs:
     # every run had been building the packages from source. The key carries
     # the runner image version: a new compiler changes every package's ABI
     # hash, and an exact hit on the old key would never save the new archives.
+    # It carries the package list for the same reason. There is no prefix
+    # fallback: archives built by an older compiler are dead weight that a
+    # fallback would carry into every later cache.
     - name: vcpkg cache key
       id: vcpkg-key
       shell: pwsh
       run: |
-        "key=vcpkg-msvc-$env:VCPKG_PIN-$env:ImageVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        $packages = ($env:VCPKG_PACKAGES -replace '[^A-Za-z0-9]+', '-')
+        "key=vcpkg-msvc-$env:VCPKG_PIN-$env:ImageVersion-$packages" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
         New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\.vcpkg-archives" | Out-Null
 
     - name: Restore vcpkg archives
@@ -1151,8 +1156,6 @@ jobs:
       with:
         path: .vcpkg-archives
         key: ${{ steps.vcpkg-key.outputs.key }}
-        restore-keys: |
-          vcpkg-msvc-${{ env.VCPKG_PIN }}-
 
     - name: Install vcpkg dependencies
       timeout-minutes: 25
@@ -1187,10 +1190,12 @@ jobs:
         Invoke-WithRetry 'fetch vcpkg pin' 3 { git -C vcpkg fetch --depth 1 -q origin $env:VCPKG_PIN }
         Invoke-WithRetry 'checkout vcpkg pin' 3 { git -C vcpkg checkout -q FETCH_HEAD }
         Invoke-WithRetry 'bootstrap-vcpkg' 3 { .\vcpkg\bootstrap-vcpkg.bat }
-        Invoke-WithRetry 'vcpkg install' 3 { .\vcpkg\vcpkg install lz4:x64-windows gtest:x64-windows benchmark:x64-windows }
+        Invoke-WithRetry 'vcpkg install' 3 { .\vcpkg\vcpkg install @($env:VCPKG_PACKAGES -split ' ') }
 
+    # Not always(): this runs only after the install succeeded, so a failed
+    # or partial install is never saved under the key every later run hits.
     - name: Save vcpkg archives
-      if: always() && github.ref == 'refs/heads/main' && steps.vcpkg-restore.outputs.cache-hit != 'true'
+      if: github.ref == 'refs/heads/main' && steps.vcpkg-restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
       with:
         path: .vcpkg-archives
@@ -1261,6 +1266,7 @@ jobs:
       # vcpkg release 2026.07.29. A tag, resolved to its commit, so the
       # toolchain is the same on every run and the cache key is stable.
       VCPKG_PIN: 'c76c06644034521fb761a39f8f52d8e87d1103d5'
+      VCPKG_PACKAGES: 'lz4:x64-windows benchmark:x64-windows'
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
 
     steps:
@@ -1311,11 +1317,15 @@ jobs:
     # every run had been building the packages from source. The key carries
     # the runner image version: a new compiler changes every package's ABI
     # hash, and an exact hit on the old key would never save the new archives.
+    # It carries the package list for the same reason. There is no prefix
+    # fallback: archives built by an older compiler are dead weight that a
+    # fallback would carry into every later cache.
     - name: vcpkg cache key
       id: vcpkg-key
       shell: pwsh
       run: |
-        "key=vcpkg-clangcl-$env:VCPKG_PIN-$env:ImageVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        $packages = ($env:VCPKG_PACKAGES -replace '[^A-Za-z0-9]+', '-')
+        "key=vcpkg-clangcl-$env:VCPKG_PIN-$env:ImageVersion-$packages" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
         New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\.vcpkg-archives" | Out-Null
 
     - name: Restore vcpkg archives
@@ -1324,8 +1334,6 @@ jobs:
       with:
         path: .vcpkg-archives
         key: ${{ steps.vcpkg-key.outputs.key }}
-        restore-keys: |
-          vcpkg-clangcl-${{ env.VCPKG_PIN }}-
 
     - name: Install vcpkg dependencies
       timeout-minutes: 25
@@ -1367,10 +1375,12 @@ jobs:
         # against while the one built here is the one linked, and the two
         # are different versions. Installing it is what makes that
         # possible, so it is not installed.
-        Invoke-WithRetry 'vcpkg install' 3 { .\vcpkg\vcpkg install lz4:x64-windows benchmark:x64-windows }
+        Invoke-WithRetry 'vcpkg install' 3 { .\vcpkg\vcpkg install @($env:VCPKG_PACKAGES -split ' ') }
 
+    # Not always(): this runs only after the install succeeded, so a failed
+    # or partial install is never saved under the key every later run hits.
     - name: Save vcpkg archives
-      if: always() && github.ref == 'refs/heads/main' && steps.vcpkg-restore.outputs.cache-hit != 'true'
+      if: github.ref == 'refs/heads/main' && steps.vcpkg-restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
       with:
         path: .vcpkg-archives

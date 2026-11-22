@@ -139,6 +139,12 @@ and sees only an unrecognised status code — which it must treat as **not
 tradeable**, never as `Trading`. On FIX it is `326 = 18` (*Not available for
 trading*, FIX 4.4's end-of-session value), deliberately not the halt code `2`.
 
+`Delisted` is appended the same way and reaches FIX as `326 = 18` as well:
+`SecurityTradingStatus` has no value for a delisting, so the reason travels in
+Text (58) as `Delisted`, the way a volatility pause does. A status value the
+FIX encoder does not know goes out as `326 = 18` with the text
+`Not available for trading`, never as `17`.
+
 The engine reaches the feed through a new `OutboundEvent`,
 `TradingStatusChanged`, which is hashed like every other event
 (`untilNs` is sequencer time, so it replays). It carries no account: the

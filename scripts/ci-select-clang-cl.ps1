@@ -31,12 +31,33 @@ function Test-ClangCl {
     Write-Host "  not present: $Path"
     return $false
   }
-  $version = (& $Path --version | Select-Object -First 1)
-  & $Path /nologo /std:c++latest /EHsc /c $probe "/Fo$probeDir\probe.obj" 2>&1 |
-    Select-Object -First 5 | ForEach-Object { Write-Host "    $_" }
-  $ok = ($LASTEXITCODE -eq 0)
-  Write-Host ("  {0}: {1} ({2})" -f $(if ($ok) { 'accepted' } else { 'rejected' }), $Path, $version)
-  return $ok
+  # Captured whole and trimmed afterwards: Select-Object -First stops the
+  # pipeline once it has its lines, which ends the compiler early and leaves
+  # $LASTEXITCODE saying nothing about the compile.
+  $version = @(& $Path --version)[0]
+  $output = @(& $Path /nologo /std:c++latest /EHsc /c $probe "/Fo$probeDir\probe.obj" 2>&1)
+  $compiled = ($LASTEXITCODE -eq 0)
+  $output | Select-Object -First 5 | ForEach-Object { Write-Host "    $_" }
+  if (-not $compiled) {
+    Write-Host "  rejected: $Path ($version): does not compile an STL header"
+    return $false
+  }
+  # CMakeLists.txt needs clang_rt.builtins next to the compiler for 128-bit
+  # arithmetic and stops the configure without it. A clang-cl that passes
+  # the STL but ships no runtime is no use; the next candidate may have one.
+  $builtins = @(& $Path --rtlib=compiler-rt -print-libgcc-file-name 2>$null)[0]
+  if (-not ($builtins -and (Test-Path $builtins))) {
+    $root = Split-Path (Split-Path $Path -Parent) -Parent
+    $builtins = Get-ChildItem -Path (Join-Path $root 'lib\clang') -Recurse `
+      -Filter 'clang_rt.builtins-x86_64.lib' -ErrorAction SilentlyContinue |
+      Select-Object -First 1 -ExpandProperty FullName
+  }
+  if (-not $builtins) {
+    Write-Host "  rejected: $Path ($version): no clang_rt.builtins-x86_64.lib"
+    return $false
+  }
+  Write-Host "  accepted: $Path ($version)"
+  return $true
 }
 
 $standalone = 'C:\Program Files\LLVM\bin\clang-cl.exe'

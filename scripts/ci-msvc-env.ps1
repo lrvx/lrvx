@@ -37,8 +37,9 @@ if (-not (Test-Path $vcvars)) {
 $bat = Join-Path $env:RUNNER_TEMP 'lrvx-vcvars.cmd'
 Set-Content -Path $bat -Encoding ascii -Value @(
   '@echo off',
-  "call `"$vcvars`" >nul",
+  "call `"$vcvars`"",
   'if errorlevel 1 exit /b 1',
+  'echo ---LRVX-ENV---',
   'set'
 )
 
@@ -51,12 +52,29 @@ if ($LASTEXITCODE -ne 0) {
   exit 1
 }
 
+# vcvars reports most of its failures as [ERROR:...] lines and still exits 0,
+# so its own output is read, not discarded.
+$marker = [array]::IndexOf($lines, '---LRVX-ENV---')
+if ($marker -lt 0) {
+  Write-Host '::error::vcvars64.bat produced no environment dump'
+  exit 1
+}
+$banner = @($lines | Select-Object -First $marker)
+$vcErrors = @($banner | Where-Object { $_ -match '^\[ERROR' })
+if ($vcErrors.Count -gt 0) {
+  $vcErrors | ForEach-Object { Write-Host "::error::vcvars64.bat: $_" }
+  exit 1
+}
+$lines = @($lines | Select-Object -Skip ($marker + 1))
+
 $exported = 0
+$seen = @{}
 foreach ($line in $lines) {
   $eq = $line.IndexOf('=')
   if ($eq -lt 1) { continue }
   $name = $line.Substring(0, $eq)
   $value = $line.Substring($eq + 1)
+  $seen[$name] = $true
   if ($name -eq 'VCPKG_ROOT') { continue }
   if ($before.ContainsKey($name) -and $before[$name] -ceq $value) { continue }
   "$name=$value" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -66,5 +84,11 @@ foreach ($line in $lines) {
 if ($exported -eq 0) {
   Write-Host '::error::vcvars64.bat changed nothing; the developer environment was not loaded'
   exit 1
+}
+foreach ($required in 'INCLUDE', 'LIB', 'VCINSTALLDIR') {
+  if (-not $seen.ContainsKey($required)) {
+    Write-Host "::error::vcvars64.bat did not set $required; the developer environment is incomplete"
+    exit 1
+  }
 }
 Write-Host "MSVC environment from $vs ($exported variables)"

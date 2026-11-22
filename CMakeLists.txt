@@ -178,7 +178,11 @@ if(LRVX_BUILD_TESTS AND LRVX_FETCH_GTEST)
   FetchContent_Declare(
     googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG        v1.15.2
+    # 1.18.0 is the first release that builds under Clang 22: 1.15.2 converts
+    # char8_t to char32_t implicitly in gtest-printers.h, which Clang 22
+    # reports as -Wcharacter-conversion, and GoogleTest builds itself with
+    # -Werror.
+    GIT_TAG        v1.18.0
   )
   set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
   set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
