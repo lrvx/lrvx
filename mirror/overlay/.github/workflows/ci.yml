@@ -38,7 +38,7 @@ jobs:
 
     - name: Restore ccache
       id: ccache-restore
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ${{ env.CCACHE_DIR }}
         key: ccache-${{ runner.os }}-gcc14-venue-lite-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'cmake/**', '**/CMakeLists.txt') }}-${{ github.run_id }}
@@ -70,7 +70,7 @@ jobs:
 
     - name: Save ccache
       if: always()
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: ${{ env.CCACHE_DIR }}
         key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
@@ -111,7 +111,7 @@ jobs:
 
     - name: Restore ccache
       id: ccache-restore
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: ${{ env.CCACHE_DIR }}
         key: ccache-${{ runner.os }}-gcc14-venue-lite-standalone-${{ hashFiles('CMakeLists.txt', 'CMakePresets.json', 'cmake/**', '**/CMakeLists.txt') }}-${{ github.run_id }}
@@ -133,7 +133,7 @@ jobs:
 
     - name: Save ccache
       if: always()
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: ${{ env.CCACHE_DIR }}
         key: ${{ steps.ccache-restore.outputs.cache-primary-key }}

@@ -114,6 +114,7 @@
       <validValue name="AuctionPreOpen">3</validValue>
       <validValue name="AuctionUncross">4</validValue>
       <validValue name="Closed">5</validValue>
+      <validValue name="Delisted">6</validValue>
     </enum>
     <enum name="StatusReason" encodingType="uint8">
       <validValue name="None">0</validValue>

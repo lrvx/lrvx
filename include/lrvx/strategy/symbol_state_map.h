@@ -446,8 +446,7 @@ class SymbolStateMap
   // move-constructible (see operator[] above). Never aliases `flat[0]` or
   // any other real symbol; not reachable through tryGet/contains/forEach,
   // so it never masquerades as a real symbol's data either.
-  [[no_unique_address]] std::conditional_t<std::is_move_constructible_v<State>, char, State>
-      _overflowScratch{};
+  std::conditional_t<std::is_move_constructible_v<State>, char, State> _overflowScratch{};
 
   // Accessor for overflow (only valid for movable types)
   auto& overflow()

@@ -101,7 +101,7 @@ jobs:
                 -DLRVX_ENABLE_LZ4=ON
 
       - name: Build
-        run: cmake --build build -j$(nproc)
+        run: cmake --build build -j"$(nproc)"
 
       - name: Run the core test suite
         run: ctest --output-on-failure --test-dir build
@@ -186,7 +186,7 @@ jobs:
           cp node/build/Release/lrvx_node.node \
              node/prebuilds/${{ matrix.platform }}-${{ matrix.arch }}/lrvx_node.node
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: prebuilt-${{ matrix.platform }}-${{ matrix.arch }}
           # Upload the parent directory, not the per-platform directory
@@ -228,7 +228,7 @@ jobs:
       - name: Upgrade npm for Trusted Publishing OIDC
         run: npm install -g npm@latest
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: node/prebuilds
           merge-multiple: true

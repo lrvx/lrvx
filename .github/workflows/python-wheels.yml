@@ -101,7 +101,7 @@ jobs:
                 -DLRVX_ENABLE_LZ4=ON
 
       - name: Build
-        run: cmake --build build -j$(nproc)
+        run: cmake --build build -j"$(nproc)"
 
       - name: Run the core test suite
         run: ctest --output-on-failure --test-dir build
@@ -146,7 +146,7 @@ jobs:
           # cpXYt-* and are skipped explicitly as well; the extension does
           # not declare itself free-threading safe.
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-* cp315-*"
-          CIBW_SKIP: "*-musllinux_* pp* cp31?t-*"
+          CIBW_SKIP: "*-musllinux_* cp31?t-*"
           CIBW_ARCHS_LINUX: "x86_64"
           CIBW_ARCHS_MACOS: "arm64"
           CIBW_ARCHS_WINDOWS: "AMD64"
@@ -175,7 +175,7 @@ jobs:
           CIBW_TEST_COMMAND: >
             python -c "import importlib.metadata, lrvx; assert lrvx.__version__ == lrvx.version() == importlib.metadata.version('lrvx'), lrvx.__version__; reg = lrvx.SymbolRegistry(); sid = reg.add_symbol('bybit', 'BTCUSDT', 0.01); assert lrvx.SLIPPAGE_NONE == 0; assert sid is not None; print('lrvx wheel smoke OK, symbol id:', sid)"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -213,7 +213,7 @@ jobs:
       - run: python -m build --sdist
       - name: Install the sdist in a clean venv and import it
         run: scripts/check_published_package.sh --sdist dist/*.tar.gz
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -253,7 +253,7 @@ jobs:
         # just matches nothing -- and the published wheel ships with
         # docs_search dead. Fail here instead.
         run: unzip -l mcp/dist/*.whl | grep -q "lrvx_mcp/data/docs.fts.sqlite"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: lrvx-mcp-dist
           path: mcp/dist/*
@@ -283,7 +283,7 @@ jobs:
     steps:
       # Every artifact this workflow builds is publishable now that the
       # sdist installs, so one unfiltered download is what dist/ wants.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -312,7 +312,7 @@ jobs:
       id-token: write
     steps:
       # See publish-testpypi above.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true

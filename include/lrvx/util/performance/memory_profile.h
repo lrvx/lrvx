@@ -11,9 +11,9 @@
 
 #include <cerrno>
 #include <cstdint>
-#include <cstring>
 #include <sstream>
 #include <string>
+#include <system_error>
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <sys/mman.h>
@@ -144,7 +144,9 @@ inline MemoryReport applyMemoryProfile(MemoryProfile profile)
     }
     else
     {
-      report.mlockError = std::strerror(errno);
+      // Not strerror: it hands back a pointer into a buffer every thread
+      // shares.
+      report.mlockError = std::generic_category().message(errno);
     }
   }
 #else
