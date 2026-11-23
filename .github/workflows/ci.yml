@@ -236,7 +236,7 @@ jobs:
               -DLRVX_BUILD_PYTHON=ON \
               -DLRVX_ENABLE_BACKTEST=ON \
               -Dpybind11_DIR="$(python3 -c 'import pybind11; print(pybind11.get_cmake_dir())')"
-        cmake --build build -j$(nproc)
+        cmake --build build -j"$(nproc)"
 
     - name: Generate docs.fts.sqlite
       # mcp/tests open the index read-only the way the docs_search tool
@@ -341,7 +341,7 @@ jobs:
         mkdir -p ~/.codon && cd ~/.codon
         curl -fsSL "https://github.com/exaloop/codon/releases/download/${CODON_VERSION}/codon-linux-x86_64.tar.gz" \
           | tar zxf - --strip-components=1
-        echo "$HOME/.codon/bin" >> $GITHUB_PATH
+        echo "$HOME/.codon/bin" >> "$GITHUB_PATH"
 
     - name: Build and Install GoogleTest
       run: |
@@ -409,7 +409,7 @@ jobs:
       run: ccache -z
 
     - name: Build
-      run: cmake --build build -j$(nproc)
+      run: cmake --build build -j"$(nproc)"
 
     - name: ccache stats
       if: always()
@@ -806,7 +806,7 @@ jobs:
       run: ccache -z
 
     - name: Build
-      run: cmake --build build -j$(nproc)
+      run: cmake --build build -j"$(nproc)"
 
     - name: ccache stats
       if: always()
@@ -909,7 +909,7 @@ jobs:
       run: ccache -z
 
     - name: Build
-      run: cmake --build build -j$(nproc)
+      run: cmake --build build -j"$(nproc)"
 
     - name: ccache stats
       if: always()
@@ -1040,7 +1040,7 @@ jobs:
       run: ccache -z
 
     - name: Build
-      run: cmake --build build -j$(sysctl -n hw.ncpu)
+      run: cmake --build build -j"$(sysctl -n hw.ncpu)"
 
     - name: ccache stats
       if: always()
@@ -1511,7 +1511,7 @@ jobs:
               -DLRVX_ENABLE_BACKTEST=ON
 
     - name: Build
-      run: cmake --build build -j$(nproc)
+      run: cmake --build build -j"$(nproc)"
 
     - name: Run all tests including affinity
       run: scripts/run-with-sanitizer-scan.sh ctest --output-on-failure --test-dir build
@@ -1568,7 +1568,7 @@ jobs:
           -DCMAKE_CXX_COMPILER=g++-14 \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-          -DCMAKE_INSTALL_PREFIX=$HOME/gtest-install
+          -DCMAKE_INSTALL_PREFIX="$HOME/gtest-install"
         cmake --build gtest-build
         cmake --install gtest-build
 
@@ -1589,7 +1589,7 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLRVX_LTO=OFF \
               -DLRVX_NATIVE=OFF \
-              -DCMAKE_PREFIX_PATH=$HOME/gtest-install \
+              -DCMAKE_PREFIX_PATH="$HOME/gtest-install" \
               -DLRVX_BUILD_CONNECTORS=ON \
               -DLRVX_ENABLE_POLYMARKET_ORDER_EXECUTOR=OFF \
               -DLRVX_BUILD_TESTS=ON
@@ -1598,7 +1598,7 @@ jobs:
       run: ccache -z
 
     - name: Build connectors target and tests
-      run: cmake --build build -j$(nproc)
+      run: cmake --build build -j"$(nproc)"
 
     - name: ccache stats
       if: always()
@@ -1725,7 +1725,7 @@ jobs:
               -DLRVX_ENABLE_BACKTEST=ON
 
     - name: Build without the venue
-      run: cmake --build build-without-venue -j$(nproc)
+      run: cmake --build build-without-venue -j"$(nproc)"
 
     - name: Test without the venue
       run: scripts/run-with-sanitizer-scan.sh ctest --output-on-failure --test-dir build-without-venue
@@ -1825,7 +1825,7 @@ jobs:
               -DLRVX_ENABLE_BACKTEST=ON
 
     - name: Build the fuzz targets
-      run: cmake --build build --target test_venue_differential_fuzz test_venue_conservation_fuzz -j$(nproc)
+      run: cmake --build build --target test_venue_differential_fuzz test_venue_conservation_fuzz -j"$(nproc)"
 
     - name: Differential fuzz (deep)
       env:

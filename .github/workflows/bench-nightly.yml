@@ -112,7 +112,7 @@ jobs:
       run: ccache -z
 
     - name: Build
-      run: cmake --build build -j$(nproc)
+      run: cmake --build build -j"$(nproc)"
 
     - name: ccache stats
       if: always()
@@ -214,7 +214,7 @@ jobs:
       run: ccache -z
 
     - name: Build
-      run: cmake --build build -j$(nproc)
+      run: cmake --build build -j"$(nproc)"
 
     - name: ccache stats
       if: always()

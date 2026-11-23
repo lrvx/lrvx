@@ -106,7 +106,7 @@ jobs:
           -DCMAKE_CXX_COMPILER=g++-14 \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-          -DCMAKE_INSTALL_PREFIX=$HOME/gtest-install
+          -DCMAKE_INSTALL_PREFIX="$HOME/gtest-install"
         cmake --build gtest-build
         cmake --install gtest-build
 
@@ -118,7 +118,7 @@ jobs:
     - name: Resolve pybind11_DIR
       if: matrix.needs_pybind
       run: |
-        echo "pybind11_DIR=$(python3 -c 'import pybind11; print(pybind11.get_cmake_dir())')" >> $GITHUB_ENV
+        echo "pybind11_DIR=$(python3 -c 'import pybind11; print(pybind11.get_cmake_dir())')" >> "$GITHUB_ENV"
 
     # LRVX_LTO=OFF: this matrix checks that each flag combination
     # configures and builds; the whole-program link step adds nothing to
@@ -146,7 +146,7 @@ jobs:
       run: ccache -z
 
     - name: Build
-      run: cmake --build build -j$(nproc)
+      run: cmake --build build -j"$(nproc)"
 
     - name: ccache stats
       if: always()
